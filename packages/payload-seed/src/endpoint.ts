@@ -18,7 +18,7 @@ export function createSeedEndpoint(options: ResolvedSeedOptions): Endpoint {
       if (options.authorize && !(await options.authorize(req.user))) return Response.json({ error: 'Action forbidden.' }, { status: 403 })
 
       try {
-        const result = await runSeed({ payload: req.payload, req, options })
+        const result = await runSeed({ payload: req.payload, req, options, definitions: options.definitions })
         return Response.json({ success: true, ...result })
       } catch (e) {
         req.payload.logger.error({ err: e, msg: 'Error seeding data' })

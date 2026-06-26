@@ -28,15 +28,29 @@ pnpm --filter seed-sandbox generate:importmap
 pnpm --filter seed-sandbox dev         # http://localhost:3050/admin
 ```
 
-Create the first admin user, then seed:
+Create the first admin user, then seed by clicking **“Seed your database”** on the admin
+dashboard (`POST /api/seed`).
+
+## Tests
 
 ```bash
-pnpm --filter seed-sandbox seed        # CLI (Local API)
-# or click “Seed your database” in the admin dashboard (POST /api/seed)
+pnpm --filter seed-sandbox test
 ```
 
-> The seed engine is still under construction — until it lands, `pnpm seed` reports
-> "engine not yet implemented". This app is the harness it's built against.
+An integration test (`tests/seed.int.spec.ts`) boots this config against a temporary
+SQLite DB and runs the real engine via the Local API — the automated analog of the admin
+button. It asserts the seeded counts, that cross-file `ref()`/`asset()` tokens resolve to
+real ids, the topological create order, and idempotency (re-running clears + recreates
+without duplicating).
+
+## Auto-discovery vs. the bundled server
+
+Auto-discovery (globbing `seed.ts` files and importing them) works in the Local API / CLI
+/ test paths — the integration test relies on it. The **bundled Next server**, though,
+can't dynamically import source files at runtime, so the in-app endpoint is fed the
+definitions explicitly: `src/seed/index.ts` is a small barrel that imports each definition
+and is passed to `seedPlugin({ definitions })` in `payload.config.ts`. (A future
+`payload-seed generate` step will write that barrel automatically.)
 
 ## Collections
 

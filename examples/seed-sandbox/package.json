@@ -11,6 +11,7 @@
     "generate:types": "pnpm payload generate:types",
     "generate:importmap": "pnpm payload generate:importmap",
     "seed": "pnpm payload run scripts/seed.ts",
+    "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -31,6 +32,7 @@
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

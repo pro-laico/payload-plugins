@@ -10,6 +10,7 @@ import { Posts } from './collections/Posts'
 import { Services } from './collections/Services'
 import { Users } from './collections/Users'
 import { SiteSettings } from './globals/SiteSettings'
+import { definitions } from './seed'
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)
@@ -31,6 +32,7 @@ export default buildConfig({
       enabled: true,
       assets: { dir: 'assets', collection: 'media' },
       adminButton: true,
+      definitions,
     }),
   ],
 })

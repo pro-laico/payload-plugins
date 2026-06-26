@@ -8,9 +8,12 @@ plugin track dependencies, sort the seed order, validate against your live schem
 emit a reviewable dependency graph. Ships the `POST /api/seed` endpoint, the `ENABLE_SEED`
 kill-switch, and an optional admin button.
 
-> **Status: in development.** The public API (plugin, `defineSeed`, `ref`/`asset`, run
-> infra) is in place and type-safe; the run engine is being implemented incrementally.
-> See [DESIGN.md](./DESIGN.md) for the full architecture.
+> **Status: working, pre-1.0.** The plugin, `defineSeed`/`ref`/`asset`, the run engine
+> (discover → assets → graph → validate → topo-sort → clear → create → artifact) and the
+> endpoint are implemented and tested (unit + a Payload integration test in the
+> `seed-sandbox` example). Still to come: the `payload-seed generate` codegen (typed ref
+> keys + a discovery barrel for bundled servers) and field-level schema validation. See
+> [DESIGN.md](./DESIGN.md) for the full architecture.
 
 ## Install
 

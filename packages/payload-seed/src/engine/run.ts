@@ -1,12 +1,20 @@
-import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createLocalReq, type CollectionSlug, type Payload, type PayloadRequest } from 'payload'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
-import type { SeedDefinition } from '../types'
+import { asset, ref } from '../refs'
+import type { AssetSpec, SeedDefinition } from '../types'
+import { uploadAssets } from './assets'
+import { writeGraphArtifact } from './artifact'
+import { type BuiltCollection, type BuiltGlobal, type BuiltModel, buildGraph } from './graph'
+import { docNodeId, resolveTokens } from './tokens'
+import { validateModel } from './validate'
 
 export interface SeedResult {
-  /** Created doc counts keyed by collection slug. */
+  /** Created doc counts keyed by collection slug (includes uploaded assets). */
   created: Record<string, number>
-  /** The computed topological create order (collection slugs). */
+  /** The computed topological create order (doc node ids, `collection:_key`). */
   order: string[]
+  /** Where the dependency graph was written, if enabled. */
+  graph?: string
 }
 
 export interface RunSeedArgs {
@@ -17,27 +25,123 @@ export interface RunSeedArgs {
   definitions?: SeedDefinition[]
 }
 
+const tokens = { ref, asset }
+
+/** Split definitions by kind and build the concrete model (records/globals/assets). */
+function buildModel(definitions: SeedDefinition[]): { model: BuiltModel; specs: Record<string, AssetSpec> } {
+  const specs: Record<string, AssetSpec> = {}
+  const collections: BuiltCollection[] = []
+  const globals: BuiltGlobal[] = []
+
+  for (const def of definitions) {
+    if (def.kind === 'assets') Object.assign(specs, def.specs)
+  }
+  for (const def of definitions) {
+    if (def.kind === 'collection') {
+      const built = def.build(tokens).map((rec) => {
+        const { _key, ...data } = rec as { _key: string } & Record<string, unknown>
+        return { key: _key, data }
+      })
+      collections.push({ slug: def.slug, records: built })
+    } else if (def.kind === 'global') {
+      globals.push({ slug: def.slug, data: def.build(tokens) as Record<string, unknown> })
+    }
+  }
+
+  return { model: { assetKeys: Object.keys(specs), collections, globals }, specs }
+}
+
+async function clearCollection(payload: Payload, req: PayloadRequest, collection: string): Promise<void> {
+  const config = payload.collections[collection as CollectionSlug]?.config
+  if (!config) return
+  payload.logger.info(`[payload-seed] clearing ${collection}`)
+  if (config.upload) {
+    await payload.delete({
+      collection: collection as CollectionSlug,
+      where: { id: { exists: true } },
+      req,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+      disableTransaction: true,
+    })
+  } else {
+    await payload.db.deleteMany({ collection: collection as CollectionSlug, req, where: {} })
+  }
+  if (config.versions) await payload.db.deleteVersions({ collection: collection as CollectionSlug, req, where: {} })
+}
+
 /**
- * The seed engine entry point. Discovers (or accepts) seed definitions, uploads
- * referenced assets, builds + validates + topologically sorts the dependency graph,
- * clears the seeded collections, creates everything in order resolving ref/asset tokens
- * to ids, emits the dependency graph artifact, and revalidates.
- *
- * NOTE: Not yet implemented — this is the scaffolded entry the endpoint/CLI call into.
- * See DESIGN.md "Engine" for the full pipeline. Implemented incrementally:
- *   discover → assets → graph → validate → topo-sort → clear → create → artifact → revalidate.
+ * The seed engine. Discovers (or accepts) definitions, builds the model, validates
+ * references against the live config, topologically sorts the dependency graph, clears
+ * the seeded collections, uploads assets, creates docs (resolving ref/asset tokens to
+ * ids) in order, updates globals, and writes the dependency-graph artifact.
  */
-export async function runSeed(_args: RunSeedArgs): Promise<SeedResult> {
-  throw new Error('[payload-seed] engine not yet implemented — see packages/payload-seed/DESIGN.md')
+export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
+  const defs = definitions ?? options.definitions ?? (await (await import('./discover')).discoverDefinitions(options.discover, process.cwd()))
+  if (defs.length === 0) payload.logger.warn('[payload-seed] no seed definitions found.')
+
+  const { model, specs } = buildModel(defs)
+  const collectionSlugs = new Set(Object.keys(payload.collections))
+
+  // Validate references + build/sort the dependency graph (cycle detection here).
+  validateModel({ model, collectionSlugs })
+  const graph = buildGraph(model)
+
+  const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
+
+  // Clear: every collection we seed into, plus the asset upload collections.
+  const assetCollections = new Set(Object.values(specs).map((s) => s.collection ?? options.assetsCollection))
+  const seededCollections = [...new Set([...assetCollections, ...model.collections.map((c) => c.slug)])]
+  payload.logger.info('[payload-seed] clearing collections…')
+  for (const slug of seededCollections) await clearCollection(payload, req, slug)
+
+  // Upload assets first.
+  payload.logger.info('[payload-seed] uploading assets…')
+  const assetIds = await uploadAssets({ payload, req, specs, assetsRoot: options.assetsDir, defaultCollection: options.assetsCollection })
+
+  // Create docs in dependency order, resolving tokens to ids.
+  const docIds = new Map<string, string | number>()
+  const recordIndex = new Map<string, { slug: string; data: Record<string, unknown> }>()
+  for (const coll of model.collections)
+    for (const rec of coll.records) recordIndex.set(docNodeId(coll.slug, rec.key), { slug: coll.slug, data: rec.data })
+
+  const created: Record<string, number> = {}
+  if (assetIds.size) created[options.assetsCollection] = assetIds.size
+
+  payload.logger.info('[payload-seed] seeding documents…')
+  for (const nodeId of graph.order) {
+    const entry = recordIndex.get(nodeId)
+    if (!entry) continue
+    const data = resolveTokens(entry.data, { docs: docIds, assets: assetIds, where: nodeId }) as Record<string, unknown>
+    const doc = (await payload.create({ collection: entry.slug as CollectionSlug, data: data as never, ...baseArgs })) as {
+      id: string | number
+    }
+    docIds.set(nodeId, doc.id)
+    created[entry.slug] = (created[entry.slug] ?? 0) + 1
+  }
+
+  // Update globals after all docs exist.
+  for (const g of model.globals) {
+    payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
+    const data = resolveTokens(g.data, { docs: docIds, assets: assetIds, where: `global:${g.slug}` }) as Record<string, unknown>
+    await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
+  }
+
+  // Emit the dependency graph artifact.
+  let graphPath: string | undefined
+  if (options.graph) {
+    await writeGraphArtifact(graph, options.graph.output, options.graph.json)
+    graphPath = options.graph.output
+    payload.logger.info(`[payload-seed] wrote dependency graph → ${graphPath}`)
+  }
+
+  payload.logger.info('[payload-seed] seed complete.')
+  return { created, order: graph.order, graph: graphPath }
 }
 
 /**
  * CLI / Local-API convenience: run the seed from a script (`payload run`) or test. Builds
- * a local `req` if one isn't supplied and resolves the public plugin options, so a caller
- * doesn't reconstruct {@link ResolvedSeedOptions} by hand.
- *
- *   const payload = await getPayload({ config })
- *   await seed({ payload, options: { assets: { dir: 'assets' } } })
+ * a local `req` if one isn't supplied and resolves the public plugin options.
  */
 export async function seed(args: { payload: Payload; req?: PayloadRequest; options?: SeedPluginOptions }): Promise<SeedResult> {
   const req = args.req ?? (await createLocalReq({}, args.payload))

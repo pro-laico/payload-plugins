@@ -1,4 +1,5 @@
 import type { PayloadRequest } from 'payload'
+import type { SeedDefinition } from './types'
 
 /**
  * Authorization predicate run after the auth check; receives the authenticated user and
@@ -30,9 +31,14 @@ export interface SeedPluginOptions {
    * the endpoint entirely. Default: true.
    */
   enabled?: boolean
-  /** Glob(s), relative to cwd, for auto-discovering seed files. Default: `['**\/seed.ts']`
-   *  (excluding node_modules / dist / .next). */
+  /** Glob(s), relative to cwd, for auto-discovering seed files. Default:
+   *  `['**\/seed.ts', '**\/seed/**\/*.ts']` (excluding node_modules / dist / .next).
+   *  Ignored when `definitions` is supplied. */
   discover?: string | string[]
+  /** Supply seed definitions explicitly instead of auto-discovering them. Use this when
+   *  the runtime can't dynamically import source files (e.g. a bundled server) — import
+   *  the seed files yourself and pass their default exports. */
+  definitions?: SeedDefinition[]
   /** Media registry config. */
   assets?: AssetOptions
   /** Endpoint path (resolves under `/api`). Default: `/seed`. */
@@ -49,6 +55,7 @@ export interface SeedPluginOptions {
 export interface ResolvedSeedOptions {
   enabled: boolean
   discover: string[]
+  definitions?: SeedDefinition[]
   assetsDir: string
   assetsCollection: string
   endpoint: string
@@ -57,7 +64,7 @@ export interface ResolvedSeedOptions {
   adminButton: boolean
 }
 
-const DEFAULT_DISCOVER = ['**/seed.ts']
+const DEFAULT_DISCOVER = ['**/seed.ts', '**/seed/**/*.ts']
 const DEFAULT_GRAPH: Required<GraphOptions> = { output: '.seed/graph.html', json: true }
 
 export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOptions {
@@ -65,6 +72,7 @@ export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOpt
   return {
     enabled: options.enabled ?? true,
     discover: typeof options.discover === 'string' ? [options.discover] : (options.discover ?? DEFAULT_DISCOVER),
+    definitions: options.definitions,
     assetsDir: options.assets?.dir ?? 'assets',
     assetsCollection: options.assets?.collection ?? 'media',
     endpoint: options.endpoint ?? '/seed',
