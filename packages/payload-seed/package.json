@@ -1,0 +1,85 @@
+{
+  "name": "@pro-laico/payload-seed",
+  "version": "0.0.0",
+  "description": "Schema-aware, type-safe seeding plugin for Payload CMS: auto-discovered seed files, typed cross-file references with dependency tracking, robust media uploads, a POST /api/seed endpoint, and a reviewable dependency graph.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pro-laico/payload-plugins.git",
+    "directory": "packages/payload-seed"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "seed",
+    "seeding",
+    "fixtures"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./components/SeedButton": {
+        "types": "./dist/components/SeedButton.d.ts",
+        "default": "./dist/components/SeedButton.js"
+      }
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "payload-seed": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/SeedButton": {
+      "types": "./src/components/SeedButton.tsx",
+      "default": "./src/components/SeedButton.tsx"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm clean && pnpm build:types && pnpm build:swc",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "prepack": "pnpm build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
+  },
+  "peerDependencies": {
+    "@payloadcms/ui": ">=3.0.0",
+    "payload": ">=3.0.0",
+    "react": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@payloadcms/ui": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@payloadcms/ui": "^3.85.1",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
