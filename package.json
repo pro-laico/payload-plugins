@@ -1,0 +1,31 @@
+{
+  "name": "payload-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A monorepo of composable @pro-laico/* Payload CMS plugins, test apps, and documentation.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "check:ci": "biome check .",
+    "typecheck": "pnpm -r typecheck",
+    "build": "turbo run build",
+    "docs": "pnpm --filter docs dev",
+    "release": "pnpm --filter @tools/releaser release",
+    "publish-packages": "pnpm --filter @tools/releaser publish-packages"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.1",
+    "@swc/cli": "^0.8.1",
+    "@swc/core": "^1.15.43",
+    "copyfiles": "^2.4.1",
+    "cross-env": "^10.1.0",
+    "rimraf": "^6.1.3",
+    "turbo": "^2.10.0"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

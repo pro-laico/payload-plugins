@@ -1,0 +1,48 @@
+node_modules
+.next
+.vercel
+.DS_Store
+
+# Env files
+.env
+.env*.local
+
+# Output of 'npm pack'
+*.tgz
+
+# Built package output — generated on prepack, published via publishConfig (src→dist
+# swap). Dev consumes src directly, so dist is never committed.
+packages/*/dist
+
+# Logs
+*.log
+npm-debug.log*
+.pnpm-debug.log*
+
+# Build / tooling caches
+.swc
+.turbo
+.source
+*.tsbuildinfo
+
+# Next.js
+out/
+next-env.d.ts
+
+# Keep local Claude config out of the repo, but track shared project skills.
+.claude/*
+!.claude/skills/
+.mcp.json
+/CLAUDE.md
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# Windows OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

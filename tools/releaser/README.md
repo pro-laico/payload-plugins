@@ -1,0 +1,97 @@
+# @tools/releaser
+
+Internal, **private** monorepo release tooling — never published to npm. Modeled on Payload's `tools/releaser`.
+
+Its job is **lockstep versioning**: keep every package on one shared version (tied to the monorepo), so you never hand-edit version numbers across the workspace.
+
+## What it does
+
+When you run it, the script:
+
+1. Reads the **root `package.json` version** as the source of truth.
+2. Computes the next version from your chosen bump (`patch` / `minor` / `major` / `prerelease`).
+3. Writes that **same version** into the root plus every releasable workspace package — all `packages/*` and all `examples/*` (the `tools/*` packages and `docs` are intentionally excluded). Only the `version` line is rewritten, so Biome formatting is preserved.
+4. `git commit -m "chore(release): vX.Y.Z"` and creates an annotated tag `vX.Y.Z`.
+
+Internal `workspace:*` dependencies are left untouched — pnpm rewrites them to the concrete version automatically at publish time.
+
+Publishing to npm is a separate command — see [Publishing](#publishing).
+
+## Usage
+
+Always dry-run first — it prints the version table and writes nothing:
+
+```bash
+pnpm release --dry-run
+```
+
+Then the real run (it prompts for confirmation before writing, unless `--yes`):
+
+```bash
+pnpm release                       # patch bump (e.g. 0.2.0 -> 0.2.1)
+```
+
+To pass a bump type or other flags, invoke through the package filter so arguments forward cleanly:
+
+```bash
+pnpm --filter @tools/releaser release --bump minor                    # 0.2.0 -> 0.3.0
+pnpm --filter @tools/releaser release --bump major                    # 0.2.0 -> 1.0.0
+pnpm --filter @tools/releaser release --bump prerelease --preid beta  # 0.2.0 -> 0.2.1-beta.0
+```
+
+After a successful run, push the commit and tag:
+
+```bash
+git push --follow-tags
+```
+
+## Flags
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--bump <patch\|minor\|major\|prerelease>` | `patch` | Which part of the version to bump. |
+| `--preid <id>` | `beta` | Prerelease identifier (only used with `--bump prerelease`). |
+| `--dry-run` | `false` | Print the plan, write nothing, run no git commands. |
+| `--yes` | `false` | Skip the interactive confirmation prompt. |
+| `--skip-git` | `false` | Stamp the version files but do not commit or tag. |
+
+## Publishing
+
+`release` owns the version and tag; `publish-packages` builds and publishes. They're separate so versioning happens locally while publishing happens in CI (on the pushed tag).
+
+```bash
+pnpm publish-packages --dry-run          # build + pack every package, no upload
+pnpm publish-packages                     # publish at dist-tag "latest" (prompts)
+pnpm publish-packages --tag beta
+pnpm publish-packages --provenance --yes  # CI: signed provenance, no prompt
+```
+
+It publishes every **non-private `packages/*`** (examples, docs, and `tools/*` are never published). Each `pnpm publish` runs the package's `prepack` (swc/tsc build), and pnpm rewrites `workspace:*` deps to the concrete shared version. Versions already on the registry are skipped, so re-running after a partial failure is safe.
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `--tag <name>` | `latest` | npm dist-tag to publish under. |
+| `--provenance` | `false` | Emit npm provenance (requires CI OIDC — fails locally). |
+| `--dry-run` | `false` | Build + pack every package without uploading. |
+| `--yes` | `false` | Skip the confirmation prompt. |
+
+## Typical workflow
+
+```bash
+pnpm release --dry-run                                # eyeball the version table
+pnpm --filter @tools/releaser release --bump minor    # confirm -> stamps + commits + tags
+git push --follow-tags                                # the v* tag triggers the publish CI
+```
+
+CI (`.github/workflows/release.yml`) then runs `pnpm publish-packages --yes --provenance` on the pushed tag. For local publishing, run `pnpm publish-packages` yourself after `pnpm release`.
+
+## How it works
+
+- Entry points: `src/release.ts` and `src/publish.ts`, run via `tsx` (no `node` build step needed).
+- Workspace enumeration: `src/getPackageDetails.ts` walks up from the cwd to find the repo root (`pnpm-workspace.yaml`), then reads `packages/*` and `examples/*`.
+- Version math: a small inline SemVer increment — no external dependencies beyond `tsx`.
+- Version writes: a targeted replacement of the top-level `"version"` string in each `package.json`, so nothing else in the file changes.
+
+## First publish of a brand-new package
+
+CI publishes via npm **Trusted Publishing** (OIDC), which cannot create a package that doesn't yet exist on npm. For each new `@pro-laico/*` package, publish its **first** version locally (`npm login` + `pnpm publish-packages`), then add a Trusted Publisher on npmjs.com (package → Settings → Trusted Publisher) pointing at this repo + `.github/workflows/release.yml`. After that, tag pushes publish automatically.

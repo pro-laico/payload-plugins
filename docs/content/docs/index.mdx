@@ -1,0 +1,40 @@
+---
+title: "Introduction"
+description: "A suite of composable @pro-laico/* plugins for Payload CMS. Each works standalone in any Payload + Next.js project."
+---
+
+**Payload Plugins** is a collection of composable [Payload CMS](https://payloadcms.com/)
+plugins published under the `@pro-laico/*` scope. Each is an independent package you can
+drop into any Payload + Next.js project — add only the ones you need.
+
+<Callout type="info">
+  Payload Plugins is not affiliated with Payload CMS in any capacity.
+</Callout>
+
+## Getting started
+
+Install a plugin and add it to your Payload config:
+
+```bash
+pnpm add @pro-laico/payload-<name>
+```
+
+```ts
+import { buildConfig } from 'payload'
+import { examplePlugin } from '@pro-laico/payload-<name>'
+
+export default buildConfig({
+  plugins: [examplePlugin()],
+  // ...
+})
+```
+
+## How it's organized
+
+Every plugin follows the same shape: a `(opts) => (config) => config` factory exported
+both as the default and a named export, with the raw collections, hooks, fields, and
+components also exported for advanced consumers.
+
+<Cards>
+  <Card title="Plugins" href="/docs/plugins" description="Reference for every @pro-laico/* package." />
+</Cards>
