@@ -24,8 +24,12 @@ export type WithRefs<T> = T extends AnyRef
  *  used as its reference handle. */
 export type CollectionSeedData<TSlug extends CollectionSlug> = WithRefs<RequiredDataFromCollectionSlug<TSlug>> & { _key: string }
 
-/** A global's seed data (globals are singletons — no `_key`). */
-export type GlobalSeedData<TSlug extends GlobalSlug> = WithRefs<DataFromGlobalSlug<TSlug>>
+/** A global's seed data (globals are singletons — no `_key`). The generated global type
+ *  carries `id`/`globalType`/timestamps that `updateGlobal` doesn't accept as input, so
+ *  they're stripped here. */
+export type GlobalSeedData<TSlug extends GlobalSlug> = WithRefs<
+  Omit<DataFromGlobalSlug<TSlug>, 'id' | 'globalType' | 'createdAt' | 'updatedAt'>
+>
 
 /** Tokens handed to every seed builder. */
 export interface SeedTokens {
@@ -55,4 +59,26 @@ export interface BlockSeedDefinition<T = unknown> {
   readonly build: SeedBuilder<WithRefs<T> & { blockType: string }>
 }
 
-export type SeedDefinition = CollectionSeedDefinition | GlobalSeedDefinition | BlockSeedDefinition
+/** Declares one source asset: the file to upload (relative to the assets dir) and the
+ *  upload-doc data. The engine uploads these FIRST and resolves `asset(key)` to the
+ *  created doc's id. `focalX`/`focalY` set the upload's focal point (measured from the
+ *  top-left as percentages). */
+export interface AssetSpec {
+  /** Filename within the assets dir. The loader tolerates an extension mismatch
+   *  (a spec naming `foo.png` picks up `foo.jpg` if that's what's on disk). */
+  file: string
+  /** Upload collection to create the asset in. Defaults to the plugin's `assets.collection`. */
+  collection?: CollectionSlug
+  alt?: string
+  focalX?: number
+  focalY?: number
+  /** Extra fields to set on the created upload doc. */
+  data?: Record<string, unknown>
+}
+
+export interface AssetsSeedDefinition {
+  readonly kind: 'assets'
+  readonly specs: Record<string, AssetSpec>
+}
+
+export type SeedDefinition = CollectionSeedDefinition | GlobalSeedDefinition | BlockSeedDefinition | AssetsSeedDefinition

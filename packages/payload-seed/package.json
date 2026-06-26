@@ -34,9 +34,6 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "bin": {
-    "payload-seed": "./dist/cli.js"
-  },
   "exports": {
     ".": {
       "types": "./src/index.ts",

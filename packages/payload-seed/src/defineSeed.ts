@@ -1,6 +1,8 @@
 import type { CollectionSlug, GlobalSlug } from 'payload'
 import { asset, ref } from './refs'
 import type {
+  AssetSpec,
+  AssetsSeedDefinition,
   BlockSeedDefinition,
   CollectionSeedData,
   CollectionSeedDefinition,
@@ -50,6 +52,20 @@ export function defineBlockSeed<T = unknown>(
   build: SeedBuilder<WithRefs<T> & { blockType: string }>,
 ): BlockSeedDefinition<T> {
   return { kind: 'block', blockType, build }
+}
+
+/**
+ * Declare the source assets the seed uploads first. Each key becomes an `asset(key)`
+ * reference; its spec points at a file in the assets dir plus the upload-doc data. The
+ * engine uploads them before any content so `asset()` tokens resolve to real ids.
+ *
+ *   export default defineAssets({
+ *     serviceA: { file: 'service-1.jpg', alt: 'A service in action' },
+ *     logo:     { file: 'logo.png', alt: 'Brand logo' },
+ *   })
+ */
+export function defineAssets(specs: Record<string, AssetSpec>): AssetsSeedDefinition {
+  return { kind: 'assets', specs }
 }
 
 export { tokens }

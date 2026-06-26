@@ -19,6 +19,8 @@ export interface AssetOptions {
   /** Root directory holding source assets, organized as `image/`, `svg/`, `font/`.
    *  Default: `assets`. */
   dir?: string
+  /** Default upload collection for assets that don't set their own. Default: `media`. */
+  collection?: string
 }
 
 export interface SeedPluginOptions {
@@ -48,6 +50,7 @@ export interface ResolvedSeedOptions {
   enabled: boolean
   discover: string[]
   assetsDir: string
+  assetsCollection: string
   endpoint: string
   authorize?: SeedAuthorize
   graph: Required<GraphOptions> | false
@@ -63,6 +66,7 @@ export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOpt
     enabled: options.enabled ?? true,
     discover: typeof options.discover === 'string' ? [options.discover] : (options.discover ?? DEFAULT_DISCOVER),
     assetsDir: options.assets?.dir ?? 'assets',
+    assetsCollection: options.assets?.collection ?? 'media',
     endpoint: options.endpoint ?? '/seed',
     authorize: options.authorize,
     graph,

@@ -1,0 +1,20 @@
+node_modules
+.next
+out
+
+# Local SQLite DB (created at runtime)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Uploaded media (written at runtime to the local-disk storage)
+media/
+
+# Dependency graph artifact emitted by the seed
+.seed/
+
+.env
+.env*.local
+next-env.d.ts
+*.tsbuildinfo
