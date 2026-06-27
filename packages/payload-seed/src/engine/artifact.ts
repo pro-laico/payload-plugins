@@ -79,7 +79,7 @@ export async function writeGraphArtifact(graph: SeedGraph, output: string, json:
   const mermaid = toMermaid(graph)
   await writeFile(output, toHtml(graph, mermaid), 'utf8')
   if (json) {
-    const jsonPath = output.replace(/\.html?$/i, '') + '.json'
+    const jsonPath = `${output.replace(/\.html?$/i, '')}.json`
     await writeFile(jsonPath, JSON.stringify({ nodes: graph.nodes, edges: graph.edges, order: graph.order }, null, 2), 'utf8')
   }
 }

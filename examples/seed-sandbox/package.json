@@ -10,7 +10,8 @@
     "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",
     "generate:types": "pnpm payload generate:types",
     "generate:importmap": "pnpm payload generate:importmap",
-    "seed": "pnpm payload run scripts/seed.ts",
+    "generate:seed-types": "pnpm payload generate:seed-types",
+    "seed": "pnpm payload seed",
     "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -10,7 +10,7 @@ import { Posts } from './collections/Posts'
 import { Services } from './collections/Services'
 import { Users } from './collections/Users'
 import { SiteSettings } from './globals/SiteSettings'
-import { definitions } from './seed'
+import { definitions } from './seed.generated'
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)

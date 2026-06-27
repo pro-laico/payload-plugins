@@ -2,7 +2,10 @@ import { pathToFileURL } from 'node:url'
 import { glob } from 'tinyglobby'
 import type { SeedDefinition } from '../types'
 
-const IGNORE = ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.turbo/**', '**/.source/**']
+// Exclude runner scripts: a file like `scripts/seed.ts` matches `**/seed.ts` but is a CLI
+// entry (it boots Payload, may `process.exit`), not a `defineSeed` module. Importing it for
+// discovery would run those side effects.
+const IGNORE = ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/.turbo/**', '**/.source/**', '**/scripts/**']
 
 function isSeedDefinition(value: unknown): value is SeedDefinition {
   return (

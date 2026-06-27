@@ -126,10 +126,16 @@ declare module '@pro-laico/payload-seed' {
 }
 ```
 
-Exposed as `payload-seed generate` (and a `seed:generate` script), mirroring the
-`payload generate:types` workflow the app already runs after schema changes. The
-producing side (`_key`) stays a free string; only the consuming side (`ref`/`asset`)
-is checked — which is exactly "if a referenced item is removed, it errors at every use."
+**Implemented** as `generateSeedTypes()`, which the plugin registers as a `payload
+generate:seed-types` command through Payload's `config.bin` — the same plumbing as `payload
+generate:types`, so consumers just run `pnpm payload generate:seed-types` with no bespoke script.
+Payload's bin loads the config and calls the command WITHOUT booting Payload/a DB, so it
+avoids the local-API runtime issues. It reads the
+keys by importing the definitions and reading their actual data (the same mechanism the
+engine uses), so the types always match what gets seeded. It writes the augmentation **and**
+the `definitions` barrel in one file. The producing side (`_key`) stays a free string; only
+the consuming side (`ref`/`asset`) is checked — exactly "if a referenced item is removed, it
+errors at every use." A drift test fails if the generated file is stale.
 
 ## Engine
 

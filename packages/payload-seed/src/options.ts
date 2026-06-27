@@ -49,6 +49,9 @@ export interface SeedPluginOptions {
   graph?: GraphOptions | false
   /** Inject the admin SeedButton on the dashboard. Default: false. */
   adminButton?: boolean
+  /** Codegen output. The plugin registers a `payload generate:seed-types` command that
+   *  writes the `SeedRegistry` augmentation + `definitions` barrel here. */
+  generate?: { out?: string }
 }
 
 /** Options with defaults applied. */
@@ -62,6 +65,7 @@ export interface ResolvedSeedOptions {
   authorize?: SeedAuthorize
   graph: Required<GraphOptions> | false
   adminButton: boolean
+  generateOut: string
 }
 
 const DEFAULT_DISCOVER = ['**/seed.ts', '**/seed/**/*.ts']
@@ -79,5 +83,6 @@ export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOpt
     authorize: options.authorize,
     graph,
     adminButton: options.adminButton ?? false,
+    generateOut: options.generate?.out ?? 'src/seed.generated.ts',
   }
 }

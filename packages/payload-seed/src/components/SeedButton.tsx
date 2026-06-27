@@ -2,7 +2,7 @@
 
 import { toast } from '@payloadcms/ui'
 import type React from 'react'
-import { Fragment, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 const SuccessMessage: React.FC = () => (
   <div>
@@ -59,11 +59,9 @@ export const SeedButton: React.FC<SeedButtonProps> = ({ endpoint = '/api/seed' }
   if (error) message = ` (error: ${error})`
 
   return (
-    <Fragment>
-      <button type="button" onClick={handleClick} disabled={loading || seeded}>
-        Seed your database{message}
-      </button>
-    </Fragment>
+    <button type="button" onClick={handleClick} disabled={loading || seeded}>
+      Seed your database{message}
+    </button>
   )
 }
 

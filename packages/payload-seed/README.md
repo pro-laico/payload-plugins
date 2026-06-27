@@ -9,11 +9,11 @@ emit a reviewable dependency graph. Ships the `POST /api/seed` endpoint, the `EN
 kill-switch, and an optional admin button.
 
 > **Status: working, pre-1.0.** The plugin, `defineSeed`/`ref`/`asset`, the run engine
-> (discover → assets → graph → validate → topo-sort → clear → create → artifact) and the
-> endpoint are implemented and tested (unit + a Payload integration test in the
-> `seed-sandbox` example). Still to come: the `payload-seed generate` codegen (typed ref
-> keys + a discovery barrel for bundled servers) and field-level schema validation. See
-> [DESIGN.md](./DESIGN.md) for the full architecture.
+> (discover → assets → graph → validate → topo-sort → clear → create → artifact), the
+> endpoint, and the `generateSeedTypes` codegen (typed ref keys + a discovery barrel for
+> bundled servers) are implemented and tested (unit + a Payload integration test in the
+> `seed-sandbox` example). Still to come: field-level schema validation and a packaged CLI
+> bin. See [DESIGN.md](./DESIGN.md) for the full architecture.
 
 ## Install
 
@@ -80,7 +80,8 @@ export default defineSeed('posts', ({ ref, asset }) => [
 | `defineBlockSeed(blockType, build)` | Define a reusable block fragment for page layouts. |
 | `ref(collection, key)` | Typed reference to another seeded doc. |
 | `asset(key)` | Typed reference to an uploaded asset. |
-| `createSeedEndpoint`, `seedingEnabled`, `runSeed` | Run infra for CLI runners / custom integrations. |
+| `generateSeedTypes(options)` | Codegen: writes the `SeedRegistry` augmentation + `definitions` barrel. The plugin registers it as `payload generate:seed-types` (Payload `config.bin`), so you just run `pnpm payload generate:seed-types`. |
+| `seed`, `createSeedEndpoint`, `seedingEnabled`, `runSeed` | Run infra. The plugin also registers a `payload seed` command (Payload `config.bin`) so projects need no runner script. |
 
 See [DESIGN.md](./DESIGN.md) for the engine pipeline, the codegen registry, and the media
 registry.

@@ -23,13 +23,26 @@ DB), local-disk uploads, and just enough collections to exercise every seed feat
 ```bash
 cp .env.example .env.local            # local SQLite + ENABLE_SEED=true
 pnpm install                           # from the repo root
-pnpm --filter seed-sandbox generate:types
+pnpm --filter seed-sandbox generate:types     # Payload types
+pnpm --filter seed-sandbox generate:seed-types  # SeedRegistry + definitions barrel
 pnpm --filter seed-sandbox generate:importmap
 pnpm --filter seed-sandbox dev         # http://localhost:3050/admin
 ```
 
-Create the first admin user, then seed by clicking **“Seed your database”** on the admin
-dashboard (`POST /api/seed`).
+Create the first admin user, then seed one of two ways:
+
+- **Admin dashboard** — click **“Seed your database”** (`POST /api/seed`). Reliable on every
+  platform (runs in Next's runtime).
+- **CLI** — `pnpm seed`, which runs `payload seed` (a command the plugin registers, no
+  per-project runner script).
+
+> **Known caveat (this example):** `payload seed` boots Payload via Payload's `tsx`-based
+> CLI, and on Node 24 + tsx 4.22.4 (current latest) the `@payloadcms/db-sqlite` adapter's
+> `node:crypto` import trips a tsx loader bug (`ENOENT … node:crypto?tsx-namespace=…`) — the
+> same bug that affects any `payload run` script here. It's an upstream tooling issue, not
+> the plugin: the seed engine itself boots Payload and seeds correctly under the test
+> runner's loader (see the integration test), and the admin button is unaffected. Projects
+> on other adapters/Node versions can use `pnpm seed` directly.
 
 ## Tests
 
@@ -43,14 +56,24 @@ button. It asserts the seeded counts, that cross-file `ref()`/`asset()` tokens r
 real ids, the topological create order, and idempotency (re-running clears + recreates
 without duplicating).
 
-## Auto-discovery vs. the bundled server
+## Codegen: type-safe refs + the definitions barrel
 
-Auto-discovery (globbing `seed.ts` files and importing them) works in the Local API / CLI
-/ test paths — the integration test relies on it. The **bundled Next server**, though,
-can't dynamically import source files at runtime, so the in-app endpoint is fed the
-definitions explicitly: `src/seed/index.ts` is a small barrel that imports each definition
-and is passed to `seedPlugin({ definitions })` in `payload.config.ts`. (A future
-`payload-seed generate` step will write that barrel automatically.)
+`pnpm generate:seed-types` runs `payload generate:seed-types` — a command the **plugin
+registers** via Payload's `config.bin` (the same plumbing as `payload generate:types`, so
+no separate script or `tsx` dependency). It scans the seed files and writes
+`src/seed.generated.ts`, which does two things:
+
+1. **Augments `SeedRegistry`** with each collection's declared `_key`s (plus global and
+   asset keys), so `ref('services', 'consulting')` is type-checked — rename or remove a
+   seeded item, regenerate, and every stale reference becomes a TS error. (Try it: change a
+   `_key` and run `pnpm typecheck`.)
+2. **Exports a `definitions` barrel** of static imports. Auto-discovery (globbing `seed.ts`
+   and importing) works in the Local API / CLI / test paths — the integration test relies
+   on it — but the **bundled Next server** can't dynamically import source files at runtime,
+   so `payload.config.ts` feeds the generated barrel to `seedPlugin({ definitions })`.
+
+Rerun `generate:seed-types` after changing any `_key`, global, or asset key (the test suite
+has a drift check that fails if you forget).
 
 ## Collections
 
