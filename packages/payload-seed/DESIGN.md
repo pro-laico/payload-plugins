@@ -25,13 +25,10 @@ and makes the rest schema-driven.
    Every reference is an explicit edge. The engine builds a DAG,
    detects cycles, and topologically sorts the seed order — so an AI (or a human)
    editing one file cannot produce a dangling reference or a wrong order.
-4. **Reviewable graph.** After every seed, emit a self-contained `graph.html`
-   (Mermaid diagram of doc- and collection-level edges + the computed seed order) plus
-   a `graph.json` sidecar for tooling.
-5. **Reusable run infra.** Ship the endpoint (`POST /api/seed`), the `ENABLE_SEED`
+4. **Reusable run infra.** Ship the endpoint (`POST /api/seed`), the `ENABLE_SEED`
    kill-switch guard, and an optional admin SeedButton — so a consuming app gets the
    whole seed surface from installing one plugin.
-6. **Robust media.** Carry over the template's hard-won upload logic: upload-first,
+5. **Robust media.** Carry over the template's hard-won upload logic: upload-first,
    MIME-by-real-extension, extension-mismatch tolerance, sequential uploads sharing one
    `req`, missing-file guards, focal points.
 
@@ -46,12 +43,9 @@ import assets from '../seed/assets'
 
 export const plugins = [
   seedPlugin({
-    enabled: process.env.ENABLE_SEED === 'true', // gates the endpoint (guard still applies)
-    definitions: [assets, services, posts],      // feeds the seed run AND the injected types
-    assets: { dir: 'assets' },                   // media registry root
-    authorize: (user) => user.role === 'admin',  // endpoint authorization (default: any authed user)
-    graph: { output: '.seed/graph.html' },       // dependency artifact (set false to disable)
-    adminButton: true,                           // inject the SeedButton on the dashboard
+    definitions: [assets, services, posts], // feeds the seed run AND the injected types
+    adminButton: true,                      // seed button in the admin header
+    // assets: { dir, collection }  (default: assets/ + media)
   }),
 ]
 ```
@@ -153,8 +147,7 @@ Run order (CLI `seed()` or `POST /api/seed`):
    config, not a hand-maintained array.
 7. **Create** — in sorted order, threading created ids; resolve `ref`/`asset` tokens to
    real ids at create time. Globals updated after their dependencies.
-8. **Emit graph** — `graph.html` (Mermaid) + `graph.json`.
-9. **Revalidate** — best-effort `revalidateAll()` (no-op outside a request scope).
+8. **Revalidate** — best-effort `revalidateAll()` (no-op outside a request scope).
 
 ## What stays the app's responsibility
 

@@ -14,36 +14,28 @@ function binScriptPath(name: string): string {
 }
 
 /**
- * The seed plugin. It wires up everything a project needs so it doesn't author its own
- * seed plumbing:
- * - `payload seed` — runs the seed (writes data, behind the `ENABLE_SEED` guard).
- * - **typed refs in `payload-types.ts`** — when `definitions` are supplied, the plugin
- *   injects the `SeedRegistry` augmentation into Payload's generated types via
- *   `typescript.postProcess`, so `ref()`/`asset()` keys are type-checked. It rides
- *   `payload generate:types` (and dev `autoGenerate`) — no separate codegen command.
- * - `POST /api/seed` — the in-app endpoint (when `enabled`), behind the guard + `authorize`.
- * - the dashboard SeedButton (when `adminButton`).
+ * The seed plugin. Pass your seed `definitions`; it wires up the rest so a project authors
+ * no seed plumbing:
+ * - `payload seed` — runs the seed (behind the `ENABLE_SEED` guard).
+ * - `POST /api/seed` + the optional admin button — the in-app way to run it.
+ * - typed refs — injects the `SeedRegistry` into `payload-types.ts` via Payload's
+ *   `typescript.postProcess`, so `ref()`/`asset()` keys are checked. Rides `generate:types`.
  *
- * Pass your seed definitions (authored with `defineSeed` in `seed.ts` files, e.g. assembled
- * in a `plugins/` barrel); they feed both the seed run and the generated types.
- *
- *   seedPlugin({ definitions: [assets, services, posts], assets: { dir: 'assets' } })
+ *   seedPlugin({ definitions: [assets, services, posts], adminButton: true })
  */
 export function seedPlugin(options: SeedPluginOptions = {}): Plugin {
   const resolved = resolveOptions(options)
 
   return (incomingConfig: Config): Config => {
-    // The `seed` command is independent of the (destructive) endpoint — register it even
-    // when the endpoint is disabled, so the CLI always works.
     const config: Config = {
       ...incomingConfig,
       bin: [...(incomingConfig.bin ?? []), { key: 'seed', scriptPath: binScriptPath('seed') }],
       custom: { ...incomingConfig.custom, payloadSeed: { options } },
+      endpoints: [...(incomingConfig.endpoints ?? []), createSeedEndpoint(resolved)],
     }
 
-    // Inject the typed ref registry into `payload-types.ts` during type generation. Needs
-    // the definitions in-memory; without `definitions` there's nothing to derive types from,
-    // so it's skipped.
+    // Inject the typed ref registry into `payload-types.ts` during type generation, from the
+    // in-memory definitions. Skipped when none are passed (nothing to derive types from).
     if (resolved.definitions?.length) {
       const definitions = resolved.definitions
       config.typescript = {
@@ -55,17 +47,11 @@ export function seedPlugin(options: SeedPluginOptions = {}): Plugin {
       }
     }
 
-    if (resolved.enabled) {
-      config.endpoints = [...(config.endpoints ?? []), createSeedEndpoint(resolved)]
-    }
-
     if (resolved.adminButton) {
-      const slot = resolved.adminButton
       const components = config.admin?.components ?? {}
-      const existing = (components[slot] ?? []) as unknown[]
       config.admin = {
         ...config.admin,
-        components: { ...components, [slot]: [...existing, '@pro-laico/payload-seed/components/SeedButton#SeedButton'] },
+        components: { ...components, actions: [...(components.actions ?? []), '@pro-laico/payload-seed/components/SeedButton#SeedButton'] },
       }
     }
 

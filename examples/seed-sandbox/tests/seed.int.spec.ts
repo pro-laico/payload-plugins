@@ -9,11 +9,7 @@ import { seedDefinitions } from '@/plugins'
 
 let payload: Payload
 
-const seedOptions = {
-  definitions: seedDefinitions,
-  assets: { dir: 'assets', collection: 'media' },
-  graph: { output: '.seed/test-graph.html', json: true },
-}
+const seedOptions = { definitions: seedDefinitions, assets: { dir: 'assets', collection: 'media' } }
 
 beforeAll(async () => {
   payload = await getPayload({ config })

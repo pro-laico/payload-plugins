@@ -3,7 +3,6 @@ import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from
 import { asset, ref } from '../refs'
 import type { AssetSpec, SeedDefinition } from '../types'
 import { uploadAssets } from './assets'
-import { writeGraphArtifact } from './artifact'
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, buildGraph } from './graph'
 import { docNodeId, resolveTokens } from './tokens'
 import { validateModel } from './validate'
@@ -13,8 +12,6 @@ export interface SeedResult {
   created: Record<string, number>
   /** The computed topological create order (doc node ids, `collection:_key`). */
   order: string[]
-  /** Where the dependency graph was written, if enabled. */
-  graph?: string
 }
 
 export interface RunSeedArgs {
@@ -74,7 +71,7 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
  * The seed engine. Takes the seed definitions, builds the model, validates references
  * against the live config, topologically sorts the dependency graph, clears the seeded
  * collections, uploads assets, creates docs (resolving ref/asset tokens to ids) in order,
- * updates globals, and writes the dependency-graph artifact.
+ * and updates globals.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
   const defs = definitions ?? options.definitions ?? []
@@ -97,7 +94,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
   // Validate references + fields, build/sort the dependency graph (cycle detection here).
   validateModel({ model, collectionSlugs, fieldNames })
-  const graph = buildGraph(model)
+  const { order } = buildGraph(model)
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
@@ -121,7 +118,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   if (assetIds.size) created[options.assetsCollection] = assetIds.size
 
   payload.logger.info('[payload-seed] seeding documents...')
-  for (const nodeId of graph.order) {
+  for (const nodeId of order) {
     const entry = recordIndex.get(nodeId)
     if (!entry) continue
     const data = resolveTokens(entry.data, { docs: docIds, assets: assetIds, where: nodeId }) as Record<string, unknown>
@@ -139,16 +136,8 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
   }
 
-  // Emit the dependency graph artifact.
-  let graphPath: string | undefined
-  if (options.graph) {
-    await writeGraphArtifact(graph, options.graph.output, options.graph.json)
-    graphPath = options.graph.output
-    payload.logger.info(`[payload-seed] wrote dependency graph to ${graphPath}`)
-  }
-
   payload.logger.info('[payload-seed] seed complete.')
-  return { created, order: graph.order, graph: graphPath }
+  return { created, order }
 }
 
 /**

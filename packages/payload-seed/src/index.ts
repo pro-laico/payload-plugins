@@ -1,32 +1,15 @@
-// Plugin
+// The plugin
 export { seedPlugin } from './plugin'
-export type { AssetOptions, GraphOptions, ResolvedSeedOptions, SeedAuthorize, SeedButtonSlot, SeedPluginOptions } from './options'
+export type { SeedPluginOptions } from './options'
 
-// Authoring helpers
+// Authoring: define seed data, reference docs/assets with typed tokens
 export { defineSeed, defineGlobalSeed, defineAssets } from './defineSeed'
-export { ref, asset, isRef, isAssetRef, isAnyRef } from './refs'
-export type { AnyRef, AssetRef, Ref } from './refs'
+export { ref, asset } from './refs'
+export type { SeedDefinition } from './types'
 
-// Types
-export type {
-  AssetSpec,
-  AssetsSeedDefinition,
-  CollectionSeedData,
-  CollectionSeedDefinition,
-  GlobalSeedData,
-  GlobalSeedDefinition,
-  SeedBuilder,
-  SeedDefinition,
-  SeedTokens,
-  WithRefs,
-} from './types'
+// The augmentable interface that generated types fill in (so `ref`/`asset` keys are typed)
 export type { SeedRegistry } from './registry'
 
-// Engine + run infra (for CLI runners and custom integrations)
-export { runSeed, seed } from './engine/run'
-export type { RunSeedArgs, SeedResult } from './engine/run'
-
-// Type generation — the SeedRegistry augmentation injected into payload-types.ts
-export { buildSeedRegistry, SEED_PACKAGE } from './typegen'
-export { createSeedEndpoint } from './endpoint'
-export { seedingEnabled, SEED_DISABLED_MESSAGE } from './guard'
+// Run the seed from a script or test (the `payload seed` command and endpoint use this)
+export { seed } from './engine/run'
+export type { SeedResult } from './engine/run'

@@ -12,7 +12,6 @@ out
 media/
 
 # Dependency graph artifact emitted by the seed
-.seed/
 
 .env
 .env*.local
