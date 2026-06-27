@@ -11,12 +11,12 @@ import type { SeedPluginOptions } from '../options'
  */
 export const script = async (config: SanitizedConfig): Promise<void> => {
   if (!seedingEnabled()) {
-    console.error(`✗ ${SEED_DISABLED_MESSAGE}`)
+    console.error(SEED_DISABLED_MESSAGE)
     process.exitCode = 1
     return
   }
   const options = (config.custom?.payloadSeed?.options ?? {}) as SeedPluginOptions
   const payload = await getPayload({ config })
   const result = await seed({ payload, options })
-  payload.logger.info({ msg: '✓ seed complete', ...result })
+  payload.logger.info({ msg: 'seed complete', ...result })
 }

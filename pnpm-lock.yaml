@@ -141,10 +141,6 @@ importers:
         version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4))
 
   packages/payload-seed:
-    dependencies:
-      tinyglobby:
-        specifier: ^0.2.15
-        version: 0.2.17
     devDependencies:
       '@payloadcms/ui':
         specifier: ^3.85.1

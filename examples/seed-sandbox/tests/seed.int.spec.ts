@@ -2,14 +2,18 @@ import config from '@payload-config'
 import { seed } from '@pro-laico/payload-seed'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { seedDefinitions } from '@/plugins'
 
 // Integration test: boots the real example config against a temp SQLite DB and drives the
 // REAL seed engine via the Local API — the automated analog of the admin SeedButton flow.
-// Uses auto-discovery (no `definitions` passed), so it also exercises the discovery path.
 
 let payload: Payload
 
-const seedOptions = { assets: { dir: 'assets', collection: 'media' }, graph: { output: '.seed/test-graph.html', json: true } }
+const seedOptions = {
+  definitions: seedDefinitions,
+  assets: { dir: 'assets', collection: 'media' },
+  graph: { output: '.seed/test-graph.html', json: true },
+}
 
 beforeAll(async () => {
   payload = await getPayload({ config })
@@ -20,7 +24,7 @@ afterAll(async () => {
 })
 
 describe('seed engine (integration)', () => {
-  it('discovers definitions, seeds docs, and resolves refs + assets', async () => {
+  it('seeds docs and resolves refs + assets', async () => {
     const result = await seed({ payload, options: seedOptions })
 
     // The order is *a* valid topological order (not a canonical one — it depends on input

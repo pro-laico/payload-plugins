@@ -21,7 +21,7 @@ export interface RunSeedArgs {
   payload: Payload
   req: PayloadRequest
   options: ResolvedSeedOptions
-  /** Seed definitions. When omitted, the engine auto-discovers them via `options.discover`. */
+  /** Seed definitions. Falls back to `options.definitions` when omitted. */
   definitions?: SeedDefinition[]
 }
 
@@ -71,20 +71,32 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
 }
 
 /**
- * The seed engine. Discovers (or accepts) definitions, builds the model, validates
- * references against the live config, topologically sorts the dependency graph, clears
- * the seeded collections, uploads assets, creates docs (resolving ref/asset tokens to
- * ids) in order, updates globals, and writes the dependency-graph artifact.
+ * The seed engine. Takes the seed definitions, builds the model, validates references
+ * against the live config, topologically sorts the dependency graph, clears the seeded
+ * collections, uploads assets, creates docs (resolving ref/asset tokens to ids) in order,
+ * updates globals, and writes the dependency-graph artifact.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
-  const defs = definitions ?? options.definitions ?? (await (await import('./discover')).discoverDefinitions(options.discover, process.cwd()))
-  if (defs.length === 0) payload.logger.warn('[payload-seed] no seed definitions found.')
+  const defs = definitions ?? options.definitions ?? []
+  if (defs.length === 0) payload.logger.warn('[payload-seed] no seed definitions: pass `definitions` to seedPlugin() or seed().')
 
   const { model, specs } = buildModel(defs)
   const collectionSlugs = new Set(Object.keys(payload.collections))
 
-  // Validate references + build/sort the dependency graph (cycle detection here).
-  validateModel({ model, collectionSlugs })
+  // Valid top-level field names per node, read from the live config — for unknown-field
+  // detection at runtime (the counterpart to the compile-time exactness check).
+  const fieldNames = new Map<string, Set<string>>()
+  for (const coll of model.collections) {
+    const cfg = payload.collections[coll.slug as CollectionSlug]?.config
+    if (cfg) fieldNames.set(coll.slug, new Set(cfg.flattenedFields.map((f) => f.name)))
+  }
+  for (const g of model.globals) {
+    const cfg = payload.config.globals.find((gc) => gc.slug === g.slug)
+    if (cfg) fieldNames.set(`global:${g.slug}`, new Set(cfg.flattenedFields.map((f) => f.name)))
+  }
+
+  // Validate references + fields, build/sort the dependency graph (cycle detection here).
+  validateModel({ model, collectionSlugs, fieldNames })
   const graph = buildGraph(model)
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
@@ -92,11 +104,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   // Clear: every collection we seed into, plus the asset upload collections.
   const assetCollections = new Set(Object.values(specs).map((s) => s.collection ?? options.assetsCollection))
   const seededCollections = [...new Set([...assetCollections, ...model.collections.map((c) => c.slug)])]
-  payload.logger.info('[payload-seed] clearing collections…')
+  payload.logger.info('[payload-seed] clearing collections...')
   for (const slug of seededCollections) await clearCollection(payload, req, slug)
 
   // Upload assets first.
-  payload.logger.info('[payload-seed] uploading assets…')
+  payload.logger.info('[payload-seed] uploading assets...')
   const assetIds = await uploadAssets({ payload, req, specs, assetsRoot: options.assetsDir, defaultCollection: options.assetsCollection })
 
   // Create docs in dependency order, resolving tokens to ids.
@@ -108,7 +120,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   const created: Record<string, number> = {}
   if (assetIds.size) created[options.assetsCollection] = assetIds.size
 
-  payload.logger.info('[payload-seed] seeding documents…')
+  payload.logger.info('[payload-seed] seeding documents...')
   for (const nodeId of graph.order) {
     const entry = recordIndex.get(nodeId)
     if (!entry) continue
@@ -132,7 +144,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   if (options.graph) {
     await writeGraphArtifact(graph, options.graph.output, options.graph.json)
     graphPath = options.graph.output
-    payload.logger.info(`[payload-seed] wrote dependency graph → ${graphPath}`)
+    payload.logger.info(`[payload-seed] wrote dependency graph to ${graphPath}`)
   }
 
   payload.logger.info('[payload-seed] seed complete.')

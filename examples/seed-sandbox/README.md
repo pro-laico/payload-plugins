@@ -23,8 +23,7 @@ DB), local-disk uploads, and just enough collections to exercise every seed feat
 ```bash
 cp .env.example .env.local            # local SQLite + ENABLE_SEED=true
 pnpm install                           # from the repo root
-pnpm --filter seed-sandbox generate:types     # Payload types
-pnpm --filter seed-sandbox generate:seed-types  # SeedRegistry + definitions barrel
+pnpm --filter seed-sandbox generate:types     # Payload types + injected SeedRegistry
 pnpm --filter seed-sandbox generate:importmap
 pnpm --filter seed-sandbox dev         # http://localhost:3050/admin
 ```
@@ -56,24 +55,18 @@ button. It asserts the seeded counts, that cross-file `ref()`/`asset()` tokens r
 real ids, the topological create order, and idempotency (re-running clears + recreates
 without duplicating).
 
-## Codegen: type-safe refs + the definitions barrel
+## Type-safe refs (in `payload-types.ts`)
 
-`pnpm generate:seed-types` runs `payload generate:seed-types` — a command the **plugin
-registers** via Payload's `config.bin` (the same plumbing as `payload generate:types`, so
-no separate script or `tsx` dependency). It scans the seed files and writes
-`src/seed.generated.ts`, which does two things:
+There's no separate seed codegen step. `src/plugins/index.ts` imports the seed definitions
+and hands them to `seedPlugin({ definitions: [...] })`. From those, the plugin injects a
+`SeedRegistry` augmentation directly into `payload-types.ts` via Payload's
+`typescript.postProcess` hook — so it rides `payload generate:types` (and Payload's dev
+`autoGenerate`, which reruns on every server boot).
 
-1. **Augments `SeedRegistry`** with each collection's declared `_key`s (plus global and
-   asset keys), so `ref('services', 'consulting')` is type-checked — rename or remove a
-   seeded item, regenerate, and every stale reference becomes a TS error. (Try it: change a
-   `_key` and run `pnpm typecheck`.)
-2. **Exports a `definitions` barrel** of static imports. Auto-discovery (globbing `seed.ts`
-   and importing) works in the Local API / CLI / test paths — the integration test relies
-   on it — but the **bundled Next server** can't dynamically import source files at runtime,
-   so `payload.config.ts` feeds the generated barrel to `seedPlugin({ definitions })`.
-
-Rerun `generate:seed-types` after changing any `_key`, global, or asset key (the test suite
-has a drift check that fails if you forget).
+That augmentation type-checks `ref('services', 'consulting')` / `asset('serviceA')` against
+the declared `_key`s. It's global (like Payload's own `GeneratedTypes`) — no import needed.
+Rename or remove a seeded item and every stale reference becomes a TS error. Try it: change
+a `_key` in a `seed.ts` file, rerun `generate:types`, and `pnpm typecheck`.
 
 ## Collections
 

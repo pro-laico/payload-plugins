@@ -79,7 +79,7 @@ export async function uploadAssets({
   for (const [key, spec] of Object.entries(specs)) {
     const path = await resolveAssetFile(spec.file, assetsRoot)
     if (!path) {
-      payload.logger.warn({ msg: `[payload-seed] asset '${key}': file '${spec.file}' not found under ${assetsRoot} — skipped` })
+      payload.logger.warn({ msg: `[payload-seed] asset '${key}': file '${spec.file}' not found under ${assetsRoot} - skipped` })
       continue
     }
     const file = await readAssetFile(path)
@@ -88,7 +88,7 @@ export async function uploadAssets({
     if (spec.focalX !== undefined) data.focalX = spec.focalX
     if (spec.focalY !== undefined) data.focalY = spec.focalY
     const collection = spec.collection ?? defaultCollection
-    payload.logger.info(`[payload-seed] uploading asset '${key}' → ${collection}/${file.name}`)
+    payload.logger.info(`[payload-seed] uploading asset '${key}' to ${collection}/${file.name}`)
     const doc = (await payload.create({ collection: collection as never, data: data as never, file, ...baseArgs })) as { id: string | number }
     ids.set(key, doc.id)
   }

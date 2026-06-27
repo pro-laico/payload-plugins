@@ -426,6 +426,18 @@ export interface Auth {
 }
 
 
+declare module '@pro-laico/payload-seed' {
+  interface SeedRegistry {
+    collections: {
+      'posts': 'launch'
+      'services': 'consulting' | 'implementation'
+    }
+    globals: 'site-settings'
+    assets: 'logo' | 'post' | 'serviceA' | 'serviceB'
+  }
+}
+
+
 declare module 'payload' {
   export interface GeneratedTypes extends Config {}
 }

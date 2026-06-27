@@ -1,9 +1,9 @@
 // Plugin
 export { seedPlugin } from './plugin'
-export type { AssetOptions, GraphOptions, ResolvedSeedOptions, SeedAuthorize, SeedPluginOptions } from './options'
+export type { AssetOptions, GraphOptions, ResolvedSeedOptions, SeedAuthorize, SeedButtonSlot, SeedPluginOptions } from './options'
 
 // Authoring helpers
-export { defineSeed, defineGlobalSeed, defineBlockSeed, defineAssets } from './defineSeed'
+export { defineSeed, defineGlobalSeed, defineAssets } from './defineSeed'
 export { ref, asset, isRef, isAssetRef, isAnyRef } from './refs'
 export type { AnyRef, AssetRef, Ref } from './refs'
 
@@ -11,7 +11,6 @@ export type { AnyRef, AssetRef, Ref } from './refs'
 export type {
   AssetSpec,
   AssetsSeedDefinition,
-  BlockSeedDefinition,
   CollectionSeedData,
   CollectionSeedDefinition,
   GlobalSeedData,
@@ -27,8 +26,7 @@ export type { SeedRegistry } from './registry'
 export { runSeed, seed } from './engine/run'
 export type { RunSeedArgs, SeedResult } from './engine/run'
 
-// Codegen — type-safe ref registry + definitions barrel
-export { generateSeedTypes } from './generate'
-export type { GenerateOptions, GenerateResult } from './generate'
+// Type generation — the SeedRegistry augmentation injected into payload-types.ts
+export { buildSeedRegistry, SEED_PACKAGE } from './typegen'
 export { createSeedEndpoint } from './endpoint'
 export { seedingEnabled, SEED_DISABLED_MESSAGE } from './guard'

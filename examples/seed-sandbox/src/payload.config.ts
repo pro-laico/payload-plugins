@@ -2,7 +2,6 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { seedPlugin } from '@pro-laico/payload-seed'
 import { buildConfig } from 'payload'
 import sharp from 'sharp'
 import { Media } from './collections/Media'
@@ -10,7 +9,7 @@ import { Posts } from './collections/Posts'
 import { Services } from './collections/Services'
 import { Users } from './collections/Users'
 import { SiteSettings } from './globals/SiteSettings'
-import { definitions } from './seed.generated'
+import { plugins } from './plugins'
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)
@@ -27,12 +26,5 @@ export default buildConfig({
   typescript: { outputFile: resolve(currentDir, 'payload-types.ts') },
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URI || 'file:./seed-sandbox.db' } }),
   sharp,
-  plugins: [
-    seedPlugin({
-      enabled: true,
-      assets: { dir: 'assets', collection: 'media' },
-      adminButton: true,
-      definitions,
-    }),
-  ],
+  plugins,
 })

@@ -3,55 +3,46 @@ import { asset, ref } from './refs'
 import type {
   AssetSpec,
   AssetsSeedDefinition,
-  BlockSeedDefinition,
   CollectionSeedData,
   CollectionSeedDefinition,
   GlobalSeedData,
   GlobalSeedDefinition,
-  SeedBuilder,
-  WithRefs,
+  SeedTokens,
 } from './types'
 
 const tokens = { ref, asset }
+
+// Re-enable excess-property checking, which TS disables for our mapped/intersection record
+// types: any key on `T` not present in `Shape` is forced to `never`, so a misspelled or
+// bogus field fails to type-check. (Wrong-*typed* values are already caught by the `extends`
+// constraint; this adds the missing unknown-*field* check.)
+type Exact<T, Shape> = T & Record<Exclude<keyof T, keyof Shape>, never>
+type ExactEach<T extends readonly unknown[], Shape> = { [I in keyof T]: Exact<T[I], Shape> }
 
 /**
  * Define seed data for a collection. The builder returns an array of records typed
  * against the app's generated Payload types (`RequiredDataFromCollectionSlug<slug>`),
  * each with a local `_key` reference handle. Relationship/upload fields accept `ref()` /
- * `asset()` tokens. Place one in a `seed.ts` file colocated with the collection — the
- * plugin auto-discovers it.
+ * `asset()` tokens. Unknown fields are rejected. Default-export one per `seed.ts` file, then
+ * wire it into `seedPlugin({ definitions })` (e.g. via a `plugins/` barrel).
  *
  *   export default defineSeed('services', ({ asset }) => [
  *     { _key: 'consulting', title: 'Consulting', slug: 'consulting', image: asset('serviceA') },
  *   ])
  */
-export function defineSeed<TSlug extends CollectionSlug>(
+export function defineSeed<TSlug extends CollectionSlug, const T extends ReadonlyArray<CollectionSeedData<TSlug>>>(
   slug: TSlug,
-  build: SeedBuilder<Array<CollectionSeedData<TSlug>>>,
+  build: (tokens: SeedTokens) => ExactEach<T, CollectionSeedData<TSlug>>,
 ): CollectionSeedDefinition<TSlug> {
-  return { kind: 'collection', slug, build }
+  return { kind: 'collection', slug, build } as CollectionSeedDefinition<TSlug>
 }
 
-/** Define seed data for a global (a singleton — no `_key`). */
-export function defineGlobalSeed<TSlug extends GlobalSlug>(
+/** Define seed data for a global (a singleton — no `_key`). Unknown fields are rejected. */
+export function defineGlobalSeed<TSlug extends GlobalSlug, const T extends GlobalSeedData<TSlug>>(
   slug: TSlug,
-  build: SeedBuilder<GlobalSeedData<TSlug>>,
+  build: (tokens: SeedTokens) => Exact<T, GlobalSeedData<TSlug>>,
 ): GlobalSeedDefinition<TSlug> {
-  return { kind: 'global', slug, build }
-}
-
-/**
- * Define a reusable block fragment composed into a page's layout. Its `ref`/`asset`
- * tokens propagate into the host page's dependency set. Pass the block's generated type
- * as `T` for full typing (block typing is refined per Payload version).
- *
- *   export default defineBlockSeed<HeroBlock>('hero', ({ asset }) => ({ blockType: 'hero', image: asset('hero') }))
- */
-export function defineBlockSeed<T = unknown>(
-  blockType: string,
-  build: SeedBuilder<WithRefs<T> & { blockType: string }>,
-): BlockSeedDefinition<T> {
-  return { kind: 'block', blockType, build }
+  return { kind: 'global', slug, build } as GlobalSeedDefinition<TSlug>
 }
 
 /**

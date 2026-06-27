@@ -47,7 +47,7 @@ export function resolveTokens(value: unknown, ctx: ResolveContext): unknown {
 function resolveRef(token: Ref, ctx: ResolveContext): string | number {
   const id = ctx.docs.get(docNodeId(token.collection, token.key))
   if (id === undefined) {
-    throw new Error(`[payload-seed] ${ctx.where}: unresolved ref('${token.collection}', '${token.key}') — no seeded doc with that _key.`)
+    throw new Error(`[payload-seed] ${ctx.where}: unresolved ref('${token.collection}', '${token.key}') - no seeded doc with that _key.`)
   }
   return id
 }
@@ -55,7 +55,7 @@ function resolveRef(token: Ref, ctx: ResolveContext): string | number {
 function resolveAsset(token: AssetRef, ctx: ResolveContext): string | number {
   const id = ctx.assets.get(token.key)
   if (id === undefined) {
-    throw new Error(`[payload-seed] ${ctx.where}: unresolved asset('${token.key}') — no asset declared with that key.`)
+    throw new Error(`[payload-seed] ${ctx.where}: unresolved asset('${token.key}') - no asset declared with that key.`)
   }
   return id
 }

@@ -38,7 +38,7 @@ export interface SeedTokens {
 }
 
 /** A seed builder receives the ref/asset tokens and returns the seed data. Deferred
- *  (not eager data) so refs resolve against the full, discovered definition set. */
+ *  (not eager data) so refs resolve against the full definition set. */
 export type SeedBuilder<T> = (tokens: SeedTokens) => T
 
 export interface CollectionSeedDefinition<TSlug extends CollectionSlug = CollectionSlug> {
@@ -51,12 +51,6 @@ export interface GlobalSeedDefinition<TSlug extends GlobalSlug = GlobalSlug> {
   readonly kind: 'global'
   readonly slug: TSlug
   readonly build: SeedBuilder<GlobalSeedData<TSlug>>
-}
-
-export interface BlockSeedDefinition<T = unknown> {
-  readonly kind: 'block'
-  readonly blockType: string
-  readonly build: SeedBuilder<WithRefs<T> & { blockType: string }>
 }
 
 /** Declares one source asset: the file to upload (relative to the assets dir) and the
@@ -81,4 +75,4 @@ export interface AssetsSeedDefinition {
   readonly specs: Record<string, AssetSpec>
 }
 
-export type SeedDefinition = CollectionSeedDefinition | GlobalSeedDefinition | BlockSeedDefinition | AssetsSeedDefinition
+export type SeedDefinition = CollectionSeedDefinition | GlobalSeedDefinition | AssetsSeedDefinition

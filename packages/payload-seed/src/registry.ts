@@ -1,9 +1,7 @@
 /**
- * The cross-file type bridge. Auto-discovered `seed.ts` files are invisible to the
- * compiler, so the set of valid reference keys is materialized into types here by the
- * `payload-seed generate` codegen step (mirroring `payload generate:types`).
- *
- * A consuming app's generated `seed.generated.ts` augments this interface:
+ * The cross-file type bridge. The set of valid reference keys is materialized into types by
+ * the plugin, which injects an augmentation of this interface into the project's
+ * `payload-types.ts` during `payload generate:types` (via `typescript.postProcess`):
  *
  *   declare module '@pro-laico/payload-seed' {
  *     interface SeedRegistry {
@@ -14,11 +12,11 @@
  *   }
  *
  * Once augmented, `ref()` / `asset()` keys are checked against these unions — remove a
- * seeded item's `_key` and every reference to it becomes a TS error. Before codegen runs
- * (interface empty), the resolvers below fall back to permissive `string` keys, so refs
- * are runtime-validated only. Progressive: safe without codegen, fully safe with it.
+ * seeded item's `_key` and every reference to it becomes a TS error. Before types are
+ * generated (interface empty), the resolvers below fall back to permissive `string` keys, so
+ * refs are runtime-validated only. Progressive: safe without it, fully safe with it.
  */
-// Intentionally empty — augmented by app codegen (`payload-seed generate`).
+// Intentionally empty — augmented in the project's payload-types.ts during generate:types.
 export interface SeedRegistry {}
 
 /** Resolve `SeedRegistry[K]` if augmented, else the permissive default `D`. */

@@ -57,9 +57,6 @@
     "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
   },
-  "dependencies": {
-    "tinyglobby": "^0.2.15"
-  },
   "peerDependencies": {
     "@payloadcms/ui": ">=3.0.0",
     "payload": ">=3.0.0",

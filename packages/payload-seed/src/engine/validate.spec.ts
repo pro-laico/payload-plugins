@@ -69,6 +69,31 @@ describe('validateModel', () => {
     ).toThrow(/duplicate _key 'dup'/)
   })
 
+  it('flags unknown record fields when fieldNames is supplied', () => {
+    const fieldNames = new Map([['services', new Set(['title', 'slug'])]])
+    expect(() =>
+      validateModel({
+        model: {
+          assetKeys: [],
+          collections: [{ slug: 'services', records: [{ key: 'a', data: { title: 'X', bogus: 'Y' } }] }],
+          globals: [],
+        },
+        collectionSlugs: slugs,
+        fieldNames,
+      }),
+    ).toThrow(/unknown field 'bogus'/)
+  })
+
+  it('allows `_status` and known fields; skips the check without fieldNames', () => {
+    const model: BuiltModel = {
+      assetKeys: [],
+      collections: [{ slug: 'services', records: [{ key: 'a', data: { title: 'X', _status: 'draft' } }] }],
+      globals: [],
+    }
+    expect(() => validateModel({ model, collectionSlugs: slugs, fieldNames: new Map([['services', new Set(['title'])]]) })).not.toThrow()
+    expect(() => run(model)).not.toThrow() // no fieldNames → field check skipped
+  })
+
   it('aggregates multiple issues into one SeedValidationError', () => {
     try {
       run({

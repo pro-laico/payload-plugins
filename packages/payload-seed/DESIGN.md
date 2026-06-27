@@ -3,9 +3,9 @@
 A schema-aware, type-safe seeding plugin for Payload CMS. It replaces the
 hand-maintained seed orchestrator pattern (one big `index.ts` that hardcodes the
 collection list, clear order, create order, and prop-drills returned docs) with a
-declarative, auto-discovered, dependency-tracked system that **stays aligned with the
-schema by construction** — drift surfaces as a TypeScript error or a precise runtime
-error, never as a silent omission.
+declarative, dependency-tracked system that **stays aligned with the schema by
+construction** — drift surfaces as a TypeScript error or a precise runtime error, never as
+a silent omission.
 
 Origin: generalized from the seed in `payload-service-template`
 (`apps/web/src/seed/*`). That seed had excellent media handling but every other part
@@ -19,9 +19,10 @@ and makes the rest schema-driven.
    collection's fields → the seed file shows a TS error until it matches.
 2. **Type-safe references.** A doc is referenced by a named token, not a raw id.
    Remove or rename a seeded item and every `ref()` to it becomes a TS error
-   everywhere it's used (via a generated `SeedRegistry` — see Codegen).
-3. **Strong dependency tracking.** Collections, globals, and blocks can all reference
-   collection docs. Every reference is an explicit edge. The engine builds a DAG,
+   everywhere it's used (via the `SeedRegistry` injected into `payload-types.ts` — see
+   "Typed refs").
+3. **Strong dependency tracking.** Collections and globals can reference collection docs.
+   Every reference is an explicit edge. The engine builds a DAG,
    detects cycles, and topologically sorts the seed order — so an AI (or a human)
    editing one file cannot produce a dangling reference or a wrong order.
 4. **Reviewable graph.** After every seed, emit a self-contained `graph.html`
@@ -37,25 +38,26 @@ and makes the rest schema-driven.
 ## Public API
 
 ```ts
-// payload.config.ts
+// src/plugins/index.ts — assemble definitions and hand them to the plugin
 import { seedPlugin } from '@pro-laico/payload-seed'
+import services from '../collections/Services/seed'
+import posts from '../collections/Posts/seed'
+import assets from '../seed/assets'
 
-export default buildConfig({
-  plugins: [
-    seedPlugin({
-      enabled: process.env.ENABLE_SEED === 'true', // gates the endpoint (guard still applies)
-      discover: ['src/**/seed.ts'],                // auto-discovery globs (default)
-      assets: { dir: 'assets' },                   // media registry root
-      authorize: (user) => user.role === 'admin',  // endpoint authorization (default: any authed user)
-      graph: { output: '.seed/graph.html' },       // dependency artifact (set false to disable)
-      adminButton: true,                           // inject the SeedButton on the dashboard
-    }),
-  ],
-})
+export const plugins = [
+  seedPlugin({
+    enabled: process.env.ENABLE_SEED === 'true', // gates the endpoint (guard still applies)
+    definitions: [assets, services, posts],      // feeds the seed run AND the injected types
+    assets: { dir: 'assets' },                   // media registry root
+    authorize: (user) => user.role === 'admin',  // endpoint authorization (default: any authed user)
+    graph: { output: '.seed/graph.html' },       // dependency artifact (set false to disable)
+    adminButton: true,                           // inject the SeedButton on the dashboard
+  }),
+]
 ```
 
 ```ts
-// src/collections/Services/seed.ts  (auto-discovered)
+// src/collections/Services/seed.ts
 import { defineSeed } from '@pro-laico/payload-seed'
 
 export default defineSeed('services', ({ asset }) => [
@@ -70,7 +72,7 @@ export default defineSeed('services', ({ asset }) => [
 ```
 
 ```ts
-// src/collections/Posts/seed.ts  (a different, auto-discovered file)
+// src/collections/Posts/seed.ts  (a different file, referencing the service above)
 import { defineSeed } from '@pro-laico/payload-seed'
 
 export default defineSeed('posts', ({ ref, asset }) => [
@@ -83,16 +85,11 @@ export default defineSeed('posts', ({ ref, asset }) => [
 ])
 ```
 
-Globals and blocks use sibling helpers:
+Globals use a sibling helper:
 
 ```ts
 export default defineGlobalSeed('header', ({ ref }) => ({ /* HeaderGlobal data */ }))
-export default defineBlockSeed('hero',   ({ asset }) => ({ /* HeroBlock fragment */ }))
 ```
-
-A block seed is a typed fragment composed into a page's `layout`; its `ref`/`asset`
-tokens propagate into the parent page's dependency set, so a block that references a
-collection doc is tracked automatically.
 
 ## Type model
 
@@ -108,15 +105,12 @@ collection doc is tracked automatically.
   runtime-validated only. Progressive: safe without codegen, fully safe with it.
 - `asset(key)` is checked against `SeedRegistry['assets']` the same way.
 
-## Codegen (the cross-file safety bridge)
+## Typed refs (injected into `payload-types.ts`)
 
-Auto-discovery is a runtime fs scan; the compiler can't see it. To get
-"remove an item → TS error everywhere," a small generate step scans the `seed.ts`
-files, extracts each `_key` / asset key literal, and writes a `SeedRegistry`
-augmentation:
+To get "remove an item → TS error everywhere," the `SeedRegistry` interface must be
+augmented with the declared keys:
 
 ```ts
-// seed.generated.ts  (committed; regenerated on schema/seed change)
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: { services: 'consulting' | 'implementation'; posts: 'launch' }
@@ -126,26 +120,28 @@ declare module '@pro-laico/payload-seed' {
 }
 ```
 
-**Implemented** as `generateSeedTypes()`, which the plugin registers as a `payload
-generate:seed-types` command through Payload's `config.bin` — the same plumbing as `payload
-generate:types`, so consumers just run `pnpm payload generate:seed-types` with no bespoke script.
-Payload's bin loads the config and calls the command WITHOUT booting Payload/a DB, so it
-avoids the local-API runtime issues. It reads the
-keys by importing the definitions and reading their actual data (the same mechanism the
-engine uses), so the types always match what gets seeded. It writes the augmentation **and**
-the `definitions` barrel in one file. The producing side (`_key`) stays a free string; only
-the consuming side (`ref`/`asset`) is checked — exactly "if a referenced item is removed, it
-errors at every use." A drift test fails if the generated file is stale.
+Rather than a bespoke codegen command + a separate generated file, the plugin **injects
+this block into Payload's own `payload-types.ts`** via the `config.typescript.postProcess`
+hook (which Payload added for "plugins that need to inject generic types JSON Schema cannot
+express"). `buildSeedRegistry(definitions)` derives the unions from the in-memory
+definitions the project passed to `seedPlugin` — no fs scan, no extra file. Because it rides
+`payload generate:types`, it's regenerated by the same command the project already runs, and
+by Payload's dev `autoGenerate` on every server boot. The augmentation lives in
+`payload-types.ts`, which is always in the tsconfig `include`, so it's **global with no
+import** — exactly like Payload's own `GeneratedTypes`.
+
+The producing side (`_key`) stays a free string; only the consuming side (`ref`/`asset`) is
+checked. Trade-off: the types reflect the definitions **wired into the plugin**, not a raw
+filesystem scan — a non-issue when definitions are assembled in a `plugins/` barrel.
 
 ## Engine
 
 Run order (CLI `seed()` or `POST /api/seed`):
 
-1. **Discover** — glob + import all seed definitions (collections, globals, blocks).
+1. **Take definitions** — the `SeedDefinition[]` passed to the plugin / `seed()`.
 2. **Build asset registry** — collect every `asset(key)` used; upload sources from
    `assets/` FIRST (generalized template media logic); resolve keys → ids.
 3. **Build DAG** — every `ref(collection, key)` is an edge `dependent → dependency`.
-   Block fragments contribute their refs to their host page node.
 4. **Validate against live schema** — read `payload.collections[slug].config.fields`:
    required fields present, no unknown fields, every `ref` target collection is allowed
    by the relationship field's config, every `ref`/`asset` key resolves. Errors name the
@@ -163,12 +159,17 @@ Run order (CLI `seed()` or `POST /api/seed`):
 ## What stays the app's responsibility
 
 - The source assets in `assets/image|svg|font/` and their specs (alt, focal point).
-- The actual seed content (the `seed.ts` files).
-- Running `payload-seed generate` after changing seed `_key`s (like `generate:types`).
+- The actual seed content (the `seed.ts` files), and wiring their definitions into
+  `seedPlugin({ definitions })` (e.g. via a `plugins/` barrel).
+- Running `payload generate:types` after changing seed `_key`s — the same command already
+  run after schema changes; it re-injects the `SeedRegistry`.
 
 ## Open / later
 
-- **Autofill** (faker-style generation of unspecified fields) — explicitly out of v1;
-  v1 validates and orchestrates but never invents content. Possible opt-in layer later.
-- Discovery is fs-based; a future explicit-registry mode could drop the fs scan for apps
-  that prefer a single import barrel.
+- **Autofill** (faker-style generation of unspecified fields) — explicitly out of scope for
+  now; the engine validates and orchestrates but never invents content. Possible opt-in layer.
+- **Block fragments** — a `defineBlockSeed` helper (typed block data composed into a page's
+  `layout`, its refs tracked) was prototyped but isn't wired into the engine; removed until
+  implemented end-to-end.
+- **Field-level schema validation** — required/unknown-field and ref-target-collection checks
+  against `payload.collections[slug].config.fields` (today: dangling-ref + cycle + unknown-key).

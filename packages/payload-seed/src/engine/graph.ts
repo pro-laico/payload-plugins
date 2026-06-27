@@ -92,7 +92,7 @@ function topoSortDocs(docIds: Set<string>, deps: Map<string, Set<string>>): stri
     const s = state.get(id)
     if (s === 'done') return
     if (s === 'visiting') {
-      const cycle = [...stack.slice(stack.indexOf(id)), id].join(' → ')
+      const cycle = [...stack.slice(stack.indexOf(id)), id].join(' -> ')
       throw new Error(`[payload-seed] dependency cycle detected: ${cycle}`)
     }
     state.set(id, 'visiting')

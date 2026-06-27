@@ -31,13 +31,9 @@ export interface SeedPluginOptions {
    * the endpoint entirely. Default: true.
    */
   enabled?: boolean
-  /** Glob(s), relative to cwd, for auto-discovering seed files. Default:
-   *  `['**\/seed.ts', '**\/seed/**\/*.ts']` (excluding node_modules / dist / .next).
-   *  Ignored when `definitions` is supplied. */
-  discover?: string | string[]
-  /** Supply seed definitions explicitly instead of auto-discovering them. Use this when
-   *  the runtime can't dynamically import source files (e.g. a bundled server) — import
-   *  the seed files yourself and pass their default exports. */
+  /** The seed definitions (from `defineSeed` / `defineGlobalSeed` / `defineAssets`). Wire
+   *  them in — typically via a `plugins/` barrel — so they feed both the seed run and the
+   *  `SeedRegistry` types injected into `payload-types.ts`. */
   definitions?: SeedDefinition[]
   /** Media registry config. */
   assets?: AssetOptions
@@ -47,42 +43,40 @@ export interface SeedPluginOptions {
   authorize?: SeedAuthorize
   /** Dependency graph artifact. Set `false` to disable. Default: enabled at `.seed/graph.html`. */
   graph?: GraphOptions | false
-  /** Inject the admin SeedButton on the dashboard. Default: false. */
-  adminButton?: boolean
-  /** Codegen output. The plugin registers a `payload generate:seed-types` command that
-   *  writes the `SeedRegistry` augmentation + `definitions` barrel here. */
-  generate?: { out?: string }
+  /**
+   * Inject the admin SeedButton. `true` places it in the header actions (top-right, every
+   * page); pass a slot name to choose where. `false`/omitted = no button. Default: false.
+   */
+  adminButton?: boolean | SeedButtonSlot
 }
+
+/** Where the SeedButton mounts. All are `admin.components.*` arrays in Payload. */
+export type SeedButtonSlot = 'actions' | 'beforeDashboard' | 'afterDashboard' | 'beforeNavLinks' | 'afterNavLinks' | 'settingsMenu'
 
 /** Options with defaults applied. */
 export interface ResolvedSeedOptions {
   enabled: boolean
-  discover: string[]
   definitions?: SeedDefinition[]
   assetsDir: string
   assetsCollection: string
   endpoint: string
   authorize?: SeedAuthorize
   graph: Required<GraphOptions> | false
-  adminButton: boolean
-  generateOut: string
+  adminButton: SeedButtonSlot | false
 }
 
-const DEFAULT_DISCOVER = ['**/seed.ts', '**/seed/**/*.ts']
 const DEFAULT_GRAPH: Required<GraphOptions> = { output: '.seed/graph.html', json: true }
 
 export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOptions {
   const graph = options.graph === false ? false : { ...DEFAULT_GRAPH, ...options.graph }
   return {
     enabled: options.enabled ?? true,
-    discover: typeof options.discover === 'string' ? [options.discover] : (options.discover ?? DEFAULT_DISCOVER),
     definitions: options.definitions,
     assetsDir: options.assets?.dir ?? 'assets',
     assetsCollection: options.assets?.collection ?? 'media',
     endpoint: options.endpoint ?? '/seed',
     authorize: options.authorize,
     graph,
-    adminButton: options.adminButton ?? false,
-    generateOut: options.generate?.out ?? 'src/seed.generated.ts',
+    adminButton: options.adminButton ? (options.adminButton === true ? 'actions' : options.adminButton) : false,
   }
 }
