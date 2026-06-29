@@ -10,7 +10,6 @@
     "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",
     "generate:types": "pnpm payload generate:types",
     "generate:importmap": "pnpm payload generate:importmap",
-    "seed:mux": "pnpm payload run scripts/seed-mux.ts",
     "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db MUX_WEBHOOK_SECRET=whsec_test_payload_mux vitest run",
     "typecheck": "tsc --noEmit"
   },

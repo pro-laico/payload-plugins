@@ -1,9 +1,10 @@
 import { createLocalReq, type CollectionSlug, type Payload, type PayloadRequest } from 'payload'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
-import { asset, ref } from '../refs'
+import { asset, ref, video } from '../refs'
 import type { AssetSpec, SeedDefinition } from '../types'
 import { uploadAssets } from './assets'
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, buildGraph } from './graph'
+import { collectSourceRefs, resolveSourceFiles } from './sources'
 import { docNodeId, resolveTokens } from './tokens'
 import { validateModel } from './validate'
 
@@ -22,7 +23,7 @@ export interface RunSeedArgs {
   definitions?: SeedDefinition[]
 }
 
-const tokens = { ref, asset }
+const tokens = { ref, asset, video }
 
 /** Split definitions by kind and build the concrete model (records/globals/assets). */
 function buildModel(definitions: SeedDefinition[]): { model: BuiltModel; specs: Record<string, AssetSpec> } {
@@ -48,11 +49,11 @@ function buildModel(definitions: SeedDefinition[]): { model: BuiltModel; specs: 
   return { model: { assetKeys: Object.keys(specs), collections, globals }, specs }
 }
 
-async function clearCollection(payload: Payload, req: PayloadRequest, collection: string): Promise<void> {
+async function clearCollection(payload: Payload, req: PayloadRequest, collection: string, withHooks: boolean): Promise<void> {
   const config = payload.collections[collection as CollectionSlug]?.config
   if (!config) return
   payload.logger.info(`[payload-seed] clearing ${collection}`)
-  if (config.upload) {
+  if (config.upload || withHooks) {
     await payload.delete({
       collection: collection as CollectionSlug,
       where: { id: { exists: true } },
@@ -98,15 +99,24 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
+  // Provider collections (e.g. mux-video) clear via payload.delete so their hooks fire
+  // (the owning plugin's afterDelete removes the external asset).
+  const providerCollections = new Set(options.assetProviders.map((p) => p.collection))
+
   // Clear: every collection we seed into, plus the asset upload collections.
   const assetCollections = new Set(Object.values(specs).map((s) => s.collection ?? options.assetsCollection))
   const seededCollections = [...new Set([...assetCollections, ...model.collections.map((c) => c.slug)])]
   payload.logger.info('[payload-seed] clearing collections...')
-  for (const slug of seededCollections) await clearCollection(payload, req, slug)
+  for (const slug of seededCollections) await clearCollection(payload, req, slug, providerCollections.has(slug))
 
-  // Upload assets first.
+  // Upload image assets first; resolve provider source files (e.g. videos) to absolute paths.
   payload.logger.info('[payload-seed] uploading assets...')
   const assetIds = await uploadAssets({ payload, req, specs, assetsRoot: options.assetsDir, defaultCollection: options.assetsCollection })
+  const sourceRefs = [
+    ...model.collections.flatMap((c) => c.records.flatMap((r) => collectSourceRefs(r.data))),
+    ...model.globals.flatMap((g) => collectSourceRefs(g.data)),
+  ]
+  const sources = await resolveSourceFiles({ payload, refs: sourceRefs, providers: options.assetProviders, assetsRoot: options.assetsDir })
 
   // Create docs in dependency order, resolving tokens to ids.
   const docIds = new Map<string, string | number>()
@@ -121,7 +131,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   for (const nodeId of order) {
     const entry = recordIndex.get(nodeId)
     if (!entry) continue
-    const data = resolveTokens(entry.data, { docs: docIds, assets: assetIds, where: nodeId }) as Record<string, unknown>
+    const data = resolveTokens(entry.data, { docs: docIds, assets: assetIds, sources, where: nodeId }) as Record<string, unknown>
     const doc = (await payload.create({ collection: entry.slug as CollectionSlug, data: data as never, ...baseArgs })) as {
       id: string | number
     }
@@ -132,7 +142,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   // Update globals after all docs exist.
   for (const g of model.globals) {
     payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
-    const data = resolveTokens(g.data, { docs: docIds, assets: assetIds, where: `global:${g.slug}` }) as Record<string, unknown>
+    const data = resolveTokens(g.data, { docs: docIds, assets: assetIds, sources, where: `global:${g.slug}` }) as Record<string, unknown>
     await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
   }
 

@@ -2,8 +2,8 @@ import { createHmac } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { clearMuxSeed, seedMuxVideos, uploadMuxVideoFromFile } from '@pro-laico/payload-seed/mux'
-import { getPayload, type Payload } from 'payload'
+import { ingestMuxAsset, ingestMuxVideo, muxAssetProvider } from '@pro-laico/payload-mux'
+import { createLocalReq, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '../src/payload.config'
 
@@ -41,6 +41,12 @@ describe('payload-mux wiring', () => {
     // MUX_WEBHOOK_SECRET comes from the test script env (set before this module imported the
     // config). Token id/secret stay unset — new Mux() boots fine without them.
     payload = await getPayload({ config })
+    // The sqlite adapter binds DATABASE_URI at config import (before this hook), so the db is
+    // the shared file from the `test` script — clear seeded collections so the run is
+    // idempotent. db.deleteMany bypasses hooks, so no Mux call is attempted for fake assetIds.
+    const req = await createLocalReq({}, payload)
+    await payload.db.deleteMany({ collection: 'mux-video', req, where: {} })
+    await payload.db.deleteMany({ collection: 'pages', req, where: {} })
   })
 
   afterAll(async () => {
@@ -52,12 +58,12 @@ describe('payload-mux wiring', () => {
     const collection = payload.config.collections.find((c) => c.slug === 'mux-video')
     expect(collection).toBeDefined()
     const fieldNames = (collection?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
-    expect(fieldNames).toEqual(expect.arrayContaining(['muxUploader', 'title', 'assetId', 'duration', 'playbackOptions']))
+    expect(fieldNames).toEqual(expect.arrayContaining(['muxUploader', 'source', 'title', 'assetId', 'duration', 'playbackOptions']))
   })
 
-  it('registers the upload and webhook endpoints', () => {
+  it('registers the upload, webhook, and seed endpoints', () => {
     const paths = payload.config.endpoints.map((e) => `${e.method.toUpperCase()} ${e.path}`)
-    expect(paths).toEqual(expect.arrayContaining(['POST /mux/upload', 'GET /mux/upload', 'POST /mux/webhook']))
+    expect(paths).toEqual(expect.arrayContaining(['POST /mux/upload', 'GET /mux/upload', 'POST /mux/webhook', 'POST /seed']))
   })
 
   it('exposes mux-video as a relationship target', () => {
@@ -66,15 +72,20 @@ describe('payload-mux wiring', () => {
     expect(heroVideo).toMatchObject({ type: 'relationship', relationTo: 'mux-video' })
   })
 
-  it('stashes plugin options on config.custom for the seed helpers', () => {
-    // seedMuxVideos / clearMuxSeed read this stash (credentials fall back to MUX_* env vars).
-    const stashed = (payload.config.custom as { payloadMux?: { options?: unknown } }).payloadMux
-    expect(stashed?.options).toBeDefined()
-    expect([seedMuxVideos, clearMuxSeed, uploadMuxVideoFromFile].every((fn) => typeof fn === 'function')).toBe(true)
+  it('exposes the server-side ingest API and the seed asset provider', () => {
+    expect(typeof ingestMuxVideo).toBe('function')
+    expect(typeof ingestMuxAsset).toBe('function')
+    expect(muxAssetProvider()).toEqual({ token: 'video', collection: 'mux-video', sourceDir: 'video' })
+    expect(muxAssetProvider({ sourceDir: 'videos' }).sourceDir).toBe('videos')
   })
 
-  // Pre-resolved data (assetId + playbackOptions) makes the beforeChange hook skip Mux, so we
-  // can create a target doc without a real asset.
+  it('stashes plugin options on config.custom (so tooling can build a Mux client from payload)', () => {
+    const stashed = (payload.config.custom as { payloadMux?: { options?: unknown } }).payloadMux
+    expect(stashed?.options).toBeDefined()
+  })
+
+  // Pre-resolved data (assetId + playbackOptions) makes the hooks skip Mux, so we can create a
+  // target doc without a real asset.
   const seedDoc = (assetId: string, duration: number) =>
     payload.create({
       collection: 'mux-video',

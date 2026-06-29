@@ -2,6 +2,7 @@ import type Mux from '@mux/mux-node'
 import type { CollectionConfig } from 'payload'
 import { getAfterDeleteHook } from '../hooks/afterDelete'
 import { getBeforeChangeHook } from '../hooks/beforeChange'
+import { getBeforeValidateHook } from '../hooks/beforeValidate'
 import { defaultAccess } from '../lib/defaultAccess'
 import type { MuxVideoPluginOptions } from '../types'
 
@@ -40,6 +41,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
+    beforeValidate: [getBeforeValidateHook(mux)],
     beforeChange: [getBeforeChangeHook(mux, (options.extendCollection as string) ?? 'mux-video')],
   },
   fields: [
@@ -49,6 +51,10 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       type: 'ui',
       admin: { components: { Field: `${C}/MuxUploaderField#MuxUploaderField`, Cell: thumbnailCell(options.adminThumbnail) } },
     },
+    // Transient server-side ingest input (a local path / URL, or `{ file|url, playbackPolicy,
+    // posterTimestamp }`). The beforeValidate hook uploads it to Mux and strips it — never
+    // persisted. Lets a video be created from a file without the admin's client-side upload.
+    { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
     {
       name: 'title',
       type: 'text',
@@ -57,7 +63,10 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       unique: true,
       admin: { description: 'A unique title for this video that will help you identify it later.' },
     },
-    { name: 'assetId', type: 'text', required: true, admin: { readOnly: true, condition: (data) => data.assetId } },
+    // Not `required`: it's filled by the beforeValidate (server-side ingest) / beforeChange
+    // (admin upload) hooks before the row is written. Marking it required would reject a
+    // create that supplies a `source` instead of an already-resolved `assetId`.
+    { name: 'assetId', type: 'text', admin: { readOnly: true, condition: (data) => data.assetId } },
     { name: 'duration', label: 'Duration', type: 'number', admin: { readOnly: true, condition: (data) => data.duration } },
     {
       name: 'posterTimestamp',

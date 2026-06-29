@@ -1,10 +1,10 @@
-import { asset, ref } from './refs'
+import { asset, ref, video } from './refs'
 import type { SeedDefinition } from './types'
 
 /** Module name whose `SeedRegistry` interface the generated augmentation targets. */
 export const SEED_PACKAGE = '@pro-laico/payload-seed'
 
-const tokens = { ref, asset }
+const tokens = { ref, asset, video }
 const union = (values: string[]): string => (values.length ? values.map((v) => `'${v}'`).join(' | ') : 'never')
 
 /**

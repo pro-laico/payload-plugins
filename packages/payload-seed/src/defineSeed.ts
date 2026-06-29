@@ -1,5 +1,5 @@
 import type { CollectionSlug, GlobalSlug } from 'payload'
-import { asset, ref } from './refs'
+import { asset, ref, video } from './refs'
 import type {
   AssetSpec,
   AssetsSeedDefinition,
@@ -10,7 +10,7 @@ import type {
   SeedTokens,
 } from './types'
 
-const tokens = { ref, asset }
+const tokens = { ref, asset, video }
 
 // Re-enable excess-property checking, which TS disables for our mapped/intersection record
 // types: any key on `T` not present in `Shape` is forced to `never`, so a misspelled or

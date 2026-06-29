@@ -4,8 +4,9 @@ export type { SeedPluginOptions } from './options'
 
 // Authoring: define seed data, reference docs/assets with typed tokens
 export { defineSeed, defineGlobalSeed, defineAssets } from './defineSeed'
-export { ref, asset } from './refs'
-export type { SeedDefinition } from './types'
+export { ref, asset, video } from './refs'
+export type { AssetRef, Ref, SourceOptions, SourceRef } from './refs'
+export type { SeedAssetProvider, SeedDefinition } from './types'
 
 // The augmentable interface that generated types fill in (so `ref`/`asset` keys are typed)
 export type { SeedRegistry } from './registry'

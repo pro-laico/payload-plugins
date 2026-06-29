@@ -1,4 +1,5 @@
-import { type AnyRef, type AssetRef, isAnyRef, isAssetRef, isRef, type Ref } from '../refs'
+import { type AnyRef, type AssetRef, isAnyRef, isAssetRef, isRef, isSourceRef, type Ref, type SourceRef } from '../refs'
+import { sourceKey } from './sources'
 
 /** The map key for a seeded doc node: `collection:_key`. */
 export const docNodeId = (collection: string, key: string): string => `${collection}:${key}`
@@ -25,16 +26,19 @@ export interface ResolveContext {
   docs: Map<string, string | number>
   /** asset key → created upload id. */
   assets: Map<string, string | number>
+  /** `token\0file` → absolute source path (for provider source tokens). */
+  sources: Map<string, string>
   /** For error messages. */
   where: string
 }
 
-/** Deep-clone a seed-data value, replacing every ref/asset token with the resolved id.
- *  Throws a contextual error if a token can't be resolved (should be impossible after
+/** Deep-clone a seed-data value, replacing every ref/asset/source token with its resolved
+ *  value. Throws a contextual error if a token can't be resolved (should be impossible after
  *  validation + topo-sort, but guards against engine bugs). */
 export function resolveTokens(value: unknown, ctx: ResolveContext): unknown {
   if (isRef(value)) return resolveRef(value, ctx)
   if (isAssetRef(value)) return resolveAsset(value, ctx)
+  if (isSourceRef(value)) return resolveSource(value, ctx)
   if (Array.isArray(value)) return value.map((item) => resolveTokens(item, ctx))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
@@ -58,4 +62,17 @@ function resolveAsset(token: AssetRef, ctx: ResolveContext): string | number {
     throw new Error(`[payload-seed] ${ctx.where}: unresolved asset('${token.key}') - no asset declared with that key.`)
   }
   return id
+}
+
+/** Resolve a source token to the value the provider collection ingests: the absolute file
+ *  path (resolved in the pre-pass) plus the token's options. The owning collection's hook
+ *  turns this into the stored asset. */
+function resolveSource(token: SourceRef, ctx: ResolveContext): Record<string, unknown> {
+  const file = ctx.sources.get(sourceKey(token.token, token.file))
+  if (file === undefined) {
+    throw new Error(
+      `[payload-seed] ${ctx.where}: unresolved ${token.token}('${token.file}') - source file not found or no provider registered.`,
+    )
+  }
+  return { file, ...token.options }
 }

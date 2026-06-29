@@ -32,11 +32,6 @@
         "import": "./dist/components/SeedButton.js",
         "types": "./dist/components/SeedButton.d.ts",
         "default": "./dist/components/SeedButton.js"
-      },
-      "./mux": {
-        "import": "./dist/integrations/mux/index.js",
-        "types": "./dist/integrations/mux/index.d.ts",
-        "default": "./dist/integrations/mux/index.js"
       }
     }
   },
@@ -52,11 +47,6 @@
       "import": "./src/components/SeedButton.tsx",
       "types": "./src/components/SeedButton.tsx",
       "default": "./src/components/SeedButton.tsx"
-    },
-    "./mux": {
-      "import": "./src/integrations/mux/index.ts",
-      "types": "./src/integrations/mux/index.ts",
-      "default": "./src/integrations/mux/index.ts"
     }
   },
   "files": [
@@ -71,9 +61,6 @@
     "test:watch": "vitest",
     "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
-  },
-  "dependencies": {
-    "@mux/mux-node": "^14.1.1"
   },
   "peerDependencies": {
     "@payloadcms/ui": "^3.0.0",

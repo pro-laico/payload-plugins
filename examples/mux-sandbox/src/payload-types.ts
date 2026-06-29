@@ -161,6 +161,15 @@ export interface Page {
  */
 export interface MuxVideo {
   id: number;
+  source?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   /**
    * A unique title for this video that will help you identify it later.
    */
@@ -302,6 +311,7 @@ export interface PagesSelect<T extends boolean = true> {
  * via the `definition` "mux-video_select".
  */
 export interface MuxVideoSelect<T extends boolean = true> {
+  source?: T;
   title?: T;
   assetId?: T;
   duration?: T;
@@ -378,6 +388,18 @@ export interface CollectionsWidget {
  */
 export interface Auth {
   [k: string]: unknown;
+}
+
+
+declare module '@pro-laico/payload-seed' {
+  interface SeedRegistry {
+    collections: {
+      'mux-video': 'sample'
+      'pages': 'home'
+    }
+    globals: never
+    assets: never
+  }
 }
 
 

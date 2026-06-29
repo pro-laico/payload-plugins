@@ -158,39 +158,45 @@ Run order (CLI `seed()` or `POST /api/seed`):
 - Running `payload generate:types` after changing seed `_key`s — the same command already
   run after schema changes; it re-injects the `SeedRegistry`.
 
-## Integrations (`src/integrations/`)
+## External-asset providers
 
-Beyond the core engine, the seed package hosts **integrations** that seed the data of other
-`@pro-laico/*` plugins from local sources — e.g. uploading local video files to Mux for
-`@pro-laico/payload-mux`. They live here (not in each plugin) so all seeding is in one place,
-but they stay **fully decoupled** from those plugins.
+Some collections store their "file" in an external service rather than a Payload upload — e.g.
+`@pro-laico/payload-mux`'s `mux-video`, whose bytes live in Mux. A **provider** lets such a
+collection seed like an image asset, through the normal engine run (no script):
 
-Each integration is a folder `src/integrations/<name>/` exposed at its own package subpath
-(`@pro-laico/payload-seed/<name>`). The convention (which mirrors how Payload's own SDK
-integrations — `plugin-stripe`, `storage-s3` — declare deps):
+```ts
+seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })
 
-- **Imports** only the relevant third-party SDK (declared as a regular `dependency`, following
-  Payload's convention that external SDKs are dependencies, not peers — Payload uses no
-  optional peers), never the sibling plugin package. It reads the plugin's credentials/config
-  off `config.custom.<key>` by string (via `readPluginConfig`) — plugins expose their options
-  there for exactly this. Alignment between the two packages is by convention, not types.
-- **Shape**: a primary `seed<Thing>s(payload, options): Promise<SeedIntegrationResult>`, an
-  optional `clear<Thing>(...)`, and its own types. Credentials default to the plugin's
-  `config.custom` stash with an explicit `initSettings` override.
-- **Reuses `shared.ts`** — `pollUntil`, `delay`, `readPluginConfig`, `seedLog`, and the
-  `SeedIntegrationResult` type — so integrations stay small and consistent.
-- **Destructive clears are precise**: the integration tags the records it creates (e.g. Mux
-  `passthrough`) so a reseed clears only what it made by default, with an opt-in `'all'`.
+defineSeed('mux-video', ({ video }) => [{ _key: 'intro', title: 'Intro', source: video('intro.mp4') }])
+defineSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
+```
 
-Adding one = a new `src/integrations/<name>/` folder + a `./<name>` entry in the `exports`
-map + the SDK as a `dependency`. No engine changes, no registry. Composition is just calling
-each `seed*` function in the app's seed script (consistent return shape if a runner is wanted
-later). `mux/` is the reference implementation.
+Responsibilities split by ownership — the **ingest** (the SDK work) lives in the owning plugin;
+the **orchestration** lives here:
 
-> Trade-off: because the integrations are subpaths of one package (not a package each), their
-> SDKs are dependencies of `payload-seed`, so installing it pulls them even if you don't seed
-> that service. Payload avoids this by shipping a package per integration; if the weight
-> matters, an integration can graduate to its own `@pro-laico/payload-seed-<name>` package.
+- **The owning plugin owns ingest.** `@pro-laico/payload-mux` accepts a server-side `source`
+  (local path / URL) on its collection: a `beforeValidate` hook uploads it to Mux, waits for
+  the asset to be ready, folds in the metadata, and strips `source` (it's never persisted). So
+  the seed engine needs no Mux SDK and no credentials — and the same capability is reusable
+  outside seeding (`ingestMuxVideo()`, for imports/migrations).
+- **The engine owns orchestration.** A `SeedAssetProvider` (`{ token, collection, sourceDir }`)
+  is plain config: it adds a builder source token (`video()`), resolves that token's file under
+  `assetsDir/<sourceDir>` FIRST (mirroring image-asset uploads), and resolves it to
+  `{ file, ...options }` — which the owning collection's hook turns into the stored asset. The
+  provider collection is cleared via `payload.delete` so its `afterDelete` hook removes the
+  external asset; no per-record tagging needed (the doc lifecycle owns the asset lifecycle).
+- **Decoupled both ways.** The provider is structural config: the mux plugin returns it without
+  importing this package, and this package consumes it without importing the mux plugin or its
+  SDK. Alignment is by the `config.custom` stash + the collection's `source` contract, not types.
+
+Adding a provider for another service = the service's plugin gains a server-side `source`
+ingest + a `…AssetProvider()` helper; the seed engine is unchanged. Source-file resolution is
+generic (`engine/sources.ts`); `video` / `mux-video` is the reference implementation.
+
+> Trade-off: a reseed cleans external assets via the doc lifecycle (clear docs → `afterDelete`),
+> so an external asset can orphan if the DB is wiped without a normal clear — the same property
+> as Payload upload files. A deeper "delete everything in the external account" pass is left to
+> the owning plugin (e.g. a dedicated dev token), not the seed engine.
 
 ## Open / later
 

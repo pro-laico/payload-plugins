@@ -68,51 +68,53 @@ global, no import (like Payload's own generated types).
 | --- | --- | --- |
 | `definitions` | — | Your seed definitions (the `seed.ts` default exports). |
 | `assets` | `{ dir: 'assets', collection: 'media' }` | Where source files live + the upload collection. |
+| `assetProviders` | `[]` | External-asset providers (e.g. `muxAssetProvider()`) — see below. |
 | `adminButton` | `false` | Show the seed button in the admin header. |
 
-## Mux video seeding (`./mux`)
+## External assets (Mux video)
 
-The `./mux` subpath seeds [`@pro-laico/payload-mux`](../payload-mux) videos from **local
-files** — it uploads a clip to your Mux account exactly as the admin uploader would, the easy
-way to push content from local into a live Mux account without committing video files to git.
-It imports only the third-party `@mux/mux-node` SDK (a regular dependency of this package, so
-nothing extra to install) and reads the mux plugin's credentials from `config.custom` by
-convention; it never imports `@pro-laico/payload-mux`, so the two stay decoupled.
+Some collections store their "file" in an external service rather than a Payload upload — e.g.
+[`@pro-laico/payload-mux`](../payload-mux)'s `mux-video`, whose bytes live in Mux. An **asset
+provider** lets such a collection seed **like an image asset**: declare it with a source token
+and reference it anywhere, all within the normal seed run — no custom script.
 
-Per video it creates a Mux direct upload, PUTs the local file's bytes, **waits for Mux to
-finish encoding** (up to ~2 min), then creates the `mux-video` doc with the ready asset's
-metadata — tagged (Mux `passthrough`) so a reseed clears only what it made. Because it waits
-for `ready`, seeded videos are immediately playable with **no webhook needed** (a clip needing
-more than ~2 min throws rather than creating an incomplete doc).
+Register the provider (the mux plugin exports it) and seed a video with the `video()` source
+token. The provider is plain config; the actual upload to Mux happens in the mux plugin's own
+collection hook, so the two packages stay decoupled:
 
 ```ts
-// scripts/seed-mux.ts — run with `payload run scripts/seed-mux.ts`
-import { seedMuxVideos } from '@pro-laico/payload-seed/mux'
-import { getPayload } from 'payload'
-import config from '../src/payload.config'
+import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
+import { seedPlugin } from '@pro-laico/payload-seed'
+import videos from './seed/videos'
+import pages from './seed/pages'
 
-const payload = await getPayload({ config })
-
-await seedMuxVideos(payload, {
-  // One entry per clip to upload + create:
-  videos: [
-    {
-      title: 'Intro', // doc title — must be unique in the collection
-      file: 'intro.mp4', // local file, relative to `dir` → seed-assets/intro.mp4 (nested paths ok)
-      playbackPolicy: 'public', // 'public' (default) or 'signed'
-      posterTimestamp: 3, // optional poster frame, seconds in (default: middle of the video)
-    },
-  ],
-  dir: 'seed-assets', // base dir each video's `file` resolves against (default: 'seed-assets')
-  clear: 'tagged', // reseed cleanup: 'tagged' = only seed-created assets+docs; 'all' = wipe the Mux env
-  // collection: 'mux-video',   // override the collection slug
-  // corsOrigin: '*',           // CORS origin for the direct upload
-  // initSettings: { ... },     // override Mux creds; omitted fields read their MUX_* env var
-})
+plugins: [
+  muxVideoPlugin(),
+  seedPlugin({
+    definitions: [videos, pages],
+    assets: { dir: 'seed-assets' },          // video files live under seed-assets/videos/
+    assetProviders: [muxAssetProvider()],    // token 'video', collection 'mux-video', dir 'video'
+  }),
+]
 ```
 
-The lower-level `uploadMuxVideoFromFile(mux, path, opts)` and `clearMuxSeed(payload, mux, { scope })`
-are exported too if you want to orchestrate the flow yourself.
+```ts
+// seed/videos.ts — the source file is uploaded to Mux, then the doc is created with its metadata
+export default defineSeed('mux-video', ({ video }) => [
+  { _key: 'intro', title: 'Intro', source: video('intro.mp4', { playbackPolicy: 'public', posterTimestamp: 3 }) },
+])
+
+// seed/pages.ts — reference it like any other doc; the engine seeds the video first
+export default defineSeed('pages', ({ ref }) => [
+  { _key: 'home', title: 'Home', heroVideo: ref('mux-video', 'intro') },
+])
+```
+
+Running the seed (admin button / `POST /api/seed` / `payload seed`) uploads each `video()`
+source to Mux, **waits for the asset to be ready**, creates the `mux-video` doc with the asset
+metadata, then resolves every `ref('mux-video', …)`. Reseeds clear the provider collection via
+`payload.delete`, so the mux plugin's `afterDelete` hook removes the old Mux assets too. For
+one-off programmatic creation outside seeding, the mux plugin also exports `ingestMuxVideo()`.
 
 ## License
 

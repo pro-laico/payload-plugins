@@ -162,10 +162,9 @@ in that window. Anything slower is saved with just its `assetId` and left for th
 
 - The upload itself, and metadata for short videos (set synchronously by the 6s poll).
 - **Payload → Mux delete** — handled by the collection's `afterDelete` hook, not the webhook.
-- **Seeding** (`seedMuxVideos`) — the 6s limit does **not** apply here. The seeder waits for the
-  asset to finish encoding (up to ~2 min) and writes the full metadata into the doc itself, so
-  seeded videos are playable straight away whatever their length, webhook or not. (A clip that
-  takes longer than ~2 min throws rather than creating an incomplete doc.)
+- **Server-side ingest / seeding** (`ingestMuxVideo`) — the 6s limit does **not** apply. The
+  ingest waits for the asset to finish encoding and writes the full metadata into the doc
+  itself, so these videos are playable straight away whatever their length, webhook or not.
 - Playback of already-populated videos — the URLs compute on read from the stored playback id.
 
 ### Can it work without a live site?
@@ -179,49 +178,41 @@ the signature** on the receiving end — it can't make Mux reach `localhost`. So
 - **Local dev**: expose localhost with a tunnel (`cloudflared tunnel --url http://localhost:3000`
   or ngrok), set that URL as the webhook, and keep `MUX_WEBHOOK_SECRET` in your local env.
 
-Without a tunnel or deployment, short-video uploads, Payload→Mux delete, and seeding all still
-work — only the webhook-dependent items above wait until the endpoint is reachable.
+Without a tunnel or deployment, short-video uploads, Payload→Mux delete, and server-side
+ingest / seeding all still work — only the webhook-dependent items above wait until the
+endpoint is reachable.
 
-## Seeding from local files
+## Creating a video from a file (server-side ingest)
 
-Local-file seeding lives in the **seed plugin**, not here — the two packages stay fully
-decoupled (neither imports the other). [`@pro-laico/payload-seed`](/docs/plugins/payload-seed)
-exposes a Mux helper on its `./mux` subpath, `seedMuxVideos`, that pushes local clips into your
-Mux account from a script. It reads this plugin's credentials from `config.custom`, so you pass
-only `payload` and the videos.
-
-**What it does, per video:** creates a Mux direct upload → PUTs the local file's bytes →
-**waits for Mux to finish encoding** (up to ~2 min) → creates the `mux-video` doc with the
-ready asset's metadata, tagged (Mux `passthrough`) so a reseed clears only what it made.
-Because it waits for `ready`, seeded videos carry full `playbackOptions` and are **immediately
-playable — no webhook needed**, whatever their length (a clip needing more than ~2 min throws
-rather than creating an incomplete doc).
+Besides the admin uploader (browser-side), a `mux-video` can be created **server-side** from a
+local file or URL — handy for imports, migrations, and seeding. Pass a `source`; the
+collection's `beforeValidate` hook uploads it to Mux, waits for the asset to be ready, fills in
+the metadata, and discards `source` (it's never stored):
 
 ```ts
-// scripts/seed-mux.ts — run with `payload run scripts/seed-mux.ts`
-import { seedMuxVideos } from '@pro-laico/payload-seed/mux'
-import { getPayload } from 'payload'
-import config from '../src/payload.config'
+import { ingestMuxVideo } from '@pro-laico/payload-mux'
 
-const payload = await getPayload({ config })
-
-await seedMuxVideos(payload, {
-  // One entry per clip to upload + create:
-  videos: [
-    {
-      title: 'Intro', // doc title — must be unique in the collection
-      file: 'intro.mp4', // local file, relative to `dir` → seed-assets/intro.mp4 (nested paths ok)
-      playbackPolicy: 'public', // 'public' (default) or 'signed'
-      posterTimestamp: 3, // optional poster frame, seconds in (default: middle of the video)
-    },
-  ],
-  dir: 'seed-assets', // base dir each video's `file` resolves against (default: 'seed-assets')
-  clear: 'tagged', // reseed cleanup: 'tagged' = only seed-created assets+docs; 'all' = wipe the Mux env
-  // collection: 'mux-video',   // override the collection slug
-  // corsOrigin: '*',           // CORS origin for the direct upload
-  // initSettings: { ... },     // override Mux creds; omitted fields read their MUX_* env var
-})
+await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro', playbackPolicy: 'public' })
+// or a URL: ingestMuxVideo(payload, { source: 'https://example.com/intro.mp4', title: 'Intro' })
 ```
 
-The Mux SDK ships with the seed plugin, so there's nothing extra to install. See the
-[seed plugin docs](/docs/plugins/payload-seed#mux-video-seeding) for the full reference.
+The lower-level `ingestMuxAsset(mux, source, opts)` (create upload → PUT bytes → poll until
+ready → return the asset) is exported too.
+
+### Declarative seeding with payload-seed
+
+For declarative seeding, this plugin exports `muxAssetProvider()` so `mux-video` seeds **like an
+image asset** via [`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers)
+— declared with a `video('clip.mp4')` token and run by the normal seed flow, no script. The
+provider is plain config (the seed package never imports this one, nor the Mux SDK; the upload
+runs in this plugin's hook), so the two packages stay fully decoupled.
+
+```ts
+import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
+```
+
+See the [seed plugin docs](/docs/plugins/payload-seed#external-assets-asset-providers) for the
+full reference.
