@@ -1,5 +1,8 @@
-import type { AssetOptions } from '@mux/mux-node/resources/video/assets.mjs'
+import type Mux from '@mux/mux-node'
 import type { PayloadRequest, TypedCollection } from 'payload'
+
+/** Mux's asset-creation params, via the SDK namespace (avoids a deep subpath import). */
+type AssetOptions = Mux.Video.Assets.AssetOptions
 
 /** Mux API credentials + webhook/signing secrets. Pull these from the Mux dashboard. */
 export interface MuxVideoInitSettings {
