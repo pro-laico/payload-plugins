@@ -3,8 +3,8 @@ import type { Payload } from 'payload'
 /**
  * Shared toolkit for seed integrations. An "integration" seeds the data of another
  * `@pro-laico/*` plugin (Mux videos, etc.) from local sources, while staying fully decoupled
- * from that plugin: it imports only the relevant third-party SDK (an optional peer dependency)
- * and reads the plugin's credentials/config off `config.custom` by string key — never
+ * from that plugin: it imports only the relevant third-party SDK (a regular dependency, per
+ * Payload's convention) and reads the plugin's credentials/config off `config.custom` by string key — never
  * importing the plugin package. See `mux/` for the reference implementation, and DESIGN.md
  * ("Integrations") for the convention each one follows.
  */

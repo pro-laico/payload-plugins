@@ -1,9 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "typecheck": {},
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
     "build": {
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "test": {
+      "cache": false
     },
     "//#check:ci": { "cache": false }
   }

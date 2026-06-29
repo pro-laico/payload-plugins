@@ -166,12 +166,13 @@ Beyond the core engine, the seed package hosts **integrations** that seed the da
 but they stay **fully decoupled** from those plugins.
 
 Each integration is a folder `src/integrations/<name>/` exposed at its own package subpath
-(`@pro-laico/payload-seed/<name>`), so a consumer pulls only the one they use and only that
-integration's optional-peer SDK. The convention:
+(`@pro-laico/payload-seed/<name>`). The convention (which mirrors how Payload's own SDK
+integrations — `plugin-stripe`, `storage-s3` — declare deps):
 
-- **Imports** only the relevant third-party SDK (declared as an **optional** peer dependency),
-  never the sibling plugin package. It reads the plugin's credentials/config off
-  `config.custom.<key>` by string (via `readPluginConfig`) — plugins expose their options
+- **Imports** only the relevant third-party SDK (declared as a regular `dependency`, following
+  Payload's convention that external SDKs are dependencies, not peers — Payload uses no
+  optional peers), never the sibling plugin package. It reads the plugin's credentials/config
+  off `config.custom.<key>` by string (via `readPluginConfig`) — plugins expose their options
   there for exactly this. Alignment between the two packages is by convention, not types.
 - **Shape**: a primary `seed<Thing>s(payload, options): Promise<SeedIntegrationResult>`, an
   optional `clear<Thing>(...)`, and its own types. Credentials default to the plugin's
@@ -182,9 +183,14 @@ integration's optional-peer SDK. The convention:
   `passthrough`) so a reseed clears only what it made by default, with an opt-in `'all'`.
 
 Adding one = a new `src/integrations/<name>/` folder + a `./<name>` entry in the `exports`
-map + the SDK as an optional peer. No engine changes, no registry. Composition is just calling
+map + the SDK as a `dependency`. No engine changes, no registry. Composition is just calling
 each `seed*` function in the app's seed script (consistent return shape if a runner is wanted
 later). `mux/` is the reference implementation.
+
+> Trade-off: because the integrations are subpaths of one package (not a package each), their
+> SDKs are dependencies of `payload-seed`, so installing it pulls them even if you don't seed
+> that service. Payload avoids this by shipping a package per integration; if the weight
+> matters, an integration can graduate to its own `@pro-laico/payload-seed-<name>` package.
 
 ## Open / later
 

@@ -16,6 +16,10 @@
     "video",
     "upload"
   ],
+  "sideEffects": [
+    "*.scss",
+    "*.css"
+  ],
   "type": "module",
   "publishConfig": {
     "access": "public",
@@ -23,18 +27,22 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
+        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
       "./components/MuxUploaderField": {
+        "import": "./dist/components/MuxUploaderField.js",
         "types": "./dist/components/MuxUploaderField.d.ts",
         "default": "./dist/components/MuxUploaderField.js"
       },
       "./components/MuxVideoGifCell": {
+        "import": "./dist/components/MuxVideoGifCell.js",
         "types": "./dist/components/MuxVideoGifCell.d.ts",
         "default": "./dist/components/MuxVideoGifCell.js"
       },
       "./components/MuxVideoImageCell": {
+        "import": "./dist/components/MuxVideoImageCell.js",
         "types": "./dist/components/MuxVideoImageCell.d.ts",
         "default": "./dist/components/MuxVideoImageCell.js"
       }
@@ -44,18 +52,22 @@
   "types": "./src/index.ts",
   "exports": {
     ".": {
+      "import": "./src/index.ts",
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./components/MuxUploaderField": {
+      "import": "./src/components/MuxUploaderField.tsx",
       "types": "./src/components/MuxUploaderField.tsx",
       "default": "./src/components/MuxUploaderField.tsx"
     },
     "./components/MuxVideoGifCell": {
+      "import": "./src/components/MuxVideoGifCell.tsx",
       "types": "./src/components/MuxVideoGifCell.tsx",
       "default": "./src/components/MuxVideoGifCell.tsx"
     },
     "./components/MuxVideoImageCell": {
+      "import": "./src/components/MuxVideoImageCell.tsx",
       "types": "./src/components/MuxVideoImageCell.tsx",
       "default": "./src/components/MuxVideoImageCell.tsx"
     }
@@ -74,29 +86,23 @@
   },
   "dependencies": {
     "@mux/mux-node": "^14.1.1",
+    "@mux/mux-player-react": "^3.13.0",
     "@mux/mux-uploader-react": "^1.5.0"
   },
   "peerDependencies": {
-    "@mux/mux-player-react": "^3.13.0",
-    "@payloadcms/ui": ">=3.0.0",
-    "payload": ">=3.0.0",
-    "react": ">=19.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@payloadcms/ui": {
-      "optional": true
-    },
-    "react": {
-      "optional": true
-    }
+    "@payloadcms/ui": "^3.0.0",
+    "payload": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@mux/mux-player-react": "^3.13.0",
     "@payloadcms/ui": "^3.85.1",
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "payload": "^3.85.1",
     "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^6.0.3"
   },
   "engines": {

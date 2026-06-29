@@ -10,8 +10,8 @@ import { pollUntil, readPluginConfig, type SeedIntegrationResult, seedLog } from
  * way to push content from local into a live Mux account without committing video files.
  *
  * Decoupled from `@pro-laico/payload-mux`: it imports only the third-party `@mux/mux-node` SDK
- * (an optional peer dependency) and reads the plugin's credentials from `config.custom` by
- * string. The two packages are kept aligned by convention.
+ * (a regular dependency of this package) and reads the plugin's credentials from `config.custom`
+ * by string. The two packages are kept aligned by convention.
  */
 
 export type { SeedIntegrationResult } from '../shared'

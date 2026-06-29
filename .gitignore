@@ -10,6 +10,9 @@ node_modules
 # Output of 'npm pack'
 *.tgz
 
+# Output of the audit-dependencies script
+audit_output.json
+
 # Built package output — generated on prepack, published via publishConfig (src→dist
 # swap). Dev consumes src directly, so dist is never committed.
 packages/*/dist
