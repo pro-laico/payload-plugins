@@ -65,7 +65,7 @@ muxVideoPlugin({
 
 | Option | Type | Default | |
 | --- | --- | --- | --- |
-| `enabled` | `boolean` | **required** | Set `false` to skip the collection, endpoints, and hooks. |
+| `enabled` | `boolean` | `true` | Set `false` to skip the collection, endpoints, and hooks. |
 | `initSettings` | `MuxVideoInitSettings` | **required** | Mux token id/secret + webhook secret (and the JWT key pair for signed playback). |
 | `uploadSettings` | `MuxVideoUploadSettings` | **required** | `cors_origin` plus optional `new_asset_settings` (e.g. `playback_policy`). |
 | `extendCollection` | `string` | — | Slug of an existing collection to extend instead of creating `mux-video`. |

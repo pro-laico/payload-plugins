@@ -38,8 +38,9 @@ export interface MuxVideoSignedUrlOptions {
 
 /** Configuration for the Mux Video plugin. */
 export interface MuxVideoPluginOptions {
-  /** Set to `false` to disable the plugin (collection, endpoints, and hooks are skipped). */
-  enabled: boolean
+  /** Set to `false` to disable the plugin (collection, endpoints, and hooks are skipped).
+   *  @default true */
+  enabled?: boolean
   /** Mux credentials + webhook secret. */
   initSettings: MuxVideoInitSettings
   /** Upload settings (CORS origin + new-asset settings). */

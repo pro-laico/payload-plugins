@@ -1,16 +1,20 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, PayloadHandler } from 'payload'
-import { getAssetMetadata } from '../lib/getAssetMetadata'
+import { type AssetLike, getAssetMetadata } from '../lib/getAssetMetadata'
 import type { MuxVideoPluginOptions } from '../types'
 
 const ok = () => new Response('Success!', { status: 200 })
 const noop = () => new Response('Error', { status: 204 })
 
 /**
- * `POST /api/mux/webhook` — keep Payload in sync with Mux. Verifies the Mux signature, then:
- * sets metadata on `video.asset.ready` / `updated`, deletes the doc on `video.asset.deleted`,
- * logs on `video.asset.errored`, and (when `autoCreateOnWebhook`) backfills a doc for an
- * asset Payload doesn't have yet. Always 200s after a verified event so Mux stops retrying.
+ * `POST /api/mux/webhook` — keep Payload in sync with Mux. `unwrap()` verifies the Mux
+ * signature and returns a typed event; we then set metadata on `video.asset.ready` /
+ * `updated`, delete the doc on `video.asset.deleted`, log on `video.asset.errored`, and
+ * (when `autoCreateOnWebhook`) backfill a doc for an asset Payload doesn't have yet. Always
+ * 200s after a verified event so Mux stops retrying.
+ *
+ * Note: Payload pre-parses the request body, so the signature is verified against a
+ * re-serialized payload rather than the original bytes — unavoidable at the endpoint layer.
  */
 export const muxWebhookHandler =
   (mux: Mux, pluginOptions: MuxVideoPluginOptions): PayloadHandler =>
@@ -20,28 +24,28 @@ export const muxWebhookHandler =
     const body = await req.json()
     if (!body) return Response.json({ error: 'Bad request.' }, { status: 400 })
 
+    let event: Awaited<ReturnType<typeof mux.webhooks.unwrap>>
     try {
-      mux.webhooks.verifySignature(JSON.stringify(body), req.headers)
+      event = await mux.webhooks.unwrap(JSON.stringify(body), req.headers)
     } catch (err) {
       req.payload.logger.error({ err, msg: '[payload-mux] Webhook signature verification failed' })
       return Response.json({ error: 'Invalid signature.' }, { status: 401 })
     }
 
     const collection = ((pluginOptions.extendCollection as string) ?? 'mux-video') as CollectionSlug
-    const event = body as { type?: string; data?: Record<string, unknown>; object?: { id?: string } }
-    const assetId = event.object?.id
+    const assetId = event.object.id
 
     const videos = await req.payload.find({ collection, where: { assetId: { equals: assetId } }, limit: 1, pagination: false })
     const video = videos.totalDocs > 0 ? videos.docs[0] : null
 
     if (!video) {
       const backfillable = event.type === 'video.asset.created' || event.type === 'video.asset.ready' || event.type === 'video.asset.updated'
-      if (pluginOptions.autoCreateOnWebhook && backfillable && event.data) {
+      if (pluginOptions.autoCreateOnWebhook && backfillable) {
         try {
-          const meta = event.data.meta as { title?: string } | undefined
+          const meta = (event.data as { meta?: { title?: string } }).meta
           await req.payload.create({
             collection,
-            data: { title: meta?.title || assetId, assetId, ...getAssetMetadata(event.data as never) } as never,
+            data: { title: meta?.title || assetId, assetId, ...getAssetMetadata(event.data as AssetLike) } as never,
           })
         } catch (err) {
           req.payload.logger.error({ err, msg: `[payload-mux] Failed to backfill asset '${assetId}'` })
@@ -55,13 +59,13 @@ export const muxWebhookHandler =
       switch (event.type) {
         case 'video.asset.ready':
         case 'video.asset.updated':
-          await req.payload.update({ collection, id: video.id, data: { ...getAssetMetadata(event.data as never) } as never })
+          await req.payload.update({ collection, id: video.id, data: { ...getAssetMetadata(event.data) } as never })
           break
         case 'video.asset.deleted':
           await req.payload.delete({ collection, id: video.id })
           break
         case 'video.asset.errored':
-          if (event.data?.errors) req.payload.logger.error({ assetId, errors: event.data.errors, msg: '[payload-mux] Asset errored' })
+          if (event.data.errors) req.payload.logger.error({ assetId, errors: event.data.errors, msg: '[payload-mux] Asset errored' })
           break
         default:
           break
