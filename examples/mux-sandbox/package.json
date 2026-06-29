@@ -1,0 +1,38 @@
+{
+  "name": "mux-sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3051",
+    "build": "next build",
+    "start": "next start -p 3051",
+    "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",
+    "generate:types": "pnpm payload generate:types",
+    "generate:importmap": "pnpm payload generate:importmap",
+    "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db MUX_TOKEN_ID=test MUX_TOKEN_SECRET=test MUX_WEBHOOK_SIGNING_SECRET=test vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mux/mux-player-react": "^3.4.1",
+    "@payloadcms/db-sqlite": "^3.85.1",
+    "@payloadcms/next": "^3.85.1",
+    "@payloadcms/richtext-lexical": "^3.85.1",
+    "@payloadcms/ui": "^3.85.1",
+    "@pro-laico/payload-mux": "workspace:*",
+    "cross-env": "^10.1.0",
+    "graphql": "^16.14.2",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "name": "@pro-laico/payload-mux",
+  "version": "0.0.0",
+  "description": "Mux Video for Payload CMS: a Videos collection that uploads straight to Mux, signed or public playback, virtual playback/poster/gif URLs, two-way delete, and an admin uploader + list-view previews.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pro-laico/payload-plugins.git",
+    "directory": "packages/payload-mux"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "mux",
+    "video",
+    "upload"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./components/MuxUploaderField": {
+        "types": "./dist/components/MuxUploaderField.d.ts",
+        "default": "./dist/components/MuxUploaderField.js"
+      },
+      "./components/MuxVideoGifCell": {
+        "types": "./dist/components/MuxVideoGifCell.d.ts",
+        "default": "./dist/components/MuxVideoGifCell.js"
+      },
+      "./components/MuxVideoImageCell": {
+        "types": "./dist/components/MuxVideoImageCell.d.ts",
+        "default": "./dist/components/MuxVideoImageCell.js"
+      }
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/MuxUploaderField": {
+      "types": "./src/components/MuxUploaderField.tsx",
+      "default": "./src/components/MuxUploaderField.tsx"
+    },
+    "./components/MuxVideoGifCell": {
+      "types": "./src/components/MuxVideoGifCell.tsx",
+      "default": "./src/components/MuxVideoGifCell.tsx"
+    },
+    "./components/MuxVideoImageCell": {
+      "types": "./src/components/MuxVideoImageCell.tsx",
+      "default": "./src/components/MuxVideoImageCell.tsx"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm clean && pnpm build:types && pnpm build:swc && pnpm build:assets",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "prepack": "pnpm build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck",
+    "build:assets": "copyfiles -u 1 \"src/**/*.css\" dist"
+  },
+  "dependencies": {
+    "@mux/mux-node": "^11.1.0",
+    "@mux/mux-uploader-react": "^1.2.0"
+  },
+  "peerDependencies": {
+    "@mux/mux-player-react": "^3.4.1",
+    "@payloadcms/ui": ">=3.0.0",
+    "payload": ">=3.0.0",
+    "react": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@payloadcms/ui": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mux/mux-player-react": "^3.4.1",
+    "@payloadcms/ui": "^3.85.1",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

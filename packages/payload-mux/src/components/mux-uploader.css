@@ -1,0 +1,19 @@
+.mux-uploader {
+  margin-bottom: var(--base);
+}
+
+.mux-uploader__processing::after {
+  display: inline-block;
+  overflow: hidden;
+  width: 0;
+  vertical-align: bottom;
+  /* ascii code for the ellipsis character */
+  content: "\2026";
+  animation: mux-ellipsis steps(5, end) 1.5s infinite;
+}
+
+@keyframes mux-ellipsis {
+  to {
+    width: 2ch;
+  }
+}
