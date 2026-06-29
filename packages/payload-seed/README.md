@@ -70,6 +70,45 @@ global, no import (like Payload's own generated types).
 | `assets` | `{ dir: 'assets', collection: 'media' }` | Where source files live + the upload collection. |
 | `adminButton` | `false` | Show the seed button in the admin header. |
 
+## Mux video seeding (`./mux`)
+
+The `./mux` subpath seeds [`@pro-laico/payload-mux`](../payload-mux) videos from **local
+files** — it uploads a clip to your Mux account exactly as the admin uploader would, the easy
+way to push content from local into a live Mux account without committing video files to git.
+It imports only the third-party `@mux/mux-node` SDK (an **optional peer dependency** — install
+it to use this) and reads the mux plugin's credentials from `config.custom` by convention; it
+never imports `@pro-laico/payload-mux`, so the two stay decoupled.
+
+```ts
+// scripts/seed-mux.ts — run with `payload run scripts/seed-mux.ts`
+import { seedMuxVideos } from '@pro-laico/payload-seed/mux'
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+
+const payload = await getPayload({ config })
+await seedMuxVideos(payload, {
+  dir: 'seed-assets',          // local clips, relative dir (keep them out of git)
+  clear: 'tagged',             // idempotent reseed; 'all' wipes the whole (dev) Mux environment
+  videos: [{ title: 'Intro', file: 'intro.mp4', playbackPolicy: 'public' }],
+})
+```
+
+`seedMuxVideos(payload, options)` options:
+
+| Option | Default | |
+| --- | --- | --- |
+| `videos` | — | `{ title, file, playbackPolicy?, posterTimestamp? }[]` to upload + create. |
+| `dir` | `'seed-assets'` | Directory the `file` paths are relative to. |
+| `clear` | — | `true`/`'tagged'` clears only seed-created (tagged) assets + docs; `'all'` wipes every asset in the Mux environment. |
+| `collection` | `'mux-video'` | Override the collection slug. |
+| `initSettings` | `MUX_*` env vars | Override Mux credentials; omitted fields read their `MUX_*` env var. |
+| `corsOrigin` | `'*'` | CORS origin for the direct upload. |
+
+Each uploaded asset is stamped with a Mux `passthrough` tag, so `clear: 'tagged'` removes only
+what the seed created — never assets you uploaded by hand or in the dashboard. The lower-level
+`uploadMuxVideoFromFile(mux, path, opts)` and `clearMuxSeed(payload, mux, { scope })` are
+exported too if you want to orchestrate the flow yourself.
+
 ## License
 
 MIT

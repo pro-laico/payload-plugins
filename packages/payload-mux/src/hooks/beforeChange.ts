@@ -20,6 +20,10 @@ export const getBeforeChangeHook =
     let data = { ...incomingData }
     const previousAssetId: string | undefined = originalDoc?.assetId
 
+    // Pre-resolved data (seed / import / webhook backfill): the doc already carries its
+    // assetId and playback options, so there's nothing to fetch from Mux. Pass it through.
+    if (data.assetId && Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0) return data
+
     if (previousAssetId === data.assetId) return data
 
     try {

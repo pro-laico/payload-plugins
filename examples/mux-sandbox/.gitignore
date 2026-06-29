@@ -11,6 +11,10 @@ out
 # Uploaded media (written at runtime to the local-disk storage)
 media/
 
+# Local seed video files — uploaded to Mux from local, never committed
+seed-assets/*
+!seed-assets/.gitkeep
+
 .env
 .env*.local
 next-env.d.ts

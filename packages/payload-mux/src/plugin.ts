@@ -11,15 +11,19 @@ import type { MuxVideoPluginOptions } from './types'
  * registers the upload + webhook endpoints, and wires the admin uploader. Direct uploads go
  * straight to Mux; a webhook keeps Payload in sync and deletes cascade both ways.
  *
- *   muxVideoPlugin({ enabled: true, initSettings: {...}, uploadSettings: { cors_origin } })
+ * Credentials default to the standard `MUX_*` env vars, so `muxVideoPlugin()` is enough — pass
+ * options only to override (custom env var name, playback policy, etc).
  */
 export const muxVideoPlugin =
-  (pluginOptions: MuxVideoPluginOptions): Plugin =>
+  (pluginOptions: MuxVideoPluginOptions = {}): Plugin =>
   (incomingConfig: Config): Config => {
     if (pluginOptions.enabled === false) return incomingConfig
 
     const mux = new Mux(pluginOptions.initSettings)
-    const config: Config = { ...incomingConfig }
+    // Expose the options on config.custom so external tooling (e.g. a seeder) can build a Mux
+    // client from the already-configured credentials, given just `payload` — read by string
+    // key, no import, so other packages stay decoupled from this one.
+    const config: Config = { ...incomingConfig, custom: { ...incomingConfig.custom, payloadMux: { options: pluginOptions } } }
 
     if (pluginOptions.extendCollection) {
       const target = config.collections?.find((c) => c.slug === pluginOptions.extendCollection)

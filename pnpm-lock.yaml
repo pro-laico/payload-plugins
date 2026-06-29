@@ -87,6 +87,9 @@ importers:
 
   examples/mux-sandbox:
     dependencies:
+      '@mux/mux-node':
+        specifier: ^14.1.1
+        version: 14.1.1
       '@mux/mux-player-react':
         specifier: ^3.13.0
         version: 3.13.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -105,6 +108,9 @@ importers:
       '@pro-laico/payload-mux':
         specifier: workspace:*
         version: link:../../packages/payload-mux
+      '@pro-laico/payload-seed':
+        specifier: workspace:*
+        version: link:../../packages/payload-seed
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -231,6 +237,9 @@ importers:
 
   packages/payload-seed:
     devDependencies:
+      '@mux/mux-node':
+        specifier: ^14.1.1
+        version: 14.1.1
       '@payloadcms/ui':
         specifier: ^3.85.1
         version: 3.85.1(@types/react@19.2.17)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)

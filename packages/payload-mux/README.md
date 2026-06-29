@@ -13,50 +13,40 @@ pnpm add @pro-laico/payload-mux @mux/mux-player-react
 
 ## Setup
 
-Generate a token + webhook signing secret in the Mux dashboard, then add the plugin. Point
-the Mux webhook at `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if you've
-customized Payload's API route).
+Set your Mux credentials as the **standard `MUX_*` environment variables** — the plugin (and
+the Mux SDK) read them automatically, so adding the plugin takes no arguments:
 
-### Public playback
+```bash
+MUX_TOKEN_ID=...
+MUX_TOKEN_SECRET=...
+MUX_WEBHOOK_SECRET=...        # for signed playback also: MUX_SIGNING_KEY, MUX_PRIVATE_KEY
+```
 
 ```ts
 import { buildConfig } from 'payload'
 import { muxVideoPlugin } from '@pro-laico/payload-mux'
 
 export default buildConfig({
-  plugins: [
-    muxVideoPlugin({
-      enabled: true,
-      initSettings: {
-        tokenId: process.env.MUX_TOKEN_ID || '',
-        tokenSecret: process.env.MUX_TOKEN_SECRET || '',
-        webhookSecret: process.env.MUX_WEBHOOK_SIGNING_SECRET || '',
-      },
-      uploadSettings: {
-        cors_origin: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-      },
-    }),
-  ],
+  plugins: [muxVideoPlugin()],
 })
 ```
 
-### Signed playback
+Point the Mux webhook at `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if you've
+customized Payload's API route). `cors_origin` for uploads defaults to
+`process.env.NEXT_PUBLIC_SERVER_URL`.
 
-Add the JWT key pair to `initSettings` and set the asset playback policy to `signed`:
+### Overriding
+
+Pass options only to override a default — e.g. a non-standard env var name, signed playback,
+or a custom CORS origin. Any `initSettings` field you omit still falls back to its `MUX_*` env
+var:
 
 ```ts
 muxVideoPlugin({
-  enabled: true,
-  initSettings: {
-    tokenId: process.env.MUX_TOKEN_ID || '',
-    tokenSecret: process.env.MUX_TOKEN_SECRET || '',
-    webhookSecret: process.env.MUX_WEBHOOK_SIGNING_SECRET || '',
-    jwtSigningKey: process.env.MUX_JWT_KEY_ID || '',
-    jwtPrivateKey: process.env.MUX_JWT_KEY || '',
-  },
+  initSettings: { webhookSecret: process.env.MY_WEBHOOK_SECRET }, // tokenId/secret still from env
   uploadSettings: {
-    cors_origin: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-    new_asset_settings: { playback_policy: ['signed'] },
+    cors_origin: 'https://mysite.com',
+    new_asset_settings: { playback_policy: ['signed'] },          // signed playback
   },
 })
 ```
@@ -66,8 +56,8 @@ muxVideoPlugin({
 | Option | Type | Default | |
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Set `false` to skip the collection, endpoints, and hooks. |
-| `initSettings` | `MuxVideoInitSettings` | **required** | Mux token id/secret + webhook secret (and the JWT key pair for signed playback). |
-| `uploadSettings` | `MuxVideoUploadSettings` | **required** | `cors_origin` plus optional `new_asset_settings` (e.g. `playback_policy`). |
+| `initSettings` | `MuxVideoInitSettings` | `MUX_*` env vars | Override Mux credentials per-field; omitted fields read their `MUX_*` env var. |
+| `uploadSettings` | `MuxVideoUploadSettings` | `cors_origin` from `NEXT_PUBLIC_SERVER_URL` | `cors_origin` plus optional `new_asset_settings` (e.g. `playback_policy`). |
 | `extendCollection` | `string` | — | Slug of an existing collection to extend instead of creating `mux-video`. |
 | `access` | `(req) => boolean \| Promise<boolean>` | logged-in admin | Gate who can request uploads / read videos. |
 | `signedUrlOptions` | `{ expiration?: string }` | `{ expiration: '1d' }` | Signed-URL lifetime. |
@@ -75,6 +65,22 @@ muxVideoPlugin({
 | `animatedGifExtension` | `'gif' \| 'webp'` | `'gif'` | Animated preview format. |
 | `adminThumbnail` | `'gif' \| 'image' \| 'none'` | `'gif'` | List-view thumbnail style. |
 | `autoCreateOnWebhook` | `boolean` | `false` | Backfill a Payload doc for assets uploaded directly in Mux. |
+
+## Seeding videos from local files
+
+To seed `mux-video` docs from local clips (uploading them to Mux exactly as the admin uploader
+would — handy for getting content from local into a live Mux account without committing video
+files), use the **seed plugin's** Mux helper, [`@pro-laico/payload-seed/mux`](../payload-seed#mux-video-seeding):
+
+```ts
+import { seedMuxVideos } from '@pro-laico/payload-seed/mux'
+
+await seedMuxVideos(payload, { dir: 'seed-assets', clear: 'tagged', videos: [{ title: 'Intro', file: 'intro.mp4' }] })
+```
+
+It reads this plugin's credentials by convention (the two packages stay decoupled — neither
+imports the other) and requires `@mux/mux-node`. This plugin cooperates passively: its
+`beforeChange` hook skips the Mux round-trip for pre-resolved (seeded) data.
 
 ## Use a video
 

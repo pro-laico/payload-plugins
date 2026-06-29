@@ -158,6 +158,34 @@ Run order (CLI `seed()` or `POST /api/seed`):
 - Running `payload generate:types` after changing seed `_key`s — the same command already
   run after schema changes; it re-injects the `SeedRegistry`.
 
+## Integrations (`src/integrations/`)
+
+Beyond the core engine, the seed package hosts **integrations** that seed the data of other
+`@pro-laico/*` plugins from local sources — e.g. uploading local video files to Mux for
+`@pro-laico/payload-mux`. They live here (not in each plugin) so all seeding is in one place,
+but they stay **fully decoupled** from those plugins.
+
+Each integration is a folder `src/integrations/<name>/` exposed at its own package subpath
+(`@pro-laico/payload-seed/<name>`), so a consumer pulls only the one they use and only that
+integration's optional-peer SDK. The convention:
+
+- **Imports** only the relevant third-party SDK (declared as an **optional** peer dependency),
+  never the sibling plugin package. It reads the plugin's credentials/config off
+  `config.custom.<key>` by string (via `readPluginConfig`) — plugins expose their options
+  there for exactly this. Alignment between the two packages is by convention, not types.
+- **Shape**: a primary `seed<Thing>s(payload, options): Promise<SeedIntegrationResult>`, an
+  optional `clear<Thing>(...)`, and its own types. Credentials default to the plugin's
+  `config.custom` stash with an explicit `initSettings` override.
+- **Reuses `shared.ts`** — `pollUntil`, `delay`, `readPluginConfig`, `seedLog`, and the
+  `SeedIntegrationResult` type — so integrations stay small and consistent.
+- **Destructive clears are precise**: the integration tags the records it creates (e.g. Mux
+  `passthrough`) so a reseed clears only what it made by default, with an opt-in `'all'`.
+
+Adding one = a new `src/integrations/<name>/` folder + a `./<name>` entry in the `exports`
+map + the SDK as an optional peer. No engine changes, no registry. Composition is just calling
+each `seed*` function in the app's seed script (consistent return shape if a runner is wanted
+later). `mux/` is the reference implementation.
+
 ## Open / later
 
 - **Autofill** (faker-style generation of unspecified fields) — explicitly out of scope for

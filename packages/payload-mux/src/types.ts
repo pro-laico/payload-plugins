@@ -4,17 +4,22 @@ import type { PayloadRequest, TypedCollection } from 'payload'
 /** Mux's asset-creation params, via the SDK namespace (avoids a deep subpath import). */
 type AssetOptions = Mux.Video.Assets.AssetOptions
 
-/** Mux API credentials + webhook/signing secrets. Pull these from the Mux dashboard. */
+/**
+ * Mux API credentials + webhook/signing secrets. Every field is optional: anything you don't
+ * pass is read from the standard Mux environment variables by the SDK —
+ * `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `MUX_SIGNING_KEY`,
+ * `MUX_PRIVATE_KEY`. Only pass a field to override it (e.g. a non-standard env var name).
+ */
 export interface MuxVideoInitSettings {
-  /** The Mux token ID. */
-  tokenId: string
-  /** The Mux token secret. */
-  tokenSecret: string
-  /** The secret used to verify incoming Mux webhooks. */
-  webhookSecret: string
-  /** JWT signing key ID. Only required for the signed-playback setup. */
+  /** The Mux token ID. @default process.env.MUX_TOKEN_ID */
+  tokenId?: string
+  /** The Mux token secret. @default process.env.MUX_TOKEN_SECRET */
+  tokenSecret?: string
+  /** The secret used to verify incoming Mux webhooks. @default process.env.MUX_WEBHOOK_SECRET */
+  webhookSecret?: string
+  /** JWT signing key ID (signed playback). @default process.env.MUX_SIGNING_KEY */
   jwtSigningKey?: string
-  /** JWT private key. Only required for the signed-playback setup. */
+  /** JWT private key (signed playback). @default process.env.MUX_PRIVATE_KEY */
   jwtPrivateKey?: string
 }
 
@@ -27,8 +32,9 @@ export type MuxVideoNewAssetSettings = AssetOptions & {
 
 /** Settings applied to every upload. */
 export interface MuxVideoUploadSettings {
-  /** Required CORS origin for the direct-upload URL (usually your site URL). */
-  cors_origin: string
+  /** CORS origin for the direct-upload URL (usually your site URL).
+   *  @default process.env.NEXT_PUBLIC_SERVER_URL, falling back to '*' */
+  cors_origin?: string
   /** Extra settings forwarded to Mux when the asset is created. */
   new_asset_settings?: MuxVideoNewAssetSettings
 }
@@ -44,10 +50,12 @@ export interface MuxVideoPluginOptions {
   /** Set to `false` to disable the plugin (collection, endpoints, and hooks are skipped).
    *  @default true */
   enabled?: boolean
-  /** Mux credentials + webhook secret. */
-  initSettings: MuxVideoInitSettings
-  /** Upload settings (CORS origin + new-asset settings). */
-  uploadSettings: MuxVideoUploadSettings
+  /** Mux credentials + webhook secret. Optional — fields default to the standard `MUX_*`
+   *  environment variables, so you only pass this to override an env var. */
+  initSettings?: MuxVideoInitSettings
+  /** Upload settings (CORS origin + new-asset settings). Optional — `cors_origin` defaults
+   *  to `NEXT_PUBLIC_SERVER_URL`. */
+  uploadSettings?: MuxVideoUploadSettings
   /** Slug of an existing collection to extend with Mux fields instead of creating the
    *  default `mux-video` collection. */
   extendCollection?: keyof TypedCollection

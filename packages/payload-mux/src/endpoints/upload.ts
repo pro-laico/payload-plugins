@@ -11,10 +11,9 @@ export const createMuxUploadHandler =
     const allowed = (await pluginOptions.access?.(req)) ?? defaultAccess(req)
     if (!allowed) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
-    const { cors_origin, new_asset_settings } = pluginOptions.uploadSettings
     const upload = await mux.video.uploads.create({
-      cors_origin,
-      new_asset_settings: { playback_policy: ['public'], ...new_asset_settings },
+      cors_origin: pluginOptions.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
+      new_asset_settings: { playback_policy: ['public'], ...pluginOptions.uploadSettings?.new_asset_settings },
     })
 
     return Response.json(upload)

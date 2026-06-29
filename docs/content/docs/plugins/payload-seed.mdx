@@ -189,3 +189,48 @@ The CLI `seed()` and `POST /api/seed` share one engine:
 7. **Create** in sorted order, resolving `ref` / `asset` tokens to real ids at create time.
    Globals are updated after their dependencies.
 8. **Revalidate** — best-effort `revalidateAll()` (no-op outside a request scope).
+
+## Mux video seeding
+
+The `./mux` subpath seeds [`@pro-laico/payload-mux`](/docs/plugins/payload-mux) videos from
+**local files** — upload a clip to your Mux account exactly as the admin uploader would, the
+easy way to push content from local into a live Mux account without committing video files to
+git. It's fully decoupled: this package imports only the third-party `@mux/mux-node` SDK (an
+**optional peer dependency**) and reads the mux plugin's credentials from `config.custom` by
+convention — it never imports `@pro-laico/payload-mux`.
+
+```ts
+// scripts/seed-mux.ts — run with `payload run scripts/seed-mux.ts`
+import { seedMuxVideos } from '@pro-laico/payload-seed/mux'
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+
+const payload = await getPayload({ config })
+await seedMuxVideos(payload, {
+  dir: 'seed-assets',           // local clips (keep them out of git)
+  clear: 'tagged',              // idempotent reseed; 'all' wipes the whole (dev) Mux environment
+  videos: [{ title: 'Intro', file: 'intro.mp4', playbackPolicy: 'public' }],
+})
+```
+
+<TypeTable
+  type={{
+    videos: { description: "Videos to upload + create: { title, file, playbackPolicy?, posterTimestamp? }. `file` is relative to `dir`.", type: "MuxSeedVideo[]", default: "(required)" },
+    dir: { description: "Directory the file paths are relative to.", type: "string", default: "'seed-assets'" },
+    clear: { description: "Clear before seeding. true/'tagged' removes only seed-created (tagged) assets + docs; 'all' wipes every asset in the Mux environment.", type: "boolean | 'tagged' | 'all'", default: "(none)" },
+    collection: { description: "Override the mux-video collection slug.", type: "string", default: "'mux-video'" },
+    initSettings: { description: "Override Mux credentials; omitted fields read their MUX_* env var.", type: "MuxInitSettings", default: "MUX_* env vars" },
+    corsOrigin: { description: "CORS origin for the direct upload.", type: "string", default: "'*'" },
+  }}
+/>
+
+<Callout type="info">
+  Each uploaded asset is stamped with a Mux `passthrough` tag, so `clear: 'tagged'` (the
+  default when `clear` is truthy) removes only assets the seed created — never the ones you
+  uploaded by hand or in the dashboard. Lower-level pieces are exported too:
+  `uploadMuxVideoFromFile(mux, path, opts)` and `clearMuxSeed(payload, mux, { scope })`.
+</Callout>
+
+Install `@mux/mux-node` alongside the seed plugin to use this. Credentials resolve from the
+standard `MUX_*` env vars automatically (the same ones the mux plugin uses); pass
+`initSettings` to `seedMuxVideos` only to override.
