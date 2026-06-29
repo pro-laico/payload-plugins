@@ -5,12 +5,12 @@ export { muxVideoPlugin } from './plugin'
 export { MuxVideo } from './collections/MuxVideo'
 
 // Server-side ingest — create a mux-video from a local file / URL (seeding, imports, migrations)
-export { ingestMuxAsset, ingestMuxVideo } from './lib/ingest'
-export type { IngestMuxAssetOptions, IngestMuxVideoOptions, MuxSource } from './lib/ingest'
+export { ingestMuxVideo } from './lib/ingest'
+export type { IngestMuxVideoOptions } from './lib/ingest'
 
 // Seed integration — register mux-video as a @pro-laico/payload-seed asset provider
 export { muxAssetProvider } from './seed'
-export type { MuxAssetProvider, MuxAssetProviderOptions } from './seed'
+export type { MuxAssetProviderOptions } from './seed'
 
 // Types
 export type {

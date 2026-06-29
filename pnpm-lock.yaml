@@ -96,9 +96,6 @@ importers:
 
   examples/mux-sandbox:
     dependencies:
-      '@mux/mux-node':
-        specifier: ^14.1.1
-        version: 14.1.1
       '@payloadcms/db-sqlite':
         specifier: ^3.85.1
         version: 3.85.1(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))

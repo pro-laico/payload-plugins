@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { ingestMuxAsset, ingestMuxVideo, muxAssetProvider } from '@pro-laico/payload-mux'
+import { ingestMuxVideo, muxAssetProvider } from '@pro-laico/payload-mux'
 import { createLocalReq, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '../src/payload.config'
@@ -74,7 +74,6 @@ describe('payload-mux wiring', () => {
 
   it('exposes the server-side ingest API and the seed asset provider', () => {
     expect(typeof ingestMuxVideo).toBe('function')
-    expect(typeof ingestMuxAsset).toBe('function')
     expect(muxAssetProvider()).toEqual({ token: 'video', collection: 'mux-video', sourceDir: 'video' })
     expect(muxAssetProvider({ sourceDir: 'videos' }).sourceDir).toBe('videos')
   })
