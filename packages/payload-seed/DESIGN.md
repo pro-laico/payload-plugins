@@ -136,10 +136,11 @@ Run order (CLI `seed()` or `POST /api/seed`):
 2. **Build asset registry** — collect every `asset(key)` used; upload sources from
    `assets/` FIRST (generalized template media logic); resolve keys → ids.
 3. **Build DAG** — every `ref(collection, key)` is an edge `dependent → dependency`.
-4. **Validate against live schema** — read `payload.collections[slug].config.fields`:
-   required fields present, no unknown fields, every `ref` target collection is allowed
-   by the relationship field's config, every `ref`/`asset` key resolves. Errors name the
-   file, key, and field.
+4. **Validate** — every `ref` targets a real collection and resolves to a seeded doc,
+   every `asset` resolves to a declared asset, no duplicate `_key` within a collection,
+   and (against the live config's `flattenedFields`) no unknown top-level field. Collects
+   all issues and throws once, naming the file, key, and field. (Required-field and
+   ref-target-*permission* checks are not yet done — see "Open / later".)
 5. **Topo-sort** (Kahn's) — detect cycles → hard error naming the cycle.
 6. **Clear** — seeded collections in reverse-dependency order. Upload collections clear
    via `payload.delete` (fires hooks / cascades, e.g. the fonts cascade); others via
@@ -164,5 +165,8 @@ Run order (CLI `seed()` or `POST /api/seed`):
 - **Block fragments** — a `defineBlockSeed` helper (typed block data composed into a page's
   `layout`, its refs tracked) was prototyped but isn't wired into the engine; removed until
   implemented end-to-end.
-- **Field-level schema validation** — required/unknown-field and ref-target-collection checks
-  against `payload.collections[slug].config.fields` (today: dangling-ref + cycle + unknown-key).
+- **Field-level schema validation** — required-field checks and ref-target-*permission*
+  checks (does the relationship field's config actually allow that collection?) against
+  `payload.collections[slug].config.fields`. Today the engine checks dangling refs, cycles,
+  unknown collections, unknown top-level fields, and duplicate `_key`s — but not required
+  fields, and it only checks that a ref's target collection *exists*, not that the field permits it.

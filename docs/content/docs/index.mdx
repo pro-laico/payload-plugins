@@ -16,15 +16,15 @@ drop into any Payload + Next.js project — add only the ones you need.
 Install a plugin and add it to your Payload config:
 
 ```bash
-pnpm add @pro-laico/payload-<name>
+pnpm add @pro-laico/payload-seed
 ```
 
 ```ts
 import { buildConfig } from 'payload'
-import { examplePlugin } from '@pro-laico/payload-<name>'
+import { seedPlugin } from '@pro-laico/payload-seed'
 
 export default buildConfig({
-  plugins: [examplePlugin()],
+  plugins: [seedPlugin({ definitions: [/* your seed.ts exports */] })],
   // ...
 })
 ```

@@ -1,0 +1,191 @@
+---
+title: "payload-seed"
+description: "Type-safe database seeding for Payload CMS — write seed data in seed.ts files, reference other docs and uploads with typed tokens, and let the plugin order dependencies, upload media, and create everything behind an ENABLE_SEED kill switch."
+---
+
+`@pro-laico/payload-seed` replaces the hand-maintained seed orchestrator (one big
+`index.ts` that hardcodes the collection list, clear order, create order, and prop-drills
+returned docs) with a declarative, dependency-tracked system that **stays aligned with the
+schema by construction** — drift surfaces as a TypeScript error or a precise runtime error,
+never a silent omission.
+
+```bash
+pnpm add @pro-laico/payload-seed
+```
+
+## How it works
+
+<Steps>
+
+<Step>
+
+### Write seed files
+
+One default export per collection or global. Give each record a `_key` (a local reference
+handle), and point at other docs / uploads with the `ref()` / `asset()` tokens instead of
+raw ids:
+
+<Tabs items={['Services', 'Posts']}>
+
+<Tab value="Services">
+
+```ts
+// collections/Services/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('services', ({ asset }) => [
+  { _key: 'consulting', title: 'Consulting', slug: 'consulting', image: asset('serviceA') },
+])
+```
+
+</Tab>
+
+<Tab value="Posts">
+
+```ts
+// collections/Posts/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('posts', ({ ref, asset }) => [
+  {
+    _key: 'launch',
+    title: 'We launched',
+    heroImage: asset('post'),
+    relatedService: ref('services', 'consulting'), // typed dependency edge across files
+  },
+])
+```
+
+</Tab>
+
+</Tabs>
+
+Records are typed against your app's generated Payload types
+(`RequiredDataFromCollectionSlug<slug>`), except relationship and upload fields are widened
+to also accept `ref()` / `asset()` tokens. Change a collection's fields and the seed file
+shows a TS error until it matches. Unknown fields are rejected too.
+
+Globals use a sibling helper (a singleton — no `_key`):
+
+```ts
+// globals/SiteSettings/seed.ts
+import { defineGlobalSeed } from '@pro-laico/payload-seed'
+
+export default defineGlobalSeed('site-settings', ({ ref }) => ({ /* SiteSettings data */ }))
+```
+
+</Step>
+
+<Step>
+
+### Declare the uploadable assets
+
+Each key becomes an `asset(key)` reference; its spec points at a file in the assets dir
+(default `assets/`) plus the upload-doc data. The engine uploads these **first**, so
+`asset()` tokens resolve to real ids before any content is created.
+
+```ts
+// seed/assets.ts
+import { defineAssets } from '@pro-laico/payload-seed'
+
+export default defineAssets({
+  serviceA: { file: 'service-a.jpg', alt: 'Consulting' },
+  post: { file: 'post-cover.jpg', alt: 'Cover' },
+})
+```
+
+</Step>
+
+<Step>
+
+### Add the plugin
+
+Hand the plugin your definitions (assets + every `seed.ts` export). The same array feeds
+both the seed run and the injected types:
+
+```ts
+import { seedPlugin } from '@pro-laico/payload-seed'
+import services from './collections/Services/seed'
+import posts from './collections/Posts/seed'
+import assets from './seed/assets'
+
+export default buildConfig({
+  plugins: [seedPlugin({ definitions: [assets, services, posts], adminButton: true })],
+  // ...
+})
+```
+
+</Step>
+
+<Step>
+
+### Run it
+
+Set `ENABLE_SEED=true`, then either click **Seed your database** in the admin header
+(when `adminButton: true`) or run the bundled command:
+
+```bash
+pnpm payload seed
+```
+
+<Callout type="warn">
+  The seed is **destructive** — it clears and recreates the seeded collections. The
+  `ENABLE_SEED` kill switch is off by default; opt in per-environment while iterating and
+  never set it in production.
+</Callout>
+
+</Step>
+
+</Steps>
+
+## Typed references
+
+Run `payload generate:types` and the plugin injects a `SeedRegistry` into
+`payload-types.ts`, so `ref('services', 'consulting')` is checked against your real
+`_key`s — rename or remove a seeded item and every stale reference becomes a TS error.
+Unknown collections and unknown asset keys error too.
+
+It's injected via Payload's own `typescript.postProcess` hook and rides the same
+`generate:types` command you already run, so the augmentation is **global with no import** —
+exactly like Payload's generated `GeneratedTypes`. The producing side (`_key`) stays a free
+string; only the consuming side (`ref` / `asset`) is checked. Without codegen, refs fall back
+to runtime validation — safe either way, fully safe with it.
+
+## Options
+
+<TypeTable
+  type={{
+    definitions: {
+      description: 'Your seed definitions (the seed.ts default exports plus the defineAssets export). Feeds both the seed run and the injected SeedRegistry.',
+      type: 'SeedDefinition[]',
+    },
+    assets: {
+      description: 'Where source files live (dir) and the upload collection they are created in (collection).',
+      type: '{ dir?: string; collection?: string }',
+      default: "{ dir: 'assets', collection: 'media' }",
+    },
+    adminButton: {
+      description: 'Show the "Seed your database" button in the admin header.',
+      type: 'boolean',
+      default: 'false',
+    },
+  }}
+/>
+
+## What runs, in order
+
+The CLI `seed()` and `POST /api/seed` share one engine:
+
+1. **Take definitions** passed to the plugin.
+2. **Upload assets first** — collect every `asset(key)`, upload sources from the assets
+   dir, resolve keys → ids.
+3. **Build a dependency DAG** — every `ref(collection, key)` is an edge.
+4. **Validate** — every `ref` targets a real collection and resolves to a seeded doc, every
+   `asset` resolves to a declared asset, no duplicate `_key` within a collection, and no
+   unknown top-level fields. All issues collected and thrown at once, naming the file, key,
+   and field.
+5. **Topo-sort** (Kahn's) — cycles are a hard error that names the cycle.
+6. **Clear** the seeded collections in reverse-dependency order.
+7. **Create** in sorted order, resolving `ref` / `asset` tokens to real ids at create time.
+   Globals are updated after their dependencies.
+8. **Revalidate** — best-effort `revalidateAll()` (no-op outside a request scope).
