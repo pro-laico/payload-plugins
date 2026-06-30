@@ -141,14 +141,18 @@ Run order (CLI `seed()` or `POST /api/seed`):
    and (against the live config's `flattenedFields`) no unknown top-level field. Collects
    all issues and throws once, naming the file, key, and field. (Required-field and
    ref-target-*permission* checks are not yet done — see "Open / later".)
-5. **Topo-sort** (Kahn's) — detect cycles → hard error naming the cycle.
+5. **Topo-sort** (depth-first, dependencies first) — detect cycles → hard error naming the cycle.
 6. **Clear** — seeded collections in reverse-dependency order. Upload collections clear
    via `payload.delete` (fires hooks / cascades, e.g. the fonts cascade); others via
    `db.deleteMany`. Versioned collections also clear versions. Read all of this from the
    config, not a hand-maintained array.
 7. **Create** — in sorted order, threading created ids; resolve `ref`/`asset` tokens to
    real ids at create time. Globals updated after their dependencies.
-8. **Revalidate** — best-effort `revalidateAll()` (no-op outside a request scope).
+
+Every write passes `context: { disableRevalidate: true }`, so app revalidate hooks that
+honor the flag skip during a seed (avoids a per-doc revalidation storm; `revalidatePath`
+can't run under the CLI anyway). The engine does **not** revalidate at the end — the app
+revalidates after seeding (redeploy / manual), or it's a local/dev DB.
 
 ## What stays the app's responsibility
 
