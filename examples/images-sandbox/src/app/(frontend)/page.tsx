@@ -53,6 +53,11 @@ async function resetAction(): Promise<void> {
 
 export default async function HomePage() {
   const payload = await getPayload({ config })
+  // Reading the admin session here is best-effort: setting `serverURL` makes Payload enable CSRF
+  // for that origin, so `payload.auth` only resolves the user for trusted (same-site) requests —
+  // a cross-site or direct hit is intentionally treated as anonymous. So the buttons below may
+  // not appear even when you're logged in; the admin header "Seed your database" button always
+  // works (and the seed server action re-checks auth regardless).
   const { user } = await payload.auth({ headers: await nextHeaders() })
   const isLoggedIn = Boolean(user)
 
@@ -89,7 +94,8 @@ export default async function HomePage() {
           </div>
         ) : (
           <p className="empty">
-            <a href="/admin">Log in to /admin</a> first — seeding requires an authenticated user. You can also upload your own at{' '}
+            Seed from the <strong>Seed your database</strong> button in the <a href="/admin">admin</a> header (the reliable path), or{' '}
+            <a href="/admin">log in</a> and return here to use the buttons above. You can also upload your own at{' '}
             <a href="/admin/collections/images">/admin/collections/images</a>.
           </p>
         )}
