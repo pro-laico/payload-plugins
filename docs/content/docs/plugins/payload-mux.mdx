@@ -78,9 +78,7 @@ export default buildConfig({
 ```ts
 // also set MUX_SIGNING_KEY + MUX_PRIVATE_KEY in the env
 muxVideoPlugin({
-  uploadSettings: {
-    new_asset_settings: { playback_policy: ['signed'] }, // new videos upload as signed
-  },
+  playbackPolicy: 'signed',               // new videos upload as signed
   signedUrlOptions: { expiration: '1d' }, // signed URL lifetime
 })
 ```
@@ -141,11 +139,12 @@ export const options = [
     description: `Settings applied to every upload.`,
     options: [
       { name: 'cors_origin', type: 'string', default: 'NEXT_PUBLIC_SERVER_URL, then *', description: `CORS origin for the direct-upload URL — usually your site URL.` },
-      { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy — set it to ['signed'] for signed playback (defaults to ['public']).` },
+      { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy; the top-level playbackPolicy option is the shorthand, and an explicit value here wins.` },
     ],
   },
+  { name: 'playbackPolicy', type: "'public' | 'signed'", default: "'public'", description: `Playback policy for newly uploaded videos. Shorthand for uploadSettings.new_asset_settings.playback_policy — set 'signed' (plus MUX_SIGNING_KEY / MUX_PRIVATE_KEY) for JWT-signed URLs.` },
   { name: 'extendCollection', type: 'keyof TypedCollection', description: `Slug of an existing collection to extend with the Mux fields, hooks, and uploader instead of creating the mux-video collection.` },
-  { name: 'access', type: '(req) => boolean | Promise<boolean>', default: 'logged-in admin', description: `Gate who may request an upload and read videos. Defaults to logged-in admins.` },
+  { name: 'access', type: '(req) => boolean | Promise<boolean>', default: 'logged-in admin', description: `Gate who may request an upload and read videos. Create / update / delete fall back to Payload's collection access. Defaults to logged-in admins.` },
   { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
   { name: 'posterExtension', type: "'webp' | 'jpg' | 'png'", default: "'png'", description: `Image format for the poster (posterUrl).` },
   { name: 'animatedGifExtension', type: "'gif' | 'webp'", default: "'gif'", description: `Format for the animated preview (gifUrl).` },
@@ -177,6 +176,7 @@ muxVideoPlugin({
   // uploadSettings: { /* … */ }, // optional — cors_origin defaults to NEXT_PUBLIC_SERVER_URL
   // extendCollection: 'media',   // optional, no default — extend an existing collection instead of creating `mux-video`
   // access: (req) => Boolean(req.user), // default — logged-in admin
+  // playbackPolicy: 'signed',   // optional — default 'public'; 'signed' issues JWT-signed URLs
   signedUrlOptions: { expiration: '1d' },
   posterExtension: 'png',
   animatedGifExtension: 'gif',
@@ -334,8 +334,7 @@ await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro', pl
 // or a URL: ingestMuxVideo(payload, { source: 'https://example.com/intro.mp4', title: 'Intro' })
 ```
 
-The lower-level `ingestMuxAsset(mux, source, opts)` — create upload → PUT bytes → poll until ready →
-return the asset — is exported too, for when you have a Mux client and want the raw asset.
+Local paths stream from disk, so ingesting a large file doesn't load it all into memory.
 
 ### Declarative seeding
 
@@ -362,7 +361,6 @@ in this plugin's hook, so the two packages stay fully decoupled. See the
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxVideo` | `@pro-laico/payload-mux` | The collection factory, for advanced configs assembled by hand. |
 | `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a `mux-video` doc from a local file / URL (seeding, imports, migrations). |
-| `ingestMuxAsset` | `@pro-laico/payload-mux` | Lower-level: ingest a video into Mux and return the ready asset. |
 | `muxAssetProvider` | `@pro-laico/payload-mux` | Register `mux-video` as a `@pro-laico/payload-seed` asset provider. |
 | `MuxUploaderField` | `@pro-laico/payload-mux/components/MuxUploaderField` | Admin uploader + player field (wired via the import map). |
 | `MuxVideoGifCell` / `MuxVideoImageCell` | `@pro-laico/payload-mux/components/*` | List-view thumbnail cells selected by `adminThumbnail`. |

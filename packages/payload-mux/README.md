@@ -47,10 +47,8 @@ var:
 ```ts
 muxVideoPlugin({
   initSettings: { webhookSecret: process.env.MY_WEBHOOK_SECRET }, // tokenId/secret still from env
-  uploadSettings: {
-    cors_origin: 'https://mysite.com',
-    new_asset_settings: { playback_policy: ['signed'] },          // signed playback
-  },
+  uploadSettings: { cors_origin: 'https://mysite.com' },
+  playbackPolicy: 'signed',                                       // signed playback
 })
 ```
 
@@ -60,9 +58,10 @@ muxVideoPlugin({
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Set `false` to skip the collection, endpoints, and hooks. |
 | `initSettings` | `MuxVideoInitSettings` | `MUX_*` env vars | Override Mux credentials per-field; omitted fields read their `MUX_*` env var. |
-| `uploadSettings` | `MuxVideoUploadSettings` | `cors_origin` from `NEXT_PUBLIC_SERVER_URL` | `cors_origin` plus optional `new_asset_settings` (e.g. `playback_policy`). |
+| `uploadSettings` | `MuxVideoUploadSettings` | `cors_origin` from `NEXT_PUBLIC_SERVER_URL` | `cors_origin` plus optional `new_asset_settings`. |
+| `playbackPolicy` | `'public' \| 'signed'` | `'public'` | Playback policy for new uploads; shorthand for `new_asset_settings.playback_policy`. |
 | `extendCollection` | `string` | — | Slug of an existing collection to extend instead of creating `mux-video`. |
-| `access` | `(req) => boolean \| Promise<boolean>` | logged-in admin | Gate who can request uploads / read videos. |
+| `access` | `(req) => boolean \| Promise<boolean>` | logged-in admin | Gate who can request uploads / read videos. Create / update / delete use Payload's collection access. |
 | `signedUrlOptions` | `{ expiration?: string }` | `{ expiration: '1d' }` | Signed-URL lifetime. |
 | `posterExtension` | `'webp' \| 'jpg' \| 'png'` | `'png'` | Poster image format. |
 | `animatedGifExtension` | `'gif' \| 'webp'` | `'gif'` | Animated preview format. |
@@ -83,8 +82,7 @@ await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro', pl
 // or a URL: ingestMuxVideo(payload, { source: 'https://example.com/intro.mp4', title: 'Intro' })
 ```
 
-The lower-level `ingestMuxAsset(mux, source, opts)` (create upload → PUT bytes → poll until
-ready → return the asset) is exported too.
+Local paths stream from disk, so ingesting a large file never loads it all into memory.
 
 ### Seeding with `@pro-laico/payload-seed`
 

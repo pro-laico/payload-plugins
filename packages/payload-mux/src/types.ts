@@ -56,6 +56,11 @@ export interface MuxVideoPluginOptions {
   /** Upload settings (CORS origin + new-asset settings). Optional — `cors_origin` defaults
    *  to `NEXT_PUBLIC_SERVER_URL`. */
   uploadSettings?: MuxVideoUploadSettings
+  /** Playback policy for newly uploaded videos: `'public'` URLs, or `'signed'` JWT-signed
+   *  URLs (also set `MUX_SIGNING_KEY` + `MUX_PRIVATE_KEY`). Shorthand for
+   *  `uploadSettings.new_asset_settings.playback_policy`; an explicit value there wins.
+   *  @default 'public' */
+  playbackPolicy?: 'public' | 'signed'
   /** Slug of an existing collection to extend with Mux fields instead of creating the
    *  default `mux-video` collection. */
   extendCollection?: keyof TypedCollection

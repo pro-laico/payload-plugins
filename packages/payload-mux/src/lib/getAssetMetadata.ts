@@ -8,9 +8,11 @@ export interface AssetLike {
   tracks?: ReadonlyArray<{ type?: string; max_width?: number; max_height?: number }> | null
 }
 
-/** The subset of the video doc derived from a ready Mux asset. */
+/** The subset of the video doc derived from a ready Mux asset. The plugin tracks only the two
+ *  policies it can build URLs for; a `drm` playback id (rare) is treated as `signed`, since it
+ *  too needs a token. */
 export interface MuxAssetMetadata {
-  playbackOptions?: Array<{ playbackId: string; playbackPolicy: 'public' | 'signed' | 'drm' }>
+  playbackOptions?: Array<{ playbackId: string; playbackPolicy: 'public' | 'signed' }>
   aspectRatio?: string
   duration?: number
   maxWidth?: number
@@ -24,7 +26,10 @@ export const getAssetMetadata = (asset: AssetLike): MuxAssetMetadata => {
   const videoTrack = asset.tracks?.find((track) => track.type === 'video')
 
   return {
-    playbackOptions: asset.playback_ids?.map((value) => ({ playbackId: value.id, playbackPolicy: value.policy })),
+    playbackOptions: asset.playback_ids?.map((value) => ({
+      playbackId: value.id,
+      playbackPolicy: value.policy === 'public' ? 'public' : 'signed',
+    })),
     aspectRatio: asset.aspect_ratio?.replace(':', '/'),
     duration: asset.duration ?? undefined,
     ...(videoTrack ? { maxWidth: videoTrack.max_width, maxHeight: videoTrack.max_height } : {}),
