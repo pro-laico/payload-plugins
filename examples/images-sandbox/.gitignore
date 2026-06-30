@@ -1,0 +1,20 @@
+node_modules
+.next
+out
+
+# Local SQLite DB (created at runtime)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Uploaded media + generated variants (written at runtime to local-disk storage)
+media/
+images/
+generated-images/
+
+.env
+.env*.local
+next-env.d.ts
+*.tsbuildinfo
+generatedImages/

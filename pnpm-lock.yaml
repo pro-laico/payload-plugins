@@ -225,6 +225,64 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
 
+  examples/images-sandbox:
+    dependencies:
+      '@payloadcms/db-sqlite':
+        specifier: ^3.85.1
+        version: 3.85.1(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))
+      '@payloadcms/next':
+        specifier: ^3.85.1
+        version: 3.85.1(@types/react@19.2.17)(graphql@16.14.2)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+      '@payloadcms/richtext-lexical':
+        specifier: ^3.85.1
+        version: 3.85.1(@faceless-ui/modal@3.0.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@faceless-ui/scroll-info@2.0.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(@payloadcms/next@3.85.1(@types/react@19.2.17)(graphql@16.14.2)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(@types/react@19.2.17)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(yjs@13.6.31)
+      '@payloadcms/ui':
+        specifier: ^3.85.1
+        version: 3.85.1(@types/react@19.2.17)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+      '@pro-laico/payload-images':
+        specifier: workspace:*
+        version: link:../../packages/payload-images
+      '@pro-laico/payload-seed':
+        specifier: workspace:*
+        version: link:../../packages/payload-seed
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      graphql:
+        specifier: ^16.14.2
+        version: 16.14.2
+      next:
+        specifier: ^16.2.9
+        version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4)
+      payload:
+        specifier: ^3.85.1
+        version: 3.85.1(graphql@16.14.2)(typescript@6.0.3)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      sharp:
+        specifier: ^0.35.2
+        version: 0.35.2
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
+
   examples/mux-sandbox:
     dependencies:
       '@payloadcms/db-sqlite':
@@ -411,6 +469,42 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.7
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/payload-images:
+    devDependencies:
+      '@payloadcms/ui':
+        specifier: ^3.85.1
+        version: 3.85.1(@types/react@19.2.17)(monaco-editor@0.55.1)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4))(payload@3.85.1(graphql@16.14.2)(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      next:
+        specifier: ^16.2.9
+        version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.77.4)
+      payload:
+        specifier: ^3.85.1
+        version: 3.85.1(graphql@16.14.2)(typescript@6.0.3)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      sharp:
+        specifier: ^0.35.2
+        version: 0.35.2
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
