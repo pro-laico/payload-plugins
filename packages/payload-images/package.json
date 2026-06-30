@@ -1,0 +1,128 @@
+{
+  "name": "@pro-laico/payload-images",
+  "version": "0.0.0",
+  "description": "Image optimization for Payload CMS: an Images upload collection that stores only the original, an on-demand Sharp transform endpoint (focal-aware crop, format negotiation, built-in LQIP placeholders), a durable variant cache with two-way purge, an admin focal-point picker, and a responsive <ResponsiveImage> component.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pro-laico/payload-plugins.git",
+    "directory": "packages/payload-images"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "image",
+    "images",
+    "sharp",
+    "optimization",
+    "webp",
+    "avif",
+    "responsive"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./components/image": {
+        "import": "./dist/components/image.js",
+        "types": "./dist/components/image.d.ts",
+        "default": "./dist/components/image.js"
+      },
+      "./components/buildSrcset": {
+        "import": "./dist/components/buildSrcset.js",
+        "types": "./dist/components/buildSrcset.d.ts",
+        "default": "./dist/components/buildSrcset.js"
+      },
+      "./admin/focalPreview": {
+        "import": "./dist/components/admin/focalPreview.js",
+        "types": "./dist/components/admin/focalPreview.d.ts",
+        "default": "./dist/components/admin/focalPreview.js"
+      },
+      "./admin/purgeVariants": {
+        "import": "./dist/components/admin/purgeVariants.js",
+        "types": "./dist/components/admin/purgeVariants.d.ts",
+        "default": "./dist/components/admin/purgeVariants.js"
+      }
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/image": {
+      "import": "./src/components/image.tsx",
+      "types": "./src/components/image.tsx",
+      "default": "./src/components/image.tsx"
+    },
+    "./components/buildSrcset": {
+      "import": "./src/components/buildSrcset.ts",
+      "types": "./src/components/buildSrcset.ts",
+      "default": "./src/components/buildSrcset.ts"
+    },
+    "./admin/focalPreview": {
+      "import": "./src/components/admin/focalPreview.tsx",
+      "types": "./src/components/admin/focalPreview.tsx",
+      "default": "./src/components/admin/focalPreview.tsx"
+    },
+    "./admin/purgeVariants": {
+      "import": "./src/components/admin/purgeVariants.tsx",
+      "types": "./src/components/admin/purgeVariants.tsx",
+      "default": "./src/components/admin/purgeVariants.tsx"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm clean && pnpm build:types && pnpm build:swc",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "prepack": "pnpm build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
+  },
+  "peerDependencies": {
+    "@payloadcms/ui": "^3.0.0",
+    "next": ">=15.0.0",
+    "payload": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": ">=0.33.0"
+  },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@payloadcms/ui": "^3.85.1",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

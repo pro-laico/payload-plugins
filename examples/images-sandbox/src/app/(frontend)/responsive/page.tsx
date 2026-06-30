@@ -1,0 +1,77 @@
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { buildSrcset, deriveVersion, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
+export const dynamic = 'force-dynamic'
+
+type ImageDoc = {
+  id: string | number
+  alt?: string | null
+  width?: number | null
+  height?: number | null
+  focalX?: number | null
+  focalY?: number | null
+  filename?: string | null
+}
+
+export default async function ResponsivePage() {
+  const payload = await getPayload({ config })
+  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt', overrideAccess: true })).docs[0] as
+    | ImageDoc
+    | undefined
+
+  if (!img) {
+    return (
+      <main>
+        <h1>Responsive srcset demo</h1>
+        <p className="empty">
+          No images yet — <a href="/">seed the samples</a> first, then come back.
+        </p>
+      </main>
+    )
+  }
+
+  // The same srcset <ResponsiveImage> emits below, shown so you know which candidate URLs to
+  // look for in the Network tab.
+  const ar = img.width && img.height ? img.width / img.height : undefined
+  const { srcset } = buildSrcset(String(img.id), { sourceWidth: img.width ?? undefined, aspectRatio: ar, version: deriveVersion(img) })
+
+  return (
+    <main>
+      <p style={{ margin: 0 }}>
+        <a href="/">← Back to the gallery</a>
+      </p>
+      <h1>One image, every screen size</h1>
+      <p className="lead">
+        A single <code>&lt;ResponsiveImage&gt;</code> with <code>sizes=&quot;100vw&quot;</code>, full-bleed. No JavaScript and no resize handler
+        — the browser reads the <code>srcset</code> and downloads the one variant that fits your screen.
+      </p>
+
+      <ol className="steps">
+        <li>
+          Open DevTools → <strong>Network</strong>, filter to <strong>Img</strong>, and tick <strong>Disable cache</strong>.
+        </li>
+        <li>
+          Turn on the <strong>device toolbar</strong> and make the viewport <strong>narrow</strong> (phone-sized).
+        </li>
+        <li>
+          <strong>Reload.</strong> Exactly one variant loads — the smallest that covers that width × DPR. Note its <code>?w=</code>.
+        </li>
+        <li>
+          Drag the viewport <strong>wider</strong>; each time you cross a step, a larger <code>?w=</code> variant streams in.
+        </li>
+        <li>
+          Grow from narrow → wide, not the reverse: <code>srcset</code> never downgrades once it has a big-enough variant.
+        </li>
+      </ol>
+
+      {/* Full-bleed: break out of the centered column so `sizes="100vw"` is honest. */}
+      <div style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', marginTop: 24 }}>
+        <ResponsiveImage image={img} sizes="100vw" priority />
+      </div>
+
+      <h2>The srcset it emitted</h2>
+      <pre className="code">{srcset.split(', ').join('\n')}</pre>
+    </main>
+  )
+}
