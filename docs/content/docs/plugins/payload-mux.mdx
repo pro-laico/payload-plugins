@@ -3,6 +3,13 @@ title: "payload-mux"
 description: "Mux Video for Payload CMS — upload, store, and play back video without leaving the admin."
 ---
 
+<Callout type="info">
+**Based on [`@oversightstudio/mux-video`](https://github.com/oversightstudio/payload-plugins) (MIT)**,
+originally created by [Idan Yekutiel](https://github.com/idanyekutiel). A port of that Mux plugin,
+restructured to our conventions and kept as a first-party package so we can track Payload and Mux
+updates directly. Full credit and thanks to the original author.
+</Callout>
+
 `@pro-laico/payload-mux` exists to make video a first-class upload in Payload. You drop a clip into
 the admin (or seed one server-side), and the plugin pushes the bytes straight to [Mux](https://www.mux.com/),
 keeps a `mux-video` doc in sync with the encoded asset, and hands you ready-to-play HLS, poster, and
@@ -305,6 +312,14 @@ left for the webhook.
   `https://your-site/api/mux/webhook`. For local dev, expose localhost with a tunnel
   (`cloudflared tunnel --url http://localhost:3000` or ngrok) and set that URL as the webhook.
 </Callout>
+
+## Revalidation
+
+The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache — and some writes (the
+`video.asset.ready` / `deleted` webhook especially) land outside the request that rendered your page.
+Handle revalidation yourself with a Payload `afterChange` / `afterDelete` hook on `mux-video`: it fires
+for webhook writes, admin saves, and server-side ingest alike, so it's the one place to call
+`revalidateTag` / `revalidatePath` for the pages that embed videos.
 
 ## Server-side ingest
 
