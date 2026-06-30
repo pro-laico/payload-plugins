@@ -77,8 +77,9 @@ the live request origin, then `http://localhost:3000`.
 ## Rendering with `<ResponsiveImage>`
 
 `<ResponsiveImage>` emits a plain `<img>` whose `srcset` points at the transform
-endpoint, so the browser downloads the one size that fits. It's not `next/image`, and it
-runs in both server and client trees. Import it from the `components/image` subpath:
+endpoint, so the browser downloads the one size that fits. It's not `next/image` — it's an
+async server component (it resolves the project `pixelStep` from your config). Import it
+from the `components/image` subpath:
 
 ```tsx
 import { getPayload } from 'payload'
@@ -130,6 +131,7 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | `imagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks deep-merged onto the Images collection (`upload`/`access`/`admin` merged, `fields`/`hooks` appended). |
 | `generatedImagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks for the hidden variant-cache collection. |
 | `pregenerateSizes` | `boolean \| ImageSize[]` | `false` | Opt into Payload's classic on-upload size ladder instead of on-demand. `true` = built-in 7-size ladder; array = custom. |
+| `pixelStep` | `number` | `50` | Project-wide srcset width increment + the endpoint's snap grid. One value, set once; bigger = fewer widths/variants, `maxDimension` caps the total. |
 | `transform` | `TransformEndpointConfig \| false` | `{}` | Transform + purge endpoint config; `false` registers neither. |
 | `focalUI` | `boolean` | `true` | Render the focal picker + ratio preview and the Purge button. |
 | `previewRatios` | `string[]` | `['16:9','9:16','1:1','4:3','3:2','21:9']` | Aspect ratios shown as focal-preview tiles. |
@@ -140,8 +142,8 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 (`'generated-images'`), `cdnCacheControl` (`true`), `maxDimension` (`4096`),
 `defaultQuality` (`75`), `qualityRange` (`[40, 95]`), `defaultFormat` (`'auto'`),
 `formats` (`['auto','avif','webp','jpeg','png']`), `preferAvif` (`false`),
-`dimensionStep` (`50`), `maxInputPixels` (`100_000_000`), `maxConcurrency` (`cpus - 1`),
-`sharpConcurrency` (`1`).
+`maxInputPixels` (`100_000_000`), `maxConcurrency` (`cpus - 1`), `sharpConcurrency` (`1`).
+The grid the endpoint snaps to is the top-level `pixelStep`.
 
 ## Extending an existing collection
 
@@ -224,7 +226,7 @@ collection you'd build yourself:
 - **Browser/CDN cache.** Transform responses are immutable and each URL carries a `v`
   token derived from the source's filename + focal point — replace the file or move the
   focal and already-cached responses refetch; a metadata-only edit (`alt`) doesn't.
-- **Bounded variant space.** Requested dimensions snap to the `dimensionStep` grid and
+- **Bounded variant space.** Requested dimensions snap to the `pixelStep` grid and
   quality buckets to a small set, both clamped to `maxDimension`, so a caller can't spin
   up unbounded variants with `w=1,2,3,…`. Output never upscales past the source.
 - **Bounded work.** `maxInputPixels` caps how many pixels Sharp decodes (a

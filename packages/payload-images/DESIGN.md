@@ -11,7 +11,7 @@ re-pointed at this repo's conventions.
 - **Is:** a source `images` upload collection, a hidden `generated-images` variant cache,
   an on-demand Sharp transform endpoint (`/api/img/:id`) with focal-aware cropping +
   format negotiation + built-in LQIP placeholders, a two-way purge (hooks + endpoint), an
-  admin focal-point picker, and an isomorphic `<ResponsiveImage>` / `buildSrcset` frontend.
+  admin focal-point picker, an async-server-component `<ResponsiveImage>`, and isomorphic `buildSrcset` builders.
 - **Isn't:** favicons, the Atomic `ImageChild` block, the Atomic children renderer, or the
   `@pro-laico/core` cache-tag layer. Those were dropped in the port — this package depends
   only on Payload + Next + React + (optional) Sharp, like the other plugins in this repo.
@@ -106,4 +106,4 @@ correctly on first render. No provider, no custom script. See
   `afterDelete` revalidation if it caches image reads at the page layer.
 - **Per-URL request signing** isn't implemented — the endpoint is gated by the bounds
   above rather than a shared secret. Put a rate limiter / CDN in front for fully untrusted
-  traffic, or lower `dimensionStep` / `maxDimension` / `maxInputPixels`.
+  traffic, or lower `pixelStep` / `maxDimension` / `maxInputPixels`.

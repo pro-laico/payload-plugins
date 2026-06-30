@@ -4,6 +4,7 @@ import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collec
 import { createImagesCollection, imageEnhancements } from './collections/images'
 import { createPurgeEndpoint, createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
 import { mergeCollection } from './lib/mergeCollection'
+import { DEFAULT_PIXEL_STEP } from './transform/params'
 
 export interface ImagesPluginOptions {
   /**
@@ -37,6 +38,13 @@ export interface ImagesPluginOptions {
    * uses a built-in 7-size ladder; pass an array for a custom one. Ignored with `extendCollection`.
    */
   pregenerateSizes?: boolean | ImageSize[]
+  /**
+   * The project-wide pixel step (default 50): the width increment for every generated `srcset`
+   * AND the grid the transform endpoint snaps requests to. One value, set once — a bigger step
+   * means fewer srcset widths and fewer cached variants; `transform.maxDimension` caps the total.
+   * Applies uniformly to the API virtual `srcset`, `<ResponsiveImage>`, and the endpoint.
+   */
+  pixelStep?: number
   /** On-demand transform endpoint config. Pass `false` to not register the endpoints. */
   transform?: TransformEndpointConfig | false
   /** Render the focal + ratio-preview field and purge-variants button. Default true. */
@@ -77,6 +85,7 @@ export const imagesPlugin =
       imagesOverrides,
       generatedImagesOverrides,
       pregenerateSizes = false,
+      pixelStep = DEFAULT_PIXEL_STEP,
       transform = {},
       focalUI = true,
       previewRatios,
@@ -128,7 +137,7 @@ export const imagesPlugin =
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
-            createTransformEndpoint({ ...transformCfg, variantSlug, sourceSlug }),
+            createTransformEndpoint({ dimensionStep: pixelStep, ...transformCfg, variantSlug, sourceSlug }),
           ]
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]
@@ -140,7 +149,7 @@ export const imagesPlugin =
       endpoints,
       // Stash the resolved config so decoupled tooling (an OG/sitemap generator, a CDN purge
       // script, a migration) can read the slugs + options from just `payload`, no import.
-      custom: { ...config.custom, payloadImages: { options: opts, sourceSlug, variantSlug, basePath } },
+      custom: { ...config.custom, payloadImages: { options: opts, sourceSlug, variantSlug, basePath, pixelStep } },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         if (shadowed) {

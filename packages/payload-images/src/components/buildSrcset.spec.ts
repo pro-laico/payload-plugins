@@ -47,14 +47,11 @@ describe('stepWidths', () => {
   it('never exceeds the largest step multiple at or below the source width', () => {
     expect(stepWidths(120, 50)).toEqual([50, 100]) // 120 → cap at 100 (no upscale)
   })
-  it('coarsens the step to stay under the entry cap for large sources', () => {
-    const w = stepWidths(1600, 50, 4096, 16)
-    expect(w.length).toBeLessThanOrEqual(16)
-    expect(w[w.length - 1]).toBe(1600)
-    expect(w[0]).toBeGreaterThanOrEqual(50)
+  it('emits every pixelStep multiple up to the source — a bigger step means fewer widths', () => {
+    expect(stepWidths(600, 200)).toEqual([200, 400, 600])
   })
   it('falls back to stepping up to maxWidth when no source width is given', () => {
-    const w = stepWidths(undefined, 50, 200, 16)
+    const w = stepWidths(undefined, 50, 200)
     expect(w[w.length - 1]).toBe(200)
     expect(w.every((x) => x % 50 === 0)).toBe(true)
   })

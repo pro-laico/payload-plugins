@@ -27,12 +27,18 @@ export const VIRTUAL_URL_INPUTS = ['width', 'height', 'filename', 'focalX', 'foc
 const naturalAspectRatio = (d: ImageDocLike): number | undefined => (d.width && d.height ? d.width / d.height : undefined)
 
 /** Build a single virtual `text` field from a `(doc, baseUrl) => url` computer. */
-const virtualUrl = (name: string, description: string, compute: (doc: ImageDocLike, baseUrl?: string) => string | null): Field => {
+const virtualUrl = (
+  name: string,
+  description: string,
+  compute: (doc: ImageDocLike, baseUrl?: string, pixelStep?: number) => string | null,
+): Field => {
   const afterRead: FieldHook = ({ data, req }) => {
     const doc = (data ?? {}) as ImageDocLike
     if (doc.id == null || !doc.filename) return null
-    const baseUrl = req?.payload?.config?.serverURL || undefined
-    return compute(doc, baseUrl)
+    const cfg = req?.payload?.config
+    const baseUrl = cfg?.serverURL || undefined
+    const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number } | undefined)?.pixelStep
+    return compute(doc, baseUrl, pixelStep)
   }
   return { name, type: 'text', virtual: true, admin: { hidden: true, description }, hooks: { afterRead: [afterRead] } }
 }
@@ -57,9 +63,14 @@ export const virtualUrlFields = (): Field[] => [
   virtualUrl(
     'srcset',
     'Responsive srcset at the natural ratio, up to the source width.',
-    (d, baseUrl) =>
-      buildSrcset(String(d.id), { sourceWidth: d.width ?? undefined, aspectRatio: naturalAspectRatio(d), version: deriveVersion(d), baseUrl })
-        .srcset,
+    (d, baseUrl, pixelStep) =>
+      buildSrcset(String(d.id), {
+        sourceWidth: d.width ?? undefined,
+        aspectRatio: naturalAspectRatio(d),
+        version: deriveVersion(d),
+        baseUrl,
+        pixelStep,
+      }).srcset,
   ),
   virtualUrl('placeholderURL', 'Tiny low-quality placeholder (LQIP) for a blur-up / CSS background.', (d, baseUrl) =>
     buildVariantUrl(String(d.id), 32, { quality: 40, aspectRatio: naturalAspectRatio(d), version: deriveVersion(d), baseUrl }),

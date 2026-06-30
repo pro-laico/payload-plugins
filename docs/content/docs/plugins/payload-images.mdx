@@ -95,6 +95,7 @@ export const options = [
   { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key — not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
   { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
   { name: 'pregenerateSizes', type: 'boolean | ImageSize[]', default: 'false', description: `Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by default (store only the original; size on demand). true uses a built-in 7-size ladder; pass an array for a custom one.` },
+  { name: 'pixelStep', type: 'number', default: '50', description: `The project-wide pixel step — the width increment for every generated srcset, and the grid the endpoint snaps requests to. Set once: a bigger step means fewer srcset widths and fewer cached variants (maxDimension caps the total). Applies to the API srcset, <ResponsiveImage>, and the endpoint alike.` },
   {
     name: 'transform',
     type: 'TransformEndpointConfig | false',
@@ -110,7 +111,6 @@ export const options = [
       { name: 'defaultFormat', type: 'Format', default: "'auto'", description: `Output format when a request omits fmt (auto negotiates from Accept).` },
       { name: 'formats', type: 'Format[]', default: "['auto','avif','webp','jpeg','png']", description: `Output formats the endpoint may emit.` },
       { name: 'preferAvif', type: 'boolean', default: 'false', description: `Auto-negotiate AVIF when accepted. Off by default — AVIF encodes far slower, so fmt=auto serves WebP for a fast cold path (AVIF stays available on explicit fmt=avif).` },
-      { name: 'dimensionStep', type: 'number', default: '50', description: `Snap requested w/h to a grid of this many px before transforming + caching, bounding the variant space (anti-DoS). Matches the default srcset pixelStep. Set <= 1 to honor exact dimensions.` },
       { name: 'maxInputPixels', type: 'number', default: '100000000', description: `Max source pixels Sharp will decode — a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).` },
       { name: 'maxConcurrency', type: 'number', default: 'cpus - 1', description: `Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY).` },
       { name: 'sharpConcurrency', type: 'number', default: '1', description: `Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.` },
@@ -145,6 +145,7 @@ imagesPlugin({
   // imagesOverrides: { /* … */ },          // optional, no default — deep-merged onto the images collection
   // generatedImagesOverrides: { /* … */ }, // optional, no default — merged onto the variant-cache collection
   pregenerateSizes: false,
+  pixelStep: 50,
   transform: {
     sourceSlug: 'images',
     variantSlug: 'generated-images',
@@ -155,7 +156,6 @@ imagesPlugin({
     defaultFormat: 'auto',
     formats: ['auto', 'avif', 'webp', 'jpeg', 'png'],
     preferAvif: false,
-    dimensionStep: 50,
     maxInputPixels: 100_000_000,
     maxConcurrency: os.cpus().length - 1, // default
     sharpConcurrency: 1,
@@ -346,8 +346,9 @@ The transform endpoint is public-facing, so it's bounded on several fronts:
 ## `<ResponsiveImage>`
 
 The frontend surface — a plain `<img>` whose `srcset` points at the transform endpoint, so the
-browser grabs the one size that fits where it renders. Not `next/image`; runs in server or client
-trees. Import from the `components/image` subpath. **Component** = what you write, **Rendered HTML**
+browser grabs the one size that fits where it renders. Not `next/image` — an async server component
+(it resolves the project `pixelStep` from your config). Import from the `components/image` subpath.
+**Component** = what you write, **Rendered HTML**
 = what it produces (an `<img>` with a full `srcset`, one URL per width capped at the source, plus a
 blurred LQIP on the wrapper):
 
@@ -385,10 +386,10 @@ export async function Hero({ id }: { id: string }) {
              background-image:url(/api/img/64a…?w=32&h=18&fit=cover&q=40&fmt=auto&v=1a2b3c)">
   <img
     src="/api/img/64a…?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c"
-    srcset="/api/img/64a…?w=300&h=169&fit=cover&q=75&fmt=auto&v=1a2b3c 300w,
-            /api/img/64a…?w=600&h=338&fit=cover&q=75&fmt=auto&v=1a2b3c 600w,
-            /api/img/64a…?w=900&h=506&fit=cover&q=75&fmt=auto&v=1a2b3c 900w,
-            …                                                              (8 widths total)
+    srcset="/api/img/64a…?w=50&h=28&fit=cover&q=75&fmt=auto&v=1a2b3c     50w,
+            /api/img/64a…?w=100&h=56&fit=cover&q=75&fmt=auto&v=1a2b3c    100w,
+            /api/img/64a…?w=150&h=84&fit=cover&q=75&fmt=auto&v=1a2b3c    150w,
+            …                                                            (every 50px up to the source)
             /api/img/64a…?w=2400&h=1350&fit=cover&q=75&fmt=auto&v=1a2b3c 2400w"
     sizes="(max-width: 768px) 100vw, 50vw"
     alt="…"
@@ -404,11 +405,10 @@ export async function Hero({ id }: { id: string }) {
 
 </Tabs>
 
-Why 300px steps, not 50? `srcset` increments by `pixelStep` (default **50px**) but caps at
-`maxEntries` widths (default **8**) — a 2400px source at 50px = 48 entries, so the step widens to
-300 to stay at 8. Smaller sources keep 50px (a 600px image → `50, 100, … 600`). Raise `pixelStep`
-or lower `maxEntries` for fewer variants. Both are per-render props, not plugin options
-([all props](#props)).
+The `srcset` is every `pixelStep` multiple up to the source width — `pixelStep` defaults to **50px**
+(a 2400px source → `50, 100, … 2400`). It's one [plugin option](#options) (`imagesPlugin({ pixelStep })`),
+the same across every image and built into the `srcset` server-side; raise it for fewer widths and
+fewer cached variants. `maxDimension` caps the top width, so it bounds the entry count too.
 
 That markup is dynamic because the example passes the **populated doc** (the `findByID` result):
 `width`/`height` (no layout shift), `alt`, the source-width cap on the `srcset`, and the `v`
@@ -479,8 +479,6 @@ export const imageProps = [
   { name: 'quality', type: 'number', default: '75', description: `Encode quality baked into each URL.` },
   { name: 'fit', type: 'Fit', default: "'cover'", description: `Resize fit. cover focal-crops.` },
   { name: 'format', type: 'Format', default: "'auto'", description: `Output format (auto negotiates from Accept).` },
-  { name: 'pixelStep', type: 'number', default: '50', description: `Width increment for the srcset; raise it to emit fewer widths (fewer generated variants).` },
-  { name: 'maxEntries', type: 'number', default: '8', description: `Max srcset entries before the step coarsens to stay under it.` },
   { name: 'sourceWidth', type: 'number', description: `Override the source intrinsic width that caps the srcset (else read from a populated doc).` },
   { name: 'priority', type: 'boolean', description: `Eager-load with fetchPriority high — for above-the-fold heroes.` },
   { name: 'loading', type: "'lazy' | 'eager'", description: `Native loading. Defaults to lazy (eager when priority).` },
@@ -489,6 +487,7 @@ export const imageProps = [
   { name: 'style', type: 'CSSProperties', description: `Merged onto the wrapper.` },
   { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
   { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
+  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep. Defaults to the @payload-config alias withPayload sets up; pass it for a non-aliased setup.` },
   { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the one derived from the doc.` },
   { name: 'blur', type: 'boolean', default: 'true', description: `Show the LQIP placeholder (a tiny transform variant painted as the wrapper background).` },
   { name: 'dataAttributes', type: 'Record<string, string>', description: `Extra attributes (e.g. data-*) spread onto the rendered img element.` },
@@ -515,8 +514,6 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   quality={75}
   fit="cover"
   format="auto"
-  pixelStep={50}
-  maxEntries={8}
   decoding="async"
   blur
   baseUrl=""          // same-origin
@@ -529,6 +526,7 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   // loading="lazy"
   // className="rounded-xl"
   // style={{ borderRadius: 8 }}
+  // config={config}              // resolve pixelStep for a non-aliased setup
   // version="1a2b3c"
   // dataAttributes={{ 'data-test': 'hero' }}
 />

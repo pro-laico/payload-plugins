@@ -102,32 +102,29 @@ export const buildVariantUrl = (id: string, width: number, o: BuildUrlOptions = 
 }
 
 /**
- * The widths for a srcset: multiples of `pixelStep` up to the source's intrinsic
- * width (so we never request a larger-than-original image). If that would produce
- * more than `maxEntries`, the effective step is coarsened to keep the srcset short.
- * With no source width, falls back to stepping up to `maxWidth`.
+ * The widths for a srcset: every `pixelStep` multiple up to the source's intrinsic
+ * width (so we never request a larger-than-original image). With no source width,
+ * falls back to stepping up to `maxWidth`. The entry count is bounded by
+ * `min(sourceWidth, maxWidth) / pixelStep` — i.e. the size ceiling caps it, so a
+ * bigger `pixelStep` (or a smaller `maxWidth`/source) yields fewer widths.
  */
-export const stepWidths = (sourceWidth?: number, pixelStep = DEFAULT_PIXEL_STEP, maxWidth = 4096, maxEntries = 8): number[] => {
+export const stepWidths = (sourceWidth?: number, pixelStep = DEFAULT_PIXEL_STEP, maxWidth = 4096): number[] => {
   const step = pixelStep > 0 ? pixelStep : DEFAULT_PIXEL_STEP
   const cap = sourceWidth && sourceWidth > 0 ? Math.max(step, Math.floor(sourceWidth / step) * step) : maxWidth
   const top = Math.min(maxWidth, cap)
-  let effective = step
-  while (Math.ceil(top / effective) > maxEntries) effective += step
   const widths: number[] = []
-  for (let w = effective; w < top; w += effective) widths.push(w)
+  for (let w = step; w < top; w += step) widths.push(w)
   widths.push(top)
   return widths
 }
 
 export interface BuildSrcsetOptions extends BuildUrlOptions {
-  /** Width increment for the srcset. Default 50; raise it to emit fewer widths (and so generate fewer variants). */
+  /** Width increment for the srcset (the project pixel step). Default 50; bigger = fewer widths. */
   pixelStep?: number
   /** The source image's intrinsic width — caps the srcset (no upscaling). */
   sourceWidth?: number
   /** Hard ceiling. Default 4096. */
   maxWidth?: number
-  /** Max srcset entries before the step is coarsened. Default 8. */
-  maxEntries?: number
   /** Width used for the plain `src` fallback. Defaults to min(top, 1280). */
   defaultWidth?: number
 }
@@ -139,7 +136,7 @@ export interface BuildSrcsetResult {
 
 /** Build a responsive `srcset` (pixelStep multiples up to the source width) + a default `src`. */
 export const buildSrcset = (id: string, o: BuildSrcsetOptions = {}): BuildSrcsetResult => {
-  const widths = stepWidths(o.sourceWidth, o.pixelStep, o.maxWidth, o.maxEntries)
+  const widths = stepWidths(o.sourceWidth, o.pixelStep, o.maxWidth)
   const srcset = widths.map((w) => `${buildVariantUrl(id, w, o)} ${w}w`).join(', ')
   const top = widths[widths.length - 1] ?? o.maxWidth ?? 4096
   const src = buildVariantUrl(id, o.defaultWidth ?? Math.min(top, 1280), o)

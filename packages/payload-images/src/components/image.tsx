@@ -4,12 +4,13 @@
  * with a plain `<img>` (a `srcset` of on-demand transform URLs, settings baked into each
  * entry) painted over it: the placeholder shows until the real image downloads and covers
  * it. It needs only the image id; the endpoint reads the focal point and crops server-side.
- * Fully server-rendered — no client component, no hydration, no stored placeholder field —
- * so it drops into any server OR client tree. Not `next/image`.
+ * An async server component: it resolves the project `pixelStep` from your Payload config, then
+ * renders a plain `<img>` — no hydration, no stored placeholder field. Not `next/image`.
  *
  * `className` / `style` go on the wrapper (the image "box" — size/space/round it
  * with utilities there); `dataAttributes` go on the `<img>`.
  */
+import type { SanitizedConfig } from 'payload'
 import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
 
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
@@ -45,6 +46,8 @@ export type ResponsiveImageInput =
       focalY?: number | null
     }
 
+type Awaitable<T> = T | Promise<T>
+
 /** Width / quality of the LQIP placeholder variant — tiny on purpose; the browser upscales it to a soft blur. */
 const PLACEHOLDER_WIDTH = 32
 const PLACEHOLDER_QUALITY = 40
@@ -67,12 +70,8 @@ export interface ResponsiveImageProps {
   quality?: number
   fit?: Fit
   format?: Format
-  /** Width increment for the srcset. Default 50; raise it to emit fewer widths (and so generate fewer variants). */
-  pixelStep?: number
   /** Override the source intrinsic width used to cap the srcset (else read from a populated doc). */
   sourceWidth?: number
-  /** Max srcset entries before the step coarsens. Default 8. */
-  maxEntries?: number
   priority?: boolean
   loading?: 'lazy' | 'eager'
   decoding?: 'async' | 'auto' | 'sync'
@@ -84,6 +83,9 @@ export interface ResponsiveImageProps {
   baseUrl?: string
   /** Transform endpoint base. Default `/api/img`; set it only if your Payload API route or Next.js basePath differs. */
   path?: string
+  /** Payload config, used to resolve the project `pixelStep`. Defaults to the `@payload-config` alias
+   *  that `withPayload` sets up; pass it explicitly for a non-aliased setup. */
+  config?: Awaitable<SanitizedConfig>
   /** Explicit cache-busting version token (`v=`); overrides the one derived from the doc's filename + focal. */
   version?: string
   /** Show the LQIP placeholder (a tiny transform variant, painted as the wrapper background). Default true. */
@@ -102,7 +104,7 @@ const CSS_OBJECT_FIT: Record<Fit, NonNullable<CSSProperties['objectFit']>> = {
 
 const idOf = (image: ResponsiveImageInput): string => (typeof image === 'object' ? String(image.id ?? '') : String(image ?? ''))
 
-export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | null => {
+export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<ReactElement | null> => {
   const {
     image,
     alt,
@@ -112,9 +114,7 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
     quality = 75,
     fit = 'cover',
     format = 'auto',
-    pixelStep,
     sourceWidth,
-    maxEntries,
     priority,
     loading,
     decoding = 'async',
@@ -125,10 +125,23 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
     version,
     blur = true,
     dataAttributes,
+    config,
   } = props
 
   const id = idOf(image)
   if (!id) return null
+
+  // The srcset is a static string (CMS values + the project pixel step), so build it on the server:
+  // resolve `pixelStep` from the plugin config. `@payload-config` is the host bundler's alias (set up
+  // by `withPayload`); `as string` keeps TS from resolving it at this package's build. Falls back to
+  // buildSrcset's default if the config can't be read.
+  let pixelStep: number | undefined
+  try {
+    const cfg = await (config ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
+    pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number } } }).custom?.payloadImages?.pixelStep
+  } catch {
+    pixelStep = undefined
+  }
 
   const doc = typeof image === 'object' ? image : undefined
   const altText = alt ?? doc?.alt ?? ''
@@ -145,7 +158,6 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
     path,
     pixelStep,
     sourceWidth: sourceWidth ?? naturalW,
-    maxEntries,
     version: version ?? deriveVersion(doc),
   }
   const { srcset, src } = buildSrcset(id, opts)
