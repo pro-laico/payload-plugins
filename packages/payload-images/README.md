@@ -133,6 +133,8 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | `transform` | `TransformEndpointConfig \| false` | `{}` | Transform + purge endpoint config; `false` registers neither. |
 | `focalUI` | `boolean` | `true` | Render the focal picker + ratio preview and the Purge button. |
 | `previewRatios` | `string[]` | `['16:9','9:16','1:1','4:3','3:2','21:9']` | Aspect ratios shown as focal-preview tiles. |
+| `virtualFields` | `boolean` | `true` | Add computed `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields to every read. |
+| `localizeAlt` | `boolean` | `false` | Mark `alt` `localized` (needs Payload localization). Ignored with `extendCollection`. |
 
 `transform` keys (all optional): `sourceSlug` (`'images'`), `variantSlug`
 (`'generated-images'`), `cdnCacheControl` (`true`), `maxDimension` (`4096`),
@@ -159,6 +161,59 @@ error otherwise). `pregenerateSizes` is ignored in this mode — your collection
 > **Custom API route or Next `basePath`?** The transform URLs default to `/api/img`. If you've
 > changed Payload's `routes.api` (or set a Next `basePath`), pass `path` to the component once via
 > a wrapper: `const Image = (p: ResponsiveImageProps) => <ResponsiveImage path="/myapi/img" {...p} />`.
+
+## Optimized URLs in the API (no client needed)
+
+`<ResponsiveImage>` and `getImageUrl` are for JS/React. For everyone else — a mobile app, a
+GraphQL client, a plain `fetch`, an RSS/OG generator — the plugin adds **virtual fields** that
+compute optimized URLs on read, so they ride along in every REST / GraphQL / Local-API response
+with no client code and no knowledge of `/api/img`:
+
+```jsonc
+// GET /api/images/<id>  (or a populated page.heroImage)
+{
+  "id": "...", "alt": "...", "width": 2400, "height": 1600,
+  "src": "https://site.com/api/img/<id>?w=1280&fit=cover&q=75&fmt=auto&v=…",
+  "srcset": "https://site.com/api/img/<id>?w=320… 320w, …",
+  "placeholderURL": "https://site.com/api/img/<id>?w=32&q=40…", // LQIP / blur-up
+  "thumbnailURL": "https://site.com/api/img/<id>?w=160&h=160&fit=cover…"
+}
+```
+
+They're absolute when `serverURL` is set, relative otherwise; hidden in the admin; and **flow
+through relationship population** — a populated `page.heroImage` already carries `srcset` /
+`placeholderURL`, ready to render. Population is kept lean (`defaultPopulate`): relations return
+these renderable fields and **not** the `variants` cache join (which would cost an extra query).
+Turn the fields off with `virtualFields: false`.
+
+The resolved config (slugs + options) is also stashed on `config.custom.payloadImages`, so
+decoupled tooling (an OG/sitemap generator, a CDN-purge script, a migration) can read it from
+just `payload` — no import.
+
+## Admin & Payload built-ins
+
+The `images` collection leans on Payload's native upload features, so it behaves like any
+collection you'd build yourself:
+
+- **Upload-field previews + alt search, on by default.** Relationship/`upload` fields that target
+  `images` show a thumbnail (`upload.displayPreview`), the list view searches by `alt`, and the
+  list shows the fast on-demand thumbnail from above. (`extendCollection` targets keep their own
+  admin config.)
+- **Organize a big library with folders.** Payload's built-in folder organization is opt-in (it
+  adds a folder relationship to the schema). Turn it on when you want it:
+  ```ts
+  imagesPlugin({ imagesOptions: { folders: true } })
+  ```
+- **Cap stored originals.** The endpoint never serves an upscaled image, but the *stored* original
+  is whatever was uploaded. To bound storage, hand Payload's built-in `resizeOptions` a ceiling —
+  applied once, on upload:
+  ```ts
+  imagesPlugin({
+    imagesOptions: { upload: { resizeOptions: { width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true } } },
+  })
+  ```
+- **Add images by URL.** Payload's `upload.pasteURL` lets editors paste an image URL to import it
+  (guarded by an allow-list). Leave it at Payload's default or configure it via `imagesOptions`.
 
 ## Caching & abuse limits
 

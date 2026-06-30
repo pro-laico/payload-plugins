@@ -150,10 +150,16 @@ describe('payload-images wiring', () => {
     const imgs = await payload.find({ collection: 'images', limit: 50, overrideAccess: true, sort: 'createdAt' })
     expect(imgs.totalDocs).toBe(3)
     const lighthouse = imgs.docs.find((d) => d.alt === 'Landscape sample') as
-      | { id: string | number; focalX?: number; focalY?: number }
+      | { id: string | number; focalX?: number; focalY?: number; src?: string; srcset?: string; placeholderURL?: string }
       | undefined
     expect(lighthouse?.focalX).toBe(78)
     expect(lighthouse?.focalY).toBe(32)
+
+    // Virtual URL fields are computed on read and ride along in the API response (absolute, since
+    // the sandbox sets serverURL).
+    expect(lighthouse?.src).toContain('/api/img/')
+    expect(lighthouse?.srcset).toContain('/api/img/')
+    expect(lighthouse?.placeholderURL).toContain('w=32')
 
     // The page resolved its `asset('lighthouse')` token to the uploaded image's id.
     const page = (await payload.find({ collection: 'pages', depth: 0, overrideAccess: true })).docs[0] as

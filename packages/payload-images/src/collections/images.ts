@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail, ImageSize, ImageUploadFormatOptions } from 'payload'
 
 import { anyone, authd } from '../access'
+import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
 import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hooks/purge'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
@@ -38,6 +39,11 @@ export interface CreateImagesOptions {
   /** Admin list/preview thumbnail width (px), served on-demand via `/api/img` so the admin
    *  never loads full-res originals. Default 160; pass `false` to use Payload's default. */
   adminThumbnail?: number | false
+  /** Add virtual `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields (computed on read), so
+   *  optimized URLs ride along in every REST/GraphQL/Local-API response. Default true. */
+  virtualFields?: boolean
+  /** Mark the `alt` field `localized: true` (requires Payload localization). Default false. */
+  localizeAlt?: boolean
 }
 
 /**
@@ -91,10 +97,12 @@ const adminUIFields = (focalUI: boolean, variantSlug: CollectionSlug, previewRat
  * mime whitelist so it never clobbers a collection it's merged onto.
  */
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, previewRatios, purgePath } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath } = opts
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
   return {
-    fields: adminUIFields(focalUI, variantSlug, previewRatios, purgePath),
+    // Admin UI is gated by focalUI; the virtual URL fields are for API consumers, so they're
+    // added independently (hidden in the admin).
+    fields: [...adminUIFields(focalUI, variantSlug, previewRatios, purgePath), ...(virtualFields ? virtualUrlFields() : [])],
     hooks: {
       afterChange: [purgeStaleVariantsAfterChange({ variantSlug })],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
@@ -112,19 +120,47 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * transform variant — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
-  const { pregenerateSizes = false } = opts
+  const { pregenerateSizes = false, virtualFields = true, localizeAlt = false } = opts
   const imageSizes = pregenerateSizes === true ? DEFAULT_SIZE_LADDER : Array.isArray(pregenerateSizes) ? pregenerateSizes : undefined
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail)
   const enh = imageEnhancements(opts)
 
+  // Lean relationship population: when an image is referenced (e.g. `page.heroImage`), populate the
+  // renderable fields + the virtual URLs, and skip the `variants` join (which would run an extra
+  // query per populated image). `forceSelect` keeps the virtual fields' inputs present under `select`.
+  const renderableFields = { alt: true, url: true, filename: true, width: true, height: true, focalX: true, focalY: true }
+  const defaultPopulate = virtualFields
+    ? { ...renderableFields, ...Object.fromEntries(VIRTUAL_URL_FIELDS.map((f) => [f, true])) }
+    : renderableFields
+  const forceSelect = virtualFields ? Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])) : undefined
+
   return {
     slug: 'images',
     access: { create: authd, delete: authd, read: anyone, update: authd },
-    admin: { group: 'Assets', enableListViewSelectAPI: true, useAsTitle: 'alt', defaultColumns: ['alt', 'updatedAt'] },
-    fields: [{ name: 'alt', type: 'text', required: true }, ...(enh.fields ?? [])],
+    admin: {
+      group: 'Assets',
+      description: 'Upload images here. Display sizes are generated on demand and cached — store the original once, render any size.',
+      enableListViewSelectAPI: true,
+      useAsTitle: 'alt',
+      defaultColumns: ['alt', 'updatedAt'],
+      listSearchableFields: ['alt'],
+    },
+    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
+    ...(forceSelect ? { forceSelect: forceSelect as CollectionConfig['forceSelect'] } : {}),
+    fields: [
+      {
+        name: 'alt',
+        type: 'text',
+        required: true,
+        localized: localizeAlt,
+        admin: { description: 'Describe the image for screen readers and SEO.' },
+      },
+      ...(enh.fields ?? []),
+    ],
     hooks: enh.hooks,
     upload: {
       focalPoint: true,
+      displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
       mimeTypes: IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
       ...(imageSizes ? { imageSizes } : {}),

@@ -162,20 +162,40 @@ export interface Page {
   createdAt: string;
 }
 /**
+ * Upload images here. Display sizes are generated on demand and cached — store the original once, render any size.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "images".
  */
 export interface Image {
   id: number;
+  /**
+   * Describe the image for screen readers and SEO.
+   */
   alt: string;
   variants?: {
     docs?: (number | GeneratedImage)[];
     hasNextPage?: boolean;
     totalDocs?: number;
   };
+  /**
+   * Optimized URL (≤1280px) for a plain <img> or OG tag.
+   */
+  src?: string | null;
+  /**
+   * Responsive srcset at the natural ratio, up to the source width.
+   */
+  srcset?: string | null;
+  /**
+   * Tiny low-quality placeholder (LQIP) for a blur-up / CSS background.
+   */
+  placeholderURL?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
+  /**
+   * Small focal-cropped square (160px) for cards, lists, and feeds.
+   */
   thumbnailURL?: string | null;
   filename?: string | null;
   mimeType?: string | null;
@@ -329,6 +349,9 @@ export interface PagesSelect<T extends boolean = true> {
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
   variants?: T;
+  src?: T;
+  srcset?: T;
+  placeholderURL?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

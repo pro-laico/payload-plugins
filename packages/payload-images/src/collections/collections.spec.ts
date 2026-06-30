@@ -43,6 +43,39 @@ describe('createImagesCollection', () => {
     expect(upload.adminThumbnail).toBeUndefined()
   })
 
+  it('leans on Payload built-ins: upload-field previews, alt search, and editor descriptions', () => {
+    const c = createImagesCollection()
+    expect((c.upload as { displayPreview?: boolean }).displayPreview).toBe(true)
+    expect(c.admin?.listSearchableFields).toContain('alt')
+    expect(typeof c.admin?.description).toBe('string')
+    const alt = byName(c.fields, 'alt')
+    expect((alt as { admin?: { description?: string } }).admin?.description).toBeTruthy()
+  })
+
+  it('adds virtual URL fields by default (computed, for API consumers) and drops them when off', () => {
+    const on = createImagesCollection()
+    for (const name of ['src', 'srcset', 'placeholderURL', 'thumbnailURL']) {
+      const f = byName(on.fields, name)
+      expect((f as { virtual?: boolean }).virtual).toBe(true)
+    }
+    const off = createImagesCollection({ virtualFields: false })
+    expect(byName(off.fields, 'src')).toBeUndefined()
+  })
+
+  it('populates renderable fields + virtual URLs by default, never the variants join', () => {
+    const dp = createImagesCollection().defaultPopulate as Record<string, boolean>
+    expect(dp.url).toBe(true)
+    expect(dp.src).toBe(true)
+    expect(dp.variants).toBeUndefined()
+    // forceSelect keeps the virtual fields' inputs present even under `select`.
+    expect((createImagesCollection().forceSelect as Record<string, boolean>).width).toBe(true)
+  })
+
+  it('localizes alt only when localizeAlt is set', () => {
+    expect((byName(createImagesCollection({ localizeAlt: true }).fields, 'alt') as { localized?: boolean }).localized).toBe(true)
+    expect((byName(createImagesCollection().fields, 'alt') as { localized?: boolean }).localized).toBe(false)
+  })
+
   it('stores no LQIP placeholder field or beforeChange hook (the placeholder is derived on the frontend)', () => {
     const c = createImagesCollection()
     expect(byName(c.fields, 'blurDataUrl')).toBeUndefined()

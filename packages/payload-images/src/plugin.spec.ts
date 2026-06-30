@@ -32,6 +32,12 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(paths).toEqual(expect.arrayContaining(['get /img/:id', 'post /img/purge/:id']))
   })
 
+  it('stashes the resolved config on config.custom for external tooling', () => {
+    const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string } }).payloadImages
+    expect(stash?.sourceSlug).toBe('images')
+    expect(stash?.variantSlug).toBe('generated-images')
+  })
+
   it('registers nothing when enabled is false', () => {
     const off = run({ enabled: false })
     expect(off.collections ?? []).toHaveLength(0)

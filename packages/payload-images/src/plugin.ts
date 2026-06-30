@@ -43,6 +43,15 @@ export interface ImagesPluginOptions {
   focalUI?: boolean
   /** Aspect ratios shown in the focal preview tiles. */
   previewRatios?: string[]
+  /**
+   * Add virtual `src` / `srcset` / `placeholderURL` / `thumbnailURL` fields, computed on read,
+   * so optimized URLs ride along in every REST / GraphQL / Local-API response (and through
+   * relationship population). Absolute when `serverURL` is set, relative otherwise. Default true.
+   */
+  virtualFields?: boolean
+  /** Mark the `alt` field `localized: true` (requires Payload localization). Ignored with
+   *  `extendCollection`. Default false. */
+  localizeAlt?: boolean
 }
 
 /**
@@ -71,6 +80,8 @@ export const imagesPlugin =
       transform = {},
       focalUI = true,
       previewRatios,
+      virtualFields = true,
+      localizeAlt = false,
     } = opts
     if (!enabled) return config
 
@@ -89,7 +100,7 @@ export const imagesPlugin =
       if (!target) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' not found`)
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
       const enhanced = mergeCollection(
-        mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath })),
+        mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath, virtualFields })),
         imagesOptions,
       )
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
@@ -102,6 +113,8 @@ export const imagesPlugin =
           previewRatios,
           variantSlug,
           purgePath,
+          virtualFields,
+          localizeAlt,
           adminThumbnail: transform === false ? false : undefined,
         }),
         imagesOptions,
@@ -125,11 +138,22 @@ export const imagesPlugin =
       ...config,
       collections,
       endpoints,
+      // Stash the resolved config so decoupled tooling (an OG/sitemap generator, a CDN purge
+      // script, a migration) can read the slugs + options from just `payload`, no import.
+      custom: { ...config.custom, payloadImages: { options: opts, sourceSlug, variantSlug, basePath } },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         if (shadowed) {
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
+          )
+        }
+        // The endpoint reads originals from cloud/relative storage via an origin; with none set in
+        // production, generation 502s. Warn rather than fail (local-disk dev doesn't need it).
+        const hasOrigin = Boolean(payload.config.serverURL || process.env.NEXT_PUBLIC_SERVER_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL)
+        if (transform !== false && process.env.NODE_ENV === 'production' && !hasOrigin) {
+          payload.logger.warn(
+            "[payload-images] no serverURL / NEXT_PUBLIC_SERVER_URL set — on cloud or relative-URL storage the transform endpoint can't fetch originals (502s). Set serverURL in buildConfig.",
           )
         }
       },
