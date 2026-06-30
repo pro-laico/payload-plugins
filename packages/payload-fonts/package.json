@@ -1,0 +1,128 @@
+{
+  "name": "@pro-laico/payload-fonts",
+  "version": "0.0.0",
+  "description": "Custom fonts for Payload CMS: a Font typeface collection that subsets uploaded files to served WOFF2s, an optional fontSet global, an export endpoint + CLI that writes the active fonts to disk for next/font/local, and declarative seeding.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pro-laico/payload-plugins.git",
+    "directory": "packages/payload-fonts"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "fonts",
+    "font",
+    "woff2",
+    "next-font"
+  ],
+  "sideEffects": [
+    "*.scss",
+    "*.css"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./admin/FontOriginalUpload": {
+        "import": "./dist/components/admin/FontOriginalUpload.js",
+        "types": "./dist/components/admin/FontOriginalUpload.d.ts",
+        "default": "./dist/components/admin/FontOriginalUpload.js"
+      },
+      "./DevFonts": {
+        "import": "./dist/components/DevFonts.js",
+        "types": "./dist/components/DevFonts.d.ts",
+        "default": "./dist/components/DevFonts.js"
+      },
+      "./scripts/downloadFonts": {
+        "import": "./dist/scripts/downloadFonts.js",
+        "types": "./dist/scripts/downloadFonts.d.ts",
+        "default": "./dist/scripts/downloadFonts.js"
+      }
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "payload-fonts-download": "./dist/scripts/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./admin/FontOriginalUpload": {
+      "import": "./src/components/admin/FontOriginalUpload.tsx",
+      "types": "./src/components/admin/FontOriginalUpload.tsx",
+      "default": "./src/components/admin/FontOriginalUpload.tsx"
+    },
+    "./DevFonts": {
+      "import": "./src/components/DevFonts.tsx",
+      "types": "./src/components/DevFonts.tsx",
+      "default": "./src/components/DevFonts.tsx"
+    },
+    "./scripts/downloadFonts": {
+      "import": "./src/scripts/downloadFonts.ts",
+      "types": "./src/scripts/downloadFonts.ts",
+      "default": "./src/scripts/downloadFonts.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm clean && pnpm build:types && pnpm build:swc && pnpm build:assets",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "prepack": "pnpm build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck",
+    "build:assets": "copyfiles -u 1 \"src/**/*.{scss,css}\" dist"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "fontkit": "^2.0.4",
+    "subset-font": "^2.5.0"
+  },
+  "peerDependencies": {
+    "@payloadcms/ui": "^3.0.0",
+    "next": ">=15.0.0",
+    "payload": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@payloadcms/db-sqlite": "^3.85.1",
+    "@payloadcms/ui": "^3.85.1",
+    "@types/fontkit": "^2.0.9",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/subset-font": "^2.3.0",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

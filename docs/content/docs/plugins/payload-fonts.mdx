@@ -1,0 +1,213 @@
+---
+title: "payload-fonts"
+description: "Custom fonts for Payload CMS — a Font typeface collection that subsets uploaded files to served WOFF2s, a fontSet global, and serving via next/font/local in prod or a zero-config DevFonts component in dev, plus declarative seeding."
+---
+
+<Callout type="info">
+  **Ported from [`@pro-laico/fonts`](https://github.com/pro-laico/atomic-payload/tree/main/packages/fonts)
+  (Atomic Payload, MIT).** Restructured to this monorepo's conventions and decoupled from the
+  Atomic kernel and the `@pro-laico/styles` design set, with declarative seeding added.
+</Callout>
+
+`@pro-laico/payload-fonts` lets editors upload custom fonts to Payload and self-host them. It
+adds a **Font** typeface collection that **subsets uploaded files to web-ready WOFF2s** and a
+`fontSet` global for choosing the active sans / serif / mono / display faces. On the frontend the
+active fonts apply as `--font-set*` CSS variables — self-hosted with
+[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) in production, or
+loaded with no build step by the `<DevFonts />` component in development. Fonts can be created in
+the admin, server-side from a file (`ingestFont`), or seeded declaratively.
+
+```bash
+pnpm add @pro-laico/payload-fonts
+```
+
+## Setup
+
+```ts
+import { buildConfig } from 'payload'
+import { fontsPlugin } from '@pro-laico/payload-fonts'
+
+export default buildConfig({
+  plugins: [fontsPlugin()],
+})
+```
+
+That registers three collections — `font` (the visible typeface) plus the hidden `fontOriginal`
+(raw uploads) and `fontOptimized` (served WOFF2s) — the `fontSet` global, and the
+`GET /api/fonts/export` endpoint. Editors create a **Font**, drop in either a variable file or
+per-weight files, and the save hook subsets each to a served WOFF2.
+
+<Callout type="warn">
+  **Next.js: externalize the subsetter.** The subset step uses `subset-font` (harfbuzz **wasm**)
+  and `fontkit`, which load wasm/native assets at runtime by a path relative to their own module.
+  If Next bundles them, that path is rewritten to a virtual one that doesn't exist on disk and
+  **the subset silently fails** (`hb-subset.wasm ENOENT` in the logs, no `fontOptimized` files).
+  Mark them external in `next.config.mjs`:
+
+  ```js
+  import { withPayload } from '@payloadcms/next/withPayload'
+
+  const nextConfig = { serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit'] }
+
+  export default withPayload(nextConfig)
+  ```
+
+  Skip it and the plugin logs one loud, actionable error the first time a subset fails, so the
+  fix is obvious rather than silent.
+</Callout>
+
+## How it works
+
+```
+font (typeface)              fontOriginal (hidden)        fontOptimized (hidden)
+  title: "Inter"               raw uploaded bytes           subsetted WOFF2, served
+  family: sans          ──▶    (woff/woff2/ttf/otf)   ──▶   weight/style/isVariable
+  variable | weights[]         one per typeface slot        one per weight, linked back
+```
+
+- **`font`** — one document per typeface. Not an upload collection itself; it holds Payload
+  `upload` slots (a `variable` group _or_ a `weights` array) pointing at `fontOriginal`. On save,
+  every referenced original is subsetted to a `fontOptimized` WOFF2 (variable fonts keep their
+  `wght` axis range; static files take the row's weight/style). Delete cascades to both.
+- **`fontOriginal`** — the untouched archive. Carries no hooks, so it can be a client-upload
+  (direct-to-Blob) collection in production. Each original belongs to exactly one typeface — the
+  upload slots render create-only (no "Choose from existing"), backed by a data-layer guard.
+- **`fontOptimized`** — the bytes the site serves. Derived, never hand-uploaded; public-read so
+  the build-time export can fetch them.
+
+## Options
+
+<TypeTable
+  type={{
+    enabled: { description: "Set false to skip the plugin entirely.", type: "boolean", default: "true" },
+    charset: { description: "Characters the subsetter keeps — a preset, or an explicit string of characters.", type: "'latin' | 'latin-ext' | string", default: "'latin'" },
+    includeFontSet: { description: "Register the fontSet global (the active selection the export endpoint reads). Set false only if you drive the selection some other way.", type: "boolean", default: "true" },
+    fontOptions: { description: "Merged onto the font collection (e.g. tighter access).", type: "Partial<CollectionConfig>" },
+    fontOriginalOptions: { description: "Merged onto fontOriginal (e.g. upload.staticDir or a client-uploads adapter).", type: "Partial<CollectionConfig>" },
+    fontOptimizedOptions: { description: "Merged onto fontOptimized (e.g. upload.staticDir).", type: "Partial<CollectionConfig>" },
+    fontSetOptions: { description: "Merged onto the fontSet global.", type: "Partial<GlobalConfig>" },
+  }}
+/>
+
+Overrides merge non-destructively: `fields` append, `access` / `admin` / `upload` shallow-merge,
+and `hooks` merge per phase — so `fontOriginalOptions: { upload: { staticDir } }` keeps the
+built-in font-mime whitelist.
+
+## The Font collection
+
+One document per **typeface**. A typeface carries its files one of two mutually-exclusive ways.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title` | text | The typeface name, required. |
+| `family` | radio | The generic role it fills: `sans` / `serif` / `mono` / `display`. |
+| `variable` | group | A single variable file per `upright` / `italic` (covers many weights). |
+| `weights[]` | array | One file per `weight` (100–900) + `style` (normal/italic); each pair must be unique. |
+| `source` | json | Transient server-side ingest input — uploaded and stripped on save, never stored. |
+
+## Creating a font from a file (server-side ingest)
+
+Besides the admin slots, a typeface can be created **server-side** from a local file or URL —
+handy for imports, migrations, and seeding. The `font` collection's `beforeValidate` hook
+uploads the `source` to `fontOriginal`, wires the slot, and strips it; the `afterChange` hook
+then subsets it into a served `fontOptimized` WOFF2.
+
+```ts
+import { ingestFont } from '@pro-laico/payload-fonts'
+
+await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', family: 'sans', weight: '400' })
+// variable font: ingestFont(payload, { source: '/path/to/Inter-Variable.woff2', title: 'Inter', family: 'sans', variable: true })
+```
+
+## Declarative seeding with payload-seed
+
+This plugin exports `fontAssetProvider()` so a typeface seeds **like an image asset** via
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers) — declared
+with a `fontSource('inter.woff2')` token and run by the normal seed flow, no script. The provider
+is plain config (the seed package never imports this one, nor `fontkit` / `subset-font`; the
+upload + subset run in this plugin's hooks), so the two packages stay fully decoupled.
+
+```ts
+import { fontsPlugin, fontAssetProvider } from '@pro-laico/payload-fonts'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+plugins: [
+  fontsPlugin(),
+  seedPlugin({ definitions: [fonts, fontSet], assetProviders: [fontAssetProvider()] }),
+]
+```
+
+```ts
+// seed/fonts.ts — files live in <assetsDir>/fonts/
+import { defineSeed } from '@pro-laico/payload-seed'
+import { fontSource } from '@pro-laico/payload-fonts'
+
+export default defineSeed('font', () => [
+  { _key: 'inter', title: 'Inter', family: 'sans', source: fontSource('inter.woff2', { weight: '400' }) },
+])
+
+// seed/fontSet.ts — pick the active typeface per role with ordinary ref() tokens
+import { defineGlobalSeed } from '@pro-laico/payload-seed'
+export const fontSet = defineGlobalSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
+```
+
+A reseed clears the `font` collection via `payload.delete`, so its cascade removes the old
+originals + optimized too (idempotent). See the
+[seed plugin docs](/docs/plugins/payload-seed#external-assets-asset-providers) for the full
+reference.
+
+## Serving the fonts on your frontend
+
+The active fonts are applied as the `--font-set{Sans,Serif,Mono,Display}` CSS variables, so your
+app just uses `font-family: var(--font-setSans)`. Those variables are produced **two ways that
+never both fire** — optimized in production, zero-config in development. Wire both in your root
+layout; each is a no-op in the other environment:
+
+```tsx
+import config from '@payload-config'
+import definitionFonts from '@/app/definition'
+import { extractFonts } from '@pro-laico/payload-fonts'
+import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
+
+<html className={extractFonts(definitionFonts)}>   {/* production: next/font */}
+  <head>
+    <DevFonts config={config} definition={definitionFonts} />   {/* development: runtime */}
+  </head>
+</html>
+```
+
+### Production — `next/font/local`
+
+`fontSet` holds one typeface per role. The `GET /api/fonts/export` endpoint — gated by
+`PAYLOAD_SECRET` (Bearer) — resolves the selection to each role's `fontOptimized` bytes, and the
+`payload-fonts-download` CLI self-hosts them via
+[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font): precise preloading,
+size-adjusted fallbacks, content-hashed static assets.
+
+```json
+// package.json — set FONT_DOWNLOAD_URL (the running Payload URL) + PAYLOAD_SECRET
+{ "scripts": { "prebuild": "payload-fonts-download" } }
+```
+
+The CLI writes `public/fonts/*.woff2` and `src/app/definition.ts`; `extractFonts` puts the
+generated classes (which define the `--font-set*` variables) on `<html>`. Commit an empty
+`definition.ts` (or add a `predev: payload-fonts-download`) so the import resolves before the first
+build.
+
+<Callout type="info">
+  **Failures empty the definition.** Any error during the download — a missing env var, an
+  unreachable endpoint, or an unexpected throw — resets `definition.ts` to an **empty** module so
+  the build still compiles, rather than leaving a stale one that imports font files no longer on
+  disk (a fresh checkout gitignores `public/fonts/`).
+</Callout>
+
+### Development — `<DevFonts />`
+
+`<DevFonts />` reads the active selection from Payload and inlines the matching `@font-face` +
+`--font-set*` variables **at runtime**, so seeding or editing a font shows up on refresh with no
+build step. It renders nothing in production, and stands down in dev once `definition.ts` is
+populated — so running `payload-fonts-download` against your dev server lets you preview the exact
+production path locally. (It's a server component; pass it your `@payload-config`.)
+
+Tune the output paths and CSS-variable prefix with `PAYLOAD_FONTS_*` env vars. If you change
+`cssVariablePrefix`, pass the same `cssVarPrefix` to `DevFonts`.
