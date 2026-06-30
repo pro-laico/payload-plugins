@@ -1,9 +1,10 @@
+import { PageActions } from '@/components/ai/page-actions'
+import { getMDXComponents } from '@/components/mdx'
 import { source } from '@/lib/source'
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page'
 import { createRelativeLink } from 'fumadocs-ui/mdx'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getMDXComponents } from '@/components/mdx'
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params
@@ -16,6 +17,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
     <DocsPage toc={page.data.toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
+      <PageActions markdownUrl={`${page.url}.md`} />
       <DocsBody>
         <MDX components={getMDXComponents({ a: createRelativeLink(source, page) })} />
       </DocsBody>
@@ -32,5 +34,10 @@ export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): P
   const page = source.getPage(params.slug)
   if (!page) notFound()
 
-  return { title: page.data.title, description: page.data.description }
+  return {
+    title: page.data.title,
+    description: page.data.description,
+    // Advertise the clean-markdown version to crawlers / agents.
+    alternates: { types: { 'text/markdown': `${page.url}.md` } },
+  }
 }
