@@ -1,0 +1,192 @@
+---
+title: "payload-icons"
+description: "SVG icons for Payload CMS — an Icon upload collection that optimizes and sanitizes SVGs on save (svgo + viewBox tightening + currentColor theming), a drop-in <Icon name> server component that fetches and inlines the SVG, and one-line declarative seeding."
+---
+
+`@pro-laico/payload-icons` adds an **Icon** collection to Payload: SVG-only uploads that are
+**optimized and sanitized** on save — [svgo](https://github.com/svg/svgo) + a tightened, squared
+`viewBox` + `currentColor` theming — and a **drop-in `<Icon name="…" />`** server component that
+fetches and inlines the SVG with zero wiring. Seeding is declarative and native to
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
+
+```bash
+pnpm add @pro-laico/payload-icons
+```
+
+## Setup
+
+```ts
+import { buildConfig } from 'payload'
+import { iconsPlugin } from '@pro-laico/payload-icons'
+
+export default buildConfig({
+  plugins: [iconsPlugin()],
+})
+```
+
+That registers an `icon` collection. Upload `.svg` files in the admin; each is optimized on save
+and stored as `svgString` (the cleaned `<svg>…</svg>`) plus `optimized` (a human-readable report,
+e.g. `SVG optimized: 1234 to 567 bytes (54.1% reduction)`).
+
+<Callout type="warn">
+  Payload blocks SVG uploads by default (they're on its restricted-file-types list). This
+  collection is SVG-only and sanitizes every file before storage, so it opts in automatically via
+  `upload.allowRestrictedFileTypes`. You don't need to configure anything.
+</Callout>
+
+### What the optimizer does
+
+The `beforeChange` `formatSVGHook` runs svgo (loaded dynamically, so it never lands in a frontend
+or edge bundle) and:
+
+- **Sanitizes** untrusted SVGs — strips `<script>` elements, `on*` handlers, and `javascript:`
+  URLs. The stored string is later inlined via `dangerouslySetInnerHTML`, so this happens even when
+  geometry optimization is skipped.
+- **Optimizes** with svgo (`preset-default` + path/number cleanup, dimensions removed).
+- **Themes** by replacing hard-coded `fill`/`stroke` with `currentColor`, so an icon takes its
+  color from CSS.
+- **Normalizes** the `viewBox` — tightened to the real path bounds and squared around the glyph's
+  center, so mismatched source artboards render consistently.
+
+<Callout type="info">
+  SVGs using `transform` / `clip-path` skip the geometry rewrite (it can't be applied safely) but
+  are still sanitized before storage.
+</Callout>
+
+## Options
+
+`iconsPlugin()` takes no arguments by default. Pass any of these to customize:
+
+<TypeTable
+  type={{
+    enabled: { description: "Set false to skip registering the collection.", type: "boolean", default: "true" },
+    slug: { description: "Collection slug.", type: "string", default: "'icon'" },
+    adminGroup: { description: "Admin sidebar group the collection appears under.", type: "string", default: "'Assets'" },
+    access: { description: "Override per-operation access. Omitted operations keep the defaults (public read, logged-in-admin writes).", type: "{ read?, create?, update?, delete? }", default: "public read, admin writes" },
+    fields: { description: "Extra fields appended after the built-in optimized + svgString fields.", type: "Field[]" },
+    hooks: { description: "Additional collection hooks, appended after the built-ins — your beforeChange hooks see the already-optimized SVG.", type: "CollectionConfig['hooks']" },
+    upload: { description: "Extra upload config shallow-merged onto the default (e.g. a staticDir).", type: "CollectionConfig['upload']", default: "{ mimeTypes: ['image/svg+xml'], allowRestrictedFileTypes: true }" },
+  }}
+/>
+
+<Callout type="info">
+  Read defaults to **public** — icons are frontend assets. Tighten it with `access.read` if yours
+  are private.
+</Callout>
+
+## The Icon collection
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `filename` | upload | The uploaded SVG (the admin `useAsTitle`). |
+| `svgString` | code | The cleaned, sanitized `<svg>…</svg>`, ready to inline (read-only output). |
+| `optimized` | text | The optimization report (read-only output). |
+| `filesize` | number | Updated to the optimized size. |
+| `name` | text (virtual) | The filename without directory or `.svg` (`arrow-right`). Computed on read. |
+
+`name` is a **virtual** field — never stored, derived per read with a pure `afterRead` hook (no
+I/O) — so it appears in REST, GraphQL, and the Local API (and through relationship population)
+without consumers having to strip the extension client-side. A `forceSelect` keeps its input
+(`filename`) selected even under a consumer's `select`.
+
+## Use an icon on the frontend
+
+One import, no wrapper file. The `<Icon>` server component fetches the icon by `name` and inlines it
+as a real `<svg>` — your `className`/props win over the SVG's intrinsic attributes, and it inherits
+CSS `color` via `currentColor`:
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+<Icon name="arrow-right" className="size-6 text-primary" />
+```
+
+<Callout type="info">
+  It's an async **server component** (it queries Payload), so use it in a server component / page.
+  By default it resolves your config via the `@payload-config` alias that `withPayload` sets up — the
+  standard Next + Payload setup — so there's nothing to wire. Pass `config` explicitly for a
+  non-aliased setup. Renders nothing if the name doesn't resolve.
+</Callout>
+
+### Rendering it yourself
+
+For client components, many-at-once rendering, or a populated relationship you already fetched, skip
+the component: `getIcon(payload, name)` returns the icon doc and the pure `extractSvg*` helpers
+inline its `svgString`. (The `<Icon>` component is just these two composed.) You can also pass a
+string straight to the component — `<Icon svg={icon.svgString} />` — to render without a lookup.
+
+```tsx
+import { extractSvgContent, extractSvgProps, getIcon } from '@pro-laico/payload-icons'
+
+const icon = await getIcon(payload, 'arrow-right')
+if (!icon?.svgString) return null
+return <svg {...extractSvgProps(icon.svgString)} className="size-6" dangerouslySetInnerHTML={{ __html: extractSvgContent(icon.svgString) }} />
+```
+
+### Styling with CVA + Tailwind
+
+Because the optimizer rewrites fills to `currentColor`, a single source SVG recolors and resizes
+from class names alone — which composes naturally with
+[`class-variance-authority`](https://cva.style). Build the inline `<svg>` once with variant / size /
+tone options:
+
+```tsx
+import { extractSvgContent, extractSvgProps } from '@pro-laico/payload-icons'
+import { cva } from 'class-variance-authority'
+import { cn } from '@/lib/cn' // clsx + tailwind-merge
+
+const InlineSvg = ({ svg, className }: { svg: string; className?: string }) => (
+  <svg aria-hidden {...extractSvgProps(svg)} className={className} dangerouslySetInnerHTML={{ __html: extractSvgContent(svg) }} />
+)
+
+const glyphSize = { xs: 'size-3.5', sm: 'size-4', base: 'size-5', lg: 'size-6', xl: 'size-8' }
+const toneClass = { current: '', muted: 'text-muted-foreground', primary: 'text-primary', destructive: 'text-destructive' }
+
+const frameVariants = cva('inline-flex shrink-0 items-center justify-center rounded-full', {
+  variants: {
+    variant: {
+      outline: 'border border-border text-foreground',
+      solid: 'bg-primary text-primary-foreground',
+      ghost: 'text-foreground transition-colors hover:bg-muted',
+    },
+  },
+})
+
+// Compose <InlineSvg> with frameVariants/size/tone → <Icon svg={…} variant="solid" size="lg" />.
+// One source SVG, every variant — recolored and resized by class.
+```
+
+The [`icons-sandbox` example](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
+ships the full version of this — a presentational `Icon` (CVA over the inline `<svg>`) plus a
+name-based `CmsIcon` server wrapper — and a showcase page that renders the same source SVG across
+the variant, size, and tone axes.
+
+## Seeding with payload-seed
+
+Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
+`payload-mux`) no asset provider. Put your source `.svg` files in the seed assets dir (the loader
+searches the `svg/` subdir, so `assets/svg/arrow-right.svg` resolves from `'arrow-right.svg'`) and
+declare them with `iconAssets`:
+
+```ts
+import { defineAssets } from '@pro-laico/payload-seed'
+import { iconAssets } from '@pro-laico/payload-icons'
+
+// assets/svg/arrow-right.svg, assets/svg/check.svg
+export default defineAssets(iconAssets(['arrow-right.svg', 'check.svg']))
+```
+
+Each entry is referenceable elsewhere in the seed as `asset('arrow-right')` / `asset('check')`, and
+every file is optimized on upload via the same `formatSVGHook`. Wire the definition into the seed
+plugin as usual:
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+plugins: [iconsPlugin(), seedPlugin({ definitions: [icons /*, pages, … */] })]
+```
+
+`iconAssets` returns plain data — this package never imports the seed package, so the two stay
+decoupled. Renamed the collection? Pass `iconAssets([...], { collection: 'my-icon' })`. See the
+[seed plugin docs](/docs/plugins/payload-seed) for the full reference.
