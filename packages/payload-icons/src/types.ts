@@ -9,10 +9,9 @@ export interface IconAccess {
   delete?: Access
 }
 
-/** Configuration for the icons plugin. Every field is optional — `iconsPlugin()` is enough. */
-export interface IconsPluginOptions {
-  /** Set to `false` to disable the plugin (the collection is not registered). @default true */
-  enabled?: boolean
+/** Overrides for the `icon` upload collection — replaces collection-level config (slug, adminGroup,
+ *  access, upload) and extends `fields` / `hooks`. Every field is optional. */
+export interface IconCollectionOverrides {
   /** Slug for the icon collection. @default 'icon' */
   slug?: string
   /** Admin sidebar group the collection appears under. @default 'Assets' */

@@ -33,7 +33,30 @@
         "import": "./dist/components/Icon.js",
         "types": "./dist/components/Icon.d.ts",
         "default": "./dist/components/Icon.js"
+      },
+      "./cache": {
+        "import": "./dist/cache/index.js",
+        "types": "./dist/cache/index.d.ts",
+        "default": "./dist/cache/index.js"
+      },
+      "./scan": {
+        "import": "./dist/scan/index.js",
+        "types": "./dist/scan/index.d.ts",
+        "default": "./dist/scan/index.js"
+      },
+      "./admin/iconRowLabel": {
+        "import": "./dist/components/admin/iconRowLabel.js",
+        "types": "./dist/components/admin/iconRowLabel.d.ts",
+        "default": "./dist/components/admin/iconRowLabel.js"
+      },
+      "./admin/iconUsagePanel": {
+        "import": "./dist/components/admin/iconUsagePanel.js",
+        "types": "./dist/components/admin/iconUsagePanel.d.ts",
+        "default": "./dist/components/admin/iconUsagePanel.js"
       }
+    },
+    "bin": {
+      "payload-icons-scan": "./dist/scan/cli.js"
     }
   },
   "main": "./src/index.ts",
@@ -48,6 +71,26 @@
       "import": "./src/components/Icon.tsx",
       "types": "./src/components/Icon.tsx",
       "default": "./src/components/Icon.tsx"
+    },
+    "./cache": {
+      "import": "./src/cache/index.ts",
+      "types": "./src/cache/index.ts",
+      "default": "./src/cache/index.ts"
+    },
+    "./scan": {
+      "import": "./src/scan/index.ts",
+      "types": "./src/scan/index.ts",
+      "default": "./src/scan/index.ts"
+    },
+    "./admin/iconRowLabel": {
+      "import": "./src/components/admin/iconRowLabel.tsx",
+      "types": "./src/components/admin/iconRowLabel.tsx",
+      "default": "./src/components/admin/iconRowLabel.tsx"
+    },
+    "./admin/iconUsagePanel": {
+      "import": "./src/components/admin/iconUsagePanel.tsx",
+      "types": "./src/components/admin/iconUsagePanel.tsx",
+      "default": "./src/components/admin/iconUsagePanel.tsx"
     }
   },
   "files": [
@@ -64,16 +107,29 @@
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
   },
   "dependencies": {
+    "server-only": "^0.0.1",
     "svg-path-bbox": "^2.1.0",
     "svgo": "^4.0.1"
   },
   "peerDependencies": {
+    "@payloadcms/ui": "^3.0.0",
+    "next": ">=15.0.0",
     "payload": "^3.0.0",
     "react": "^19.0.0"
   },
+  "peerDependenciesMeta": {
+    "@payloadcms/ui": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@payloadcms/ui": "^3.85.1",
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
+    "next": "^16.2.9",
     "payload": "^3.85.1",
     "react": "^19.2.7",
     "typescript": "^6.0.3",

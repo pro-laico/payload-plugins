@@ -3,7 +3,7 @@ import { formatSVGHook } from '../hooks/formatSVG'
 import { defaultAdminAccess, defaultReadAccess } from '../lib/defaultAccess'
 import { iconNameFromFilename } from '../lib/derive'
 import { mergeHooks } from '../lib/mergeHooks'
-import type { IconDoc, IconsPluginOptions } from '../types'
+import type { IconCollectionOverrides, IconDoc } from '../types'
 
 /** The default slug for the icon collection. */
 export const ICON_SLUG = 'icon'
@@ -16,7 +16,7 @@ export const ICON_SLUG = 'icon'
  * Pass {@link IconsPluginOptions} to append fields/hooks, override access, or rename the slug —
  * additions stack on top of the defaults.
  */
-export const Icon = (options: IconsPluginOptions = {}): CollectionConfig => {
+export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig => {
   const { slug = ICON_SLUG, adminGroup = 'Assets', access, fields = [], hooks, upload } = options
 
   return {
