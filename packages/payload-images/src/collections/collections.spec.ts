@@ -71,10 +71,12 @@ describe('createImagesCollection', () => {
     expect((byName(createImagesCollection().fields, 'alt') as { localized?: boolean }).localized).toBe(false)
   })
 
-  it('stores no LQIP placeholder field or beforeChange hook (the placeholder is derived on the frontend)', () => {
+  it('generates no placeholder at upload (no beforeChange hook); blurDataURL is virtual, not stored', () => {
     const c = createImagesCollection()
-    expect(byName(c.fields, 'blurDataUrl')).toBeUndefined()
     expect(c.hooks?.beforeChange ?? []).toHaveLength(0)
+    // The LQIP is generated on demand, never stored — the blurDataURL field is virtual.
+    const blur = byName(c.fields, 'blurDataURL') as { virtual?: boolean } | undefined
+    expect(blur?.virtual).toBe(true)
   })
 
   it('renders the focal + purge UI and the variants join only when focalUI is on', () => {

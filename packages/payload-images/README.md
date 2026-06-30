@@ -137,6 +137,7 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | `virtualFields` | `boolean` | `true` | Add computed `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields to every read. |
 | `localizeAlt` | `boolean` | `false` | Mark `alt` `localized` (needs Payload localization). Ignored with `extendCollection`. |
 | `mimeTypes` | `string[]` | raster set | Accepted upload mime types (defaults to avif/webp/jpeg/png). Ignored with `extendCollection`. |
+| `placeholder` | `false \| { width?, quality?, format? }` | `{ width: 24, quality: 40, format: 'webp' }` | Inline LQIP for `<ResponsiveImage>` — a faithful (per ratio + focal) base64 placeholder generated server-side and painted instantly. `false` disables it. |
 
 `transform` keys (all optional): `sourceSlug` (`'images'`), `variantSlug`
 (`'generated-images'`), `cdnCacheControl` (`true`), `maxDimension` (`4096`),

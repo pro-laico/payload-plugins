@@ -190,6 +190,10 @@ export interface Image {
    * Tiny low-quality placeholder (LQIP) for a blur-up / CSS background.
    */
   placeholderURL?: string | null;
+  /**
+   * Inline LQIP data-URI; generated only when a read sets req.context.lqip ({ ar, fit }) or sends an X-LQIP header. Null otherwise.
+   */
+  blurDataURL?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -352,6 +356,7 @@ export interface ImagesSelect<T extends boolean = true> {
   src?: T;
   srcset?: T;
   placeholderURL?: T;
+  blurDataURL?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

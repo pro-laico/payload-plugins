@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config, Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { imagesPlugin } from './plugin'
+import { imagesPlugin, resolvePlaceholder } from './plugin'
 
 const baseConfig = (collections: CollectionConfig[] = []): Config => ({ collections }) as Config
 // The Payload `Plugin` type returns `Config | Promise<Config>`; this plugin is synchronous, so
@@ -33,9 +33,10 @@ describe('imagesPlugin — default (creates the images collection)', () => {
   })
 
   it('stashes the resolved config on config.custom for external tooling', () => {
-    const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string } }).payloadImages
+    const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string; placeholder?: unknown } }).payloadImages
     expect(stash?.sourceSlug).toBe('images')
     expect(stash?.variantSlug).toBe('generated-images')
+    expect(stash?.placeholder).toEqual({ width: 24, quality: 40, format: 'webp' })
   })
 
   it('registers nothing when enabled is false', () => {
@@ -48,6 +49,17 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     const out2 = run({ transform: false })
     expect(slugs(out2)).toEqual(expect.arrayContaining(['images', 'generated-images']))
     expect(out2.endpoints ?? []).toHaveLength(0)
+  })
+})
+
+describe('resolvePlaceholder', () => {
+  it('fills the 24 / 40 / webp defaults', () => {
+    expect(resolvePlaceholder(undefined)).toEqual({ width: 24, quality: 40, format: 'webp' })
+  })
+  it('honors overrides and passes false through (disabled)', () => {
+    expect(resolvePlaceholder({ width: 16, quality: 30, format: 'jpeg' })).toEqual({ width: 16, quality: 30, format: 'jpeg' })
+    expect(resolvePlaceholder({ width: 32 })).toEqual({ width: 32, quality: 40, format: 'webp' })
+    expect(resolvePlaceholder(false)).toBe(false)
   })
 })
 

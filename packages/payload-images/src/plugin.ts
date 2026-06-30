@@ -4,7 +4,7 @@ import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collec
 import { createImagesCollection, imageEnhancements } from './collections/images'
 import { createPurgeEndpoint, createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
 import { mergeCollection } from './lib/mergeCollection'
-import { DEFAULT_PIXEL_STEP } from './transform/params'
+import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './transform/params'
 
 export interface ImagesPluginOptions {
   /**
@@ -68,7 +68,31 @@ export interface ImagesPluginOptions {
    * (you own that collection's `upload.mimeTypes`).
    */
   mimeTypes?: string[]
+  /**
+   * Inline LQIP placeholder for `<ResponsiveImage>`. A tiny, faithful (per aspect-ratio +
+   * focal point) image is generated server-side, base64-inlined behind the real image, and
+   * painted instantly with zero network. Pass `false` to disable it project-wide. Defaults:
+   * 24px / quality 40 / webp.
+   */
+  placeholder?: false | PlaceholderConfig
 }
+
+/** Inline-LQIP placeholder settings (see {@link ImagesPluginOptions.placeholder}). */
+export interface PlaceholderConfig {
+  /** Longest edge of the LQIP, in px. Default 24. */
+  width?: number
+  /** Encode quality for the LQIP. Default 40. */
+  quality?: number
+  /** LQIP encode format. Default `webp`. */
+  format?: 'webp' | 'jpeg'
+}
+
+/** The resolved placeholder settings stashed for the component, or `false` when disabled. */
+export type ResolvedPlaceholder = false | Required<PlaceholderConfig>
+
+/** Fill in the placeholder defaults (24px / q40 / webp), or `false` when disabled. */
+export const resolvePlaceholder = (p: ImagesPluginOptions['placeholder']): ResolvedPlaceholder =>
+  p === false ? false : { width: p?.width ?? 24, quality: p?.quality ?? 40, format: p?.format ?? 'webp' }
 
 /**
  * Registers the `images` (source) and hidden `generated-images` (variant cache) collections,
@@ -76,9 +100,9 @@ export interface ImagesPluginOptions {
  *
  * Uploads store only the original; every rendered size is generated the first time a page asks
  * for it (resized and cropped to the focal point set in the admin), then cached in
- * `generated-images` so it's only ever built once. The LQIP placeholder is derived on the
- * frontend by `<ResponsiveImage>` from the smallest transform variant — nothing is stored on
- * the source doc.
+ * `generated-images` so it's only ever built once. The LQIP placeholder is generated on demand by
+ * `<ResponsiveImage>` (a tiny inline base64, via the same variant cache) — nothing is stored on the
+ * source doc.
  *
  * Pass `extendCollection: '<slug>'` to add the pipeline to an upload collection you already have
  * instead of creating `images`. The transform endpoint mounts at `/api/img`; do not name a
@@ -99,6 +123,7 @@ export const imagesPlugin =
       virtualFields = true,
       localizeAlt = false,
       mimeTypes,
+      placeholder,
     } = opts
     if (!enabled) return config
 
@@ -163,8 +188,20 @@ export const imagesPlugin =
       collections,
       endpoints,
       // Stash the resolved config so decoupled tooling (an OG/sitemap generator, a CDN purge
-      // script, a migration) can read the slugs + options from just `payload`, no import.
-      custom: { ...config.custom, payloadImages: { options: opts, sourceSlug, variantSlug, basePath, pixelStep } },
+      // script, a migration) and `<ResponsiveImage>` (inline LQIP) can read the slugs + options
+      // from just `payload`, no import.
+      custom: {
+        ...config.custom,
+        payloadImages: {
+          options: opts,
+          sourceSlug,
+          variantSlug,
+          basePath,
+          pixelStep,
+          placeholder: resolvePlaceholder(placeholder),
+          maxInputPixels: transformCfg.maxInputPixels ?? DEFAULT_CONSTRAINTS.maxInputPixels,
+        },
+      },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         if (shadowed) {

@@ -1,18 +1,20 @@
 /**
- * `<ResponsiveImage>` — a wrapper carrying an LQIP placeholder (the smallest transform
- * variant, set as the wrapper's background and upscaled by the browser to a soft blur),
- * with a plain `<img>` (a `srcset` of on-demand transform URLs, settings baked into each
- * entry) painted over it: the placeholder shows until the real image downloads and covers
- * it. It needs only the image id; the endpoint reads the focal point and crops server-side.
- * An async server component: it resolves the project `pixelStep` from your Payload config, then
- * renders a plain `<img>` — no hydration, no stored placeholder field. Not `next/image`.
+ * `<ResponsiveImage>` — a single plain `<img>` carrying a `srcset` of on-demand transform URLs,
+ * with a faithful **inline LQIP** painted as its own `background-image`: a tiny base64 data-URI
+ * (generated server-side at the requested aspect-ratio + focal point, zero network) shows
+ * instantly, and the real image paints over it on load — the swap is native, no JS, no `<head>`
+ * script. An async server component: it resolves the project config (pixel step + placeholder
+ * settings), generates the LQIP via the shared variant cache, and renders one `<img>`. Not
+ * `next/image`.
  *
- * `className` / `style` go on the wrapper (the image "box" — size/space/round it
- * with utilities there); `dataAttributes` go on the `<img>`.
+ * `className` / `style` / `dataAttributes` all go on the `<img>` itself (size / space / round it
+ * there). The LQIP is on by default; pass `blur={false}` (or the plugin's `placeholder: false`)
+ * to skip it, and it's skipped automatically when there's no populated doc to generate from.
  */
 import type { SanitizedConfig } from 'payload'
 import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
 
+import type { VariantSourceDoc } from '../transform/getVariantBytes'
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
 import {
   type BuildSrcsetOptions,
@@ -32,7 +34,7 @@ import {
 export { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths }
 export type { BuildSrcsetOptions, BuildUrlOptions, Fit, Format, GetImageUrlOptions, ImageResource }
 
-/** A bare id, or a populated image doc (for natural dims, alt, and the cache-busting version token). */
+/** A bare id, or a populated image doc (for natural dims, alt, the version token, and inline-LQIP generation). */
 export type ResponsiveImageInput =
   | string
   | number
@@ -42,15 +44,12 @@ export type ResponsiveImageInput =
       height?: number | null
       alt?: string | null
       filename?: string | null
+      url?: string | null
       focalX?: number | null
       focalY?: number | null
     }
 
 type Awaitable<T> = T | Promise<T>
-
-/** Width / quality of the LQIP placeholder variant — tiny on purpose; the browser upscales it to a soft blur. */
-const PLACEHOLDER_WIDTH = 32
-const PLACEHOLDER_QUALITY = 40
 
 export interface ResponsiveImageProps {
   image: ResponsiveImageInput
@@ -60,11 +59,10 @@ export interface ResponsiveImageProps {
   /** Render aspect ratio (`16/9` | `"16:9"`); falls back to the doc's natural ratio. Ignored when `fill` is set. */
   aspectRatio?: number | string
   /**
-   * Cover-fill a height-driven parent instead of acting as an aspect-ratio box. The wrapper
-   * becomes `position:absolute; inset:0; size:100%` and the `<img>` renders `width/height:100%`
-   * with `object-fit:<fit>` and NO aspect-ratio — so it fills a parent that sets its own height
-   * (full-bleed hero, carousel slide, map panel). The parent must be positioned. The placeholder
-   * still applies. Default false.
+   * Cover-fill a height-driven parent instead of acting as an aspect-ratio box. The `<img>`
+   * becomes `position:absolute; inset:0; size:100%` with `object-fit:<fit>` and NO aspect-ratio
+   * — so it fills a parent that sets its own height (full-bleed hero, carousel slide, map panel).
+   * The parent must be positioned. The placeholder still applies. Default false.
    */
   fill?: boolean
   quality?: number
@@ -78,9 +76,9 @@ export interface ResponsiveImageProps {
   fetchPriority?: 'high' | 'low' | 'auto'
   /** Native `<img>` `decoding` hint. Default `async`. */
   decoding?: 'async' | 'auto' | 'sync'
-  /** Applied to the wrapper (the image box). */
+  /** Applied to the `<img>` (size / space / round it here). */
   className?: string
-  /** Merged onto the wrapper (the image box). */
+  /** Merged onto the `<img>`'s style. */
   style?: CSSProperties
   /** Absolute base for the generated URLs (default same-origin). */
   baseUrl?: string
@@ -91,7 +89,7 @@ export interface ResponsiveImageProps {
   config?: Awaitable<SanitizedConfig>
   /** Explicit cache-busting version token (`v=`); overrides the one derived from the doc's filename + focal. */
   version?: string
-  /** Show the LQIP placeholder (a tiny transform variant, painted as the wrapper background). Default true. */
+  /** Show the inline LQIP placeholder (a tiny base64 variant painted as the `<img>`'s background). Default true. */
   blur?: boolean
   /** Extra attributes (e.g. `data-*`) spread onto the `<img>`. */
   dataAttributes?: Record<string, string>
@@ -134,17 +132,16 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   const id = idOf(image)
   if (!id) return null
 
-  // The srcset is a static string (CMS values + the project pixel step), so build it on the server:
-  // resolve `pixelStep` from the plugin config. `@payload-config` is the host bundler's alias (set up
-  // by `withPayload`); `as string` keeps TS from resolving it at this package's build. Falls back to
-  // buildSrcset's default if the config can't be read.
-  let pixelStep: number | number[] | undefined
+  // Resolve the Payload config once (the srcset's `pixelStep` and the placeholder settings both
+  // come off it). `@payload-config` is the host bundler's alias (set up by `withPayload`);
+  // `as string` keeps TS from resolving it at this package's build. Stays undefined if unreadable.
+  let cfg: SanitizedConfig | undefined
   try {
-    const cfg = await (config ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
-    pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } }).custom?.payloadImages?.pixelStep
+    cfg = await (config ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
   } catch {
-    pixelStep = undefined
+    cfg = undefined
   }
+  const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep
 
   const doc = typeof image === 'object' ? image : undefined
   const altText = alt ?? doc?.alt ?? ''
@@ -171,48 +168,52 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
     version: version ?? deriveVersion(doc),
   }
   const { srcset, src } = buildSrcset(id, opts)
-  // The LQIP placeholder is the smallest transform variant (a tiny, low-quality crop sharing the
-  // same fit/format/focal/version); the browser upscales it to a soft blur behind the real image.
-  const blurSrc = blur ? buildVariantUrl(id, PLACEHOLDER_WIDTH, { ...opts, quality: PLACEHOLDER_QUALITY }) : undefined
+
+  // The faithful inline LQIP: a tiny base64 variant at this exact ratio/focal, generated
+  // server-side (shared variant cache) and painted as the <img>'s own background — instant,
+  // zero network, covered when the real image loads. Needs a populated doc + the config;
+  // the engine is dynamic-imported so the non-placeholder path never bundles Sharp/getPayload.
+  let lqip: string | undefined
+  if (blur && cfg && doc?.filename) {
+    try {
+      const { generateInlineLqip } = await import('./inlineLqip')
+      lqip = await generateInlineLqip({ config: cfg, source: doc as VariantSourceDoc, ar, fit })
+    } catch {
+      lqip = undefined
+    }
+  }
 
   const intrinsicW = naturalW ?? (ar ? 1280 : undefined)
   const intrinsicH = naturalH ?? (ar && intrinsicW ? Math.round(intrinsicW / ar) : undefined)
+  const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
 
   return (
-    <span
+    // biome-ignore lint/performance/noImgElement: intentional plain <img> — a hand-built srcset + inline LQIP that next/image would defeat
+    <img
+      src={src}
+      srcSet={srcset}
+      sizes={sizes}
+      alt={altText}
+      width={intrinsicW}
+      height={intrinsicH}
+      loading={loading}
+      fetchPriority={fetchPriority}
+      decoding={decoding}
       className={className}
       style={{
         display: 'block',
-        overflow: 'hidden',
         width: '100%',
-        ...(fill ? { position: 'absolute', inset: 0, height: '100%' } : null),
-        ...(blurSrc
-          ? { backgroundImage: `url(${blurSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
+        height: fill ? '100%' : 'auto',
+        ...(ar ? { aspectRatio: String(ar) } : null),
+        objectFit: CSS_OBJECT_FIT[fit],
+        ...(fill ? { position: 'absolute', inset: 0 } : null),
+        ...(lqip
+          ? { backgroundImage: `url(${lqip})`, backgroundSize: bgSize, backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
           : null),
         ...style,
       }}
-    >
-      {/* biome-ignore lint/performance/noImgElement: intentional plain <img> — a hand-built srcset + LQIP that next/image would defeat */}
-      <img
-        src={src}
-        srcSet={srcset}
-        sizes={sizes}
-        alt={altText}
-        width={intrinsicW}
-        height={intrinsicH}
-        loading={loading}
-        fetchPriority={fetchPriority}
-        decoding={decoding}
-        style={{
-          display: 'block',
-          width: '100%',
-          height: fill ? '100%' : 'auto',
-          ...(ar ? { aspectRatio: String(ar) } : null),
-          objectFit: CSS_OBJECT_FIT[fit],
-        }}
-        {...(dataAttributes as ImgHTMLAttributes<HTMLImageElement>)}
-      />
-    </span>
+      {...(dataAttributes as ImgHTMLAttributes<HTMLImageElement>)}
+    />
   )
 }
 

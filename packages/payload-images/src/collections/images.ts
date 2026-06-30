@@ -103,8 +103,8 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * default); keeps Payload's built-in `focalPoint` (the focal component enhances it). The
  * on-demand transform endpoint serves every rendered variant and records it in the
  * generated-images collection, surfaced here via the `variants` join and purged by the
- * change/delete hooks. The LQIP placeholder is derived on the frontend from the smallest
- * transform variant — there's no stored placeholder field.
+ * change/delete hooks. The LQIP placeholder is generated on demand by `<ResponsiveImage>` (a tiny
+ * inline base64 via the shared variant cache) — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
   const { virtualFields = true, localizeAlt = false } = opts

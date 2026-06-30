@@ -124,6 +124,7 @@ export const options = [
   { name: 'virtualFields', type: 'boolean', default: 'true', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population.` },
   { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection — defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
+  { name: 'placeholder', type: 'false | { width?, quality?, format? }', default: '{ width: 24, quality: 40, format: \'webp\' }', description: `Inline LQIP placeholder for <ResponsiveImage>: a tiny, faithful (per ratio + focal) image generated server-side, base64-inlined behind the real image, painted instantly with zero network. Tune width/quality/format, or pass false to disable placeholders project-wide.` },
 ]
 
 Pass options to customize — the **Reference** tab is the interactive view (`transform` expands to its
@@ -198,8 +199,9 @@ logged-in-admin only.
     variants: { description: "Lists this image's cached generated-images. Only with focalUI.", type: "join" },
     src: { description: "Default-width optimized URL, computed on read and hidden in admin. Only with virtualFields.", type: "virtual" },
     srcset: { description: "Responsive srcset of optimized URLs. Only with virtualFields.", type: "virtual" },
-    placeholderURL: { description: "Tiny blurred LQIP URL. Only with virtualFields.", type: "virtual" },
+    placeholderURL: { description: "Tiny blurred LQIP URL (URL form, for non-React consumers). Only with virtualFields.", type: "virtual" },
     thumbnailURL: { description: "160px focal-cropped thumbnail URL. Only with virtualFields.", type: "virtual" },
+    blurDataURL: { description: "On-demand inline LQIP data-URI — null unless the read sets req.context.lqip / X-LQIP. Only with virtualFields.", type: "virtual" },
   }}
 />
 
@@ -350,10 +352,12 @@ The transform endpoint is public-facing, so it's bounded on several fronts:
 
 The frontend surface — a plain `<img>` whose `srcset` points at the transform endpoint, so the
 browser grabs the one size that fits where it renders. Not `next/image` — an async server component
-(it resolves the project `pixelStep` from your config). Import from the `components/image` subpath.
+(it resolves the project `pixelStep` + placeholder settings from your config, and generates the inline
+LQIP). Import from the `components/image` subpath.
 **Component** = what you write, **Rendered HTML**
-= what it produces (an `<img>` with a full `srcset`, one URL per width capped at the source, plus a
-blurred LQIP on the wrapper):
+= what it produces: a single `<img>` with a full `srcset` (one URL per width, capped at the source),
+plus an inline LQIP painted as the image's own `background-image` — instant, zero network, covered
+when the real image loads:
 
 <Tabs items={['Component', 'Rendered HTML']}>
 
@@ -372,7 +376,7 @@ export async function Hero({ id }: { id: string }) {
       image={image}
       aspectRatio="16:9"
       sizes="(max-width: 768px) 100vw, 50vw"
-      className="rounded-xl" // Tailwind (or any className) → the wrapper
+      className="rounded-xl" // Tailwind (or any className) → the <img>
     />
   )
 }
@@ -383,25 +387,24 @@ export async function Hero({ id }: { id: string }) {
 <Tab value="Rendered HTML">
 
 ```html
-<!-- your className is on the wrapper; the inline styles are the component's own layout plumbing -->
-<span class="rounded-xl"
-      style="display:block; overflow:hidden; width:100%;
-             background-image:url(/api/img/64a…?w=32&h=18&fit=cover&q=40&fmt=auto&v=1a2b3c)">
-  <img
-    src="/api/img/64a…?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c"
-    srcset="/api/img/64a…?w=50&h=28&fit=cover&q=75&fmt=auto&v=1a2b3c     50w,
-            /api/img/64a…?w=100&h=56&fit=cover&q=75&fmt=auto&v=1a2b3c    100w,
-            /api/img/64a…?w=150&h=84&fit=cover&q=75&fmt=auto&v=1a2b3c    150w,
-            …                                                            (every 50px up to the source)
-            /api/img/64a…?w=2400&h=1350&fit=cover&q=75&fmt=auto&v=1a2b3c 2400w"
-    sizes="(max-width: 768px) 100vw, 50vw"
-    alt="…"
-    width="2400"
-    height="1350"
-    loading="lazy"
-    decoding="async"
-    style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777777; object-fit:cover" />
-</span>
+<!-- one element: your className + the layout plumbing + the inline LQIP, all on the <img> -->
+<img
+  class="rounded-xl"
+  src="/api/img/64a…?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c"
+  srcset="/api/img/64a…?w=50&h=28&fit=cover&q=75&fmt=auto&v=1a2b3c     50w,
+          /api/img/64a…?w=100&h=56&fit=cover&q=75&fmt=auto&v=1a2b3c    100w,
+          /api/img/64a…?w=150&h=84&fit=cover&q=75&fmt=auto&v=1a2b3c    150w,
+          …                                                            (every 50px up to the source)
+          /api/img/64a…?w=2400&h=1350&fit=cover&q=75&fmt=auto&v=1a2b3c 2400w"
+  sizes="(max-width: 768px) 100vw, 50vw"
+  alt="…"
+  width="2400"
+  height="1350"
+  loading="lazy"
+  fetchpriority="auto"
+  decoding="async"
+  style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777777; object-fit:cover;
+         background-image:url(data:image/webp;base64,UklGR…); background-size:cover; background-position:center" />
 ```
 
 </Tab>
@@ -460,19 +463,6 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
   `const Image = (p: ResponsiveImageProps) => <ResponsiveImage path="/myapi/img" {...p} />`.
 </Callout>
 
-### Blur placeholder
-
-No pop-in by default — no blank box that snaps to the image on load. `<ResponsiveImage>` paints a
-blurred preview from the first render; the real image covers it once downloaded.
-
-Just another transform: the smallest variant — a **32px, low-quality crop** sharing the image's
-fit / format / focal / version — set as the wrapper's `background-image`, upscaled into a soft blur
-(the `?w=32…&q=40` URL above). The `<img>` sits over it.
-
-So it's **zero-config and fully server-rendered** — no JS, no hydration, **no stored placeholder
-field** (nothing to generate or migrate). The blur matches the final crop (same focal + `v`). Opt
-out with `blur={false}`.
-
 ### Props
 
 export const imageProps = [
@@ -488,13 +478,13 @@ export const imageProps = [
   { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", description: `Native <img> loading. Set 'eager' for an above-the-fold hero.` },
   { name: 'fetchPriority', type: "'high' | 'low' | 'auto'", default: "'auto'", description: `Native <img> fetchpriority. Set 'high' for the LCP image.` },
   { name: 'decoding', type: "'async' | 'auto' | 'sync'", default: "'async'", description: `Native <img> decoding hint.` },
-  { name: 'className', type: 'string', description: `Applied to the wrapper (the image box) — size / space / round it here.` },
-  { name: 'style', type: 'CSSProperties', description: `Merged onto the wrapper.` },
+  { name: 'className', type: 'string', description: `Applied to the <img> — size / space / round it here.` },
+  { name: 'style', type: 'CSSProperties', description: `Merged onto the <img>'s style.` },
   { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
   { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
-  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep. Defaults to the @payload-config alias withPayload sets up; pass it for a non-aliased setup.` },
+  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep + placeholder settings and generate the inline LQIP. Defaults to the @payload-config alias withPayload sets up; pass it for a non-aliased setup.` },
   { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the one derived from the doc.` },
-  { name: 'blur', type: 'boolean', default: 'true', description: `Show the LQIP placeholder (a tiny transform variant painted as the wrapper background).` },
+  { name: 'blur', type: 'boolean', default: 'true', description: `Show the inline LQIP placeholder (a tiny base64 variant painted as the <img>'s background). false renders no placeholder.` },
   { name: 'dataAttributes', type: 'Record<string, string>', description: `Extra attributes (e.g. data-*) spread onto the rendered img element.` },
 ]
 
@@ -540,6 +530,32 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 </Tab>
 
 </Tabs>
+
+### Placeholder
+
+No pop-in by default — no blank box that snaps to the image on load. `<ResponsiveImage>` paints a
+blurred preview from the first render; the real image covers it once downloaded.
+
+It's an **inline LQIP**: a tiny (default **24px, q40 webp**), **faithful** crop — generated at the
+exact aspect-ratio + focal point you're rendering, so it matches the final image — resolved to a
+**base64 data-URI server-side** and set as the `<img>`'s own `background-image`. Because it's inline
+in the HTML it paints on the **first frame with zero network**; the real foreground pixels cover it
+on load. The swap is native: **no JS, no hydration, no `<head>` script.** (The browser interpolates
+the upscaled background smoothly, so it reads as a soft blur.)
+
+The LQIP is generated once via the shared variant cache (the same one the `/api/img` endpoint uses)
+and is on for **every** image — eager included: a missing serverURL aside, a blur under a hero costs
+nothing extra (it's inline, and the low-entropy data-URI doesn't count as the LCP element). It's
+skipped automatically when you pass a bare id (nothing to generate from). Opt out per-image with
+`blur={false}`, or project-wide with `imagesPlugin({ placeholder: false })`; tune size/quality/format
+via the [`placeholder`](#options) option.
+
+<Callout type="info">
+  **Non-React consumers** (mobile, REST/GraphQL) can request the same inline LQIP without the
+  component: set `req.context.lqip = { ar, fit }` on a Local-API read, or send an `X-LQIP: 16/9`
+  header — the doc comes back with a `blurDataURL` data-URI. It's a no-op (and absent) on every other
+  read, so it never taxes normal queries or relationship population.
+</Callout>
 
 ## Revalidation
 
