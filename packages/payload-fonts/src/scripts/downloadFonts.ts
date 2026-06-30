@@ -3,6 +3,9 @@ import path from 'node:path'
 
 import dotenv from 'dotenv'
 
+import type { ExportFontsResponse } from '../endpoints/exportFonts'
+import { roleExportName, roleVarSuffix } from '../lib/roles'
+
 const colors = {
   blue: (t: string) => `\x1b[34m${t}\x1b[0m`,
   green: (t: string) => `\x1b[32m${t}\x1b[0m`,
@@ -10,19 +13,11 @@ const colors = {
   orange: (t: string) => `\x1b[33m${t}\x1b[0m`,
 }
 
-type GenericFontFamily = 'sans' | 'serif' | 'mono' | 'display'
-const ROLES: GenericFontFamily[] = ['sans', 'serif', 'mono', 'display']
-
-/** One font file as returned by the plugin's `/api/fonts/export` endpoint. */
-type ExportedFont = {
-  filename: string
-  extension: string
-  mimeType: string | null
-  data: string
-  weight?: string | null
-  style?: string | null
-}
-type ExportFontsResponse = { fonts: Partial<Record<GenericFontFamily, ExportedFont[]>> }
+// A role key. `sans`/`serif`/`mono`/`display` by default, but the plugin's `roles` option can
+// replace or extend them — so this CLI never hardcodes the list; it discovers the active roles
+// from the keys of the export response and derives each role's `next/font` export name + CSS
+// variable from the same shared convention (`sans` → `fontSans` / `--font-setSans`).
+type Role = string
 
 /** A written weight file, ready to emit into a generated `localFont` `src` array. */
 type WeightFile = { path: string; weight: string; style: string }
@@ -82,25 +77,22 @@ export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Pro
   const FONT_DEFINITION_FILE = opts.definitionFile
   const localPrefix = opts.localFontSrcPrefix.replace(/\/$/, '')
 
-  function generateFontDefinitions(roleFiles: Record<GenericFontFamily, WeightFile[]>): void {
-    const cssVar = (type: GenericFontFamily) => `${opts.cssVariablePrefix}${type.charAt(0).toUpperCase()}${type.slice(1)}`
-    const configs: Array<{ name: string; type: GenericFontFamily; variable: string }> = [
-      { name: 'fontSans', type: 'sans', variable: cssVar('sans') },
-      { name: 'fontSerif', type: 'serif', variable: cssVar('serif') },
-      { name: 'fontMono', type: 'mono', variable: cssVar('mono') },
-      { name: 'fontDisplay', type: 'display', variable: cssVar('display') },
-    ]
+  function generateFontDefinitions(roleFiles: Record<Role, WeightFile[]>): void {
+    // One `localFont()` per role with files, each with an array of weighted `src` entries — so
+    // multiple weights collapse into a single CSS variable for that role. The export name +
+    // variable are derived from the role key by the shared convention (`sans` → `fontSans` /
+    // `<prefix>Sans`).
+    const configs = Object.entries(roleFiles)
+      .filter(([, files]) => files.length > 0)
+      .map(([role, files]) => ({ name: roleExportName(role), files, variable: `${opts.cssVariablePrefix}${roleVarSuffix(role)}` }))
 
-    // One `localFont()` per role, each with an array of weighted `src` entries — so multiple
-    // weights collapse into a single CSS variable for that role.
-    const available = configs.filter((c) => roleFiles[c.type].length > 0)
-    const declarations = available
+    const declarations = configs
       .map((c) => {
-        const src = roleFiles[c.type].map((f) => `{ path: '${f.path}', weight: '${f.weight}', style: '${f.style}' }`).join(', ')
+        const src = c.files.map((f) => `{ path: '${f.path}', weight: '${f.weight}', style: '${f.style}' }`).join(', ')
         return `const ${c.name} = localFont({ src: [${src}], variable: '${c.variable}' })`
       })
       .join('\n')
-    const exports = available.map((c) => c.name).join(', ')
+    const exports = configs.map((c) => c.name).join(', ')
 
     fs.mkdirSync(path.dirname(FONT_DEFINITION_FILE), { recursive: true })
 
@@ -127,7 +119,7 @@ export default fonts
    * absent), so a definition is never preserved on error.
    */
   function writeEmptyDefinitions(): void {
-    generateFontDefinitions({ sans: [], serif: [], mono: [], display: [] })
+    generateFontDefinitions({})
   }
 
   function wipeFontFiles(): void {
@@ -185,9 +177,13 @@ export default fonts
 
     wipeFontFiles()
 
-    const roleFiles: Record<GenericFontFamily, WeightFile[]> = { sans: [], serif: [], mono: [], display: [] }
+    // Discover the active roles from the response keys (the plugin's `roles` option drives them).
+    const roles: Role[] = Object.keys(fonts)
+    const roleFiles: Record<Role, WeightFile[]> = {}
     let count = 0
-    for (const role of ROLES) {
+    for (const role of roles) {
+      const bucket: WeightFile[] = []
+      roleFiles[role] = bucket
       const files = fonts[role]
       if (!files) continue
       for (let i = 0; i < files.length; i++) {
@@ -202,17 +198,16 @@ export default fonts
           const weightSlug = weight.replace(/\s+/g, '-')
           // Distinct filename per weight/style; append the index if two files share one.
           const base = `${role}-${weightSlug}${style === 'italic' ? '-italic' : ''}`
-          const fileName = roleFiles[role].some((f) => f.path.endsWith(`/${base}.${ext}`)) ? `${base}-${i}` : base
+          const fileName = bucket.some((f) => f.path.endsWith(`/${base}.${ext}`)) ? `${base}-${i}` : base
           fs.writeFileSync(path.join(FONT_FILES_DIR, `${fileName}.${ext}`), Buffer.from(font.data, 'base64'))
-          roleFiles[role].push({ path: `${localPrefix}/${fileName}.${ext}`, weight, style })
+          bucket.push({ path: `${localPrefix}/${fileName}.${ext}`, weight, style })
           count++
         } catch (err) {
           console.warn(colors.red(`Failed to write ${role} font (weight ${font.weight ?? '?'})`))
           if (opts.verbose) console.warn(err)
         }
       }
-      const written = roleFiles[role].length
-      if (written) console.log(`${colors.green('✓')} Downloaded ${role} font (${written} weight${written === 1 ? '' : 's'})`)
+      if (bucket.length) console.log(`${colors.green('✓')} Downloaded ${role} font (${bucket.length} weight${bucket.length === 1 ? '' : 's'})`)
     }
 
     generateFontDefinitions(roleFiles)

@@ -2,6 +2,11 @@
 export { default, fontsPlugin } from './plugin'
 export type { FontsPluginOptions } from './plugin'
 
+// Font roles (slots) — the default set, the per-role descriptor, and the resolver. Customise via
+// `fontsPlugin({ roles })`; pass the same list to `<DevFonts roles>` if you changed it.
+export { DEFAULT_FONT_ROLES, resolveFontRoles } from './lib/roles'
+export type { FontRoleConfig, ResolvedFontRole } from './lib/roles'
+
 // Server-side ingest — create a `font` typeface from a local file / URL (imports, migrations)
 export { ingestFont } from './lib/ingest'
 export type { IngestFontOptions } from './lib/ingest'

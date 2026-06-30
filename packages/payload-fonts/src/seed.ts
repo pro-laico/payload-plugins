@@ -27,7 +27,7 @@ export interface FontAssetProvider {
 export interface FontAssetProviderOptions {
   /** Builder token name (must match {@link fontSource}'s token). @default 'font' */
   token?: string
-  /** The `font` collection slug (match `fontOptions.slug` if you renamed it). @default 'font' */
+  /** The `font` collection slug (match `fontOverrides.slug` if you renamed it). @default 'font' */
   collection?: string
   /** Subdirectory under the seed assets dir holding font files. @default 'fonts' */
   sourceDir?: string

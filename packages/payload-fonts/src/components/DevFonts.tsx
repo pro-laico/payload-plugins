@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 import { extractFonts } from '../extractFonts'
 import { buildFontFaceCss, getActiveFontFaces } from '../lib/activeFonts'
+import { type FontRoleConfig, resolveFontRoles } from '../lib/roles'
 
 export interface DevFontsProps {
   /** Your Payload config — the same `@payload-config` import you pass to `getPayload`. */
@@ -18,6 +19,9 @@ export interface DevFontsProps {
   fontSetSlug?: string
   /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
   optimizedSlug?: string
+  /** The same `roles` you passed to `fontsPlugin` — needed only if you customised them, so the
+   *  dev preview reads the same slots and fallbacks. @default sans/serif/mono/display */
+  roles?: FontRoleConfig[]
 }
 
 /**
@@ -51,6 +55,7 @@ export async function DevFonts({
   cssVarPrefix,
   fontSetSlug,
   optimizedSlug,
+  roles,
 }: DevFontsProps): Promise<React.ReactElement | null> {
   // Production self-hosts via next/font — never touch the runtime path there.
   if (process.env.NODE_ENV === 'production') return null
@@ -60,9 +65,11 @@ export async function DevFonts({
 
   let css = ''
   try {
+    const resolved = resolveFontRoles(roles)
+    const fallbacks = Object.fromEntries(resolved.map((r) => [r.key, r.fallback]))
     const payload = await getPayload({ config })
-    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug })
-    css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug })
+    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, roles: resolved.map((r) => r.key) })
+    css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug, fallbacks })
   } catch {
     return null // no DB / not seeded yet — render nothing rather than throw in the layout
   }

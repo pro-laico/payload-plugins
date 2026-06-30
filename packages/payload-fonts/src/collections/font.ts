@@ -2,7 +2,9 @@ import { APIError, type ArrayField, type CollectionBeforeValidateHook, type Coll
 
 import { authd } from '../access/authd'
 import { cleanupFontAssetsHook, optimizeFromOriginalsHook, originalIdsFromDoc } from '../hooks/optimizeFromOriginals'
+import type { Charset } from '../hooks/optimizeFont'
 import { getFontSourceHook } from '../lib/ingest'
+import { type FontRoleConfig, resolveFontRoles } from '../lib/roles'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
@@ -21,11 +23,13 @@ const createOnlyUpload = () => ({ components: { Field: { path: FontOriginalUploa
 
 export interface CreateFontCollectionOptions {
   /** Characters the subsetter keeps, or a preset ('latin' | 'latin-ext'). Default 'latin'. */
-  charset?: string
+  charset?: Charset
   /** Slug of the archival original upload collection. Default 'fontOriginal'. */
   originalSlug?: string
   /** Slug of the optimized (served) upload collection. Default 'fontOptimized'. */
   optimizedSlug?: string
+  /** Generic-family roles offered by the `family` field. Default sans/serif/mono/display. */
+  roles?: FontRoleConfig[]
 }
 
 type VariableGroup = { upright?: unknown; italic?: unknown }
@@ -109,6 +113,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   const fontSlug = 'font'
   const originalSlug = (opts.originalSlug || FONT_ORIGINAL_SLUG) as CollectionSlug
   const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
+  const roles = resolveFontRoles(opts.roles)
 
   const fields: Field[] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
@@ -118,7 +123,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       required: true,
       label: 'Preferred Family',
       interfaceName: 'GenericFontFamily',
-      options: ['sans', 'serif', 'mono', 'display'],
+      options: roles.map((r) => ({ label: r.label, value: r.key })),
     },
     // Transient server-side ingest input (a local path / URL via `{ file, weight, style,
     // variable }`). The `getFontSourceHook` beforeValidate uploads it to `fontOriginal`, wires
@@ -200,6 +205,3 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
     },
   }
 }
-
-/** Default `Font` (typeface) collection. */
-export const Font: CollectionConfig = createFontCollection()

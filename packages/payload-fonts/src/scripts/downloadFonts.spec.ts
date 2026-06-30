@@ -110,4 +110,36 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
     expect(hasFontDeclarations(definitionFile)).toBe(true)
     expect(fs.readFileSync(definitionFile, 'utf8')).toContain('--font-setSans')
   })
+
+  it('generates a font<Key> export + --font-set<Key> var for a custom role key', () => {
+    process.env.PAYLOAD_SECRET = 'secret'
+    // The export endpoint keys the response by whatever roles the plugin was configured with; the
+    // CLI must discover them from the response, not a hardcoded sans/serif/mono/display list.
+    const manifest = {
+      fonts: {
+        brand: [
+          {
+            filename: 'brand.woff2',
+            extension: 'woff2',
+            mimeType: 'font/woff2',
+            data: Buffer.from('abc').toString('base64'),
+            weight: '700',
+            style: 'normal',
+          },
+        ],
+      },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(manifest) } as Response)),
+    )
+
+    return runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' }).then(() => {
+      const out = fs.readFileSync(definitionFile, 'utf8')
+      expect(out).toContain('const fontBrand = localFont(')
+      expect(out).toContain("variable: '--font-setBrand'")
+      expect(out).toContain('const fonts = { fontBrand }')
+      expect(fs.existsSync(path.join(fontsOutputDir, 'brand-700.woff2'))).toBe(true)
+    })
+  })
 })

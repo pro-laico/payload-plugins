@@ -42,6 +42,3 @@ export const createFontOriginalCollection = ({ slug = FONT_ORIGINAL_SLUG }: { sl
   upload: { mimeTypes: FONT_MIME_TYPES },
   fields: [],
 })
-
-/** Default `fontOriginal` collection. */
-export const FontOriginal: CollectionConfig = createFontOriginalCollection()

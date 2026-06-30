@@ -79,11 +79,12 @@ obvious, not silent.
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op and registers nothing.` },
   { name: 'charset', type: "'latin' | 'latin-ext' | string", default: "'latin'", description: `Characters the subsetter keeps in the served WOFF2 files: a preset (latin is ASCII + Latin-1 + common punctuation, latin-ext widens it), or an explicit string of characters to retain.` },
-  { name: 'includeFontSet', type: 'boolean', default: 'true', description: `Register the fontSet global — the active sans/serif/mono/display selection the export endpoint and your frontend read. On by default; set false only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
-  { name: 'fontOptions', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection — e.g. tighter access.` },
-  { name: 'fontOriginalOptions', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection — e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter.` },
-  { name: 'fontOptimizedOptions', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s) — e.g. an upload.staticDir.` },
-  { name: 'fontSetOptions', type: 'Partial<GlobalConfig>', description: `Merged onto the fontSet global.` },
+  { name: 'roles', type: 'FontRoleConfig[]', default: 'sans / serif / mono / display', description: `The font roles (slots) the plugin exposes end-to-end: the family options on the font collection, the relationship slots on the fontSet global, the keys in the export JSON, and (capitalised) the generated font<Key> / --font-set<Key> names. Pass your own list to replace, extend, drop, or reorder them. Each entry is { key, label?, fallback? } — only key is required (label defaults to the capitalised key, fallback to a generic sans stack).` },
+  { name: 'includeFontSet', type: 'boolean', default: 'true', description: `Register the fontSet global — the active per-role selection the export endpoint and your frontend read. On by default; set false only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
+  { name: 'fontOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection — e.g. tighter access.` },
+  { name: 'fontOriginalOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection — e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter.` },
+  { name: 'fontOptimizedOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s) — e.g. an upload.staticDir.` },
+  { name: 'fontSetOverrides', type: 'Partial<GlobalConfig>', description: `Merged onto the fontSet global.` },
 ]
 
 Pass options to customize — **Reference** is the interactive view, **TypeScript** is the same shape
@@ -107,10 +108,12 @@ fontsPlugin({
   enabled: true,
   charset: 'latin',
   includeFontSet: true,
-  // fontOptions: { /* … */ },          // optional, no default — merged onto the font collection
-  // fontOriginalOptions: { /* … */ },  // optional, no default — merged onto fontOriginal
-  // fontOptimizedOptions: { /* … */ }, // optional, no default — merged onto fontOptimized
-  // fontSetOptions: { /* … */ },       // optional, no default — merged onto the fontSet global
+  // roles: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
+  //   ^ the default. Replace/extend/reorder — e.g. add { key: 'brand', fallback: 'Georgia, serif' }
+  // fontOverrides: { /* … */ },          // optional, no default — merged onto the font collection
+  // fontOriginalOverrides: { /* … */ },  // optional, no default — merged onto fontOriginal
+  // fontOptimizedOverrides: { /* … */ }, // optional, no default — merged onto fontOptimized
+  // fontSetOverrides: { /* … */ },       // optional, no default — merged onto the fontSet global
 })
 ```
 
@@ -119,7 +122,7 @@ fontsPlugin({
 </Tabs>
 
 Overrides merge non-destructively: `fields` append, `access` / `admin` / `upload` shallow-merge,
-and `hooks` merge per phase — so `fontOriginalOptions: { upload: { staticDir } }` keeps the built-in
+and `hooks` merge per phase — so `fontOriginalOverrides: { upload: { staticDir } }` keeps the built-in
 font-mime whitelist.
 
 ## Collections
@@ -141,7 +144,7 @@ files take the row's weight/style); delete cascades to both. Read and writes are
 <TypeTable
   type={{
     title: { description: "The typeface name. Required; the admin title and list-search field.", type: "text" },
-    family: { description: "The generic role it fills: sans / serif / mono / display. Required.", type: "radio" },
+    family: { description: "The generic role it fills: sans / serif / mono / display by default (customisable via the plugin's roles option). Required.", type: "radio" },
     variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added — use this OR weights, not both.", type: "group" },
     weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
     source: { description: "Transient server-side ingest input (a file path / URL). Uploaded to fontOriginal, wired to a slot, and stripped on save — never stored. Drives ingestFont and seeding.", type: "json" },
@@ -198,8 +201,8 @@ weight/style (or variable file), written by `font`'s save hook, never hand-uploa
 
 Uploading a typeface doesn't put it on the site — it just adds it to the library. **`fontSet`** is
 how you choose which uploaded typeface fills each role. `fontsPlugin()` registers it as a singleton
-global under the **Assets** group with four single-relationship slots, each filtered to its role so
-the admin only offers matching typefaces:
+global under the **Assets** group with one single-relationship slot per role (four by default),
+each filtered to its role so the admin only offers matching typefaces:
 
 | Slot | Picks the typeface used for… | Choices |
 | --- | --- | --- |
@@ -219,6 +222,25 @@ await payload.updateGlobal({ slug: 'fontSet', data: { sans: interId, mono: jetbr
 
 Seeds set it the same way with `ref()` tokens (see [Seeding](#seeding)). Driving the selection some
 other way? Pass `includeFontSet: false` to skip the global and resolve the active typefaces yourself.
+
+**Custom roles.** The four slots above are the default. Pass a `roles` array to `fontsPlugin` to
+replace, extend, drop, or reorder them — it flows through everything in lockstep: the `family`
+options, these slots, the export JSON keys, and the generated `font<Key>` / `--font-set<Key>` names.
+
+```ts
+fontsPlugin({
+  roles: [
+    { key: 'sans' },                                   // label defaults to "Sans"
+    { key: 'display' },
+    { key: 'brand', label: 'Brand', fallback: 'Georgia, serif' }, // add a new role
+  ],
+})
+// → family options sans/display/brand; fontSet slots sans/display/brand;
+//   generated exports fontSans/fontDisplay/fontBrand; vars --font-setSans/…/--font-setBrand.
+```
+
+If you customise roles, pass the same `roles` to `<DevFonts>` so the dev preview reads the same
+slots and fallbacks.
 
 ## Serving
 
@@ -286,6 +308,7 @@ export const devFontsProps = [
   { name: 'cssVarPrefix', type: 'string', default: "'--font-set'", description: `CSS role-variable prefix; must match the download CLI cssVariablePrefix.` },
   { name: 'fontSetSlug', type: 'string', default: "'fontSet'", description: `Slug of the font-selection global.` },
   { name: 'optimizedSlug', type: 'string', default: "'fontOptimized'", description: `Slug of the optimized (served) upload collection.` },
+  { name: 'roles', type: 'FontRoleConfig[]', default: 'sans / serif / mono / display', description: `Pass the same roles you gave fontsPlugin, if you customised them — so the dev preview reads the same slots and per-role fallbacks. Omit it when using the default roles.` },
 ]
 
 <ConfigOptions items={devFontsProps} />
@@ -293,6 +316,19 @@ export const devFontsProps = [
 </Tab>
 
 </Tabs>
+
+## Revalidation & caching
+
+How a `fontSet` change reaches the browser depends on the serving path — by design.
+
+- **Production** bakes fonts at build time, so there's no runtime cache to bust and **no
+  `revalidatePath`/`revalidateTag`** — that's the tradeoff for stock `next/font`. Publish a change by
+  re-running the download and rebuilding (`payload-fonts-download` → `next build`). To automate it,
+  trigger a redeploy from a `fontSetOverrides.hooks.afterChange` deploy hook. The export endpoint is
+  `Cache-Control: no-store`, so each run sees the current selection.
+- **Development** reads the live selection on every render, so just keep the route dynamic
+  (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches
+  the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface.
 
 ## Server ingest
 

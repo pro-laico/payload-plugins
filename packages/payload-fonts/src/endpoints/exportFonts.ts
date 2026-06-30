@@ -2,10 +2,13 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 
 import type { CollectionSlug, Endpoint, GlobalSlug } from 'payload'
 
+import { refId } from '../lib/refs'
+import { DEFAULT_FONT_ROLES } from '../lib/roles'
 import { readUploadBytes } from '../lib/uploadBytes'
 
-type Role = 'sans' | 'serif' | 'mono' | 'display'
-const ROLES: Role[] = ['sans', 'serif', 'mono', 'display']
+/** A role key — `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
+type Role = string
+const DEFAULT_ROLE_KEYS: Role[] = DEFAULT_FONT_ROLES.map((r) => r.key)
 
 export interface ExportFontsEndpointOptions {
   /** Mount path under the Payload API route. Default `/fonts/export` (→ `/api/fonts/export`). */
@@ -14,6 +17,8 @@ export interface ExportFontsEndpointOptions {
   fontSetGlobalSlug?: string
   /** Slug of the optimized (served) weight-file upload collection. Default `fontOptimized`. */
   fontOptimizedSlug?: string
+  /** Role keys to resolve from the `fontSet` global. Default sans/serif/mono/display. */
+  roles?: Role[]
 }
 
 /** The selected typeface for a role: a populated `font` doc or its id. */
@@ -32,8 +37,6 @@ export type ExportedFont = {
 /** JSON returned by the fonts export endpoint — an array of weight files per role. */
 export type ExportFontsResponse = { fonts: Partial<Record<Role, ExportedFont[]>> }
 
-const refId = (r: TypefaceRef): string | number | undefined => (r && typeof r === 'object' ? r.id : (r ?? undefined)) ?? undefined
-
 /**
  * Constant-time secret compare. Both sides are sha256-hashed to a fixed 32 bytes first, so the
  * comparison is constant-time regardless of length.
@@ -51,7 +54,12 @@ function secretsMatch(provided: string, secret: string): boolean {
  * `next/font/local`. Secured by the project's `PAYLOAD_SECRET` (Bearer).
  */
 export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endpoint => {
-  const { path: endpointPath = '/fonts/export', fontSetGlobalSlug = 'fontSet', fontOptimizedSlug = 'fontOptimized' } = opts
+  const {
+    path: endpointPath = '/fonts/export',
+    fontSetGlobalSlug = 'fontSet',
+    fontOptimizedSlug = 'fontOptimized',
+    roles = DEFAULT_ROLE_KEYS,
+  } = opts
 
   return {
     path: endpointPath,
@@ -74,36 +82,51 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           slug: fontSetGlobalSlug as GlobalSlug,
           depth: 0,
           overrideAccess: true,
-        })) as FontSelection
-        selection = { sans: fontSetGlobal?.sans, serif: fontSetGlobal?.serif, mono: fontSetGlobal?.mono, display: fontSetGlobal?.display }
+          // `as unknown as` — in a project with generated types this resolves to the concrete
+          // fontSet interface, which doesn't structurally overlap a string-keyed record.
+        })) as unknown as FontSelection
+        selection = Object.fromEntries(roles.map((role) => [role, fontSetGlobal?.[role]]))
       } catch {
         // no fontSet global in this project
       }
 
       const fonts: Partial<Record<Role, ExportedFont[]>> = {}
       if (selection) {
-        for (const role of ROLES) {
-          const ref = selection[role]
-          // One typeface per role (tolerate a stray array — take the first).
-          const typefaceId = refId((Array.isArray(ref) ? ref[0] : ref) ?? null)
-          if (typefaceId == null) continue
+        // One typeface per role (tolerate a stray array — take the first); fetch every role's
+        // served files in a single query grouped by typeface, rather than one round-trip per role.
+        const roleIds = roles
+          .map((role) => ({
+            role,
+            id: refId((Array.isArray(selection[role]) ? (selection[role] as TypefaceRef[])[0] : selection[role]) ?? null),
+          }))
+          .filter((r): r is { role: Role; id: string | number } => r.id != null)
 
-          let optimized: Array<Record<string, unknown>> = []
+        const docsByFont = new Map<string | number, Array<Record<string, unknown>>>()
+        if (roleIds.length) {
+          const uniqueIds = [...new Set(roleIds.map((r) => r.id))]
           try {
             const res = await payload.find({
               collection: fontOptimizedSlug as CollectionSlug,
-              where: { font: { equals: typefaceId } },
+              where: { font: { in: uniqueIds } },
               depth: 0,
               limit: 1000,
               overrideAccess: true,
             })
-            optimized = res.docs as unknown as Array<Record<string, unknown>>
+            for (const doc of res.docs as unknown as Array<Record<string, unknown>>) {
+              const fontId = refId(doc.font)
+              if (fontId == null) continue
+              const bucket = docsByFont.get(fontId)
+              if (bucket) bucket.push(doc)
+              else docsByFont.set(fontId, [doc])
+            }
           } catch {
-            continue
+            // leave docsByFont empty — the response just carries no fonts
           }
+        }
 
+        for (const { role, id } of roleIds) {
           const exported: ExportedFont[] = []
-          for (const doc of optimized) {
+          for (const doc of docsByFont.get(id) ?? []) {
             const filename = typeof doc.filename === 'string' ? doc.filename : null
             if (!filename) continue
             const bytes = await readUploadBytes(payload, fontOptimizedSlug, doc as { filename?: string | null; url?: string | null })

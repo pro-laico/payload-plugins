@@ -20,7 +20,7 @@ async function getActive(): Promise<ActiveEntry[]> {
 
   const titleByRole = new Map<FontRole, string>()
   try {
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as Partial<
+    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as unknown as Partial<
       Record<FontRole, { title?: string } | null>
     >
     for (const role of ['sans', 'serif', 'mono', 'display'] as FontRole[]) {

@@ -1,10 +1,10 @@
 import type { CollectionAfterChangeHook, CollectionBeforeDeleteHook, CollectionSlug } from 'payload'
 
+import { refId } from '../lib/refs'
 import { readUploadBytes } from '../lib/uploadBytes'
-import { detectMetadata, resolveCharsetText, subsetToWoff2 } from './optimizeFont'
+import { type Charset, detectMetadata, resolveCharsetText, subsetToWoff2 } from './optimizeFont'
 
 type Ref = string | number | { id?: string | number } | null | undefined
-const refId = (r: Ref): string | number | undefined => (r && typeof r === 'object' ? r.id : (r ?? undefined)) ?? undefined
 
 // The most common deployment mistake: a bundler (Next/Turbopack) bundles the harfbuzz / fontkit
 // wasm + native assets, so `subset-font` can't load its `hb-subset.wasm` at runtime. The subset
@@ -71,7 +71,7 @@ const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
 
 export interface OptimizeFromOriginalsOptions {
   /** Characters to keep, or a preset name ('latin' | 'latin-ext'). Default 'latin'. */
-  charset?: string
+  charset?: Charset
   /** Slug of the archival original collection. Default 'fontOriginal'. */
   originalSlug?: string
   /** Slug of the optimized (served) collection. Default 'fontOptimized'. */

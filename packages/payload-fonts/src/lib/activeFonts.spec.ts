@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { type ActiveTypeface, buildFontFaceCss } from './activeFonts'
+import { type ActiveTypeface, buildFontFaceCss, getActiveFontFaces } from './activeFonts'
 
 const typefaces: ActiveTypeface[] = [
   { role: 'sans', id: 1, faces: [{ filename: 'inter.woff2', weight: '400', style: 'normal' }] },
@@ -59,5 +59,56 @@ describe('buildFontFaceCss', () => {
   it('encodes filenames with spaces in the served URL', () => {
     const css = buildFontFaceCss([{ role: 'mono', id: 3, faces: [{ filename: 'My Mono.woff2', weight: '400', style: 'normal' }] }])
     expect(css).toContain('/api/fontOptimized/file/My%20Mono.woff2')
+  })
+
+  it('supports a custom role with a per-role fallback override, capitalising its var name', () => {
+    const css = buildFontFaceCss([{ role: 'brand', id: 5, faces: [{ filename: 'b.woff2', weight: '400', style: 'normal' }] }], {
+      fallbacks: { brand: 'Georgia, serif' },
+    })
+    expect(css).toContain("--font-setBrand:'pl-font-5',Georgia, serif")
+  })
+
+  it('falls back to a generic sans stack for a custom role with no declared fallback', () => {
+    const css = buildFontFaceCss([{ role: 'brand', id: 5, faces: [{ filename: 'b.woff2', weight: '400', style: 'normal' }] }])
+    expect(css).toContain("--font-setBrand:'pl-font-5',ui-sans-serif, system-ui, sans-serif")
+  })
+})
+
+describe('getActiveFontFaces', () => {
+  // A payload double: the fontSet global selection + the served fontOptimized docs the one
+  // batched find should return (filtered here by the `font: { in: [...] }` clause).
+  const makePayload = (selection: Record<string, unknown>, docs: Array<Record<string, unknown>>) => {
+    const find = vi.fn(async ({ where }: { where: { font: { in: Array<string | number> } } }) => ({
+      docs: docs.filter((d) => where.font.in.includes(d.font as string | number)),
+    }))
+    return { payload: { findGlobal: vi.fn(async () => selection), find } as never, find }
+  }
+
+  it('resolves each role to its served faces in ONE query, preserving role order', async () => {
+    const { payload, find } = makePayload({ sans: 1, mono: 2 }, [
+      { filename: 'inter.woff2', font: 1, weight: '400', style: 'normal' },
+      { filename: 'jbm.woff2', font: 2, weight: '400', style: 'normal' },
+    ])
+    const out = await getActiveFontFaces(payload, { roles: ['sans', 'serif', 'mono'] })
+    expect(find).toHaveBeenCalledTimes(1) // batched, not one-per-role
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [1, 2] } })
+    expect(out.map((t) => t.role)).toEqual(['sans', 'mono']) // serif unselected → dropped, order kept
+    expect(out[0]?.faces).toEqual([{ filename: 'inter.woff2', weight: '400', style: 'normal' }])
+  })
+
+  it('handles a populated relationship object and two roles sharing one typeface', async () => {
+    const { payload, find } = makePayload(
+      { sans: { id: 9 }, display: { id: 9 } }, // same typeface in two slots
+      [{ filename: 'x.woff2', font: 9, weight: '400', style: 'normal' }],
+    )
+    const out = await getActiveFontFaces(payload, { roles: ['sans', 'display'] })
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [9] } }) // deduped id
+    expect(out.map((t) => t.role)).toEqual(['sans', 'display']) // both resolve
+  })
+
+  it('returns [] without querying when nothing is selected', async () => {
+    const { payload, find } = makePayload({}, [])
+    expect(await getActiveFontFaces(payload, { roles: ['sans'] })).toEqual([])
+    expect(find).not.toHaveBeenCalled()
   })
 })

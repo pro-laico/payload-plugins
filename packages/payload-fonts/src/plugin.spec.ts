@@ -29,8 +29,8 @@ describe('fontsPlugin (unit)', () => {
     expect(endpoints.some((e) => typeof e.path === 'string' && e.path.includes('/fonts/export'))).toBe(true)
   })
 
-  it('merges fontOriginalOptions onto the upload collection (keeps the mime whitelist)', () => {
-    const collections = apply(fontsPlugin({ fontOriginalOptions: { upload: { staticDir: '/tmp/x' } } })).collections ?? []
+  it('merges fontOriginalOverrides onto the upload collection (keeps the mime whitelist)', () => {
+    const collections = apply(fontsPlugin({ fontOriginalOverrides: { upload: { staticDir: '/tmp/x' } } })).collections ?? []
     const original = collections.find((c) => c.slug === 'fontOriginal')
     const upload = original?.upload as { staticDir?: string; mimeTypes?: string[] }
     expect(upload.staticDir).toBe('/tmp/x')
@@ -62,5 +62,45 @@ describe('fontsPlugin (unit)', () => {
     // Only identifying metadata is populated — not `variable`/`weights` (which would drag in the
     // private fontOriginal blobs).
     expect(font?.defaultPopulate).toEqual({ title: true, family: true })
+  })
+
+  describe('custom roles', () => {
+    // Pull the option values off the `family` radio field.
+    const familyValues = (config: Config): string[] => {
+      const font = (config.collections ?? []).find((c) => c.slug === 'font')
+      const family = (font?.fields ?? []).find((f) => 'name' in f && f.name === 'family') as { options?: Array<{ value: string }> } | undefined
+      return (family?.options ?? []).map((o) => o.value)
+    }
+    // Pull the relationship slot names off the fontSet global (fields are rows of slots).
+    const slotNames = (config: Config): string[] => {
+      const global = (config.globals ?? []).find((g) => g.slug === 'fontSet')
+      return (global?.fields ?? []).flatMap((row) =>
+        'fields' in row ? row.fields.flatMap((f) => ('name' in f && f.name ? [f.name] : [])) : [],
+      )
+    }
+
+    it('defaults the family options and fontSet slots to sans/serif/mono/display', () => {
+      const config = apply(fontsPlugin())
+      expect(familyValues(config)).toEqual(['sans', 'serif', 'mono', 'display'])
+      expect(slotNames(config)).toEqual(['sans', 'serif', 'mono', 'display'])
+    })
+
+    it('replaces, extends, and reorders both the family options and the fontSet slots in lockstep', () => {
+      const roles = [{ key: 'display' }, { key: 'sans' }, { key: 'brand', fallback: 'Georgia, serif' }]
+      const config = apply(fontsPlugin({ roles }))
+      expect(familyValues(config)).toEqual(['display', 'sans', 'brand'])
+      expect(slotNames(config)).toEqual(['display', 'sans', 'brand'])
+    })
+
+    it('labels a custom role by capitalising its key unless a label is given', () => {
+      const config = apply(fontsPlugin({ roles: [{ key: 'brand' }, { key: 'mono', label: 'Code' }] }))
+      const global = (config.globals ?? []).find((g) => g.slug === 'fontSet')
+      const slots = (global?.fields ?? []).flatMap((row) => ('fields' in row ? row.fields : [])) as Array<{
+        name?: string
+        label?: string
+      }>
+      expect(slots.find((s) => s.name === 'brand')?.label).toBe('Brand')
+      expect(slots.find((s) => s.name === 'mono')?.label).toBe('Code')
+    })
   })
 })

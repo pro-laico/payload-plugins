@@ -78,13 +78,13 @@ font (typeface)              fontOriginal (hidden)        fontOptimized (hidden)
 | `enabled` | `boolean` | `true` | Set `false` to skip the plugin entirely. |
 | `charset` | `'latin' \| 'latin-ext' \| string` | `'latin'` | Characters the subsetter keeps (a preset, or an explicit string). |
 | `includeFontSet` | `boolean` | `true` | Register the `fontSet` global (the active selection the export endpoint reads). Set `false` only if you drive the selection some other way. |
-| `fontOptions` | `Partial<CollectionConfig>` | — | Merged onto the `font` collection (e.g. tighter `access`). |
-| `fontOriginalOptions` | `Partial<CollectionConfig>` | — | Merged onto `fontOriginal` (e.g. `upload: { staticDir }` or a client-uploads adapter). |
-| `fontOptimizedOptions` | `Partial<CollectionConfig>` | — | Merged onto `fontOptimized` (e.g. `upload: { staticDir }`). |
-| `fontSetOptions` | `Partial<GlobalConfig>` | — | Merged onto the `fontSet` global. |
+| `fontOverrides` | `Partial<CollectionConfig>` | — | Merged onto the `font` collection (e.g. tighter `access`). |
+| `fontOriginalOverrides` | `Partial<CollectionConfig>` | — | Merged onto `fontOriginal` (e.g. `upload: { staticDir }` or a client-uploads adapter). |
+| `fontOptimizedOverrides` | `Partial<CollectionConfig>` | — | Merged onto `fontOptimized` (e.g. `upload: { staticDir }`). |
+| `fontSetOverrides` | `Partial<GlobalConfig>` | — | Merged onto the `fontSet` global. |
 
 Overrides merge non-destructively: `fields` append, `access`/`admin`/`upload` shallow-merge,
-`hooks` merge per phase — so `fontOriginalOptions: { upload: { staticDir } }` keeps the built-in
+`hooks` merge per phase — so `fontOriginalOverrides: { upload: { staticDir } }` keeps the built-in
 font-mime whitelist.
 
 ## Creating a font from a file (server-side ingest)
