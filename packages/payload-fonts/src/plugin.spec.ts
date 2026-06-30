@@ -56,4 +56,11 @@ describe('fontsPlugin (unit)', () => {
       options: { weight: '400' },
     })
   })
+
+  it('trims `font` defaultPopulate so a populated relationship omits the private upload slots', () => {
+    const font = (apply(fontsPlugin()).collections ?? []).find((c) => c.slug === 'font')
+    // Only identifying metadata is populated — not `variable`/`weights` (which would drag in the
+    // private fontOriginal blobs).
+    expect(font?.defaultPopulate).toEqual({ title: true, family: true })
+  })
 })

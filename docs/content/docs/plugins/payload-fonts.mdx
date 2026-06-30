@@ -1,6 +1,6 @@
 ---
 title: "payload-fonts"
-description: "Custom fonts for Payload CMS — a Font typeface collection that subsets uploaded files to served WOFF2s, an optional fontSet global, an export endpoint + CLI for next/font/local, and declarative seeding."
+description: "Custom fonts for Payload CMS — a Font typeface collection that subsets uploaded files to served WOFF2s, a fontSet global, and serving via next/font/local in prod or a zero-config DevFonts component in dev, plus declarative seeding."
 ---
 
 <Callout type="info">
@@ -10,11 +10,12 @@ description: "Custom fonts for Payload CMS — a Font typeface collection that s
 </Callout>
 
 `@pro-laico/payload-fonts` lets editors upload custom fonts to Payload and self-host them. It
-adds a **Font** typeface collection that **subsets uploaded files to web-ready WOFF2s**, an
-optional `fontSet` global for choosing the active sans / serif / mono / display faces, and an
-**export endpoint + CLI** that writes the active fonts to disk for
-[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font). Fonts can be
-created in the admin, server-side from a file (`ingestFont`), or seeded declaratively.
+adds a **Font** typeface collection that **subsets uploaded files to web-ready WOFF2s** and a
+`fontSet` global for choosing the active sans / serif / mono / display faces. On the frontend the
+active fonts apply as `--font-set*` CSS variables — self-hosted with
+[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) in production, or
+loaded with no build step by the `<DevFonts />` component in development. Fonts can be created in
+the admin, server-side from a file (`ingestFont`), or seeded declaratively.
 
 ```bash
 pnpm add @pro-laico/payload-fonts

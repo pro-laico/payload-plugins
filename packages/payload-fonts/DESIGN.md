@@ -69,6 +69,11 @@ The split is deliberate: prod owns **zero** runtime font code (it's next/font), 
 convenience. The CSS-building core (`buildFontFaceCss`) is pure and unit-tested; `DevFonts` is the
 thin IO wrapper.
 
+The `font` collection sets a lean `defaultPopulate` (`{ title, family }`) so that when a typeface
+is populated as a relationship target (e.g. the `fontSet` global at depth), only its identifying
+metadata comes back — never the `variable`/`weights` upload slots, which would otherwise drag the
+private `fontOriginal` blobs through every populated row.
+
 ## Server-side ingest (`source`) + seeding
 
 The `font` collection carries a transient `source` JSON field. When set to

@@ -181,6 +181,10 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
     access: { create: authd, delete: authd, read: authd, update: authd },
     admin: { group: 'Assets', useAsTitle: 'title', enableListViewSelectAPI: true, defaultColumns: ['title', 'family'] },
     timestamps: true,
+    // When a font is populated as a relationship target (e.g. the `fontSet` global at depth),
+    // return only its identifying metadata and NOT the `variable` / `weights` upload slots — which
+    // would otherwise drag the private `fontOriginal` blobs through every populated row.
+    defaultPopulate: { title: true, family: true },
     fields,
     hooks: {
       // `getFontSourceHook` FIRST: it turns a transient `source` into a real `fontOriginal`

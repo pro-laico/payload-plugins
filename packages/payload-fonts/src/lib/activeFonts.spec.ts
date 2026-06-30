@@ -38,4 +38,26 @@ describe('buildFontFaceCss', () => {
     expect(css).toContain('--typeSans:')
     expect(css).toContain('/api/webfonts/file/inter.woff2')
   })
+
+  it('emits italic style and a variable weight range verbatim', () => {
+    const css = buildFontFaceCss([
+      {
+        role: 'serif',
+        id: 9,
+        faces: [
+          { filename: 'src-italic.woff2', weight: '400', style: 'italic' },
+          { filename: 'src-variable.woff2', weight: '100 900', style: 'normal' },
+        ],
+      },
+    ])
+    expect(css).toContain('font-style:italic')
+    expect(css).toContain('font-weight:100 900')
+    // Both faces share the one family the role variable points at: 2 @font-face + the :root var.
+    expect(css.match(/'pl-font-9'/g)).toHaveLength(3)
+  })
+
+  it('encodes filenames with spaces in the served URL', () => {
+    const css = buildFontFaceCss([{ role: 'mono', id: 3, faces: [{ filename: 'My Mono.woff2', weight: '400', style: 'normal' }] }])
+    expect(css).toContain('/api/fontOptimized/file/My%20Mono.woff2')
+  })
 })
