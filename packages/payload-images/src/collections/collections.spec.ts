@@ -14,14 +14,9 @@ describe('createImagesCollection', () => {
       formatOptions?: unknown
     }
     expect(upload).toBeTruthy()
-    expect(upload.imageSizes).toBeUndefined() // no pre-generated sizes
+    expect(upload.imageSizes).toBeUndefined() // on-demand only — never pre-generates sizes
     expect(upload.focalPoint).toBe(true)
     expect(upload.formatOptions).toBeUndefined() // stored as-uploaded
-  })
-
-  it('uses the built-in 7-size ladder when pregenerateSizes is true', () => {
-    const c = createImagesCollection({ pregenerateSizes: true })
-    expect((c.upload as { imageSizes?: unknown[] }).imageSizes).toHaveLength(7)
   })
 
   it('exposes a `variants` join onto the generated-images collection', () => {

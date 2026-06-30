@@ -47,9 +47,9 @@ GET /api/img/:id?w&h&ar&fit&q&fmt
 
 Key design points carried over from the original:
 
-1. **Original-only storage, on-demand everything.** Uploads don't pre-generate a size
-   ladder by default (`pregenerateSizes` opts into a built-in 7-size ladder). Every
-   variant is built lazily and cached, so storage scales with what's actually requested.
+1. **Original-only storage, on-demand everything.** Uploads never pre-generate a size
+   ladder — the original is stored untouched. Every variant is built lazily and cached, so
+   storage scales with what's actually requested.
 2. **Deterministic variant keys.** `variantCacheKey` folds source id + filename + focal +
    transform params + resolved format into a short hash. The key goes stale exactly when
    the purge hook fires (file replace / focal edit), so unreachable variants are removed

@@ -72,8 +72,11 @@ export interface ResponsiveImageProps {
   format?: Format
   /** Override the source intrinsic width used to cap the srcset (else read from a populated doc). */
   sourceWidth?: number
-  priority?: boolean
+  /** Native `<img>` `loading`. Default `lazy`; set `eager` for an above-the-fold hero. */
   loading?: 'lazy' | 'eager'
+  /** Native `<img>` `fetchpriority`. Default `auto`; set `high` for the LCP image. */
+  fetchPriority?: 'high' | 'low' | 'auto'
+  /** Native `<img>` `decoding` hint. Default `async`. */
   decoding?: 'async' | 'auto' | 'sync'
   /** Applied to the wrapper (the image box). */
   className?: string
@@ -115,8 +118,8 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
     fit = 'cover',
     format = 'auto',
     sourceWidth,
-    priority,
-    loading,
+    loading = 'lazy',
+    fetchPriority = 'auto',
     decoding = 'async',
     className,
     style,
@@ -197,8 +200,8 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
         alt={altText}
         width={intrinsicW}
         height={intrinsicH}
-        loading={priority ? 'eager' : (loading ?? 'lazy')}
-        fetchPriority={priority ? 'high' : undefined}
+        loading={loading}
+        fetchPriority={fetchPriority}
         decoding={decoding}
         style={{
           display: 'block',

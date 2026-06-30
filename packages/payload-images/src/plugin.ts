@@ -1,4 +1,4 @@
-import type { CollectionConfig, Config, ImageSize, Plugin } from 'payload'
+import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 import { createImagesCollection, imageEnhancements } from './collections/images'
@@ -19,7 +19,7 @@ export interface ImagesPluginOptions {
    * `variants` join, the purge hooks, and `upload.focalPoint`), instead of creating the
    * default `images` collection. Use this when your project already has a `media`/`images`
    * upload collection — no second collection, no migration. The target must be an upload
-   * collection. `pregenerateSizes` is ignored in this mode (you own the collection's sizes).
+   * collection (you own the collection's `upload` config, including any `imageSizes`).
    */
   extendCollection?: string
   /**
@@ -32,12 +32,6 @@ export interface ImagesPluginOptions {
   imagesOverrides?: Partial<CollectionConfig>
   /** Override for the hidden generated-images (variant cache) collection. */
   generatedImagesOverrides?: Partial<CollectionConfig>
-  /**
-   * Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by
-   * default — uploads store only the original and every size is generated on demand. `true`
-   * uses a built-in 7-size ladder; pass an array for a custom one. Ignored with `extendCollection`.
-   */
-  pregenerateSizes?: boolean | ImageSize[]
   /**
    * The project-wide srcset widths, set once and applied uniformly to the API virtual `srcset`,
    * `<ResponsiveImage>`, and the endpoint's anti-DoS dimension grid. Two forms:
@@ -98,7 +92,6 @@ export const imagesPlugin =
       extendCollection,
       imagesOverrides,
       generatedImagesOverrides,
-      pregenerateSizes = false,
       pixelStep = DEFAULT_PIXEL_STEP,
       transform = {},
       focalUI = true,
@@ -132,7 +125,6 @@ export const imagesPlugin =
       const images = mergeCollection(
         // No transform endpoint → no on-demand thumbnail; fall back to Payload's default.
         createImagesCollection({
-          pregenerateSizes,
           focalUI,
           previewRatios,
           variantSlug,

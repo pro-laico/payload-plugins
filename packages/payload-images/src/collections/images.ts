@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail, ImageSize, ImageUploadFormatOptions } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 'payload'
 
 import { anyone, authd } from '../access'
 import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
@@ -6,28 +6,11 @@ import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hoo
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
 
-const formatOptions: ImageUploadFormatOptions = { format: 'webp', options: { nearLossless: true, quality: 75 } }
-
 /** Admin component subpaths (referenced by the Payload import map). */
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
 export const PurgeVariantsFieldPath = '@pro-laico/payload-images/admin/purgeVariants'
 
-/** Built-in size ladder used when `pregenerateSizes: true` — Payload's classic on-upload sizes. */
-const DEFAULT_SIZE_LADDER: ImageSize[] = [
-  { formatOptions, name: 'thumbnail', width: 300 },
-  { formatOptions, name: 'square', width: 500, height: 500 },
-  { formatOptions, name: 'small', width: 600 },
-  { formatOptions, name: 'medium', width: 900 },
-  { formatOptions, name: 'large', width: 1400 },
-  { formatOptions, name: 'xlarge', width: 1920 },
-  { formatOptions, name: 'og', width: 1200, height: 630, crop: 'center' },
-]
-
 export interface CreateImagesOptions {
-  /** Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by
-   *  default (uploads store only the original; every size is generated on demand). `true` uses a
-   *  built-in 7-size ladder; pass an array for a custom one. */
-  pregenerateSizes?: boolean | ImageSize[]
   /** Render the focal-point + ratio-preview field and the purge-variants button. Default true. */
   focalUI?: boolean
   /** Aspect ratios shown in the focal preview tiles. */
@@ -124,8 +107,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * transform variant — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
-  const { pregenerateSizes = false, virtualFields = true, localizeAlt = false } = opts
-  const imageSizes = pregenerateSizes === true ? DEFAULT_SIZE_LADDER : Array.isArray(pregenerateSizes) ? pregenerateSizes : undefined
+  const { virtualFields = true, localizeAlt = false } = opts
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail)
   const enh = imageEnhancements(opts)
 
@@ -167,7 +149,6 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
       mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
-      ...(imageSizes ? { imageSizes } : {}),
     },
   }
 }

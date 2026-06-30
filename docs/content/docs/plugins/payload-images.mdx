@@ -95,10 +95,9 @@ transform + purge endpoints, and the admin UI (all detailed below). It's zero-co
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, registers nothing. This is "not installed", not "paused": on SQL adapters, turning it off for an existing project produces a migration that drops the image tables and their data.` },
-  { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection. pregenerateSizes is ignored in this mode.` },
+  { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection (you own its upload config).` },
   { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key — not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
   { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
-  { name: 'pregenerateSizes', type: 'boolean | ImageSize[]', default: 'false', description: `Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by default (store only the original; size on demand). true uses a built-in 7-size ladder; pass an array for a custom one.` },
   { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths. A number is the step (bigger = fewer widths and cached variants); an array is an explicit ladder, e.g. [200, 450, 750, 1200, 2000] (keep to multiples of 50, the endpoint's snap grid). Capped by maxDimension.` },
   {
     name: 'transform',
@@ -149,7 +148,6 @@ imagesPlugin({
   // extendCollection: 'media',           // optional, no default — add the pipeline to an existing collection instead of creating `images`
   // imagesOverrides: { /* … */ },          // optional, no default — deep-merged onto the images collection
   // generatedImagesOverrides: { /* … */ }, // optional, no default — merged onto the variant-cache collection
-  pregenerateSizes: false,
   pixelStep: 50,
   transform: {
     sourceSlug: 'images',
@@ -252,8 +250,8 @@ imagesPlugin({ extendCollection: 'media' })
 
 The transform endpoint then serves `/api/img/:id` for `media` docs, and the variant cache
 relates back to `media`. The target must be an upload collection (the plugin throws a clear
-error otherwise), and `pregenerateSizes` is ignored — your collection already owns its
-`imageSizes`.
+error otherwise); your collection keeps full ownership of its own `upload` config, including
+any `imageSizes`.
 
 ### API URLs
 
@@ -487,9 +485,9 @@ export const imageProps = [
   { name: 'fit', type: 'Fit', default: "'cover'", description: `Resize fit. cover focal-crops.` },
   { name: 'format', type: 'Format', default: "'auto'", description: `Output format (auto negotiates from Accept).` },
   { name: 'sourceWidth', type: 'number', description: `Override the source intrinsic width that caps the srcset (else read from a populated doc).` },
-  { name: 'priority', type: 'boolean', description: `Eager-load with fetchPriority high — for above-the-fold heroes.` },
-  { name: 'loading', type: "'lazy' | 'eager'", description: `Native loading. Defaults to lazy (eager when priority).` },
-  { name: 'decoding', type: "'async' | 'auto' | 'sync'", default: "'async'", description: `Native decoding hint.` },
+  { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", description: `Native <img> loading. Set 'eager' for an above-the-fold hero.` },
+  { name: 'fetchPriority', type: "'high' | 'low' | 'auto'", default: "'auto'", description: `Native <img> fetchpriority. Set 'high' for the LCP image.` },
+  { name: 'decoding', type: "'async' | 'auto' | 'sync'", default: "'async'", description: `Native <img> decoding hint.` },
   { name: 'className', type: 'string', description: `Applied to the wrapper (the image box) — size / space / round it here.` },
   { name: 'style', type: 'CSSProperties', description: `Merged onto the wrapper.` },
   { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
@@ -521,6 +519,8 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   quality={75}
   fit="cover"
   format="auto"
+  loading="lazy"
+  fetchPriority="auto"
   decoding="async"
   blur
   baseUrl=""          // same-origin
@@ -529,8 +529,6 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   // alt="A lighthouse at dusk"
   // aspectRatio="16:9"
   // sourceWidth={2400}
-  // priority
-  // loading="lazy"
   // className="rounded-xl"
   // style={{ borderRadius: 8 }}
   // config={config}              // resolve pixelStep for a non-aliased setup
