@@ -30,14 +30,14 @@ const naturalAspectRatio = (d: ImageDocLike): number | undefined => (d.width && 
 const virtualUrl = (
   name: string,
   description: string,
-  compute: (doc: ImageDocLike, baseUrl?: string, pixelStep?: number) => string | null,
+  compute: (doc: ImageDocLike, baseUrl?: string, pixelStep?: number | number[]) => string | null,
 ): Field => {
   const afterRead: FieldHook = ({ data, req }) => {
     const doc = (data ?? {}) as ImageDocLike
     if (doc.id == null || !doc.filename) return null
     const cfg = req?.payload?.config
     const baseUrl = cfg?.serverURL || undefined
-    const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number } | undefined)?.pixelStep
+    const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number | number[] } | undefined)?.pixelStep
     return compute(doc, baseUrl, pixelStep)
   }
   return { name, type: 'text', virtual: true, admin: { hidden: true, description }, hooks: { afterRead: [afterRead] } }

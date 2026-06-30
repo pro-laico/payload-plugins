@@ -39,12 +39,18 @@ export interface ImagesPluginOptions {
    */
   pregenerateSizes?: boolean | ImageSize[]
   /**
-   * The project-wide pixel step (default 50): the width increment for every generated `srcset`
-   * AND the grid the transform endpoint snaps requests to. One value, set once — a bigger step
-   * means fewer srcset widths and fewer cached variants; `transform.maxDimension` caps the total.
-   * Applies uniformly to the API virtual `srcset`, `<ResponsiveImage>`, and the endpoint.
+   * The project-wide srcset widths, set once and applied uniformly to the API virtual `srcset`,
+   * `<ResponsiveImage>`, and the endpoint's anti-DoS dimension grid. Two forms:
+   *  - a **number** (default 50): the width increment AND the grid the endpoint snaps requests
+   *    to — a bigger step means fewer srcset widths and fewer cached variants.
+   *  - an **array**: an explicit, non-linear width ladder (e.g. `[200, 450, 750, 1200, 2000]`)
+   *    for the srcset — denser where it matters, fewer entries than a fine linear step. The
+   *    endpoint's snap grid then falls back to the default 50, so use ladder widths that are
+   *    multiples of 50 (or set `transform.dimensionStep`) to have them pass through unchanged.
+   *
+   * `transform.maxDimension` caps the largest width in either form.
    */
-  pixelStep?: number
+  pixelStep?: number | number[]
   /** On-demand transform endpoint config. Pass `false` to not register the endpoints. */
   transform?: TransformEndpointConfig | false
   /** Render the focal + ratio-preview field and purge-variants button. Default true. */
@@ -60,6 +66,14 @@ export interface ImagesPluginOptions {
   /** Mark the `alt` field `localized: true` (requires Payload localization). Ignored with
    *  `extendCollection`. Default false. */
   localizeAlt?: boolean
+  /**
+   * Accepted upload mime types for the `images` collection. Defaults to the raster formats the
+   * transform pipeline can process (avif/webp/jpeg/png). Widen it to accept more (e.g. add
+   * `'image/svg+xml'`) or narrow it — but the endpoint only meaningfully resizes/crops raster
+   * images, so non-raster uploads are stored and served as-is. Ignored with `extendCollection`
+   * (you own that collection's `upload.mimeTypes`).
+   */
+  mimeTypes?: string[]
 }
 
 /**
@@ -91,6 +105,7 @@ export const imagesPlugin =
       previewRatios,
       virtualFields = true,
       localizeAlt = false,
+      mimeTypes,
     } = opts
     if (!enabled) return config
 
@@ -124,6 +139,7 @@ export const imagesPlugin =
           purgePath,
           virtualFields,
           localizeAlt,
+          mimeTypes,
           adminThumbnail: transform === false ? false : undefined,
         }),
         imagesOverrides,
@@ -137,7 +153,14 @@ export const imagesPlugin =
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
-            createTransformEndpoint({ dimensionStep: pixelStep, ...transformCfg, variantSlug, sourceSlug }),
+            // A custom width ladder (array) can't double as the endpoint's numeric snap grid, so the
+            // grid falls back to the default; a numeric pixelStep stays coupled to it as before.
+            createTransformEndpoint({
+              dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep,
+              ...transformCfg,
+              variantSlug,
+              sourceSlug,
+            }),
           ]
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]
@@ -155,14 +178,6 @@ export const imagesPlugin =
         if (shadowed) {
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
-          )
-        }
-        // The endpoint reads originals from cloud/relative storage via an origin; with none set in
-        // production, generation 502s. Warn rather than fail (local-disk dev doesn't need it).
-        const hasOrigin = Boolean(payload.config.serverURL || process.env.NEXT_PUBLIC_SERVER_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL)
-        if (transform !== false && process.env.NODE_ENV === 'production' && !hasOrigin) {
-          payload.logger.warn(
-            "[payload-images] no serverURL / NEXT_PUBLIC_SERVER_URL set — on cloud or relative-URL storage the transform endpoint can't fetch originals (502s). Set serverURL in buildConfig.",
           )
         }
       },

@@ -44,6 +44,10 @@ export interface CreateImagesOptions {
   virtualFields?: boolean
   /** Mark the `alt` field `localized: true` (requires Payload localization). Default false. */
   localizeAlt?: boolean
+  /** Accepted upload mime types. Defaults to the raster formats the transform pipeline can
+   *  process ({@link IMAGE_MIME_TYPES}: avif/webp/jpeg/png). Override to widen or narrow what
+   *  the collection accepts — but the endpoint only meaningfully transforms raster images. */
+  mimeTypes?: string[]
 }
 
 /**
@@ -161,7 +165,7 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
     upload: {
       focalPoint: true,
       displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
-      mimeTypes: IMAGE_MIME_TYPES,
+      mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
       ...(imageSizes ? { imageSizes } : {}),
     },

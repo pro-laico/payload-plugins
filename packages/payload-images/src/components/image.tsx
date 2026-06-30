@@ -135,10 +135,10 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   // resolve `pixelStep` from the plugin config. `@payload-config` is the host bundler's alias (set up
   // by `withPayload`); `as string` keeps TS from resolving it at this package's build. Falls back to
   // buildSrcset's default if the config can't be read.
-  let pixelStep: number | undefined
+  let pixelStep: number | number[] | undefined
   try {
     const cfg = await (config ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
-    pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number } } }).custom?.payloadImages?.pixelStep
+    pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } }).custom?.payloadImages?.pixelStep
   } catch {
     pixelStep = undefined
   }
@@ -147,6 +147,13 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   const altText = alt ?? doc?.alt ?? ''
   const naturalW = doc?.width ?? undefined
   const naturalH = doc?.height ?? undefined
+  // Warn (dev only) when an aspectRatio was passed but doesn't parse — we silently fall back to the
+  // natural ratio, which is easy to miss; mirrors how Sanity's reference component surfaces this.
+  if (!fill && aspectRatio != null && parseAspectRatio(aspectRatio) === undefined && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      `[payload-images] Invalid aspectRatio ${JSON.stringify(aspectRatio)} — expected "w/h", "w:h", or a positive number. Falling back to the image's natural ratio.`,
+    )
+  }
   const ar = fill ? undefined : (parseAspectRatio(aspectRatio) ?? (naturalW && naturalH ? naturalW / naturalH : undefined))
 
   const opts: BuildSrcsetOptions = {

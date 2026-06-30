@@ -108,9 +108,12 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
     handler: async (req: PayloadRequest): Promise<Response> => {
       const { payload } = req
 
-      // Origin used to self-fetch an original served from a relative/cloud URL. Prefer the
-      // `serverURL` the app already set in buildConfig, then the env fallback, then the live
-      // request origin — so no separate NEXT_PUBLIC_SERVER_URL is needed when serverURL is set.
+      //NOTE: This origin is ONLY used to self-fetch an original from *relative-URL* storage.
+      //NOTE: Absolute-URL adapters (Vercel Blob, S3-public) fetch doc.url directly, and local disk
+      //NOTE: reads the filesystem — both paths ignore `base` entirely. The chain self-resolves per
+      //NOTE: environment (serverURL -> env -> req.origin -> localhost), so it works zero-config and
+      //NOTE: a missing serverURL is NOT a general 502 risk. The fallbacks are intentional — do not
+      //NOTE: "harden" this by requiring serverURL; relative-URL storage is the only case that needs it.
       const base = payload.config.serverURL || getServerSideURL() || req.origin || 'http://localhost:3000'
 
       const id = routeId(req)
@@ -162,7 +165,11 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
       const result = await genFlight(key, async (): Promise<GenResult> => {
         const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base)
         if (!original) {
-          payload.logger.warn(`[payload-images] source ${id} unreadable (filename=${src.filename ?? 'none'}, url=${src.url ?? 'none'})`)
+          // Only the relative-URL path needs an origin to resolve; surface the serverURL hint
+          // just here, when a read has actually failed — not preemptively at boot.
+          const relative = !!src.url && !/^https?:\/\//i.test(src.url)
+          const hint = relative ? ' — relative-URL storage and the request origin did not resolve; set serverURL in buildConfig' : ''
+          payload.logger.warn(`[payload-images] source ${id} unreadable (filename=${src.filename ?? 'none'}, url=${src.url ?? 'none'})${hint}`)
           return { ok: false, status: 502, msg: 'Source unavailable' }
         }
 

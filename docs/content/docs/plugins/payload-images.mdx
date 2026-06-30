@@ -3,11 +3,16 @@ title: "payload-images"
 description: "On-demand image optimization for Payload CMS — perfectly sized and focal-cropped at any screen size."
 ---
 
-`@pro-laico/payload-images` exists to do one thing well: **serve a correctly-sized, correctly-cropped
-image everywhere one appears — automatically.** You upload a picture once, and the plugin generates
-the exact dimensions, format, and crop each layout asks for, the first time it's asked for, then
-caches it. Think of it as the image-optimization layer `next/image` should give you but doesn't:
-art-directed focal cropping, AVIF/WebP negotiation, and a durable cache, all driven from your CMS.
+`@pro-laico/payload-images` brings a **[Sanity-style image pipeline](https://www.sanity.io/docs/image-urls)
+to Payload**: upload a picture once and ask for any size, crop, or format with a URL — the plugin
+renders it on the fly the first time it's requested, then caches it forever. The result is images
+that are **never bigger than they need to be**, and **trivial to resize, recrop, reformat, and swap
+out** — from the admin panel (drag the focal point, replace the file) or straight from your code
+(point a `<ResponsiveImage>` or a virtual `srcset` at any aspect ratio). Pair it with
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed) and even your seeded media — focal point and
+all — is declared in code and ready to serve. Think of it as the image-optimization layer `next/image`
+should give you but doesn't: art-directed focal cropping, AVIF/WebP negotiation, and a durable cache,
+all driven from your CMS.
 
 ```bash
 pnpm add @pro-laico/payload-images
@@ -15,21 +20,20 @@ pnpm add @pro-laico/payload-images
 
 ## How it works
 
-Four pieces deliver that, and the rest of this page covers them in order:
+What's in the box:
 
-- **Two collections.** You upload to **`images`**, which stores only the original — no fixed size
-  ladder baked in at upload time. A second, hidden collection caches every generated size, one row
-  each.
-- **A transform endpoint.** `/api/img/:id` resizes, crops, and re-encodes on request, then persists
-  the result — so each size is built once with [Sharp](https://sharp.pixelplumbing.com/) and
-  streamed from cache forever after.
-- **Focal-point cropping.** Set an image's subject once in the admin; every crop, at any aspect
-  ratio, stays centered on it — no decapitated center-crops.
-- **A responsive component.** `<ResponsiveImage>` (plus virtual `src`/`srcset` fields for non-React
-  consumers) asks the endpoint for the exact size each layout needs, so the browser downloads one
-  right-sized file instead of a full-res original.
+- **Two collections** — an `images` upload that stores only the original, plus a hidden cache of every generated size.
+- **A transform endpoint** — `/api/img/:id` resizes, crops, and re-encodes on request, then caches the result.
+- **Focal-point cropping** — set the subject once; every crop, at any ratio, stays centered on it.
+- **A responsive component** — `<ResponsiveImage>` and virtual `src`/`srcset` fields request the exact size each layout needs.
 
 ## Setup
+
+<Callout type="info">
+  **Built for Next.js.** The transform endpoint persists variants with Next's `after()` and the cache
+  story leans on Next's caching — so this plugin targets Payload running in a Next.js app (the default
+  Payload setup). It isn't framework-agnostic.
+</Callout>
 
 <Steps>
 
@@ -95,7 +99,7 @@ export const options = [
   { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key — not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
   { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
   { name: 'pregenerateSizes', type: 'boolean | ImageSize[]', default: 'false', description: `Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by default (store only the original; size on demand). true uses a built-in 7-size ladder; pass an array for a custom one.` },
-  { name: 'pixelStep', type: 'number', default: '50', description: `The project-wide pixel step — the width increment for every generated srcset, and the grid the endpoint snaps requests to. Set once: a bigger step means fewer srcset widths and fewer cached variants (maxDimension caps the total). Applies to the API srcset, <ResponsiveImage>, and the endpoint alike.` },
+  { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths. A number is the step (bigger = fewer widths and cached variants); an array is an explicit ladder, e.g. [200, 450, 750, 1200, 2000] (keep to multiples of 50, the endpoint's snap grid). Capped by maxDimension.` },
   {
     name: 'transform',
     type: 'TransformEndpointConfig | false',
@@ -120,6 +124,7 @@ export const options = [
   { name: 'previewRatios', type: 'string[]', default: "['16:9','9:16','1:1','4:3','3:2','21:9']", description: `Aspect ratios shown as preview tiles in the focal-point field.` },
   { name: 'virtualFields', type: 'boolean', default: 'true', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population.` },
   { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
+  { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection — defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
 ]
 
 Pass options to customize — the **Reference** tab is the interactive view (`transform` expands to its
@@ -405,10 +410,12 @@ export async function Hero({ id }: { id: string }) {
 
 </Tabs>
 
-The `srcset` is every `pixelStep` multiple up to the source width — `pixelStep` defaults to **50px**
-(a 2400px source → `50, 100, … 2400`). It's one [plugin option](#options) (`imagesPlugin({ pixelStep })`),
-the same across every image and built into the `srcset` server-side; raise it for fewer widths and
-fewer cached variants. `maxDimension` caps the top width, so it bounds the entry count too.
+The `srcset` is built server-side from the [`pixelStep`](#options) option, the same for every image.
+A **number** steps by that much up to the source width (default `50` → `50, 100, … 2400`), always
+topping out at the exact source width; raise it for fewer widths and cached variants. An **array** is
+an explicit ladder — `imagesPlugin({ pixelStep: [200, 450, 750, 1200, 2000] })` — emitting just those
+widths (below-source kept, source width added on top), denser where it matters. Keep ladder values on
+multiples of 50 (the endpoint's snap grid); `maxDimension` caps the top either way.
 
 That markup is dynamic because the example passes the **populated doc** (the `findByID` result):
 `width`/`height` (no layout shift), `alt`, the source-width cap on the `srcset`, and the `v`
@@ -535,6 +542,39 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 </Tab>
 
 </Tabs>
+
+## Revalidation
+
+Next.js caches pages and Payload reads hard. Two layers:
+
+- **Image bytes — automatic.** URLs are immutable + content-addressed (`v` token = filename + focal).
+  Replace the file or move the focal and the URL changes, so browsers/CDNs refetch — no manual purge.
+  Stale variants are dropped by the change/delete hooks.
+- **Your pages — your job.** The new URL only ships once the page re-renders with fresh data. The
+  Local API skips Next's `fetch`, so a CMS edit won't bust a cached route — revalidate it yourself.
+
+Wire an `afterChange` / `afterDelete` hook (merges with the plugin's purge hooks) to bust your
+image-read tags:
+
+```ts
+import { revalidateTag } from 'next/cache'
+
+imagesPlugin({
+  imagesOverrides: {
+    hooks: {
+      afterChange: [({ doc }) => (revalidateTag('images'), doc)],
+      afterDelete: [({ doc }) => (revalidateTag('images'), doc)],
+    },
+  },
+})
+```
+
+```ts
+// Tag the reads that render images (unstable_cache, or Next 16 "use cache" + cacheTag).
+const getImages = unstable_cache(() => payload.find({ collection: 'images' }), ['images'], { tags: ['images'] })
+```
+
+Embedded images (`page.heroImage`) refresh with *their* doc. Or skip caching: `export const dynamic = 'force-dynamic'`.
 
 ## Focal-point cropping
 
