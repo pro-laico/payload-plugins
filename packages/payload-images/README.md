@@ -127,8 +127,8 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Set `false` to register nothing (drops the tables on SQL adapters). |
 | `extendCollection` | `string` | — | Slug of an existing **upload** collection to add the pipeline to, instead of creating `images`. |
-| `imagesOptions` | `Partial<CollectionConfig>` | — | Tweaks deep-merged onto the Images collection (`upload`/`access`/`admin` merged, `fields`/`hooks` appended). |
-| `generatedImagesOptions` | `Partial<CollectionConfig>` | — | Tweaks for the hidden variant-cache collection. |
+| `imagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks deep-merged onto the Images collection (`upload`/`access`/`admin` merged, `fields`/`hooks` appended). |
+| `generatedImagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks for the hidden variant-cache collection. |
 | `pregenerateSizes` | `boolean \| ImageSize[]` | `false` | Opt into Payload's classic on-upload size ladder instead of on-demand. `true` = built-in 7-size ladder; array = custom. |
 | `transform` | `TransformEndpointConfig \| false` | `{}` | Transform + purge endpoint config; `false` registers neither. |
 | `focalUI` | `boolean` | `true` | Render the focal picker + ratio preview and the Purge button. |
@@ -202,18 +202,18 @@ collection you'd build yourself:
 - **Organize a big library with folders.** Payload's built-in folder organization is opt-in (it
   adds a folder relationship to the schema). Turn it on when you want it:
   ```ts
-  imagesPlugin({ imagesOptions: { folders: true } })
+  imagesPlugin({ imagesOverrides: { folders: true } })
   ```
 - **Cap stored originals.** The endpoint never serves an upscaled image, but the *stored* original
   is whatever was uploaded. To bound storage, hand Payload's built-in `resizeOptions` a ceiling —
   applied once, on upload:
   ```ts
   imagesPlugin({
-    imagesOptions: { upload: { resizeOptions: { width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true } } },
+    imagesOverrides: { upload: { resizeOptions: { width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true } } },
   })
   ```
 - **Add images by URL.** Payload's `upload.pasteURL` lets editors paste an image URL to import it
-  (guarded by an allow-list). Leave it at Payload's default or configure it via `imagesOptions`.
+  (guarded by an allow-list). Leave it at Payload's default or configure it via `imagesOverrides`.
 
 ## Caching & abuse limits
 

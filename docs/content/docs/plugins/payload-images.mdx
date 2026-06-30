@@ -1,36 +1,40 @@
 ---
 title: "payload-images"
-description: "On-demand image optimization for Payload CMS — an Images upload collection that stores only the original, a Sharp transform endpoint with focal-aware cropping, format negotiation, and built-in LQIP placeholders, a durable variant cache with two-way purge, an admin focal-point picker, and a responsive image component."
+description: "On-demand image optimization for Payload CMS — perfectly sized and focal-cropped at any screen size."
 ---
 
-<Callout type="info">
-  **Ported from [`@pro-laico/images`](https://github.com/pro-laico/atomic-payload)** (the Atomic
-  Payload images package), restructured to this repo's conventions and trimmed to the
-  image-optimization core — no favicons, no Atomic block/children coupling. Just the Images
-  pipeline plus declarative seeding.
-</Callout>
-
-`@pro-laico/payload-images` turns a Payload upload collection into an on-demand image pipeline.
-An upload stores only the original; every rendered size is generated the first time a page asks
-for it — resized and cropped to a focal point you set in the admin, encoded to WebP/AVIF/JPEG/PNG
-— then cached so it's only ever built once. It also ships a responsive `<ResponsiveImage>`
-component with a built-in low-res placeholder, an admin focal-point picker, and two-way variant
-purging.
+`@pro-laico/payload-images` exists to do one thing well: **serve a correctly-sized, correctly-cropped
+image everywhere one appears — automatically.** You upload a picture once, and the plugin generates
+the exact dimensions, format, and crop each layout asks for, the first time it's asked for, then
+caches it. Think of it as the image-optimization layer `next/image` should give you but doesn't:
+art-directed focal cropping, AVIF/WebP negotiation, and a durable cache, all driven from your CMS.
 
 ```bash
 pnpm add @pro-laico/payload-images
 ```
 
-## Setup
+## How it works
 
-The transform endpoint resizes and crops with [Sharp](https://sharp.pixelplumbing.com/), which
-Payload already needs — pass the same instance to `buildConfig`, and set your origin so the
-endpoint can read originals served from cloud/relative URLs.
+Four pieces deliver that, and the rest of this page covers them in order:
+
+- **Two collections.** You upload to **`images`**, which stores only the original — no fixed size
+  ladder baked in at upload time. A second, hidden collection caches every generated size, one row
+  each.
+- **A transform endpoint.** `/api/img/:id` resizes, crops, and re-encodes on request, then persists
+  the result — so each size is built once with [Sharp](https://sharp.pixelplumbing.com/) and
+  streamed from cache forever after.
+- **Focal-point cropping.** Set an image's subject once in the admin; every crop, at any aspect
+  ratio, stays centered on it — no decapitated center-crops.
+- **A responsive component.** `<ResponsiveImage>` (plus virtual `src`/`srcset` fields for non-React
+  consumers) asks the endpoint for the exact size each layout needs, so the browser downloads one
+  right-sized file instead of a full-res original.
+
+## Setup
 
 <Steps>
 
 <Step>
-### Add the plugin
+**Add the plugin**
 
 ```ts
 import { buildConfig } from 'payload'
@@ -46,21 +50,15 @@ export default buildConfig({
 })
 ```
 
-This registers the **Images** collection (you upload here; the original is stored untouched), a
-hidden **generated-images** collection (the variant cache, one row per generated size), both
-under an **Assets** admin group. It mounts the transform endpoint at `/api/img/:id` and a purge
-endpoint at `/api/img/purge/:id`. The admin list view shows fast on-demand thumbnails (160px,
-focal-cropped) instead of loading full-res originals.
-
 <Callout type="info">
   **Already have a `media`/`images` collection?** Pass `imagesPlugin({ extendCollection: 'media' })`
   to add the pipeline to your existing upload collection instead of creating a second one — see
-  [Extending an existing collection](#extending-an-existing-collection).
+  [Extending a collection](#extending-a-collection).
 </Callout>
 </Step>
 
 <Step>
-### Keep Sharp out of the bundle
+**Keep Sharp out of the bundle**
 
 Sharp ships a native binary, so tell Next not to bundle it (Turbopack and webpack both need this):
 
@@ -72,85 +70,172 @@ export default nextConfig
 </Step>
 
 <Step>
-### Set your server URL
+**Generate the admin import map**
 
-On a cloud or relative-URL storage adapter the endpoint reads the original by fetching the
-server's own file route, so it needs your origin. It uses your buildConfig **`serverURL`** (the
-one in the snippet above) — so if you set that, you're done. With none set, it falls back to
-`NEXT_PUBLIC_SERVER_URL`, then the live request origin, then `http://localhost:3000`.
-</Step>
-
-<Step>
-### Generate the admin import map
-
-The focal-point picker and **Purge variants** button are admin components, so regenerate the
-import map after adding the plugin (re-run it whenever you change registered admin components):
+The plugin registers custom admin components (the focal-point picker and **Purge variants**
+button), so regenerate the import map:
 
 ```bash
 pnpm payload generate:importmap
 ```
-
-<Callout type="info">
-  `focalUI` bundles all the image-management admin UI — the focal picker, ratio preview, purge
-  button, and the **Variants** list. Pass `focalUI: false` for a clean editor collection (just
-  `alt` + the file) and you can skip `generate:importmap` entirely — the on-demand transforms
-  still work, you only lose the in-admin tools.
-</Callout>
 </Step>
 
 </Steps>
 
-## Options
+## Plugin
 
-`imagesPlugin(options?)` accepts:
+`imagesPlugin(options?)` is the single entry point — one call registers the two collections, the
+transform + purge endpoints, and the admin UI (all detailed below). It's zero-config.
+
+### Options
+
+export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, registers nothing. This is "not installed", not "paused": on SQL adapters, turning it off for an existing project produces a migration that drops the image tables and their data.` },
+  { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection. pregenerateSizes is ignored in this mode.` },
+  { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key — not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
+  { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
+  { name: 'pregenerateSizes', type: 'boolean | ImageSize[]', default: 'false', description: `Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by default (store only the original; size on demand). true uses a built-in 7-size ladder; pass an array for a custom one.` },
+  {
+    name: 'transform',
+    type: 'TransformEndpointConfig | false',
+    default: '{}',
+    description: `Config for the on-demand transform + purge endpoints. Pass false to register neither.`,
+    options: [
+      { name: 'sourceSlug', type: 'string', default: "'images'", description: `Slug of the source upload collection to transform.` },
+      { name: 'variantSlug', type: 'string', default: "'generated-images'", description: `Slug of the collection that caches generated variants.` },
+      { name: 'cdnCacheControl', type: 'boolean', default: 'true', description: `Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).` },
+      { name: 'maxDimension', type: 'number', default: '4096', description: `Hard ceiling on either output dimension.` },
+      { name: 'defaultQuality', type: 'number', default: '75', description: `Encode quality used when a request omits q.` },
+      { name: 'qualityRange', type: '[number, number]', default: '[40, 95]', description: `Allowed quality range; requested values clamp into it.` },
+      { name: 'defaultFormat', type: 'Format', default: "'auto'", description: `Output format when a request omits fmt (auto negotiates from Accept).` },
+      { name: 'formats', type: 'Format[]', default: "['auto','avif','webp','jpeg','png']", description: `Output formats the endpoint may emit.` },
+      { name: 'preferAvif', type: 'boolean', default: 'false', description: `Auto-negotiate AVIF when accepted. Off by default — AVIF encodes far slower, so fmt=auto serves WebP for a fast cold path (AVIF stays available on explicit fmt=avif).` },
+      { name: 'dimensionStep', type: 'number', default: '50', description: `Snap requested w/h to a grid of this many px before transforming + caching, bounding the variant space (anti-DoS). Matches the default srcset pixelStep. Set <= 1 to honor exact dimensions.` },
+      { name: 'maxInputPixels', type: 'number', default: '100000000', description: `Max source pixels Sharp will decode — a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).` },
+      { name: 'maxConcurrency', type: 'number', default: 'cpus - 1', description: `Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY).` },
+      { name: 'sharpConcurrency', type: 'number', default: '1', description: `Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.` },
+    ],
+  },
+  { name: 'focalUI', type: 'boolean', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button.` },
+  { name: 'previewRatios', type: 'string[]', default: "['16:9','9:16','1:1','4:3','3:2','21:9']", description: `Aspect ratios shown as preview tiles in the focal-point field.` },
+  { name: 'virtualFields', type: 'boolean', default: 'true', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population.` },
+  { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
+]
+
+Pass options to customize — the **Reference** tab is the interactive view (`transform` expands to its
+nested options); **TypeScript** is the same shape in code, every option at its default.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={options} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+import { imagesPlugin } from '@pro-laico/payload-images'
+
+// Every option at its default — this is the zero-config behaviour, written out.
+imagesPlugin({
+  enabled: true,
+  // extendCollection: 'media',           // optional, no default — add the pipeline to an existing collection instead of creating `images`
+  // imagesOverrides: { /* … */ },          // optional, no default — deep-merged onto the images collection
+  // generatedImagesOverrides: { /* … */ }, // optional, no default — merged onto the variant-cache collection
+  pregenerateSizes: false,
+  transform: {
+    sourceSlug: 'images',
+    variantSlug: 'generated-images',
+    cdnCacheControl: true,
+    maxDimension: 4096,
+    defaultQuality: 75,
+    qualityRange: [40, 95],
+    defaultFormat: 'auto',
+    formats: ['auto', 'avif', 'webp', 'jpeg', 'png'],
+    preferAvif: false,
+    dimensionStep: 50,
+    maxInputPixels: 100_000_000,
+    maxConcurrency: os.cpus().length - 1, // default
+    sharpConcurrency: 1,
+  },
+  focalUI: true,
+  previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'],
+  virtualFields: true,
+  localizeAlt: false,
+})
+```
+
+</Tab>
+
+</Tabs>
+
+## Collections
+
+The plugin registers two collections under an **Assets** admin group — one you upload to, one that
+caches what gets generated. Both accept PNG, JPEG, WebP, and AVIF.
+
+### `images`
+
+The source upload, and the only one you touch. It stores the original untouched — no pre-generated
+sizes by default — and keeps Payload's native focal point; every rendered size is produced on demand
+by [the endpoint](#endpoint) and recorded in `generated-images`. Read is **public**; writes are
+logged-in-admin only.
+
+**Fields**
 
 <TypeTable
   type={{
-    enabled: { description: "When false, registers nothing. This is \"not installed\", not \"paused\": on SQL adapters, turning it off for an existing project produces a migration that drops the image tables and their data.", type: "boolean", default: "true" },
-    extendCollection: { description: "Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection. pregenerateSizes is ignored in this mode.", type: "string" },
-    imagesOptions: { description: "Tweaks deep-merged onto the Images collection (upload/access/admin merged, fields/hooks appended). Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.", type: "Partial<CollectionConfig>" },
-    generatedImagesOptions: { description: "Tweaks merged onto the hidden generated-images (variant cache) collection.", type: "Partial<CollectionConfig>" },
-    pregenerateSizes: { description: "Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by default (store only the original; size on demand). true uses a built-in 7-size ladder; pass an array for a custom one.", type: "boolean | ImageSize[]", default: "false" },
-    transform: { description: "Config for the on-demand transform + purge endpoints. Pass false to register neither. See the transform keys below.", type: "TransformEndpointConfig | false", default: "{}" },
-    focalUI: { description: "Render the focal-point picker + ratio-preview field and the Purge variants button.", type: "boolean", default: "true" },
-    previewRatios: { description: "Aspect ratios shown as preview tiles in the focal-point field.", type: "string[]", default: "['16:9','9:16','1:1','4:3','3:2','21:9']" },
-    virtualFields: { description: "Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population.", type: "boolean", default: "true" },
-    localizeAlt: { description: "Mark the alt field localized (requires Payload localization). Ignored with extendCollection.", type: "boolean", default: "false" },
+    file: { description: "The original image (the upload). Stored as-is; shown in relationship fields via displayPreview, and the admin list shows a 160px focal-cropped on-demand thumbnail.", type: "upload" },
+    alt: { description: "Required. Screen-reader / SEO text; the admin title and list-search field. Localizable.", type: "text" },
+    focalPoint: { description: "Payload's native upload.focalPoint, surfaced by the picker below.", type: "built-in" },
+    focalPreview: { description: "Focal-point picker + ratio preview. Only with focalUI.", type: "ui" },
+    purgeVariants: { description: "The Purge variants button. Only with focalUI.", type: "ui" },
+    variants: { description: "Lists this image's cached generated-images. Only with focalUI.", type: "join" },
+    src: { description: "Default-width optimized URL, computed on read and hidden in admin. Only with virtualFields.", type: "virtual" },
+    srcset: { description: "Responsive srcset of optimized URLs. Only with virtualFields.", type: "virtual" },
+    placeholderURL: { description: "Tiny blurred LQIP URL. Only with virtualFields.", type: "virtual" },
+    thumbnailURL: { description: "160px focal-cropped thumbnail URL. Only with virtualFields.", type: "virtual" },
   }}
 />
 
-The `transform` option (`TransformEndpointConfig`) tunes the endpoint:
+**Hooks**
 
 <TypeTable
   type={{
-    sourceSlug: { description: "Slug of the source upload collection to transform.", type: "string", default: "'images'" },
-    variantSlug: { description: "Slug of the collection that caches generated variants.", type: "string", default: "'generated-images'" },
-    cdnCacheControl: { description: "Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).", type: "boolean", default: "true" },
-    maxDimension: { description: "Hard ceiling on either output dimension.", type: "number", default: "4096" },
-    defaultQuality: { description: "Encode quality used when a request omits q.", type: "number", default: "75" },
-    qualityRange: { description: "Allowed quality range; requested values clamp into it.", type: "[number, number]", default: "[40, 95]" },
-    defaultFormat: { description: "Output format when a request omits fmt (auto negotiates from Accept).", type: "Format", default: "'auto'" },
-    formats: { description: "Output formats the endpoint may emit.", type: "Format[]", default: "['auto','avif','webp','jpeg','png']" },
-    preferAvif: { description: "Auto-negotiate AVIF when accepted. Off by default — AVIF encodes far slower, so fmt=auto serves WebP for a fast cold path (AVIF stays available on explicit fmt=avif).", type: "boolean", default: "false" },
-    dimensionStep: { description: "Snap requested w/h to a grid of this many px before transforming + caching, bounding the variant space (anti-DoS). Matches the default srcset pixelStep. Set <= 1 to honor exact dimensions.", type: "number", default: "50" },
-    maxInputPixels: { description: "Max source pixels Sharp will decode — a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).", type: "number", default: "100000000" },
-    maxConcurrency: { description: "Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY).", type: "number", default: "cpus - 1" },
-    sharpConcurrency: { description: "Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.", type: "number", default: "1" },
+    purgeStaleVariantsAfterChange: { description: "Purges this image's stale cached variants when its file or focal point changes.", type: "afterChange" },
+    purgeVariantsBeforeDelete: { description: "Purges all of this image's cached variants before the doc is deleted.", type: "beforeDelete" },
   }}
 />
 
-## The collections
+### `generated-images`
 
-The plugin registers two collections under an **Assets** admin group:
+The hidden, durable variant cache — you never touch it directly. The transform endpoint writes one
+upload doc here per (source, settings, focal) combination, keyed by a unique `cacheKey` and related
+back to its `source`. It's an upload collection, so variant bytes flow through whatever storage
+adapter you've configured. It's surfaced on `images` via the `variants` join and purged by that
+collection's change/delete hooks.
 
-| Collection | Purpose |
-| --- | --- |
-| `images` | The source upload. Stores only the original (no pre-generated sizes by default). Fields: `alt` (required), Payload's native focal point, the focal-preview + purge UI, and a `variants` join onto the cache. |
-| `generated-images` | The hidden, durable variant cache — one upload doc per (source, settings, focal) combination, keyed by a unique `cacheKey`, related back to its `source`. Purged automatically when the source's file or focal point changes, and on delete. |
+**Fields**
 
-Accepted upload types are PNG, JPEG, WebP, and AVIF.
+<TypeTable
+  type={{
+    file: { description: "The generated variant bytes (the upload).", type: "upload" },
+    source: { description: "The images doc this variant derives from. Required, indexed.", type: "relationship" },
+    cacheKey: { description: "Unique key for this (source, settings, focal) combo. The admin title.", type: "text" },
+    fit: { description: "The resize fit used to generate it.", type: "text" },
+    format: { description: "Output format.", type: "text" },
+    quality: { description: "Encode quality.", type: "number" },
+    focalX: { description: "Focal point X baked into the crop.", type: "number" },
+    focalY: { description: "Focal point Y baked into the crop.", type: "number" },
+  }}
+/>
 
-## Extending an existing collection
+**Hooks** — none; variants are derived and disposable, so the collection carries no revalidation
+hooks (busting cache tags on every cache-miss create would be pure churn).
+
+### Extending a collection
 
 Most projects already have a `media` (or `images`) upload collection. Point the plugin at it
 with `extendCollection` and it adds the pipeline — the focal UI, the `variants` join, the purge
@@ -165,87 +250,12 @@ relates back to `media`. The target must be an upload collection (the plugin thr
 error otherwise), and `pregenerateSizes` is ignored — your collection already owns its
 `imageSizes`.
 
-## Rendering with `<ResponsiveImage>`
+### API URLs
 
-`<ResponsiveImage>` is the frontend surface. It emits a plain `<img>` whose `srcset` points at
-the transform endpoint, so the browser downloads the one size that fits where the image renders.
-It is **not** `next/image`, and it runs in both server and client trees. Import it from the
-`components/image` subpath:
-
-```tsx
-import config from '@payload-config'
-import { getPayload } from 'payload'
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
-
-export async function Hero({ id }: { id: string }) {
-  const payload = await getPayload({ config })
-  const image = await payload.findByID({ collection: 'images', id, depth: 0 })
-  return <ResponsiveImage image={image} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
-}
-```
-
-Pass the **populated document** when you can — it fills in the intrinsic width/height (no layout
-shift), the `alt` fallback, and the cache-busting version token. The endpoint reads the focal
-point from the document and crops server-side, so the component never needs it.
-
-<Callout type="warn">
-  **Set `sizes` to how big the image actually renders.** It defaults to `100vw`; leaving that on an
-  image in a small column makes the browser fetch a full-width variant it doesn't need (the same
-  trap as `next/image`). Give it the rendered size, e.g. `sizes="(max-width: 768px) 100vw, 33vw"`.
-  See [MDN: responsive images](https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Responsive_images).
-</Callout>
-
-For a full-bleed hero or any element that sets its own height, pass `fill`:
-
-```tsx
-<div style={{ position: 'relative', height: '100vh' }}>
-  <ResponsiveImage image={image} fill sizes="100vw" />
-</div>
-```
-
-Need a single URL (OG tags, CSS backgrounds, emails)? Use `getImageUrl` from the
-`components/buildSrcset` subpath:
-
-```ts
-import { getImageUrl } from '@pro-laico/payload-images/components/buildSrcset'
-
-const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: process.env.NEXT_PUBLIC_SERVER_URL })
-```
-
-<Callout type="info">
-  **Custom API route or Next `basePath`?** Transform URLs default to `/api/img`. If you've changed
-  Payload's `routes.api` (or set a Next `basePath`), pass `path` once via a wrapper:
-  `const Image = (p: ResponsiveImageProps) => <ResponsiveImage path="/myapi/img" {...p} />`.
-</Callout>
-
-### The transform URL
-
-Every variant URL is `/api/img/:id` with Cloudflare-style query params, so you can hit it
-directly (or build your own `<img>`):
-
-| Param | Meaning |
-| --- | --- |
-| `w` / `h` | Target width / height in px (at least one required). Snapped to the `dimensionStep` grid and clamped to `maxDimension`. |
-| `ar` | Aspect ratio (`16:9`, `16/9`, `1.78`) — derives the missing dimension. |
-| `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
-| `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
-| `fmt` | `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
-| `v` | Cache-busting token (derived from filename + focal); the server ignores it. |
-
-```
-GET /api/img/<id>?w=600&h=600&fit=cover           # focal cover-crop, auto format
-GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
-```
-
-The first request for a size generates it with Sharp and streams it same-origin, then persists
-the variant after responding; later identical requests stream the stored copy.
-
-## Optimized URLs in the API (no client needed)
-
-`<ResponsiveImage>` and `getImageUrl` are for JS/React consumers. For everyone else — a mobile
-app, a GraphQL client, a plain `fetch`, an OG/RSS generator — the plugin adds **virtual fields**
-(computed on read, never stored) that put optimized URLs in every REST / GraphQL / Local-API
-response, with no client code and no knowledge of `/api/img`:
+Every read of an `images` doc also carries optimized URLs as **virtual fields** — computed on read,
+never stored — so any consumer gets ready-to-use URLs with no client code and no knowledge of
+`/api/img`. The component and URL builders [below](#responsiveimage) are for JS/React; this is for
+everyone else — a mobile app, a GraphQL client, a plain `fetch`, an OG/RSS generator:
 
 ```jsonc
 // GET /api/images/<id>  — or a populated page.heroImage
@@ -270,31 +280,40 @@ extra query per image). Disable with `virtualFields: false`.
   `payload` — no import.
 </Callout>
 
-## Admin & Payload built-ins
+## Endpoint
 
-The `images` collection leans on Payload's native upload features, so it behaves like any
-collection you'd build yourself.
+Everything optimized is served by one public endpoint — `/api/img/:id`. 
+You normally never write these URLs yourself (`<ResponsiveImage>` and the virtual fields do
+it for you), but seeing them is the fastest way to understand the rest:
 
-- **Upload-field previews + alt search, on by default.** Relationship/`upload` fields that target
-  `images` show a thumbnail (`upload.displayPreview`), the list view searches by `alt`, and the
-  list shows the fast on-demand thumbnail. (`extendCollection` targets keep their own admin config.)
-- **Organize a big library with folders.** Payload's built-in folder organization is opt-in (it
-  adds a folder relationship to the schema). Turn it on when you want it:
-  ```ts
-  imagesPlugin({ imagesOptions: { folders: true } })
-  ```
-- **Cap stored originals.** The endpoint never serves an upscaled image, but the *stored* original
-  is whatever was uploaded. Bound storage by handing Payload's built-in `resizeOptions` a ceiling,
-  applied once on upload:
-  ```ts
-  imagesPlugin({
-    imagesOptions: { upload: { resizeOptions: { width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true } } },
-  })
-  ```
-- **Add images by URL.** Payload's `upload.pasteURL` lets editors paste an image URL to import it
-  (guarded by an allow-list). Leave it at Payload's default or configure it via `imagesOptions`.
+```
+GET /api/img/<id>?w=600&h=600&fit=cover           # focal cover-crop, auto format
+GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
+```
 
-## Caching & abuse limits
+A component like `<ResponsiveImage image={img} aspectRatio="16:9" />` is just a URL builder over
+this endpoint: it turns its props into one URL per `srcset` width, deriving each `h` from the ratio:
+
+```
+/api/img/<id>?w=640&h=360&fit=cover&q=75&fmt=auto&v=1a2b3c   640w
+/api/img/<id>?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c 1280w
+```
+
+### Params
+
+| Param | Meaning |
+| --- | --- |
+| `w` / `h` | Target width / height in px (at least one required). Snapped to the `dimensionStep` grid and clamped to `maxDimension`. |
+| `ar` | Aspect ratio (`16:9`, `16/9`, `1.78`) — derives the missing dimension. |
+| `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
+| `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
+| `fmt` | `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
+| `v` | Cache-busting token (derived from filename + focal); the server ignores it. |
+
+The first request for a size generates it with Sharp and streams it same-origin, then persists
+the variant after responding; later identical requests stream the stored copy.
+
+### Caching & abuse limits
 
 The transform endpoint is public-facing, so it's bounded on several fronts:
 
@@ -324,13 +343,245 @@ The transform endpoint is public-facing, so it's bounded on several fronts:
   `maxInputPixels` and put a rate limiter or CDN in front.
 </Callout>
 
-## Declarative seeding with payload-seed
+## `<ResponsiveImage>`
 
-Unlike [`@pro-laico/payload-mux`](/docs/plugins/payload-mux) (whose bytes live in Mux and so
-needs an asset-*provider* seam), `images` is a plain Payload upload collection — so it seeds
-**natively** through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed)'s normal `asset()`
-flow, **no provider needed**. Point the seed plugin's asset uploads at the `images` collection
-and declare each source with `asset()`:
+The frontend surface — a plain `<img>` whose `srcset` points at the transform endpoint, so the
+browser grabs the one size that fits where it renders. Not `next/image`; runs in server or client
+trees. Import from the `components/image` subpath. **Component** = what you write, **Rendered HTML**
+= what it produces (an `<img>` with a full `srcset`, one URL per width capped at the source, plus a
+blurred LQIP on the wrapper):
+
+<Tabs items={['Component', 'Rendered HTML']}>
+
+<Tab value="Component">
+
+```tsx
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
+export async function Hero({ id }: { id: string }) {
+  const payload = await getPayload({ config })
+  const image = await payload.findByID({ collection: 'images', id, depth: 0 })
+  return (
+    <ResponsiveImage
+      image={image}
+      aspectRatio="16:9"
+      sizes="(max-width: 768px) 100vw, 50vw"
+      className="rounded-xl" // Tailwind (or any className) → the wrapper
+    />
+  )
+}
+```
+
+</Tab>
+
+<Tab value="Rendered HTML">
+
+```html
+<!-- your className is on the wrapper; the inline styles are the component's own layout plumbing -->
+<span class="rounded-xl"
+      style="display:block; overflow:hidden; width:100%;
+             background-image:url(/api/img/64a…?w=32&h=18&fit=cover&q=40&fmt=auto&v=1a2b3c)">
+  <img
+    src="/api/img/64a…?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c"
+    srcset="/api/img/64a…?w=300&h=169&fit=cover&q=75&fmt=auto&v=1a2b3c 300w,
+            /api/img/64a…?w=600&h=338&fit=cover&q=75&fmt=auto&v=1a2b3c 600w,
+            /api/img/64a…?w=900&h=506&fit=cover&q=75&fmt=auto&v=1a2b3c 900w,
+            …                                                              (8 widths total)
+            /api/img/64a…?w=2400&h=1350&fit=cover&q=75&fmt=auto&v=1a2b3c 2400w"
+    sizes="(max-width: 768px) 100vw, 50vw"
+    alt="…"
+    width="2400"
+    height="1350"
+    loading="lazy"
+    decoding="async"
+    style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777777; object-fit:cover" />
+</span>
+```
+
+</Tab>
+
+</Tabs>
+
+Why 300px steps, not 50? `srcset` increments by `pixelStep` (default **50px**) but caps at
+`maxEntries` widths (default **8**) — a 2400px source at 50px = 48 entries, so the step widens to
+300 to stay at 8. Smaller sources keep 50px (a 600px image → `50, 100, … 600`). Raise `pixelStep`
+or lower `maxEntries` for fewer variants. Both are per-render props, not plugin options
+([all props](#props)).
+
+That markup is dynamic because the example passes the **populated doc** (the `findByID` result):
+`width`/`height` (no layout shift), `alt`, the source-width cap on the `srcset`, and the `v`
+cache-bust token all come off it. It never needs the focal point — the endpoint reads that from the
+doc and crops server-side.
+
+Or just an **id**, when that's all you have:
+
+```tsx
+<ResponsiveImage image="64a1f2c…" aspectRatio="16:9" sizes="50vw" />
+```
+
+No doc → degraded output: `width`/`height` guessed from the ratio (1280×720), empty `alt`, no `v`,
+and the `srcset` climbs to the 4096 ceiling instead of the source width. Prefer the populated doc —
+you usually have one (a page query or populated relationship).
+
+<Callout type="warn">
+  **Set `sizes` to how big the image actually renders.** Defaults to `100vw` — leave that on an
+  image in a narrow column and the browser fetches a full-width variant it doesn't need (the
+  `next/image` trap). Give it the real size, e.g. `sizes="(max-width: 768px) 100vw, 33vw"`.
+  See [MDN: responsive images](https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Responsive_images).
+</Callout>
+
+Full-bleed hero, or any element that sets its own height — pass `fill`:
+
+```tsx
+<div style={{ position: 'relative', height: '100vh' }}>
+  <ResponsiveImage image={image} fill sizes="100vw" />
+</div>
+```
+
+Need one URL (OG tags, CSS backgrounds, emails)? `getImageUrl` from the `components/buildSrcset`
+subpath:
+
+```ts
+import { getImageUrl } from '@pro-laico/payload-images/components/buildSrcset'
+
+const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: process.env.NEXT_PUBLIC_SERVER_URL })
+```
+
+<Callout type="info">
+  **Custom API route or Next `basePath`?** Transform URLs default to `/api/img`. Changed Payload's
+  `routes.api` (or set a Next `basePath`)? Pass `path` once via a wrapper:
+  `const Image = (p: ResponsiveImageProps) => <ResponsiveImage path="/myapi/img" {...p} />`.
+</Callout>
+
+### Blur placeholder
+
+No pop-in by default — no blank box that snaps to the image on load. `<ResponsiveImage>` paints a
+blurred preview from the first render; the real image covers it once downloaded.
+
+Just another transform: the smallest variant — a **32px, low-quality crop** sharing the image's
+fit / format / focal / version — set as the wrapper's `background-image`, upscaled into a soft blur
+(the `?w=32…&q=40` URL above). The `<img>` sits over it.
+
+So it's **zero-config and fully server-rendered** — no JS, no hydration, **no stored placeholder
+field** (nothing to generate or migrate). The blur matches the final crop (same focal + `v`). Opt
+out with `blur={false}`.
+
+### Props
+
+export const imageProps = [
+  { name: 'image', type: 'string | number | doc', required: true, description: `A bare id, or a populated doc (for natural dims, alt, and the cache-bust version).` },
+  { name: 'alt', type: 'string', description: `Alt text. Falls back to the doc's alt, then empty.` },
+  { name: 'sizes', type: 'string', default: "'100vw'", description: `The img sizes attribute — set it to how big the image actually renders.` },
+  { name: 'aspectRatio', type: 'number | string', description: `Render ratio (16/9 | '16:9'); derives each srcset height. Falls back to the doc's natural ratio. Ignored with fill.` },
+  { name: 'fill', type: 'boolean', default: 'false', description: `Cover-fill a positioned parent that sets its own height (full-bleed hero, slide) instead of an aspect-ratio box.` },
+  { name: 'quality', type: 'number', default: '75', description: `Encode quality baked into each URL.` },
+  { name: 'fit', type: 'Fit', default: "'cover'", description: `Resize fit. cover focal-crops.` },
+  { name: 'format', type: 'Format', default: "'auto'", description: `Output format (auto negotiates from Accept).` },
+  { name: 'pixelStep', type: 'number', default: '50', description: `Width increment for the srcset; raise it to emit fewer widths (fewer generated variants).` },
+  { name: 'maxEntries', type: 'number', default: '8', description: `Max srcset entries before the step coarsens to stay under it.` },
+  { name: 'sourceWidth', type: 'number', description: `Override the source intrinsic width that caps the srcset (else read from a populated doc).` },
+  { name: 'priority', type: 'boolean', description: `Eager-load with fetchPriority high — for above-the-fold heroes.` },
+  { name: 'loading', type: "'lazy' | 'eager'", description: `Native loading. Defaults to lazy (eager when priority).` },
+  { name: 'decoding', type: "'async' | 'auto' | 'sync'", default: "'async'", description: `Native decoding hint.` },
+  { name: 'className', type: 'string', description: `Applied to the wrapper (the image box) — size / space / round it here.` },
+  { name: 'style', type: 'CSSProperties', description: `Merged onto the wrapper.` },
+  { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
+  { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
+  { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the one derived from the doc.` },
+  { name: 'blur', type: 'boolean', default: 'true', description: `Show the LQIP placeholder (a tiny transform variant painted as the wrapper background).` },
+  { name: 'dataAttributes', type: 'Record<string, string>', description: `Extra attributes (e.g. data-*) spread onto the rendered img element.` },
+]
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={imageProps} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```tsx
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
+// Every prop at its default — `image` is the only required one.
+<ResponsiveImage
+  image={image}
+  sizes="100vw"
+  fill={false}
+  quality={75}
+  fit="cover"
+  format="auto"
+  pixelStep={50}
+  maxEntries={8}
+  decoding="async"
+  blur
+  baseUrl=""          // same-origin
+  path="/api/img"
+  // optional, no default:
+  // alt="A lighthouse at dusk"
+  // aspectRatio="16:9"
+  // sourceWidth={2400}
+  // priority
+  // loading="lazy"
+  // className="rounded-xl"
+  // style={{ borderRadius: 8 }}
+  // version="1a2b3c"
+  // dataAttributes={{ 'data-test': 'hero' }}
+/>
+```
+
+</Tab>
+
+</Tabs>
+
+## Focal-point cropping
+
+Optimization is only half the job: a 16:9 hero and a 1:1 thumbnail of the same photo need
+different crops, and a naive center-crop lops off heads. So you mark the **focal point** — the part
+that must stay in frame — once per image, and the endpoint crops around it at every aspect ratio.
+
+- **Set it once.** The `images` collection ships Payload's focal-point picker plus a ratio-preview
+  field, so an editor drags the focus onto the subject and sees how it crops at common ratios.
+- **It rides along automatically.** The endpoint reads the focal point from the document and crops
+  server-side on any `fit=cover` request — so `<ResponsiveImage>`, the virtual URLs, and raw
+  endpoint calls all honor it with nothing extra to pass.
+- **Move it and stale crops refresh.** Changing the focal point purges that image's cached variants
+  and bumps its `v` token, so anything already served refetches the new crop.
+
+## Admin & Payload built-ins
+
+The `images` collection leans on Payload's native upload features, so it behaves like any
+collection you'd build yourself.
+
+- **Upload-field previews + alt search, on by default.** Relationship/`upload` fields that target
+  `images` show a thumbnail (`upload.displayPreview`), the list view searches by `alt`, and the
+  list shows the fast on-demand thumbnail. (`extendCollection` targets keep their own admin config.)
+- **Organize a big library with folders.** Payload's built-in folder organization is opt-in (it
+  adds a folder relationship to the schema). Turn it on when you want it:
+  ```ts
+  imagesPlugin({ imagesOverrides: { folders: true } })
+  ```
+- **Cap stored originals.** The endpoint never serves an upscaled image, but the *stored* original
+  is whatever was uploaded. Bound storage by handing Payload's built-in `resizeOptions` a ceiling,
+  applied once on upload:
+  ```ts
+  imagesPlugin({
+    imagesOverrides: { upload: { resizeOptions: { width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true } } },
+  })
+  ```
+- **Add images by URL.** Payload's `upload.pasteURL` lets editors paste an image URL to import it
+  (guarded by an allow-list). Leave it at Payload's default or configure it via `imagesOverrides`.
+
+## Payload Seed
+
+Because `images` is a plain Payload upload collection, it seeds **natively** through
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed)'s normal `asset()` flow — no special
+provider needed. Point the seed plugin's asset uploads at the `images` collection and declare each
+source with `asset()`:
 
 ```ts
 import { defineAssets, defineSeed, seedPlugin } from '@pro-laico/payload-seed'
@@ -357,20 +608,16 @@ subject the moment the transform endpoint serves them. See the
 setup with a visual gallery page that renders every seeded image focal-cropped at multiple
 aspect ratios.
 
-## Environment variables
-
-| Variable | Purpose |
-| --- | --- |
-| `NEXT_PUBLIC_SERVER_URL` | Fallback origin for reading the original when the storage adapter reports a relative/cloud URL — used only if you didn't set buildConfig `serverURL`. After this it falls back to the request origin, then `http://localhost:3000`. Prefer setting `serverURL` in `buildConfig`. |
-| `IMAGES_TRANSFORM_CONCURRENCY` | Max concurrent Sharp transforms in the process (overrides the `cpus - 1` default). The `transform.maxConcurrency` option takes precedence. |
-| `IMAGES_SHARP_CONCURRENCY` | Per-image libvips thread cap (overrides the default of `1`; `0` = CPU-core count). The `transform.sharpConcurrency` option takes precedence. |
-
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
 | `imagesPlugin` (default + named) | `@pro-laico/payload-images` | The plugin factory. |
-| `ImagesPluginOptions`, `TransformEndpointConfig` | `@pro-laico/payload-images` | Option types. |
+| `ImagesPluginOptions` | `@pro-laico/payload-images` | The plugin options type (for typing a wrapper / shared factory). |
 | `ResponsiveImage` | `@pro-laico/payload-images/components/image` | The responsive `<img>` component (server or client). |
-| `getImageUrl`, `buildSrcset`, `buildVariantUrl`, `deriveVersion` | `@pro-laico/payload-images/components/buildSrcset` | Isomorphic URL / srcset builders. |
-| `FocalPreview`, `PurgeVariants` | `@pro-laico/payload-images/admin/*` | Admin components (wired via the import map when `focalUI` is on). |
+| `getImageUrl` | `@pro-laico/payload-images/components/buildSrcset` | Build one transform URL for an image (an id or a populated doc) — OG tags, CSS backgrounds, emails. |
+| `buildSrcset` | `@pro-laico/payload-images/components/buildSrcset` | Build a responsive `srcset` + default `src` for an image id. |
+| `buildVariantUrl` | `@pro-laico/payload-images/components/buildSrcset` | Build a single transform URL for an id at a given width. |
+| `deriveVersion` | `@pro-laico/payload-images/components/buildSrcset` | Compute the cache-busting `v` token from a source doc (filename + focal point). |
+| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio-preview field (wired via the import map when `focalUI` is on). |
+| `PurgeVariants` | `@pro-laico/payload-images/admin/purgeVariants` | Admin **Purge variants** button (wired via the import map when `focalUI` is on). |

@@ -156,6 +156,35 @@ originals + optimized too (idempotent). See the
 [seed plugin docs](/docs/plugins/payload-seed#external-assets-asset-providers) for the full
 reference.
 
+## Selecting the active fonts (`fontSet`)
+
+Uploading a typeface doesn't put it on the site — it just adds it to the library. **`fontSet`** is
+how you choose which uploaded typeface fills each role. `fontsPlugin()` registers it as a singleton
+global under the **Assets** admin group with four relationship slots:
+
+| Slot | Picks the typeface used for… | Choices |
+| --- | --- | --- |
+| `sans` | `var(--font-setSans)` | `font` docs with `family: sans` |
+| `serif` | `var(--font-setSerif)` | `font` docs with `family: serif` |
+| `mono` | `var(--font-setMono)` | `font` docs with `family: mono` |
+| `display` | `var(--font-setDisplay)` | `font` docs with `family: display` |
+
+Each slot is a single relationship filtered to that role, so the admin only offers typefaces whose
+`family` matches — pick one **Font** per slot and save. That selection is the source of truth both
+serving paths read: the `GET /api/fonts/export` endpoint (production) and `<DevFonts />` (dev) each
+resolve `fontSet` to the chosen typefaces' `fontOptimized` bytes. Change the selection and the next
+download (or, in dev, the next refresh) swaps the served fonts — no code change.
+
+```ts
+// or set it without the admin — server-side / in a migration
+await payload.updateGlobal({ slug: 'fontSet', data: { sans: interId, mono: jetbrainsMonoId } })
+```
+
+Seeds set it the same way with `ref()` tokens (see [seeding](#declarative-seeding-with-payload-seed)
+above). Leave a role empty to fall back to whatever your CSS defines for that variable. Driving the
+selection some other way? Pass `includeFontSet: false` to skip the global entirely and resolve the
+active typefaces yourself.
+
 ## Serving the fonts on your frontend
 
 The active fonts are applied as the `--font-set{Sans,Serif,Mono,Display}` CSS variables, so your

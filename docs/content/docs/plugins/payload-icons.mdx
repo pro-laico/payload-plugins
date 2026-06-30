@@ -126,34 +126,43 @@ return <svg {...extractSvgProps(icon.svgString)} className="size-6" dangerouslyS
 ### Styling with CVA + Tailwind
 
 Because the optimizer rewrites fills to `currentColor`, a single source SVG recolors and resizes
-from class names alone — which composes naturally with
-[`class-variance-authority`](https://cva.style). Build the inline `<svg>` once with variant / size /
-tone options:
+from class names alone — and the exported `<Icon>` forwards `className` straight onto the `<svg>`.
+So you don't need a custom wrapper: pair `<Icon>` with
+[`class-variance-authority`](https://cva.style) to turn `size` / `tone` props into classes. Give
+each variant its own line so the axes stay legible:
 
 ```tsx
-import { extractSvgContent, extractSvgProps } from '@pro-laico/payload-icons'
 import { cva } from 'class-variance-authority'
-import { cn } from '@/lib/cn' // clsx + tailwind-merge
 
-const InlineSvg = ({ svg, className }: { svg: string; className?: string }) => (
-  <svg aria-hidden {...extractSvgProps(svg)} className={className} dangerouslySetInnerHTML={{ __html: extractSvgContent(svg) }} />
-)
-
-const glyphSize = { xs: 'size-3.5', sm: 'size-4', base: 'size-5', lg: 'size-6', xl: 'size-8' }
-const toneClass = { current: '', muted: 'text-muted-foreground', primary: 'text-primary', destructive: 'text-destructive' }
-
-const frameVariants = cva('inline-flex shrink-0 items-center justify-center rounded-full', {
+const iconClass = cva('inline-block shrink-0', {
   variants: {
-    variant: {
-      outline: 'border border-border text-foreground',
-      solid: 'bg-primary text-primary-foreground',
-      ghost: 'text-foreground transition-colors hover:bg-muted',
+    size: {
+      xs: 'size-3.5',
+      sm: 'size-4',
+      base: 'size-5',
+      lg: 'size-6',
+      xl: 'size-8',
+    },
+    tone: {
+      current: '',
+      muted: 'text-muted-foreground',
+      primary: 'text-primary',
+      destructive: 'text-destructive',
     },
   },
+  defaultVariants: { size: 'base', tone: 'current' },
 })
+```
 
-// Compose <InlineSvg> with frameVariants/size/tone → <Icon svg={…} variant="solid" size="lg" />.
-// One source SVG, every variant — recolored and resized by class.
+Then render the same source icon across the axes — the exported `<Icon>` fetches by `name`, and
+the `cva` className recolors and resizes it. One source SVG, every variant:
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+<Icon name="star" className={iconClass({ size: 'sm' })} />
+<Icon name="star" className={iconClass({ size: 'lg', tone: 'primary' })} />
+<Icon name="star" className={iconClass({ size: 'xl', tone: 'destructive' })} />
 ```
 
 The [`icons-sandbox` example](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)

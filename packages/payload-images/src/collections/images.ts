@@ -50,7 +50,7 @@ export interface CreateImagesOptions {
  * A focal-cropped admin thumbnail served by the transform endpoint, so the Images list view
  * loads tiny WebP thumbnails instead of full-resolution originals. Returns `undefined` when
  * disabled (`adminThumbnail: false`, or the transform endpoint isn't registered). Assumes the
- * default `/api/img` route — override via `imagesOptions.upload.adminThumbnail` for a custom
+ * default `/api/img` route — override via `imagesOverrides.upload.adminThumbnail` for a custom
  * `routes.api`.
  */
 const resolveAdminThumbnail = (adminThumbnail: number | false | undefined): GetAdminThumbnail | undefined => {

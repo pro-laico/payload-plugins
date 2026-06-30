@@ -28,9 +28,9 @@ export interface ImagesPluginOptions {
    * (e.g. `alt`/`variants`), or Payload errors on the duplicate. With `extendCollection`,
    * these tweaks are merged onto the target collection instead.
    */
-  imagesOptions?: Partial<CollectionConfig>
+  imagesOverrides?: Partial<CollectionConfig>
   /** Override for the hidden generated-images (variant cache) collection. */
-  generatedImagesOptions?: Partial<CollectionConfig>
+  generatedImagesOverrides?: Partial<CollectionConfig>
   /**
    * Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by
    * default — uploads store only the original and every size is generated on demand. `true`
@@ -74,8 +74,8 @@ export const imagesPlugin =
     const {
       enabled = true,
       extendCollection,
-      imagesOptions,
-      generatedImagesOptions,
+      imagesOverrides,
+      generatedImagesOverrides,
       pregenerateSizes = false,
       transform = {},
       focalUI = true,
@@ -92,7 +92,7 @@ export const imagesPlugin =
     const basePath = '/img'
     const purgePath = `${basePath}/purge`
 
-    const generated = mergeCollection(createGeneratedImagesCollection({ slug: variantSlug, sourceSlug }), generatedImagesOptions)
+    const generated = mergeCollection(createGeneratedImagesCollection({ slug: variantSlug, sourceSlug }), generatedImagesOverrides)
 
     let collections: CollectionConfig[]
     if (extendCollection) {
@@ -101,7 +101,7 @@ export const imagesPlugin =
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
       const enhanced = mergeCollection(
         mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath, virtualFields })),
-        imagesOptions,
+        imagesOverrides,
       )
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
     } else {
@@ -117,7 +117,7 @@ export const imagesPlugin =
           localizeAlt,
           adminThumbnail: transform === false ? false : undefined,
         }),
-        imagesOptions,
+        imagesOverrides,
       )
       collections = [...(config.collections ?? []), images, generated]
     }
