@@ -67,14 +67,14 @@ export interface IconsPluginOptions {
  * - **`icon`** — single-SVG uploads, optimized + sanitized + themed on save
  *   (`formatSVGHook`), stored as an inline `svgString`.
  * - **`iconSet`** — named `name → icon` mappings with a single-active toggle and
- *   drafts/versions. The frontend `<Icon name>` resolves through the active set,
- *   so swapping it re-skins every icon.
+ *   drafts/versions. The frontend renders the active set, so activating a
+ *   different set re-skins every icon at once.
  * - **`iconRequest`** (opt-in via {@link IconsPluginOptions.trackRequests}) —
  *   runtime miss diagnostics surfaced in the IconSet usage panel.
  *
  * Self-contained: no `@pro-laico/core` / `@pro-laico/atomic` dependency. The
- * active toggle is a plain checkbox guarded by a single-active hook, and
- * revalidation is left to the consumer (wire `revalidatePath` / `revalidateTag`
+ * single-active invariant is a small status-lane-scoped `beforeChange` hook.
+ * Revalidation is left to the consumer (wire `revalidatePath` / `revalidateTag`
  * via `iconSetOverrides.hooks`).
  *
  * @example
@@ -92,9 +92,7 @@ export const iconsPlugin =
     if (!enabled) return config
 
     const additions: CollectionConfig[] = [Icon(iconOverrides)]
-    if (includeIconSet) {
-      additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', ...iconSetOverrides }))
-    }
+    if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', ...iconSetOverrides }))
     if (trackRequests) additions.push(createIconRequestCollection(iconRequestOverrides))
 
     return { ...config, collections: [...(config.collections ?? []), ...additions] }

@@ -1,69 +1,60 @@
 import 'server-only'
 
 import { cache } from 'react'
-import type { CollectionSlug } from 'payload'
+import type { CollectionSlug, Where } from 'payload'
 
 import { getPayloadClient } from '../lib/getPayloadClient'
-import { toTitleCase } from '../lib/titleCase'
 
-/** The active icon set's icons array — name + icon reference id only. The `icon`
- *  ref is a string under Mongo (ObjectId) and a number under SQLite / Postgres-serial. */
-export type IconSetReturn = { iconsArray: { name: string; icon: string | number }[] }
-
-/** Usable-reference guard: with `depth: 0` Payload returns the relationship as its id. */
-const isIconRef = (item: {
-  name: string
-  icon?: string | number | { id: string | number } | null
-}): item is { name: string; icon: string | number } => {
-  if (typeof item.icon === 'string') return item.icon.length > 0
-  return typeof item.icon === 'number'
-}
+/** A `name → svgString` map for the active set's icons. */
+export type IconSetMap = Record<string, string>
 
 /**
- * The active icon set's icons (name + ref), resolved server-side and memoized
- * per request via React `cache()`. Reads with `overrideAccess` so it works
- * regardless of the `iconSet` read gate. Returns an empty array when no set is
- * active.
+ * The active icon set's `name → svgString` map, resolved in a SINGLE query and
+ * memoized per request via React `cache()`. Finds the set with `active: true`
+ * and populates each row's icon `svgString` in one go (depth 1 + a scoped
+ * `populate`), so a page with K icons costs one query, not K+1.
+ *
+ * On the published frontend (`draft: false`) it filters `_status: 'published'`,
+ * so it reads the published-lane active set — a set activated only in the draft
+ * lane (staged but not published) resolves to nothing, never leaking to prod.
+ * In draft mode it reads the draft-lane active set. The `_status` filter is only
+ * applied when the collection actually has drafts (safe if `drafts: false`).
  */
-export const getCachedIconSet = cache(async (draft: boolean): Promise<IconSetReturn> => {
+export const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
   const payload = await getPayloadClient()
-  const doc = (await payload
+  const hasDrafts = Boolean(
+    (payload.collections as Record<string, { config?: { versions?: { drafts?: unknown } } }>)?.iconSet?.config?.versions?.drafts,
+  )
+  const where: Where =
+    !draft && hasDrafts ? { and: [{ active: { equals: true } }, { _status: { equals: 'published' } }] } : { active: { equals: true } }
+
+  const set = (await payload
     .find({
       collection: 'iconSet' as CollectionSlug,
-      depth: 0,
+      where,
       limit: 1,
+      depth: 1,
       draft,
       pagination: false,
       overrideAccess: true,
       select: { iconsArray: true },
-      where: { active: { equals: true } },
+      // Scope the populated icon docs to just the svgString we inline.
+      populate: { icon: { svgString: true } },
     })
     .then((res) => res.docs[0] || null)) as {
-    iconsArray?: Array<{ name: string; icon?: string | number | { id: string | number } | null }>
+    iconsArray?: { name?: string | null; icon?: { svgString?: string | null } | string | number | null }[]
   } | null
-  const iconsArray = doc?.iconsArray?.filter(isIconRef).map((item) => ({ name: item.name, icon: item.icon })) || []
-  return { iconsArray }
+
+  if (!set) return {}
+  const map: IconSetMap = {}
+  for (const row of set.iconsArray ?? []) {
+    const svg = row?.icon && typeof row.icon === 'object' ? row.icon.svgString : undefined
+    if (row?.name && svg) map[row.name] = svg
+  }
+  return map
 })
 
-/** The SVG string for an icon name, resolved through the active icon set.
- *  Returns `undefined` when the name isn't in the set or its icon has no SVG. */
-export const getCachedIconByName = cache(
-  async (name: string, draft: boolean, iconSet: IconSetReturn | undefined): Promise<string | undefined> => {
-    const iconItem = iconSet?.iconsArray?.find((item) => item.name === name)
-    if (iconItem?.icon == null) return undefined
-    const payload = await getPayloadClient()
-    const icon = (await payload
-      .find({ collection: 'icon' as CollectionSlug, limit: 1, draft, overrideAccess: true, where: { id: { equals: iconItem.icon } } })
-      .then((res) => res.docs[0] || null)) as { svgString?: string | null } | null
-    return icon?.svgString || undefined
-  },
-)
-
-/** The active set as `{ label, value }` options (e.g. for a select field that
- *  lets another collection pick an icon by name). */
-export const getCachedIconOptions = cache(
-  async (draft: boolean, iconSet: IconSetReturn | undefined): Promise<{ label: string; value: string }[]> => {
-    void draft
-    return iconSet?.iconsArray?.map((icon) => ({ value: icon.name, label: toTitleCase(icon.name) })) || []
-  },
-)
+/** The SVG string for an icon name, resolved through the active set. Returns
+ *  `undefined` when the name isn't in the active set. The single seam for
+ *  rendering an icon yourself (the `<Icon>` component is this plus `extractSvg*`). */
+export const getIconSvg = async (name: string, draft = false): Promise<string | undefined> => (await getActiveIconSet(draft))[name]

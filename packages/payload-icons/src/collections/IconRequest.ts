@@ -60,6 +60,3 @@ export const createIconRequestCollection = (opts: IconRequestCollectionOverrides
     ...(hooks ? { hooks } : {}),
   }
 }
-
-/** Default `iconRequest` collection. Equivalent to `createIconRequestCollection()`. */
-export const IconRequest: CollectionConfig = createIconRequestCollection()

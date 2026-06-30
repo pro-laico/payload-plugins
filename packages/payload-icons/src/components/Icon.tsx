@@ -3,7 +3,7 @@ import 'server-only'
 import type React from 'react'
 import { draftMode } from 'next/headers'
 
-import { getCachedIconByName, getCachedIconSet } from '../cache'
+import { getIconSvg } from '../cache'
 import { extractSvgContent, extractSvgProps } from '../lib/extractSVG'
 import { trackIconMiss } from '../usage/trackIconMiss'
 
@@ -47,8 +47,7 @@ export interface IconProps extends React.SVGAttributes<SVGSVGElement> {
  */
 export const Icon = async ({ name, fallback, ...svgProps }: IconProps): Promise<React.ReactElement> => {
   const { isEnabled: draft } = await draftMode()
-  const iconSet = await getCachedIconSet(draft)
-  const svg = await getCachedIconByName(name, draft, iconSet)
+  const svg = await getIconSvg(name, draft)
   // Name didn't resolve against the active set — record it (throttled,
   // fire-and-forget) so the admin "Requested icons" panel can surface real
   // runtime misses, including dynamic names a static scan can't see.

@@ -1,43 +1,61 @@
-import type { CheckboxField, CollectionAfterChangeHook, CollectionSlug } from 'payload'
+import type { CheckboxField, CollectionBeforeChangeHook, CollectionSlug } from 'payload'
 
 /**
  * The single-active toggle for the `iconSet` collection. The frontend renders
- * whichever set has `active: true` (queried `limit: 1`), so flipping this on
- * one set re-skins every `<Icon>` across the site. The single-active invariant
- * is enforced by {@link enforceSingleActive}.
+ * whichever set has `active: true` (in its status lane), so flipping this on one
+ * set re-skins every `<Icon>` across the site. The invariant is enforced by
+ * {@link enforceSingleActive}.
  */
 export const activeField: CheckboxField = {
   name: 'active',
   type: 'checkbox',
   defaultValue: false,
+  index: true,
   admin: {
     description: 'Render this set across the frontend. Activating a set deactivates the others.',
+    style: { maxWidth: '160px', alignSelf: 'center' },
   },
 }
 
-/** Marker in the hook `context` so the cascade of deactivations we trigger
- *  doesn't recurse back into this hook. */
+/** Hook-`context` flag so the cascade of deactivations we trigger doesn't recurse. */
 const CASCADE = 'iconSetEnforceSingleActive'
 
 /**
- * `afterChange` hook enforcing the single-active invariant: when a set is saved
- * `active`, every other set in the collection is flipped `active: false` (in the
- * same request/transaction). Runs after the write commits so a concurrent read
- * can't re-cache a stale "two actives" state.
+ * `beforeChange` hook enforcing the single-active invariant, adapted (standalone,
+ * no `@pro-laico/core`) from Atomic's `unsetActive`. When a set is saved
+ * `active`, every other set in the **same status lane** is flipped `active:
+ * false` in the same request/transaction:
  *
- * Self-contained — no `@pro-laico/core` APF dependency. Other sets are updated
- * with the same `req` (one transaction) and a `context` flag so the nested
- * `afterChange` they trigger is a no-op.
+ * - The `_status: draft | published` filter scopes the deactivation to the lane
+ *   being written, so staging a new active set as a *draft* doesn't disturb the
+ *   live (published) active set — the swap only goes live on publish. (Skipped
+ *   when the collection has no drafts.)
+ * - It runs in `beforeChange` and **rethrows** on failure, so a failed
+ *   deactivation rolls the whole save back atomically rather than leaving two
+ *   active sets.
  */
-export const enforceSingleActive: CollectionAfterChangeHook = async ({ doc, req, collection, context }) => {
-  if (!doc?.active || context?.[CASCADE]) return doc
+export const enforceSingleActive: CollectionBeforeChangeHook = async ({ data, originalDoc, collection, req, context }) => {
+  if (!data?.active || context[CASCADE]) return data
+
+  const hasDrafts = Boolean((collection.versions as { drafts?: unknown } | undefined)?.drafts)
+  const draft = hasDrafts && data._status === 'draft'
+  const id = originalDoc?.id // undefined on create — then there are no other rows to exclude
+
   await req.payload.update({
-    collection: collection.slug as CollectionSlug,
-    where: { and: [{ active: { equals: true } }, { id: { not_equals: doc.id } }] },
-    data: { active: false },
     req,
+    draft,
+    collection: collection.slug as CollectionSlug,
+    // `active` isn't a field on every collection slug, so the bulk-update `data`
+    // union has no matching branch under a partial schema — cast past it.
+    data: { active: false } as unknown as never,
+    where: {
+      active: { equals: true },
+      ...(id != null ? { id: { not_equals: id } } : {}),
+      ...(hasDrafts ? { _status: { equals: draft ? 'draft' : 'published' } } : {}),
+    },
     context: { [CASCADE]: true },
     overrideAccess: true,
   })
-  return doc
+
+  return data
 }

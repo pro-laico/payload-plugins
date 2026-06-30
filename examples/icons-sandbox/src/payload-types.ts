@@ -175,7 +175,6 @@ export interface Icon {
   id: number;
   optimized?: string | null;
   svgString?: string | null;
-  name?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -202,7 +201,7 @@ export interface IconSet {
   iconsArray?:
     | {
         /**
-         * The name the frontend looks the icon up by (kebab-case).
+         * The name the frontend looks the icon up by (auto kebab-cased).
          */
         name: string;
         /**
@@ -448,7 +447,6 @@ export interface PagesSelect<T extends boolean = true> {
 export interface IconSelect<T extends boolean = true> {
   optimized?: T;
   svgString?: T;
-  name?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

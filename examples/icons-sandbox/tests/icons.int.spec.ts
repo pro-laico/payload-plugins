@@ -69,18 +69,4 @@ describe('payload-icons wiring', () => {
     expect(doc.svgString).not.toContain('#ff0000')
     expect(doc.optimized).toMatch(/SVG optimized/)
   })
-
-  it('exposes the virtual name field on read', async () => {
-    const data = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2h20v20H2z"/></svg>')
-    const created = await payload.create({
-      collection: 'icon',
-      data: {},
-      file: { name: 'square.svg', data, mimetype: 'image/svg+xml', size: data.byteLength },
-      overrideAccess: true,
-    })
-
-    // Read back so the afterRead virtual computes.
-    const doc = (await payload.findByID({ collection: 'icon', id: created.id, overrideAccess: true })) as { name?: string }
-    expect(doc.name).toBe('square')
-  })
 })

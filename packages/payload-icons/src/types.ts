@@ -29,8 +29,7 @@ export interface IconCollectionOverrides {
   upload?: Exclude<CollectionConfig['upload'], boolean>
 }
 
-/** Minimal shape of a stored icon doc — the upload fields, the optimizer's output, and the
- *  virtual (computed-on-read) `name`. */
+/** Minimal shape of a stored icon doc — the upload fields plus the optimizer's output. */
 export interface IconDoc {
   id: string | number
   filename?: string | null
@@ -38,6 +37,4 @@ export interface IconDoc {
   svgString?: string | null
   /** Human-readable optimization report (e.g. "SVG optimized: 1234 to 567 bytes (54.1% reduction)"). */
   optimized?: string | null
-  /** Virtual: the filename without directory or `.svg` extension (`arrow-right`). Computed on read. */
-  name?: string | null
 }

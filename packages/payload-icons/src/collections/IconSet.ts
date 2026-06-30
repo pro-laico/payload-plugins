@@ -3,72 +3,48 @@ import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'pa
 import { activeField, enforceSingleActive } from '../lib/activeField'
 import { authd } from '../lib/authenticated'
 import { mergeHooks } from '../lib/mergeHooks'
+import { toKebabCase } from '../lib/titleCase'
 
 /** The default slug for the icon-set collection. */
 export const ICON_SET_SLUG = 'iconSet'
 
 /** Admin import-map path for the IconSet "requested icons" usage panel. */
-export const IconUsagePanelPath = '@pro-laico/payload-icons/admin/iconUsagePanel'
+const IconUsagePanelPath = '@pro-laico/payload-icons/admin/iconUsagePanel'
 
 /** Admin import-map path for the per-row label inside `iconsArray`. */
-export const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
+const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
 
 /** Default scan command surfaced in the panel's empty state. */
 const DEFAULT_SCAN_COMMAND = 'npx payload-icons-scan'
 
 /** Inline title field so the collection has no template dependency. */
-const titleField = (defaultValue = 'New Icon Set'): Field => ({
-  name: 'title',
-  type: 'text',
-  required: true,
-  unique: true,
-  defaultValue,
-})
-
-type Hooks = NonNullable<CollectionConfig['hooks']>
+const titleField = (defaultValue = 'New Icon Set'): Field => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
 
 /**
- * Overrides for {@link createIconSetCollection} — the `iconSet` collection that
- * groups icons under a named bucket with a single-active toggle, drafts/versions,
- * and an optional "requested icons" usage panel.
- *
- * Field-injection options land at different locations in the admin UI; pick the
- * one that matches the field's natural shape:
- *
- * - {@link extraSettingsFields} — compact, packed into the title/active row.
- * - {@link fields} — full-width, below the title/active row in Settings.
- * - {@link iconRowFields} — per-icon, inside each `iconsArray` entry.
+ * Overrides for the `iconSet` collection — a named, ordered `name → icon` mapping
+ * into the shared `icon` pool. One set is `active` at a time; the frontend renders
+ * it (see {@link enforceSingleActive}).
  */
 export interface IconSetCollectionOverrides {
   /** Slug for the icon-set collection. @default 'iconSet' */
   slug?: string
-  /** The `icon` collection slug each row's upload points at. @default 'icon' */
-  iconSlug?: string
   /**
    * Live-preview URL generator. When provided, wires both `admin.preview`
-   * (legacy iframe) and `admin.livePreview.url` (Payload live preview). Omitted
-   * by default — this package ships no live-preview wiring of its own.
+   * (legacy iframe) and `admin.livePreview.url`. Omitted by default.
    */
   livePreviewUrl?: (args: { data: Record<string, unknown>; req: PayloadRequest }) => string | Promise<string>
-  /** Extra fields packed INTO the Settings row alongside `title` + `active`. Compact, width-constrained. */
-  extraSettingsFields?: Field[]
-  /** Override `admin.useAsTitle`. @default 'title' */
-  useAsTitle?: string
   /** Override the `admin.group` sidebar label. @default 'Sets' */
   group?: string
-  /** Additional hooks merged ADDITIVELY after the built-ins, per phase (user hooks run last). */
+  /** Additional collection hooks. */
   hooks?: CollectionConfig['hooks']
-  /** Extra set-level fields appended full-width to the Settings tab, below the title/active row. */
+  /** Extra set-level fields appended to the Settings tab, below the title. */
   fields?: Field[]
   /** Extra fields appended to each `iconsArray` row, after the built-in `name` + `icon`. */
   iconRowFields?: Field[]
   /**
    * Adds the "Requested icons" panel to the Settings tab — a live diff between
-   * the icon names your repo requests (collected by the build-time
-   * `payload-icons-scan` into a usage manifest) and the names defined in this
-   * set. Missing names are flagged with their `file:line`. Opt-in.
-   *
-   * @default false
+   * the names your repo requests (collected by `payload-icons-scan`) and the
+   * names defined in this set, each flagged with its `file:line`. @default false
    */
   usagePanel?: boolean
   /**
@@ -79,52 +55,35 @@ export interface IconSetCollectionOverrides {
   usageManifestPath?: string
   /** Command shown in the panel's empty state. @default 'npx payload-icons-scan' */
   usageScanCommand?: string
-  /**
-   * Versions/drafts config for the collection. Pass `false` to disable
-   * versioning entirely. @default `{ drafts: { schedulePublish: true }, maxPerDoc: 50 }`
-   */
-  versions?: CollectionConfig['versions']
+  /** Enable drafts/versions on the collection (per-set draft → publish). @default true */
+  drafts?: boolean
 }
 
 /**
- * Builds the `iconSet` collection — a named, ordered `name → icon` mapping into
- * the shared `icon` pool, with a single-active toggle and drafts/versions. The
- * frontend `<Icon name>` resolves through whichever set is `active`, so swapping
- * the active set re-skins every icon site-wide.
+ * Builds the `iconSet` collection. The frontend `<Icon name>` resolves through
+ * the set named by the `iconSettings` global's `activeSet`, so swapping that
+ * relationship re-skins every icon site-wide — no per-set flag, no invariant.
  *
- * Self-contained: the active toggle is a plain checkbox guarded by
- * {@link enforceSingleActive} (no `@pro-laico/core` dependency). Revalidation is
- * left to the consumer — wire `revalidatePath` / `revalidateTag` via {@link IconSetCollectionOverrides.hooks}.
- *
- * @example
- * ```ts
- * createIconSetCollection({
- *   usagePanel: true,
- *   fields: [{ name: 'description', type: 'textarea' }],
- *   iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
- * })
- * ```
+ * `iconSlug` is wired by the plugin from the icon collection's slug; it isn't
+ * part of the public override surface.
  */
-export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): CollectionConfig => {
+export const createIconSetCollection = (opts: IconSetCollectionOverrides & { iconSlug?: string } = {}): CollectionConfig => {
   const {
     slug = ICON_SET_SLUG,
     iconSlug = 'icon',
     livePreviewUrl,
-    extraSettingsFields = [],
-    useAsTitle = 'title',
     group = 'Sets',
-    hooks: extraHooks,
+    hooks,
     fields: extraFields = [],
     iconRowFields = [],
     usagePanel = false,
     usageManifestPath,
     usageScanCommand = DEFAULT_SCAN_COMMAND,
-    versions = { drafts: { schedulePublish: true }, maxPerDoc: 50 },
+    drafts = true,
   } = opts
 
   // Opt-in "requested icons" panel — a server UI field that reads the build-time
-  // usage manifest and diffs it against this set's icons. Appended full-width to
-  // the Settings tab, below any user `fields`.
+  // usage manifest and diffs it against this set's icons.
   const usageField: Field[] = usagePanel
     ? [
         {
@@ -132,10 +91,7 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): 
           type: 'ui',
           admin: {
             components: {
-              Field: {
-                path: IconUsagePanelPath,
-                serverProps: { manifestPath: usageManifestPath, scanCommand: usageScanCommand },
-              },
+              Field: { path: IconUsagePanelPath, serverProps: { manifestPath: usageManifestPath, scanCommand: usageScanCommand } },
             },
           },
         },
@@ -148,7 +104,7 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): 
     access: { create: authd, delete: authd, read: authd, update: authd },
     admin: {
       group,
-      useAsTitle,
+      useAsTitle: 'title',
       defaultColumns: ['title', 'active', '_status'],
       ...(livePreviewUrl && {
         preview: (data, { req }) => livePreviewUrl({ data: data as Record<string, unknown>, req }),
@@ -159,10 +115,7 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): 
       {
         type: 'tabs',
         tabs: [
-          {
-            label: 'Settings',
-            fields: [{ type: 'row', fields: [activeField, titleField('New Icon Set'), ...extraSettingsFields] }, ...extraFields, ...usageField],
-          },
+          { label: 'Settings', fields: [{ type: 'row', fields: [activeField, titleField('New Icon Set')] }, ...extraFields, ...usageField] },
           {
             label: 'Icons',
             fields: [
@@ -180,9 +133,11 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): 
                         name: 'name',
                         type: 'text',
                         required: true,
+                        // Normalize to kebab-case so the typed name matches `<Icon name>`.
+                        hooks: { beforeValidate: [({ value }) => (typeof value === 'string' ? toKebabCase(value) : value)] },
                         admin: {
                           width: '25%',
-                          description: 'The name the frontend looks the icon up by (kebab-case).',
+                          description: 'The name the frontend looks the icon up by (auto kebab-cased).',
                           style: { maxWidth: '350px' },
                         },
                       },
@@ -203,18 +158,7 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides = {}): 
         ],
       },
     ],
-    hooks: mergeHooks(
-      {
-        // afterChange (post-commit), not beforeChange — enforcing the single-active
-        // invariant after the write lands avoids a concurrent read re-caching a
-        // stale "two actives" state.
-        afterChange: [enforceSingleActive] as Hooks['afterChange'],
-      },
-      extraHooks,
-    ),
-    ...(versions ? { versions } : {}),
+    hooks: mergeHooks({ beforeChange: [enforceSingleActive] }, hooks),
+    ...(drafts ? { versions: { drafts: { schedulePublish: true }, maxPerDoc: 50 } } : {}),
   }
 }
-
-/** Default `iconSet` collection. Equivalent to `createIconSetCollection()`. */
-export const IconSet: CollectionConfig = createIconSetCollection()

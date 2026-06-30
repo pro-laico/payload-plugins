@@ -1,6 +1,18 @@
-/** Humanize a kebab/camel/snake icon name into Title Case for admin labels and
- *  select options (`arrow-right` -> `Arrow Right`). Pure string work, no deps —
- *  shared by the icon row label and the icon-select options. */
+/** Normalize a free-form icon name to kebab-case (`Arrow Right` / `arrowRight` -> `arrow-right`),
+ *  so the name an editor types in an `iconsArray` row matches the name used in `<Icon name>`. */
+export const toKebabCase = (input?: string | null): string => {
+  if (!input) return ''
+  return input
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+/** Humanize a kebab/camel/snake icon name into Title Case for admin labels
+ *  (`arrow-right` -> `Arrow Right`). Pure string work, no deps. */
 export const toTitleCase = (input?: string | null): string => {
   if (!input) return ''
   // Strip combining diacritical marks (U+0300-U+036F) left after NFKD decomposition.

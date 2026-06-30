@@ -10,14 +10,14 @@ import pages from '../seed/pages'
 // iconsPlugin: registers the `icon` SVG-upload collection (optimizes + sanitizes every SVG on save,
 // stores it as an inline `svgString`) and the `iconSet` collection — named `name → icon` mappings
 // with a single-active toggle. `<Icon name>` on the frontend resolves through the active set, so
-// swapping the active set re-skins every icon. `usagePanel: true` adds the "Requested icons" panel
-// (diff the build-time scan manifest against a set); `trackRequests: true` also logs runtime misses.
+// activating a different set re-skins every icon. `usagePanel: true` adds the "Requested icons"
+// panel; `trackRequests: true` also logs runtime misses.
 //
 // seedPlugin: the `icon` collection seeds NATIVELY as a standard upload collection — the `icons`
 // definition is `defineAssets(iconAssets([...]))`; the engine uploads each SVG from `seed-assets/svg/`
-// (running the optimize hook). `iconSets` then seeds an active set referencing those icons by name,
-// and a page references one via `asset(...)`. Set ENABLE_SEED=true, then use the admin button or
-// POST /api/seed.
+// (running the optimize hook). `iconSets` then seeds an active set referencing those icons, and a
+// page references one via `asset(...)`. Set ENABLE_SEED=true, then use the admin button or POST
+// /api/seed.
 export const plugins: Plugin[] = [
   iconsPlugin({
     iconSetOverrides: { usagePanel: true },
