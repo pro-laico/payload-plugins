@@ -121,12 +121,10 @@ PAYLOAD_SECRET=…                          # already in your Payload project, r
 
 </Steps>
 
-## Plugin
+## Plugin options
 
 `fontsPlugin(options?)` is the single entry point; one call registers the three collections, the
 `fontSet` global, and the export endpoint (all detailed below). It's zero-config.
-
-### Options
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op and registers nothing.` },
@@ -393,59 +391,6 @@ export const devFontsProps = [
 
 </Tabs>
 
-## Seeding
-
-`fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed) like any image — no
-asset marker, no glue. Each `font` typeface then **references** its original with `ref('fontOriginal', …)`
-in a weights row, and the collection's `afterChange` hook subsets the referenced original into a served
-`fontOptimized` WOFF2. Point the seed engine at both definitions and map `fontOriginal`'s source folder
-with `assetSubDirs`:
-
-```ts
-import { fontsPlugin } from '@pro-laico/payload-fonts'
-import { seedPlugin } from '@pro-laico/payload-seed'
-
-plugins: [
-  fontsPlugin(),
-  seedPlugin({
-    definitions: [fontOriginals, fonts, fontSet],
-    assetSubDirs: { fontOriginal: 'font' }, // font files live in <assetsDir>/font/, not /fontOriginal/
-  }),
-]
-```
-
-```ts
-// seed/fontOriginals.ts: raw font files, seeded natively like any upload (files live in <assetsDir>/font/)
-import { defineSeed } from '@pro-laico/payload-seed'
-
-export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
-  { _key: 'inter', _file: file('inter.woff2') },
-])
-```
-
-```ts
-// seed/fonts.ts: each typeface refs its original in a weights row
-import { defineSeed } from '@pro-laico/payload-seed'
-
-export default defineSeed('font', ({ ref }) => [
-  { _key: 'inter', title: 'Inter', family: 'sans', weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'inter') }] },
-])
-```
-
-```ts
-// seed/fontSet.ts: pick the active typeface per family with ordinary ref() tokens
-import { defineSeed } from '@pro-laico/payload-seed'
-
-export const fontSet = defineSeed('fontSet', ({ ref }) => ({
-  sans: ref('font', 'inter'),
-}))
-```
-
-A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, so the cascade removes
-the old originals + optimized too (idempotent). See the
-[seed plugin docs](/docs/plugins/payload-seed) for the full reference.
-
 ## How it works
 
 The three collections and two serving paths fit together like this.
@@ -472,6 +417,90 @@ How a `fontSet` change reaches the browser depends on the serving path, by desig
 - **Development** reads the live selection on every render, so just keep the route dynamic
   (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches
   the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface.
+
+## Seeding
+
+`fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed) like any image — no
+asset marker, no glue. Each `font` typeface then **references** its original with `ref('fontOriginal', …)`
+in a weights row, and the collection's `afterChange` hook subsets the referenced original into a served
+`fontOptimized` WOFF2. Point the seed engine at both definitions and map `fontOriginal`'s source folder
+with `assetSubDirs`:
+
+<Tabs items={['payload.config.ts', 'fontOriginals.ts', 'fonts.ts', 'fontSet.ts']}>
+
+<Tab value="payload.config.ts">
+
+```ts
+import { fontsPlugin } from '@pro-laico/payload-fonts'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+plugins: [
+  fontsPlugin(),
+  seedPlugin({
+    definitions: [fontOriginals, fonts, fontSet],
+    assetSubDirs: { fontOriginal: 'font' }, // font files live in <assetsDir>/font/, not /fontOriginal/
+  }),
+]
+```
+
+</Tab>
+
+<Tab value="fontOriginals.ts">
+
+```ts
+// src/seed/fontOriginals.ts: raw font files, seeded natively like any upload (files live in <assetsDir>/font/)
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
+  {
+    _key: 'inter',
+    _file: file('inter.woff2'),
+  },
+])
+```
+
+</Tab>
+
+<Tab value="fonts.ts">
+
+```ts
+// src/seed/fonts.ts: each typeface refs its original in a weights row
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('font', ({ ref }) => [
+  {
+    _key: 'inter',
+    title: 'Inter',
+    family: 'sans',
+    weights: [
+      { weight: '400', style: 'normal', file: ref('fontOriginal', 'inter') },
+    ],
+  },
+])
+```
+
+</Tab>
+
+<Tab value="fontSet.ts">
+
+```ts
+// src/seed/fontSet.ts: pick the active typeface per family with ordinary ref() tokens
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export const fontSet = defineSeed('fontSet', ({ ref }) => ({
+  sans: ref('font', 'inter'),
+}))
+```
+
+</Tab>
+
+</Tabs>
+
+A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, so the cascade removes
+the old originals + optimized too (idempotent). See the
+[seed plugin docs](/docs/plugins/payload-seed) for the full reference.
+
 
 ## Exports
 

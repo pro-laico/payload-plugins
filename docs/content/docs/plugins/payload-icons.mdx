@@ -100,6 +100,64 @@ styling.
   the fallback, never nothing.
 </Callout>
 
+## Plugin options
+
+`iconsPlugin(options?)` is the single entry point. One call registers the `icon` collection (upload
+pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
+collection. It's zero-config: the usage panel and request tracking are on by default; set them
+`false` to omit.
+
+export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
+  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
+  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
+  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
+  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
+  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
+  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection: additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
+]
+
+Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
+same shape in code, every defaulted option written out.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={options} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+
+// Defaulted options written out. This is what `iconsPlugin()` does with no args.
+iconsPlugin({
+  enabled: true,
+  includeIconSet: true,
+  usagePanel: true,     // the "Requested icons" panel; set false to omit
+  trackRequests: true,  // runtime miss tracking; set false to omit
+  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
+  iconOverrides: {
+    // slug: 'icon',
+    // access: { read: () => true },
+    // fields: [ /* … */ ],
+    // hooks: { /* … */ },
+  },
+  // overrides for the iconSet collection:
+  iconSetOverrides: {
+    // fields: [{ name: 'description', type: 'textarea' }],
+    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+  },
+})
+```
+
+</Tab>
+
+</Tabs>
+
 ## `<Icon>`
 
 The frontend surface: one import, no wrapper file. The `<Icon>` server component resolves `name`
@@ -240,164 +298,6 @@ ships the full version: a presentational `Icon` (CVA over the inline `<svg>`) pl
 `CmsIcon` server wrapper, along with a showcase page that renders one source SVG across the variant,
 size, and tone axes.
 
-## Icon Usage Detection
-
-**Problem:** code asks for a name the active set lacks → blank fallback glyph, and it's easy to miss
-which icons a project actually needs.
-
-**Fix:** the admin **Requested icons** panel (on by default) lists missing vs present names, from two
-sources:
-
-- **Static scan:** greps your source for literal `<Icon name="…">`, flagging missing names with
-  `file:line`. **In dev the panel scans live**, so there's nothing to set up or run. For **production** (source
-  isn't on disk at runtime) run `payload-icons-scan` in your build to write an
-  `icon-usage-manifest.json` the panel reads there.
-- **Runtime:** on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
-  `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
-  counts, last-seen, and a clear button.
-
-Both are on with `iconsPlugin()`; pass `usagePanel: false` / `trackRequests: false` to omit either.
-
-```bash
-payload-icons-scan            # production/CI: scans ./src and ./app; -o sets the manifest path
-```
-
-<Callout type="info">
-  Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
-  `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
-  (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
-</Callout>
-
-## Seeding
-
-Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
-`payload-mux`) no `custom.seedAsset` marker. Seed it like any other collection with `defineSeed`:
-each record carries its source SVG on the `_file` meta-key via the `file()` token. Drop your source
-`.svg` files in the collection's folder under the seed assets dir (named after the slug, so
-`assets/icon/star.svg` resolves from `file('star.svg')`):
-
-```ts
-// seed/icons.ts — each icon doc carries its SVG on `_file`
-import { defineSeed } from '@pro-laico/payload-seed'
-
-// assets/icon/star.svg, assets/icon/check.svg
-export default defineSeed('icon', ({ file }) => [
-  { _key: 'star', _file: file('star.svg') },
-  { _key: 'check', _file: file('check.svg') },
-])
-```
-
-Each doc is optimized on upload via the same `formatSVGHook`. An uploaded icon doesn't render on its
-own, though — the frontend resolves `<Icon name>` through the **active** set, so seed an `iconSet`
-that maps lookup names to those icons with ordinary `ref('icon', …)` tokens:
-
-```ts
-// seed/iconSets.ts — an active, published set wiring names to the seeded icons
-import { defineSeed } from '@pro-laico/payload-seed'
-
-export default defineSeed('iconSet', ({ ref }) => [
-  {
-    _key: 'default',
-    title: 'Default',
-    active: true,         // the live set
-    _status: 'published', // visible to the non-draft frontend
-    iconsArray: [
-      { name: 'star', icon: ref('icon', 'star') },
-      { name: 'check', icon: ref('icon', 'check') },
-    ],
-  },
-])
-```
-
-Icons are equally referenceable from any other doc — e.g. a page's icon relationship:
-
-```ts
-// seed/pages.ts
-import { defineSeed } from '@pro-laico/payload-seed'
-
-export default defineSeed('pages', ({ ref }) => [
-  { _key: 'home', title: 'Home', icon: ref('icon', 'star') },
-])
-```
-
-Wire the definitions into the seed plugin as usual — icons precede the set and page that reference them:
-
-```ts
-import { iconsPlugin } from '@pro-laico/payload-icons'
-import { seedPlugin } from '@pro-laico/payload-seed'
-import icons from './seed/icons'
-import iconSets from './seed/iconSets'
-import pages from './seed/pages'
-
-plugins: [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages] })]
-```
-
-Because `icon` is a real collection, its seed records are type-checked and other docs reference them
-with `ref()` — this package never imports the seed package, so the two stay decoupled. `active: true`
-makes the set live and `_status: 'published'` makes it visible to the published frontend; see the
-[`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
-app for a full working setup, or the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
-
-## Plugin
-
-`iconsPlugin(options?)` is the single entry point. One call registers the `icon` collection (upload
-pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
-collection. It's zero-config: the usage panel and request tracking are on by default; set them
-`false` to omit.
-
-### Options
-
-export const options = [
-  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
-  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
-  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
-  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
-  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
-  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
-  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection: additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
-]
-
-Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
-same shape in code, every defaulted option written out.
-
-<Tabs items={['Reference', 'TypeScript']}>
-
-<Tab value="Reference" className="p-0!">
-
-<ConfigOptions items={options} />
-
-</Tab>
-
-<Tab value="TypeScript">
-
-```ts
-import { iconsPlugin } from '@pro-laico/payload-icons'
-
-// Defaulted options written out. This is what `iconsPlugin()` does with no args.
-iconsPlugin({
-  enabled: true,
-  includeIconSet: true,
-  usagePanel: true,     // the "Requested icons" panel; set false to omit
-  trackRequests: true,  // runtime miss tracking; set false to omit
-  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
-  iconOverrides: {
-    // slug: 'icon',
-    // access: { read: () => true },
-    // fields: [ /* … */ ],
-    // hooks: { /* … */ },
-  },
-  // overrides for the iconSet collection:
-  iconSetOverrides: {
-    // fields: [{ name: 'description', type: 'textarea' }],
-    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
-  },
-})
-```
-
-</Tab>
-
-</Tabs>
-
 ## Collections
 
 The plugin registers the `icon` upload collection (an **Assets** group), the `iconSet` grouping
@@ -499,7 +399,117 @@ once. A name the active set doesn't cover renders a blank fallback and is record
 The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
 rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
 the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
-`revalidatePath`) through the collections' [`hooks`](#options) option.
+`revalidatePath`) through the collections' [`hooks`](#plugin-options) option.
+
+## Icon Use Detection
+
+**Problem:** code asks for a name the active set lacks → blank fallback glyph, and it's easy to miss
+which icons a project actually needs.
+
+**Fix:** the admin **Requested icons** panel (on by default) lists missing vs present names, from two
+sources:
+
+- **Static scan:** greps your source for literal `<Icon name="…">`, flagging missing names with
+  `file:line`. **In dev the panel scans live**, so there's nothing to set up or run. For **production** (source
+  isn't on disk at runtime) run `payload-icons-scan` in your build to write an
+  `icon-usage-manifest.json` the panel reads there.
+- **Runtime:** on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
+  `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
+  counts, last-seen, and a clear button.
+
+Both are on with `iconsPlugin()`; pass `usagePanel: false` / `trackRequests: false` to omit either.
+
+```bash
+payload-icons-scan            # production/CI: scans ./src and ./app; -o sets the manifest path
+```
+
+<Callout type="info">
+  Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
+  `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
+  (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
+</Callout>
+
+
+## Seeding
+
+Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
+`payload-mux`) no `custom.seedAsset` marker. Seed it like any other collection with `defineSeed`:
+each record carries its source SVG on the `_file` meta-key via the `file()` token. Drop your source
+`.svg` files in the collection's folder under the seed assets dir (named after the slug, so
+`assets/icon/star.svg` resolves from `file('star.svg')`):
+
+```ts
+// src/seed/icons.ts — each icon doc carries its SVG on `_file`
+import { defineSeed } from '@pro-laico/payload-seed'
+
+// assets/icon/star.svg, assets/icon/check.svg
+export default defineSeed('icon', ({ file }) => [
+  {
+    _key: 'star',
+    _file: file('star.svg'),
+  },
+  {
+    _key: 'check',
+    _file: file('check.svg'),
+  },
+])
+```
+
+Each doc is optimized on upload via the same `formatSVGHook`. An uploaded icon doesn't render on its
+own, though — the frontend resolves `<Icon name>` through the **active** set, so seed an `iconSet`
+that maps lookup names to those icons with ordinary `ref('icon', …)` tokens:
+
+```ts
+// src/seed/iconSets.ts — an active, published set wiring names to the seeded icons
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('iconSet', ({ ref }) => [
+  {
+    _key: 'default',
+    title: 'Default',
+    active: true,         // the live set
+    _status: 'published', // visible to the non-draft frontend
+    iconsArray: [
+      { name: 'star', icon: ref('icon', 'star') },
+      { name: 'check', icon: ref('icon', 'check') },
+    ],
+  },
+])
+```
+
+Icons are equally referenceable from any other doc — e.g. a page's icon relationship:
+
+```ts
+// src/seed/pages.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('pages', ({ ref }) => [
+  {
+    _key: 'home',
+    title: 'Home',
+    icon: ref('icon', 'star'),
+  },
+])
+```
+
+Wire the definitions into the seed plugin as usual — icons precede the set and page that reference them:
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+import { seedPlugin } from '@pro-laico/payload-seed'
+import icons from './seed/icons'
+import iconSets from './seed/iconSets'
+import pages from './seed/pages'
+
+plugins: [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages] })]
+```
+
+Because `icon` is a real collection, its seed records are type-checked and other docs reference them
+with `ref()` — this package never imports the seed package, so the two stay decoupled. `active: true`
+makes the set live and `_status: 'published'` makes it visible to the published frontend; see the
+[`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
+app for a full working setup, or the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
+
 
 ## Exports
 

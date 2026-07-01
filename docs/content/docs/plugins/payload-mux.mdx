@@ -105,13 +105,11 @@ pnpm payload generate:importmap
 
 </Steps>
 
-## Plugin
+## Plugin options
 
 `muxVideoPlugin(options?)` is the single entry point. One call registers the `mux-video` collection,
 the upload + webhook endpoints, and the admin uploader. It's zero-config: every option falls back to a
 `MUX_*` env var or a sensible default.
-
-### Options
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing: no collection, endpoints, or hooks.` },

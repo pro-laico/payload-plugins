@@ -5,8 +5,9 @@ import type { ResolvedSeedOptions } from './options'
 
 /**
  * Builds `POST /api/seed`. Gated by the `ENABLE_SEED` runtime guard and requires an
- * authenticated admin user. Each write sets `context.disableRevalidate`, so app revalidate
- * hooks skip during the run; the engine does no final revalidation.
+ * authenticated user (any user — not necessarily an admin). Each write sets
+ * `context.disableRevalidate`, so app revalidate hooks skip during the run; the engine
+ * does no final revalidation.
  */
 export function createSeedEndpoint(options: ResolvedSeedOptions): Endpoint {
   return {
