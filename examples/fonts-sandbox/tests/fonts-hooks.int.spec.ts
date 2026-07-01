@@ -1,18 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { getActiveFontFaces, ingestFont } from '@pro-laico/payload-fonts'
+import { getActiveFontFaces } from '@pro-laico/payload-fonts'
 import type { Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { bootFonts } from './helpers'
 
 // Direct coverage of the `font` collection hooks against a real (in-memory) Payload: the
-// subset/optimize reconcile, variable detection, update reconcile, asset cleanup on delete, the
-// validation guards, and the server-side `source` ingest seam. No app config / shared DB.
+// subset/optimize reconcile, variable detection, update reconcile, asset cleanup on delete, and the
+// validation guards. No app config / shared DB.
 
 const fixture = readFileSync(fileURLToPath(new URL('./fixtures/inter.woff2', import.meta.url)))
 const variableFixture = readFileSync(fileURLToPath(new URL('./fixtures/inter-variable.woff2', import.meta.url)))
-const variablePath = fileURLToPath(new URL('./fixtures/inter-variable.woff2', import.meta.url))
-const staticPath = fileURLToPath(new URL('./fixtures/inter.woff2', import.meta.url))
 
 type Doc = Record<string, unknown>
 type Id = string | number
@@ -186,30 +184,6 @@ describe('font collection hooks (integration)', () => {
         data: { title: 'Owner renamed', variable: { upright: shared } },
       } as Parameters<typeof payload.update>[0]),
     ).resolves.toBeTruthy()
-  })
-
-  it('ingestFont creates a typeface from a file path (server-side `source` seam)', async () => {
-    const doc = await ingestFont(payload, { source: staticPath, title: 'Ingested', family: 'sans', weight: '500' })
-    const font = (await payload.findByID({ collection: 'font', id: doc.id, overrideAccess: true })) as unknown as Doc & {
-      source?: unknown
-      weights?: Array<{ weight?: string; file?: unknown }>
-    }
-    // `source` is consumed + stripped; a weights row points at the uploaded original.
-    expect(font.source).toBeFalsy()
-    expect(font.weights?.[0]?.weight).toBe('500')
-    expect(font.weights?.[0]?.file).toBeTruthy()
-    expect(await optimizedFor(font.id as Id)).toHaveLength(1)
-  })
-
-  it('ingestFont handles a variable font (fills the variable group)', async () => {
-    const doc = await ingestFont(payload, { source: variablePath, title: 'Ingested Variable', family: 'display', variable: true })
-    const font = (await payload.findByID({ collection: 'font', id: doc.id, overrideAccess: true })) as unknown as Doc & {
-      variable?: { upright?: unknown }
-    }
-    expect(font.variable?.upright).toBeTruthy()
-    const opt = await optimizedFor(font.id as Id)
-    expect(opt).toHaveLength(1)
-    expect(opt[0].isVariable).toBe(true)
   })
 
   it('getActiveFontFaces resolves the fontSet selection to served faces', async () => {

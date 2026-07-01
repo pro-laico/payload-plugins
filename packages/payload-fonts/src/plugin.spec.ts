@@ -12,10 +12,10 @@ describe('fontsPlugin (unit)', () => {
     expect(slugs).toEqual(expect.arrayContaining(['font', 'fontOriginal', 'fontOptimized']))
   })
 
-  it('puts the typeface slots + a server-side `source` seam on `font`', () => {
+  it('puts the typeface slots on `font`', () => {
     const font = (apply(fontsPlugin()).collections ?? []).find((c) => c.slug === 'font')
     const names = (font?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
-    expect(names).toEqual(expect.arrayContaining(['title', 'family', 'source', 'variable', 'weights']))
+    expect(names).toEqual(expect.arrayContaining(['title', 'family', 'variable', 'weights']))
   })
 
   it('registers the fontSet global by default, and skips it only when opted out', () => {

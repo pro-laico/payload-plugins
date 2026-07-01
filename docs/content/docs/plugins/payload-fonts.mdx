@@ -19,7 +19,7 @@ Custom, self-hosted fonts with none of the usual setup:
 - **Fonts chosen in the CMS:** pick which typeface is your sans / serif / mono / display (or your own families) from the admin, and swap them anytime with no code change.
 - **Self-hosted, no third-party CDN:** fonts are served from your own app through [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) — fast, private, preloaded, and size-adjusted against layout shift.
 - **Zero-config in dev, optimized in prod:** a runtime component serves the live selection while you work; a build step bakes `next/font` for production. The two paths never both fire.
-- **Server ingest + declarative seeding:** create a typeface from a file or URL in code with `ingestFont`, or seed one like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
+- **Declarative seeding:** seed typefaces like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — upload the raw files to `fontOriginal` and reference them from the typeface.
 
 ## Quickstart
 
@@ -204,7 +204,6 @@ files take the row's weight/style); delete cascades to both. Read and writes are
     family: { description: "The generic family it fills: sans / serif / mono / display by default (customisable via the plugin's families option). Required.", type: "radio" },
     variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added; use this OR weights, not both.", type: "group" },
     weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
-    source: { description: "Transient server-side ingest input (a file path / URL). Uploaded to fontOriginal, wired to a slot, and stripped on save, never stored. Drives ingestFont and seeding.", type: "json" },
   }}
 />
 
@@ -212,7 +211,6 @@ files take the row's weight/style); delete cascades to both. Read and writes are
 
 <TypeTable
   type={{
-    getFontSourceHook: { description: "Turns a transient source file into a real fontOriginal upload, points the right slot at it, and strips source, so a typeface can be created from a file with no browser uploader.", type: "beforeValidate" },
     requireFontFiles: { description: "Requires at least one file and rejects mixing a variable font with specific weights.", type: "beforeValidate" },
     rejectSharedOriginals: { description: "Enforces one fontOriginal per typeface, rejecting a save that references an original already used by another typeface (keeps asset cleanup safe).", type: "beforeValidate" },
     optimizeFromOriginals: { description: "Subsets each referenced original to a served fontOptimized WOFF2, and cleans up any original a swapped/removed slot de-referenced.", type: "afterChange" },
@@ -395,20 +393,6 @@ export const devFontsProps = [
 
 </Tabs>
 
-## Server ingest
-
-Besides the admin slots, a typeface can be created **server-side** from a local file or URL, which is
-handy for imports, migrations, and seeding. `ingestFont` hands the file to the `font` collection as a
-transient `source`; the `beforeValidate` hook uploads it to `fontOriginal` and wires the slot, then
-the `afterChange` hook subsets it into a served `fontOptimized` WOFF2:
-
-```ts
-import { ingestFont } from '@pro-laico/payload-fonts'
-
-await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', family: 'sans', weight: '400' })
-// variable font: ingestFont(payload, { source: '/path/to/Inter-Variable.woff2', title: 'Inter', family: 'sans', variable: true })
-```
-
 ## Seeding
 
 `fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via
@@ -473,8 +457,8 @@ You only ever edit the `font` typeface. Its uploaded files are stored raw in `fo
 untouched originals is deliberate: the output is lossy (subsetted to your `charset`), so holding the
 source bytes lets it be re-derived later — widen `charset`, and the next save re-subsets from the
 originals with no re-upload. A delete cascades through both derived layers, and the whole flow runs in
-the `font` collection's hooks (`getFontSourceHook` → `optimizeFromOriginals`), so there's no separate
-build step to run and nothing to keep in sync by hand.
+the `font` collection's hooks (`optimizeFromOriginals` on save, `cleanupFontAssets` on delete), so
+there's no separate build step to run and nothing to keep in sync by hand.
 
 ### Revalidation & caching
 
@@ -496,7 +480,6 @@ How a `fontSet` change reaches the browser depends on the serving path, by desig
 | `fontsPlugin` | `@pro-laico/payload-fonts` | The plugin factory. |
 | `FontFamilyConfig` | `@pro-laico/payload-fonts` | The `{ key, label?, fallback? }` shape of a `families` entry. |
 | `DEFAULT_FONT_FAMILIES` | `@pro-laico/payload-fonts` | The built-in sans/serif/mono/display families (spread to extend them). |
-| `ingestFont` | `@pro-laico/payload-fonts` | Create a `font` typeface from a local file / URL (imports, migrations). |
 | `extractFonts` | `@pro-laico/payload-fonts` | Collect the generated `next/font` classes for the root `<html>` className. |
 | `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<DevFonts>`, for custom UIs. |
 | `ExportFontsResponse` | `@pro-laico/payload-fonts` | The shape of `GET /api/fonts/export`, for custom consumers. |

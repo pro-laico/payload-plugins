@@ -51,8 +51,8 @@ export interface FontsPluginOptions {
  * `@pro-laico/payload-fonts` — three collections, standard Payload primitives:
  *
  * - `font` (visible): the typeface. Editors drop files into `upload` fields backed by
- *   `fontOriginal` (a `variable` group or a `weights` array); a doc can also be created
- *   server-side from a file via the transient `source` field (`ingestFont()` / seeding).
+ *   `fontOriginal` (a `variable` group or a `weights` array). Seed it by uploading the raw files
+ *   to `fontOriginal` and referencing them from the typeface's slots.
  * - `fontOriginal` (hidden): the raw uploaded files. Register it with your storage adapter's
  *   client-uploads instance to keep big fonts off the request body in production.
  * - `fontOptimized` (hidden): the subsetted WOFF2 the site serves, built from the originals by

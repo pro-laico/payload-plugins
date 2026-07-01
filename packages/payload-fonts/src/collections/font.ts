@@ -11,7 +11,6 @@ import {
 import { authd } from '../access/authd'
 import { cleanupFontAssetsHook, optimizeFromOriginalsHook, originalIdsFromDoc } from '../hooks/optimizeFromOriginals'
 import type { Charset } from '../hooks/optimizeFont'
-import { getFontSourceHook } from '../lib/ingest'
 import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
@@ -135,9 +134,7 @@ const makeRejectSharedOriginals =
  *
  * It is NOT itself an upload collection. Editors drop font files into standard Payload `upload`
  * fields backed by `fontOriginal` (raw archive) — either the `variable` group (a single
- * variable file per upright/italic) OR the `weights` array (one file per weight/style). A doc
- * can also be created server-side from a local file / URL via the transient `source` field (see
- * `getFontSourceHook` — used by `ingestFont()` and seeding). On save,
+ * variable file per upright/italic) OR the `weights` array (one file per weight/style). On save,
  * {@link optimizeFromOriginalsHook} subsets each referenced original to a served
  * `fontOptimized` WOFF2. The slots are Payload's own upload field, thinly wrapped to be
  * create-only (no "Choose from existing"), so each original belongs to exactly one typeface —
@@ -159,11 +156,6 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       interfaceName: 'GenericFontFamily',
       options: families.map((r) => ({ label: r.label, value: r.key })),
     },
-    // Transient server-side ingest input (a local path / URL via `{ file, weight, style,
-    // variable }`). The `getFontSourceHook` beforeValidate uploads it to `fontOriginal`, wires
-    // the slot, and strips it — never persisted. Lets a typeface be created from a file without
-    // the admin's upload slot (imports, migrations, seeding via a doc's `_file`).
-    { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
     // Editor-facing status: how many web-ready files this typeface produced. Virtual (computed on
     // read by `servedFilesHook`, never stored); shown only on an existing doc so a `0` after saving
     // flags a failed/empty optimization instead of it failing silently.
@@ -248,10 +240,8 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
     defaultPopulate: { title: true, family: true },
     fields,
     hooks: {
-      // `getFontSourceHook` FIRST: it turns a transient `source` into a real `fontOriginal`
-      // upload + slot value, so the requireFontFiles / rejectSharedOriginals guards below see
-      // the resolved files.
-      beforeValidate: [getFontSourceHook({ originalSlug }), requireFontFiles, makeRejectSharedOriginals(fontSlug)],
+      // Guard the referenced originals: at least one file, and no original shared across typefaces.
+      beforeValidate: [requireFontFiles, makeRejectSharedOriginals(fontSlug)],
       // On save, (re)build the served WOFF2 files from the referenced originals (and clean up
       // any original a swapped/removed slot de-referenced).
       afterChange: [optimizeFromOriginalsHook({ charset: opts.charset, originalSlug, optimizedSlug })],
