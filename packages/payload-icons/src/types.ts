@@ -9,10 +9,9 @@ export interface IconAccess {
   delete?: Access
 }
 
-/** Configuration for the icons plugin. Every field is optional — `iconsPlugin()` is enough. */
-export interface IconsPluginOptions {
-  /** Set to `false` to disable the plugin (the collection is not registered). @default true */
-  enabled?: boolean
+/** Overrides for the `icon` upload collection — replaces collection-level config (slug, adminGroup,
+ *  access, upload) and extends `fields` / `hooks`. Every field is optional. */
+export interface IconCollectionOverrides {
   /** Slug for the icon collection. @default 'icon' */
   slug?: string
   /** Admin sidebar group the collection appears under. @default 'Assets' */
@@ -30,8 +29,7 @@ export interface IconsPluginOptions {
   upload?: Exclude<CollectionConfig['upload'], boolean>
 }
 
-/** Minimal shape of a stored icon doc — the upload fields, the optimizer's output, and the
- *  virtual (computed-on-read) `name`. */
+/** Minimal shape of a stored icon doc — the upload fields plus the optimizer's output. */
 export interface IconDoc {
   id: string | number
   filename?: string | null
@@ -39,6 +37,4 @@ export interface IconDoc {
   svgString?: string | null
   /** Human-readable optimization report (e.g. "SVG optimized: 1234 to 567 bytes (54.1% reduction)"). */
   optimized?: string | null
-  /** Virtual: the filename without directory or `.svg` extension (`arrow-right`). Computed on read. */
-  name?: string | null
 }
