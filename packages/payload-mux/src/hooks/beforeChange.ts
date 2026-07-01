@@ -15,8 +15,8 @@ const POLL_LIMIT_MS = 6000
  * requires a unique filename).
  */
 export const getBeforeChangeHook =
-  (mux: Mux, collection: string): CollectionBeforeChangeHook =>
-  async ({ req, data: incomingData, operation, originalDoc }) => {
+  (mux: Mux): CollectionBeforeChangeHook =>
+  async ({ req, data: incomingData, operation, originalDoc, collection }) => {
     let data = { ...incomingData }
     const previousAssetId: string | undefined = originalDoc?.assetId
 
@@ -56,8 +56,8 @@ export const getBeforeChangeHook =
         const titleClause = { title: { equals: uniqueTitle } }
         const where =
           operation === 'update' && originalDoc?.id != null ? { and: [titleClause, { id: { not_equals: originalDoc.id } }] } : titleClause
-        const existing = await req.payload.find({ collection: collection as CollectionSlug, where, limit: 1, depth: 0 })
-        if (existing.totalDocs === 0) break
+        const { totalDocs } = await req.payload.count({ collection: collection.slug as CollectionSlug, where })
+        if (totalDocs === 0) break
         uniqueTitle = `${base} (${n})`
       }
       data.title = uniqueTitle
@@ -65,7 +65,7 @@ export const getBeforeChangeHook =
       // When extending an actual upload collection, the Mux asset stands in for the file: blank
       // the url and mirror the unique title onto the (required, unique) filename. No-op for the
       // default `mux-video` collection, which is not an upload collection and has neither field.
-      if (req.payload.collections?.[collection as CollectionSlug]?.config?.upload) {
+      if (collection.upload) {
         data.url = ''
         data.filename = uniqueTitle
       }

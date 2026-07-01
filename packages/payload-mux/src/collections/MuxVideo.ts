@@ -3,7 +3,7 @@ import type { CollectionConfig, Field } from 'payload'
 import { getAfterDeleteHook } from '../hooks/afterDelete'
 import { getBeforeChangeHook } from '../hooks/beforeChange'
 import { getBeforeValidateHook } from '../hooks/beforeValidate'
-import { defaultAccess } from '../lib/defaultAccess'
+import { isAllowed } from '../lib/isAllowed'
 import type { MuxVideoPluginOptions } from '../types'
 
 const C = '@pro-laico/payload-mux/components'
@@ -68,12 +68,12 @@ const signableUrlField = (
 export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
   slug: (options.extendCollection as string) ?? 'mux-video',
   labels: { singular: 'Video', plural: 'Videos' },
-  access: { read: ({ req }) => options.access?.(req) ?? defaultAccess(req) },
+  access: { read: ({ req }) => isAllowed(options, req) },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
     beforeValidate: [getBeforeValidateHook(mux)],
-    beforeChange: [getBeforeChangeHook(mux, (options.extendCollection as string) ?? 'mux-video')],
+    beforeChange: [getBeforeChangeHook(mux)],
   },
   fields: [
     {
@@ -97,7 +97,8 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
     // Not `required`: it's filled by the beforeValidate (server-side ingest) / beforeChange
     // (admin upload) hooks before the row is written. Marking it required would reject a
     // create that supplies a `source` instead of an already-resolved `assetId`.
-    { name: 'assetId', type: 'text', admin: { readOnly: true, condition: (data) => data.assetId } },
+    // Indexed: the webhook looks a doc up by assetId on every Mux event.
+    { name: 'assetId', type: 'text', index: true, admin: { readOnly: true, condition: (data) => data.assetId } },
     { name: 'duration', label: 'Duration', type: 'number', admin: { readOnly: true, condition: (data) => data.duration } },
     {
       name: 'posterTimestamp',
