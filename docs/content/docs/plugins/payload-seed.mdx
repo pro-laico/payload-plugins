@@ -339,13 +339,13 @@ A `_file` name resolves on disk like this:
   theirs only so the demos run in CI.)
 </Callout>
 
-## External-asset collections
+## Custom ingestion
 
-Most collections take a plain Payload upload for their `_file` and seed natively. A few don't: the bytes
-are ingested by the collection's **own hook** into an external service (e.g.
-[`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`, stored in Mux) rather than stored as
-a Payload upload. To seed one of those, mark the collection's own Payload config so the engine hands the
-`_file` to that hook instead of trying to upload bytes:
+Most collections take a plain Payload upload for their `_file` and seed natively. A few ingest their file
+**through their own hook** instead — e.g. [`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s
+`mux-video`, whose bytes are uploaded to Mux rather than stored as a Payload upload. To seed one of those,
+mark the collection's own Payload config so the engine hands the `_file` to that hook instead of trying to
+upload bytes:
 
 ```ts
 // in the collection's own config — usually set by its plugin, not by you
@@ -370,7 +370,7 @@ register, and the owning plugin never imports payload-seed. A marked collection 
 other doc**: give the record a `_file`, reference it with `ref()`. On run, the engine resolves the file
 under `assetsDir/<subdir>`, writes it to `sourceField`, and the collection's own hook turns that into the
 stored asset. Reseeds clear it via `payload.delete`, so any `afterDelete` cleanup (e.g. removing the
-external asset) fires.
+uploaded Mux asset) fires.
 
 Set the marker on your own collection when its `_file` needs this non-standard ingest. For a full worked
 example, see [payload-mux → Seeding](/docs/plugins/payload-mux). Plugins whose asset lives in a plain
@@ -421,72 +421,179 @@ seedPlugin({
 
 ## Running the seed
 
-Four entry points run the same engine:
+Four entry points run the **same engine** over the same definitions — pick by where you are. Three of
+them (the admin button, the HTTP endpoint, and the CLI) sit behind the **`ENABLE_SEED` kill switch**: if
+`ENABLE_SEED` isn't exactly `"true"`, they refuse to run — leave it unset in production. The fourth,
+`seed()`, is the in-code path and is deliberately *not* gated (that's what lets a test drive it). Every
+entry point is **destructive** — it clears the seeded collections before recreating them — so run it on
+purpose. (See [Quickstart](#quickstart) for setting `ENABLE_SEED`.)
 
-- **`payload seed`:** the bundled CLI, over the Local API.
-- **`POST /api/seed`:** in-app, for any authenticated user.
-- **The admin button:** "Seed your database" in the header, with `adminButton: true`.
-- **`seed({ payload })`:** call the engine directly from a script, test, or migration.
+<Tabs items={['Admin button', 'HTTP endpoint', 'CLI', 'Programmatic']}>
 
-The first three are gated by the `ENABLE_SEED` kill switch and are destructive; see [Quickstart](#quickstart)
-for enabling and running them. The fourth, `seed()`, is the in-code path: it builds a Local API `req`
-if you don't pass one and resolves the plugin options.
+<Tab value="Admin button">
+
+The friendliest path: a **"Seed your database"** button in the admin header. Turn it on with
+`adminButton: true`, set `ENABLE_SEED=true`, then click it — it POSTs to `/api/seed` as the logged-in
+user and reports success (or the error) inline.
+
+```ts
+// payload.config.ts
+seedPlugin({ definitions: [media, services, posts], adminButton: true })
+```
+
+**Best for:** local development and demos — the quickest way to reseed while you build.
+
+</Tab>
+
+<Tab value="HTTP endpoint">
+
+The plugin registers **`POST /api/seed`** — a Payload REST route, and the very route the admin button
+calls. Hit it from a script, a CI step, or curl against a running app. It's guarded twice; **both** must
+pass:
+
+- **`ENABLE_SEED` must equal `"true"`**, or it returns `403` and does nothing (the primary safety —
+  leave it unset in production and the route is inert).
+- **The request must be authenticated** — a Payload auth cookie or API key — or `403`. Any logged-in
+  user qualifies, so gate by environment with `ENABLE_SEED`, not by role.
+
+```bash
+# Send your Payload auth cookie or API key (here: an API key on the `users` collection).
+curl -X POST https://your-app.com/api/seed \
+  -H 'Authorization: users API-Key <your-api-key>'
+# 200 → { "success": true, "created": { "media": 3, "services": 2, "posts": 1 }, "order": [ … ] }
+```
+
+On success it returns `200` with `{ success, created, order }`. On failure it logs the error server-side
+and returns a generic `500` (`{ error: 'Error seeding data.' }`), so internals never reach the client.
+**Best for:** CI/CD, or seeding a deployed environment over HTTP.
+
+</Tab>
+
+<Tab value="CLI">
+
+The plugin adds a **`payload seed`** command (a `bin` on the package) that runs over the Local API — no
+HTTP, no auth, just a terminal. Wire a script and run it with the switch on:
+
+```json
+// package.json
+{ "scripts": { "seed": "payload seed" } }
+```
+
+```bash
+ENABLE_SEED=true pnpm seed
+# [payload-seed] clearing collections...
+# [payload-seed] seeding documents...
+# [payload-seed] seed complete.
+```
+
+**Best for:** a terminal, or a pre-deploy CI step that seeds before the app serves traffic. Note that
+`payload seed` boots through Payload's `tsx`-based CLI; on some Node + database-adapter combinations that
+loader has bugs — if it trips, use the admin button or endpoint instead (they run in the app's own runtime).
+
+</Tab>
+
+<Tab value="Programmatic">
+
+Call the engine directly with **`seed()`** — for tests, migrations, or a custom script. It builds a Local
+API `req` if you don't pass one and resolves the options you hand it. Unlike the other three it is **not**
+behind `ENABLE_SEED` (the gate lives on the entry points), so a test can drive the real seed:
 
 ```ts
 import { seed } from '@pro-laico/payload-seed'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 
+const payload = await getPayload({ config })
 const result = await seed({ payload, options: { definitions: [media, services, posts] } })
-// result.created → { media: 3, services: 2, posts: 1 }  (created doc counts per collection)
-// result.order   → ['media:hero', 'services:consulting', 'posts:launch', …]  (the topo-sorted create order)
+
+result.created // → { media: 3, services: 2, posts: 1 }              (created docs per collection)
+result.order   // → ['media:hero', 'services:consulting', 'posts:launch']  (topo-sorted create order)
 ```
 
-`seed()` returns `{ created, order }`, the same shape the `POST /api/seed` response carries
-(alongside `success: true`) and the CLI logs on completion. Unlike the other three, it is **not**
-behind the `ENABLE_SEED` guard; the gate lives on those entry points, so a test can drive the real
-seed directly. It's still destructive; call it deliberately.
+`seed()` returns `{ created, order }` — the same shape the endpoint response carries (alongside
+`success: true`) and the CLI logs on completion. Still destructive; call it deliberately. **Best for:**
+integration tests and migrations.
 
-## The seed endpoint
+</Tab>
 
-The plugin registers `POST /api/seed` (a Payload REST route) so a seed can be triggered from the
-running app: the admin button posts to it, and you can call it yourself. It's guarded twice, and both
-checks must pass:
+</Tabs>
 
-- **`ENABLE_SEED` kill switch.** If `ENABLE_SEED` isn't exactly `"true"`, the endpoint returns `403`
-  and does nothing. This is the primary safety: leave it unset in production and the route is inert.
-- **Authentication.** The request must carry an authenticated Payload user (an auth cookie or API
-  key), or it returns `403`. Any logged-in user qualifies, so control access with `ENABLE_SEED`
-  per-environment rather than relying on roles.
+## Gotchas
 
-On success it runs the same engine as the CLI and returns `200` with `{ success: true, created, order }`
-(the per-collection counts and the topo-sorted order). On failure it logs the error server-side and
-returns a generic `500` (`{ error: 'Error seeding data.' }`), so internal details never reach the
-client. Like every entry point, the run is **destructive** and sets `context.disableRevalidate` on
-every write.
+A few things to keep in mind:
 
-```bash
-# Authenticated POST (send your Payload auth cookie or API key).
-curl -X POST https://your-app.com/api/seed
-# → { "success": true, "created": { "media": 3, "services": 2, "posts": 1 }, "order": [ … ] }
-```
+- **Every run is destructive.** A seed clears each collection it touches before recreating it — a reset,
+  not an append. Re-running wipes and rebuilds, so never point it at data you want to keep.
+- **Nothing runs without `ENABLE_SEED`.** The admin button, endpoint, and CLI all no-op (`403`) unless
+  `ENABLE_SEED` is exactly `"true"`. The in-code `seed()` is the exception — it skips the gate, so it will
+  wipe whatever database it's handed. Guard your script / test setup accordingly.
+- **No circular references.** `ref()` builds a dependency graph, so two docs that reference each other are
+  a hard error naming the cycle (`posts:a -> authors:b -> posts:a`). Break the loop — drop one side's `ref`
+  or restructure the data.
+- **A missing source file only warns.** If a `_file` isn't found under `<assetsDir>/<subdir>/`, the engine
+  logs `_file '…' not found` and keeps going — the doc is still created (and an upload collection that
+  requires a file may then error downstream). Watch the logs for typos. The subdir defaults to the
+  collection slug; override it with `assetSubDirs`.
+- **Typed refs need `generate:types`.** `ref()` keys are only checked once the `SeedRegistry` is generated;
+  before that they fall back to runtime validation. Rename a `_key` and you must regenerate types for the
+  compile-time check to catch stale references.
+- **Globals can't be referenced, and update last.** `ref()` points at collection docs only — a global can
+  reference docs, but a doc can't reference a global. Globals are applied after every doc exists.
 
 ## How it works
 
 Every entry point runs the same engine. You don't need any of this to write seeds; it's here for when
 you're debugging or curious.
 
-### The pipeline, step by step
+### What a seed run does
 
-1. **Build the model** from the definitions: collection records (with their `_file`) and globals.
-2. **Validate.** Every `ref` targets a real collection and resolves to a seeded doc, every `_file`
-   sits on an upload or provider collection, no duplicate `_key` within a collection, no unknown
-   top-level fields. All issues are collected and thrown at once, naming the collection, `_key`, and field.
-3. **Build the dependency graph** (every `ref(collection, key)` is an edge) and **topo-sort** it
-   (depth-first). A cycle is a hard error that names the cycle.
-4. **Clear** the seeded collections. Upload collections and asset-provider collections clear via
-   `payload.delete` so their hooks fire (e.g. external-asset cleanup); plain collections are wiped directly.
-5. **Create** docs in sorted order, resolving `ref` tokens to ids and delivering each doc's `_file`
-   as a native upload (upload collections) or a provider ingest (registered providers).
-6. **Update globals** after their dependencies exist.
+Trigger a seed from any entry point and the engine runs the same fixed sequence — starting from your
+in-memory `defineSeed` output and ending with a fully-populated database:
+
+<Steps>
+
+<Step>
+**Build the model**
+
+Run each definition's builder to produce the collection records (with their `_file`) and the globals.
+</Step>
+
+<Step>
+**Validate**
+
+Every `ref` targets a real collection and resolves to a seeded doc, every `_file` sits on an upload or
+`custom.seedAsset` collection, no duplicate `_key` within a collection, no unknown top-level fields. All
+issues are collected and thrown at once, naming the collection, `_key`, and field.
+</Step>
+
+<Step>
+**Build the dependency graph & topo-sort**
+
+Every `ref(collection, key)` becomes an edge; a depth-first sort orders each doc after the docs it
+references. A cycle is a hard error that names the cycle.
+</Step>
+
+<Step>
+**Clear the seeded collections**
+
+Upload collections and any collection with delete hooks clear via `payload.delete` so those hooks fire
+(e.g. external-asset cleanup); plain collections are wiped directly.
+</Step>
+
+<Step>
+**Create docs in dependency order**
+
+Resolve each doc's `ref` tokens to real ids and deliver its `_file` — a native upload, or a source-field
+value for a `custom.seedAsset` collection's ingest hook.
+</Step>
+
+<Step>
+**Update globals**
+
+Last, after every doc exists — resolving their refs too.
+</Step>
+
+</Steps>
 
 ### How typed refs are generated
 
@@ -496,29 +603,18 @@ with no import**, exactly like Payload's generated `GeneratedTypes`, so `ref('se
 is checked against your real `_key`s. Without codegen, refs fall back to runtime validation: safe
 either way, fully safe with it.
 
-### Revalidation during a seed
+### Disable revalidation
 
-Next.js caches aggressively, so Payload apps usually wire revalidation hooks: `afterChange` /
-`afterDelete` handlers that call `revalidatePath` / `revalidateTag` to push fresh content to the
-front end. A seed clears and recreates every seeded collection, so firing those hooks per doc would
-be a revalidation storm, and under the CLI there is no request scope, so `revalidatePath` can't run
-at all.
-
-So the engine sets `context: { disableRevalidate: true }` on every create, update, and delete it
-performs. Revalidate hooks that follow Payload's convention (early-returning when
-`context.disableRevalidate` is set) skip automatically during a seed:
+The engine sets `context: { disableRevalidate: true }` on every create, update, and delete. Have your
+`afterChange` / `afterDelete` revalidation hooks check for it and skip, so a bulk seed doesn't fire a
+revalidation per doc:
 
 ```ts
-// collections/Posts/hooks/revalidatePost.ts
 export const revalidatePost: CollectionAfterChangeHook = ({ doc, context }) => {
   if (!context.disableRevalidate) revalidatePath(`/posts/${doc.slug}`)
   return doc
 }
 ```
-
-The seed does **not** revalidate at the end. After it finishes, revalidate once yourself: a
-redeploy, your own revalidation call, or nothing at all when it's a local/dev database you're about
-to hit fresh.
 
 ## Exports
 

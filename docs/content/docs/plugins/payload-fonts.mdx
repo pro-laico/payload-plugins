@@ -396,7 +396,7 @@ export const devFontsProps = [
 ## Seeding
 
 `fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-asset-collections) like any image — no
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed) like any image — no
 asset marker, no glue. Each `font` typeface then **references** its original with `ref('fontOriginal', …)`
 in a weights row, and the collection's `afterChange` hook subsets the referenced original into a served
 `fontOptimized` WOFF2. Point the seed engine at both definitions and map `fontOriginal`'s source folder
@@ -444,7 +444,7 @@ export const fontSet = defineSeed('fontSet', ({ ref }) => ({
 
 A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, so the cascade removes
 the old originals + optimized too (idempotent). See the
-[seed plugin docs](/docs/plugins/payload-seed#external-asset-collections) for the full reference.
+[seed plugin docs](/docs/plugins/payload-seed) for the full reference.
 
 ## How it works
 

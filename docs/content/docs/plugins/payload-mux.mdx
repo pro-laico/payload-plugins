@@ -343,7 +343,7 @@ Local paths stream from disk, so ingesting a large file doesn't load it all into
 
 For declarative seeding, `muxVideoPlugin()` marks the `mux-video` collection with
 `custom: { seedAsset: { sourceField: 'source' } }`, so a `mux-video` seeds **like any other doc** via
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-asset-collections) — its clip rides on the
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#custom-ingestion) — its clip rides on the
 record's `_file` (the `file()` token) and the normal seed flow runs it, no script. The seed engine
 auto-discovers the marker from the live config, so there's nothing to register:
 
@@ -362,7 +362,7 @@ The `custom.seedAsset` marker is plain config on the collection — the seed pac
 one, nor the Mux SDK; when it sees a `_file` on `mux-video` it writes the file to the collection's
 `source` field and this plugin's hook does the upload. Playback policy comes from the plugin's configured
 policy, so seeded and admin-uploaded videos share one policy. See the
-[seed plugin docs](/docs/plugins/payload-seed#external-asset-collections) for the full reference.
+[seed plugin docs](/docs/plugins/payload-seed#custom-ingestion) for the full reference.
 
 ## How it works
 
