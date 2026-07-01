@@ -61,7 +61,7 @@ Key design points carried over from the original:
 4. **Single-flight coalescing.** A cold page fires every srcset width at once. The source
    read is deduped per id, and variant generation is coalesced per cache key, so the
    expensive read+encode runs once under a thundering herd.
-5. **Storage-adapter agnostic.** Both collections are uploads, so variant bytes flow
+5. **Storage-adapter agnostic.** Both collections are uploads, so each variant is stored
    through whatever adapter is configured. Local reads hit `staticDir`; cloud/relative
    reads self-fetch Payload's own file route — which is why the endpoint needs an origin. It
    uses Payload's `config.serverURL`, falling back to `NEXT_PUBLIC_SERVER_URL` and then the live
@@ -94,7 +94,7 @@ correctly on first render. No provider, no custom script. See
   reading (SSRF-guarded), the concurrency gate, the lazy Sharp loader, single-flight.
 - `variants/key.ts` — the deterministic cache key.
 - `hooks/purge.ts` — stale-on-change + all-on-delete variant purging.
-- `components/buildSrcset.ts` — isomorphic URL/srcset builders (client-safe).
+- `utils/urls.ts` — isomorphic URL/srcset builders (client-safe).
 - `components/image.tsx` — `<ResponsiveImage>` (server-rendered, LQIP placeholder).
 - `components/admin/*` — the focal-point picker and purge button (client components).
 - `lib/*` — the inlined `mergeCollection` + `getServerSideURL`.

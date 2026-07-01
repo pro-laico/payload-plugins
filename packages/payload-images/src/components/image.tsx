@@ -26,11 +26,11 @@ import {
   getImageUrl,
   type ImageResource,
   stepWidths,
-} from './buildSrcset'
+} from '../utils/urls'
 
-// Re-export the isomorphic URL builders so this single client-safe subpath covers the whole
-// frontend API — `import { ResponsiveImage, getImageUrl } from '@pro-laico/payload-images/components/image'`.
-// (The `./buildSrcset` subpath stays available for importing the builders without the component.)
+// Re-export the isomorphic URL builders so this single subpath covers the whole frontend API —
+// `import { ResponsiveImage, getImageUrl } from '@pro-laico/payload-images/components/image'`.
+// (The `utils/urls` subpath stays available for importing the builders without the component.)
 export { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths }
 export type { BuildSrcsetOptions, BuildUrlOptions, Fit, Format, GetImageUrlOptions, ImageResource }
 
@@ -50,6 +50,18 @@ export type ResponsiveImageInput =
     }
 
 type Awaitable<T> = T | Promise<T>
+
+/** Placeholder override: `false` off · `true`/unset on (defaults) · a number = LQIP width (px) · `{ width?, quality? }` = tuned. */
+export type PlaceholderProp = boolean | number | { width?: number; quality?: number }
+
+/** Resolve the `placeholder` prop (falling back to the deprecated `blur`) to on/off + optional width/quality. */
+const resolvePlaceholderProp = (placeholder: PlaceholderProp | undefined, blur: boolean): { on: boolean; width?: number; quality?: number } => {
+  if (placeholder === false) return { on: false }
+  if (placeholder === true) return { on: true }
+  if (typeof placeholder === 'number') return { on: true, width: placeholder }
+  if (placeholder && typeof placeholder === 'object') return { on: true, width: placeholder.width, quality: placeholder.quality }
+  return { on: blur } // `placeholder` unset → legacy `blur` (default true)
+}
 
 export interface ResponsiveImageProps {
   image: ResponsiveImageInput
@@ -89,7 +101,14 @@ export interface ResponsiveImageProps {
   config?: Awaitable<SanitizedConfig>
   /** Explicit cache-busting version token (`v=`); overrides the one derived from the doc's filename + focal. */
   version?: string
-  /** Show the inline LQIP placeholder (a tiny base64 variant painted as the `<img>`'s background). Default true. */
+  /**
+   * Inline LQIP placeholder. `false` disables it; a **number** sets the LQIP width in px; an object
+   * tunes `{ width, quality }`. Keep the width small — the LQIP is base64-inlined in **every**
+   * response (~0.6 KB at 24px, ~2 KB at 48, ~3–4 KB at 64), so **24–64 is the sweet spot**; larger
+   * just bloats the HTML. Defaults to the project `placeholder` config (24px). Supersedes `blur`.
+   */
+  placeholder?: PlaceholderProp
+  /** @deprecated Use `placeholder` instead (`placeholder={false}` to disable). */
   blur?: boolean
   /** Extra attributes (e.g. `data-*`) spread onto the `<img>`. */
   dataAttributes?: Record<string, string>
@@ -124,6 +143,7 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
     baseUrl,
     path,
     version,
+    placeholder,
     blur = true,
     dataAttributes,
     config,
@@ -173,11 +193,13 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   // server-side (shared variant cache) and painted as the <img>'s own background — instant,
   // zero network, covered when the real image loads. Needs a populated doc + the config;
   // the engine is dynamic-imported so the non-placeholder path never bundles Sharp/getPayload.
+  const ph = resolvePlaceholderProp(placeholder, blur)
   let lqip: string | undefined
-  if (blur && cfg && doc?.filename) {
+  if (ph.on && cfg && doc?.filename) {
     try {
       const { generateInlineLqip } = await import('./inlineLqip')
-      lqip = await generateInlineLqip({ config: cfg, source: doc as VariantSourceDoc, ar, fit })
+      // Trusted (component) call: the requested width is honored (no `untrusted` clamp).
+      lqip = await generateInlineLqip({ config: cfg, source: doc as VariantSourceDoc, ar, fit, width: ph.width, quality: ph.quality })
     } catch {
       lqip = undefined
     }

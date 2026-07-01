@@ -112,12 +112,13 @@ For a full-bleed hero or any element that sets its own height, pass `fill`:
 ```
 
 Need a single URL (OG tags, CSS backgrounds, emails)? Use `getImageUrl` from the
-`components/buildSrcset` subpath:
+`utils/urls` subpath:
 
 ```ts
-import { getImageUrl } from '@pro-laico/payload-images/components/buildSrcset'
+import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 
-const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: process.env.NEXT_PUBLIC_SERVER_URL })
+// baseUrl defaults to NEXT_PUBLIC_SERVER_URL, so the OG URL is absolute with nothing to pass.
+const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1200/630' })
 ```
 
 ## Options
@@ -137,7 +138,9 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | `virtualFields` | `boolean` | `true` | Add computed `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields to every read. |
 | `localizeAlt` | `boolean` | `false` | Mark `alt` `localized` (needs Payload localization). Ignored with `extendCollection`. |
 | `mimeTypes` | `string[]` | raster set | Accepted upload mime types (defaults to avif/webp/jpeg/png). Ignored with `extendCollection`. |
-| `placeholder` | `false \| { width?, quality?, format? }` | `{ width: 24, quality: 40, format: 'webp' }` | Inline LQIP for `<ResponsiveImage>` — a faithful (per ratio + focal) base64 placeholder generated server-side and painted instantly. `false` disables it. |
+| `folders` | `boolean` | `false` | Enable Payload's native folder organization on the managed collection (created `images`, or the `extendCollection` target). |
+| `maxOriginalSize` | `number` | — | Cap the stored original's longest edge (px), applied once on upload. Off by default — the original stays untouched. Ignored with `extendCollection`. |
+| `placeholder` | `false \| { width?, quality?, format?, maxWidth? }` | `{ width: 24, quality: 40, format: 'webp', maxWidth: 64 }` | Inline LQIP for `<ResponsiveImage>` — a faithful (per ratio + focal) base64 placeholder generated server-side and painted instantly. `width`/`quality`/`format` set the defaults; `maxWidth` caps per-read overrides from the untrusted `context.lqip` / `X-LQIP` door. `false` disables it. |
 
 `transform` keys (all optional): `sourceSlug` (`'images'`), `variantSlug`
 (`'generated-images'`), `cdnCacheControl` (`true`), `maxDimension` (`4096`),

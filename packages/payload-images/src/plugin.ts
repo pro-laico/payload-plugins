@@ -69,6 +69,18 @@ export interface ImagesPluginOptions {
    */
   mimeTypes?: string[]
   /**
+   * Enable Payload's native **folder organization** on the managed collection (the created `images`,
+   * or the `extendCollection` target) — adds a folder relationship to the schema so editors can
+   * organize a large library. Default false.
+   */
+  folders?: boolean
+  /**
+   * Cap the *stored* original's longest edge, in px (applied once on upload via Payload's
+   * `resizeOptions`). **Off by default — your original stays untouched** (so the collection can
+   * double as original storage); set it only to bound storage. Ignored with `extendCollection`.
+   */
+  maxOriginalSize?: number
+  /**
    * Inline LQIP placeholder for `<ResponsiveImage>`. A tiny, faithful (per aspect-ratio +
    * focal point) image is generated server-side, base64-inlined behind the real image, and
    * painted instantly with zero network. Pass `false` to disable it project-wide. Defaults:
@@ -79,20 +91,32 @@ export interface ImagesPluginOptions {
 
 /** Inline-LQIP placeholder settings (see {@link ImagesPluginOptions.placeholder}). */
 export interface PlaceholderConfig {
-  /** Longest edge of the LQIP, in px. Default 24. */
+  /**
+   * Default longest edge of the LQIP, in px. Default 24. Keep it tiny — the LQIP is inlined as
+   * base64 in **every** response, so size compounds: ~0.6 KB at 24px, ~2 KB at 48, ~3–4 KB at 64.
+   * **24–64 is the sensible range**; past ~64 it stops being a placeholder and bloats payloads.
+   */
   width?: number
-  /** Encode quality for the LQIP. Default 40. */
+  /** Encode quality for the LQIP. Default 40 (clamped to 20–70 — LQIPs gain nothing from more). */
   quality?: number
   /** LQIP encode format. Default `webp`. */
   format?: 'webp' | 'jpeg'
+  /**
+   * Hard ceiling for a per-read width override coming from the **untrusted** external door
+   * (`req.context.lqip` / `X-LQIP`): such widths are clamped to this and snapped to a /8 grid.
+   * Default 64. The trusted `<ResponsiveImage placeholder={…}>` prop is *not* bound by this
+   * (it honors your value up to a typo guard) — raise this only if you let external callers pick
+   * larger LQIPs, knowing each px inlines more base64. Recommended ≤ ~96.
+   */
+  maxWidth?: number
 }
 
 /** The resolved placeholder settings stashed for the component, or `false` when disabled. */
 export type ResolvedPlaceholder = false | Required<PlaceholderConfig>
 
-/** Fill in the placeholder defaults (24px / q40 / webp), or `false` when disabled. */
+/** Fill in the placeholder defaults (24px / q40 / webp / maxWidth 64), or `false` when disabled. */
 export const resolvePlaceholder = (p: ImagesPluginOptions['placeholder']): ResolvedPlaceholder =>
-  p === false ? false : { width: p?.width ?? 24, quality: p?.quality ?? 40, format: p?.format ?? 'webp' }
+  p === false ? false : { width: p?.width ?? 24, quality: p?.quality ?? 40, format: p?.format ?? 'webp', maxWidth: p?.maxWidth ?? 64 }
 
 /**
  * Registers the `images` (source) and hidden `generated-images` (variant cache) collections,
@@ -123,6 +147,8 @@ export const imagesPlugin =
       virtualFields = true,
       localizeAlt = false,
       mimeTypes,
+      folders,
+      maxOriginalSize,
       placeholder,
     } = opts
     if (!enabled) return config
@@ -142,7 +168,7 @@ export const imagesPlugin =
       if (!target) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' not found`)
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
       const enhanced = mergeCollection(
-        mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath, virtualFields })),
+        mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath, virtualFields, folders })),
         imagesOverrides,
       )
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
@@ -157,6 +183,8 @@ export const imagesPlugin =
           virtualFields,
           localizeAlt,
           mimeTypes,
+          folders,
+          maxOriginalSize,
           adminThumbnail: transform === false ? false : undefined,
         }),
         imagesOverrides,

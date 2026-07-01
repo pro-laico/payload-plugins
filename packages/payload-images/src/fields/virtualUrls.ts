@@ -10,7 +10,7 @@
  */
 import type { Field, FieldHook } from 'payload'
 
-import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl } from '../components/buildSrcset'
+import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl } from '../utils/urls'
 import { type Fit, parseAspectRatio } from '../transform/params'
 
 interface ImageDocLike {
@@ -38,25 +38,59 @@ const virtualUrl = (
     const doc = (data ?? {}) as ImageDocLike
     if (doc.id == null || !doc.filename) return null
     const cfg = req?.payload?.config
-    const baseUrl = cfg?.serverURL || undefined
+    // Explicit '' (not undefined) so these fields keep their serverURL-or-relative rule — passing
+    // undefined would let getImageUrl's NEXT_PUBLIC_SERVER_URL default leak in for `src`.
+    const baseUrl = cfg?.serverURL || ''
     const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number | number[] } | undefined)?.pixelStep
     return compute(doc, baseUrl, pixelStep)
   }
   return { name, type: 'text', virtual: true, admin: { hidden: true, description }, hooks: { afterRead: [afterRead] } }
 }
 
-/** Read an LQIP request off the operation: `req.context.lqip = { ar?, fit? }` (or `true`), or an `X-LQIP: <ar>` header. */
+interface LqipRequest {
+  ar?: number
+  fit?: Fit
+  width?: number
+  quality?: number
+}
+
+const numOrUndef = (v: unknown): number | undefined => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : undefined
+}
+
+/** Parse an `X-LQIP` header: a bare ratio (`16/9`) or a `;`-list (`16/9; w=48; q=50` / `ar=16/9; w=48`). */
+const parseLqipHeader = (h: string): LqipRequest => {
+  const out: LqipRequest = {}
+  for (const part of h.split(';')) {
+    const s = part.trim()
+    if (!s) continue
+    const eq = s.indexOf('=')
+    if (eq === -1) {
+      out.ar = out.ar ?? parseAspectRatio(s)
+      continue
+    }
+    const k = s.slice(0, eq).trim().toLowerCase()
+    const v = s.slice(eq + 1).trim()
+    if (k === 'ar') out.ar = parseAspectRatio(v)
+    else if (k === 'w' || k === 'width') out.width = numOrUndef(v)
+    else if (k === 'q' || k === 'quality') out.quality = numOrUndef(v)
+  }
+  return out
+}
+
+/** Read an LQIP request off the operation: `req.context.lqip = { ar?, fit?, width?, quality? }` (or `true`), or an `X-LQIP` header. */
 const readLqipRequest = (
   req: { context?: Record<string, unknown>; headers?: { get?: (k: string) => string | null } } | undefined,
-): { ar?: number; fit?: Fit } | undefined => {
+): LqipRequest | undefined => {
   const ctx = req?.context?.lqip
   if (ctx === true) return {}
   if (ctx && typeof ctx === 'object') {
-    const o = ctx as { ar?: number | string; fit?: Fit }
-    return { ar: parseAspectRatio(o.ar), fit: o.fit }
+    const o = ctx as { ar?: number | string; fit?: Fit; width?: number; quality?: number }
+    return { ar: parseAspectRatio(o.ar), fit: o.fit, width: numOrUndef(o.width), quality: numOrUndef(o.quality) }
   }
   const header = req?.headers?.get?.('x-lqip')
-  if (header) return { ar: parseAspectRatio(header) }
+  if (header) return parseLqipHeader(header)
   return undefined
 }
 
@@ -77,12 +111,16 @@ const blurDataUrlField = (): Field => {
     if (!cfg) return null
     try {
       const { generateInlineLqip } = await import('../components/inlineLqip')
+      // Untrusted door: width/quality come from the caller, so clamp (untrusted: true).
       const uri = await generateInlineLqip({
         config: cfg,
         payload: req.payload,
         source: { id: doc.id, filename: doc.filename, url: doc.url, focalX: doc.focalX, focalY: doc.focalY },
         ar: lqipReq.ar,
         fit: lqipReq.fit ?? 'cover',
+        width: lqipReq.width,
+        quality: lqipReq.quality,
+        untrusted: true,
       })
       return uri ?? null
     } catch {

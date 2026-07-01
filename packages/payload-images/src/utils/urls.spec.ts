@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths } from './buildSrcset'
+import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths } from './urls'
 
 describe('buildVariantUrl', () => {
   it('bakes settings into a same-origin query URL', () => {
@@ -74,6 +74,10 @@ describe('stepWidths', () => {
 })
 
 describe('getImageUrl', () => {
+  // baseUrl defaults to NEXT_PUBLIC_SERVER_URL; pin it empty so the relative-URL cases are deterministic.
+  beforeEach(() => vi.stubEnv('NEXT_PUBLIC_SERVER_URL', ''))
+  afterEach(() => vi.unstubAllEnvs())
+
   it('returns null for an empty resource', () => {
     expect(getImageUrl(null)).toBeNull()
     expect(getImageUrl(undefined)).toBeNull()
@@ -89,6 +93,12 @@ describe('getImageUrl', () => {
     const url = getImageUrl({ id: 'abc', width: 900, filename: 'a.png', focalX: 50, focalY: 50 })
     const v = deriveVersion({ filename: 'a.png', focalX: 50, focalY: 50 })
     expect(url).toBe(`/api/img/abc?w=900&fit=cover&q=75&fmt=auto&v=${v}`)
+  })
+  it('defaults baseUrl to NEXT_PUBLIC_SERVER_URL (absolute), overridable with an explicit baseUrl or ""', () => {
+    vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://site.com')
+    expect(getImageUrl('abc')).toBe('https://site.com/api/img/abc?w=1280&fit=cover&q=75&fmt=auto')
+    expect(getImageUrl('abc', { baseUrl: '' })).toBe('/api/img/abc?w=1280&fit=cover&q=75&fmt=auto') // opt out → relative
+    expect(getImageUrl('abc', { baseUrl: 'https://cdn.example.com' })).toMatch(/^https:\/\/cdn\.example\.com\/api\/img\//)
   })
 })
 

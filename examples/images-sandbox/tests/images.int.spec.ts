@@ -152,6 +152,27 @@ describe('payload-images wiring', () => {
 
     // It rode through the SAME variant cache — a generated-images row now exists for the source.
     expect(await countVariants(payload, sourceId)).toBeGreaterThan(0)
+
+    // Per-read width override (untrusted door → honored up to maxWidth, snapped to /8).
+    const sized = (await payload.findByID({
+      collection: 'images',
+      id: sourceId,
+      overrideAccess: true,
+      context: { lqip: { ar: '1/1', fit: 'cover', width: 48 } },
+    })) as { blurDataURL?: string | null }
+    const m48 = await sharp(Buffer.from((sized.blurDataURL as string).split(',')[1], 'base64')).metadata()
+    expect(m48.width).toBe(48)
+    expect(m48.height).toBe(48)
+
+    // An over-cap request is clamped to maxWidth (64) — the external door can't ask for a huge LQIP.
+    const capped = (await payload.findByID({
+      collection: 'images',
+      id: sourceId,
+      overrideAccess: true,
+      context: { lqip: { ar: '1/1', width: 200 } },
+    })) as { blurDataURL?: string | null }
+    const m200 = await sharp(Buffer.from((capped.blurDataURL as string).split(',')[1], 'base64')).metadata()
+    expect(m200.width).toBe(64)
   })
 
   it('<ResponsiveImage> renders a single <img> (Shape B) with the faithful inline LQIP in its background-image', async () => {
@@ -169,11 +190,39 @@ describe('payload-images wiring', () => {
     expect(el.props.style?.objectFit).toBe('cover')
     expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/webp;base64,/) // inline LQIP painted in
 
-    // blur={false} → no placeholder.
-    const bare = (await ResponsiveImage({ image: doc, aspectRatio: '16/9', config, blur: false } as never)) as {
+    // placeholder={48} → a larger LQIP, honored on the trusted component path.
+    const big = (await ResponsiveImage({ image: doc, aspectRatio: '1/1', config, placeholder: 48 } as never)) as {
       props: { style?: { backgroundImage?: string } }
     }
-    expect(bare.props.style?.backgroundImage).toBeUndefined()
+    const b64 = (big.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]
+    expect(b64).toBeTruthy()
+    expect((await sharp(Buffer.from(b64 as string, 'base64')).metadata()).width).toBe(48)
+
+    // placeholder={false} disables it (supersedes the deprecated blur).
+    const off = (await ResponsiveImage({ image: doc, aspectRatio: '1/1', config, placeholder: false } as never)) as {
+      props: { style?: { backgroundImage?: string } }
+    }
+    expect(off.props.style?.backgroundImage).toBeUndefined()
+  })
+
+  it('getImageUrl builds an absolute, focal-cropped OG URL that the endpoint serves (the generateMetadata pattern)', async () => {
+    const { getImageUrl } = await import('@pro-laico/payload-images/utils/urls')
+    const doc = await payload.findByID({ collection: 'images', id: sourceId, depth: 0, overrideAccess: true })
+
+    // What you'd drop into `openGraph.images[].url` in a Next generateMetadata.
+    const ogUrl = getImageUrl(doc, { width: 1200, aspectRatio: '1200/630', baseUrl: 'https://cdn.example.com' }) as string
+    expect(ogUrl.startsWith('https://cdn.example.com/api/img/')).toBe(true) // absolute — social crawlers need it
+    expect(ogUrl).toContain('w=1200')
+    expect(ogUrl).toContain('h=630')
+    expect(ogUrl).toContain('v=') // cache-bust token (filename + focal)
+
+    // And it actually resolves to an image (height snaps to the 50px anti-DoS grid → 650).
+    const handler = getHandler(payload, 'get', '/img/:id')
+    const res = await handler(makeReq(payload, sourceId, ogUrl.split('?')[1], 'image/webp'))
+    expect(res.status).toBe(200)
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata()
+    expect(meta.width).toBe(1200)
+    expect(meta.height).toBe(650)
   })
 
   it('purges a source’s variants and cascades on delete', async () => {

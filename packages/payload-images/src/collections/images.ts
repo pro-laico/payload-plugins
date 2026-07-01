@@ -31,6 +31,11 @@ export interface CreateImagesOptions {
    *  process ({@link IMAGE_MIME_TYPES}: avif/webp/jpeg/png). Override to widen or narrow what
    *  the collection accepts — but the endpoint only meaningfully transforms raster images. */
   mimeTypes?: string[]
+  /** Enable Payload's native folder organization on the collection (adds a folder relationship). Default false. */
+  folders?: boolean
+  /** Cap the *stored* original's longest edge (px) via `upload.resizeOptions`, applied once on upload.
+   *  Off by default — the original is kept untouched. Set it only to bound storage. */
+  maxOriginalSize?: number
 }
 
 /**
@@ -84,7 +89,7 @@ const adminUIFields = (focalUI: boolean, variantSlug: CollectionSlug, previewRat
  * mime whitelist so it never clobbers a collection it's merged onto.
  */
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders } = opts
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
   return {
     // Admin UI is gated by focalUI; the virtual URL fields are for API consumers, so they're
@@ -95,6 +100,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
     upload: { focalPoint: true },
+    ...(folders ? { folders: true } : {}),
   }
 }
 
@@ -107,7 +113,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * inline base64 via the shared variant cache) — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
-  const { virtualFields = true, localizeAlt = false } = opts
+  const { virtualFields = true, localizeAlt = false, folders, maxOriginalSize } = opts
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail)
   const enh = imageEnhancements(opts)
 
@@ -133,6 +139,7 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
     },
     defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
     ...(forceSelect ? { forceSelect: forceSelect as CollectionConfig['forceSelect'] } : {}),
+    ...(folders ? { folders: true } : {}),
     fields: [
       {
         name: 'alt',
@@ -149,6 +156,10 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
       mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
+      // Off by default — the stored original is kept untouched; only downsize when asked, to bound storage.
+      ...(maxOriginalSize
+        ? { resizeOptions: { width: maxOriginalSize, height: maxOriginalSize, fit: 'inside', withoutEnlargement: true } }
+        : {}),
     },
   }
 }

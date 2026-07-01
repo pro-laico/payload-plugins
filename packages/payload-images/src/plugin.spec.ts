@@ -36,7 +36,23 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string; placeholder?: unknown } }).payloadImages
     expect(stash?.sourceSlug).toBe('images')
     expect(stash?.variantSlug).toBe('generated-images')
-    expect(stash?.placeholder).toEqual({ width: 24, quality: 40, format: 'webp' })
+    expect(stash?.placeholder).toEqual({ width: 24, quality: 40, format: 'webp', maxWidth: 64 })
+  })
+
+  it('folders + maxOriginalSize are off by default, opt-in on the images collection', () => {
+    const imagesOf = (c: Config) =>
+      (c.collections ?? []).find((col) => col.slug === 'images') as CollectionConfig & {
+        folders?: unknown
+        upload?: { resizeOptions?: { width?: number; height?: number; fit?: string; withoutEnlargement?: boolean } }
+      }
+
+    const off = imagesOf(out)
+    expect(off.folders).toBeUndefined()
+    expect(off.upload?.resizeOptions).toBeUndefined() // original kept untouched
+
+    const on = imagesOf(run({ folders: true, maxOriginalSize: 4096 }))
+    expect(on.folders).toBe(true)
+    expect(on.upload?.resizeOptions).toMatchObject({ width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true })
   })
 
   it('registers nothing when enabled is false', () => {
@@ -53,12 +69,17 @@ describe('imagesPlugin — default (creates the images collection)', () => {
 })
 
 describe('resolvePlaceholder', () => {
-  it('fills the 24 / 40 / webp defaults', () => {
-    expect(resolvePlaceholder(undefined)).toEqual({ width: 24, quality: 40, format: 'webp' })
+  it('fills the 24 / 40 / webp / maxWidth 64 defaults', () => {
+    expect(resolvePlaceholder(undefined)).toEqual({ width: 24, quality: 40, format: 'webp', maxWidth: 64 })
   })
   it('honors overrides and passes false through (disabled)', () => {
-    expect(resolvePlaceholder({ width: 16, quality: 30, format: 'jpeg' })).toEqual({ width: 16, quality: 30, format: 'jpeg' })
-    expect(resolvePlaceholder({ width: 32 })).toEqual({ width: 32, quality: 40, format: 'webp' })
+    expect(resolvePlaceholder({ width: 16, quality: 30, format: 'jpeg', maxWidth: 96 })).toEqual({
+      width: 16,
+      quality: 30,
+      format: 'jpeg',
+      maxWidth: 96,
+    })
+    expect(resolvePlaceholder({ width: 32 })).toEqual({ width: 32, quality: 40, format: 'webp', maxWidth: 64 })
     expect(resolvePlaceholder(false)).toBe(false)
   })
 })
@@ -83,6 +104,12 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
 
   it('points the variant cache `source` at the extended collection', () => {
     expect(variantSourceRelTo(out)).toBe('media')
+  })
+
+  it('applies folders to the extended target', () => {
+    const withFolders = run({ extendCollection: 'media', folders: true }, [media])
+    const m = (withFolders.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig & { folders?: unknown }
+    expect(m.folders).toBe(true)
   })
 
   it('throws a clear error for a missing or non-upload target', () => {

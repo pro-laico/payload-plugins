@@ -1,8 +1,9 @@
 /**
- * Pure, isomorphic URL builders for the on-demand transform endpoint. NO Node /
- * Sharp / server imports — safe to bundle into client components. Produces
- * same-origin relative URLs by default; pass `baseUrl` for absolute contexts (OG
- * tags, emails).
+ * Isomorphic URL builders for the on-demand transform endpoint. NO Node / Sharp / server imports —
+ * safe to bundle into client components. `buildVariantUrl` / `buildSrcset` produce same-origin
+ * relative URLs by default (pass `baseUrl` for absolute); `getImageUrl` — the one-off/shareable
+ * helper — instead defaults `baseUrl` to `process.env.NEXT_PUBLIC_SERVER_URL` (a Next build-time
+ * constant, inlined in client bundles) so OG/email URLs come out absolute with no extra wiring.
  */
 import { DEFAULT_PIXEL_STEP, type Fit, type Format, parseAspectRatio } from '../transform/params'
 
@@ -69,6 +70,8 @@ export type ImageResource = string | number | ({ id: string | number; width?: nu
 export interface GetImageUrlOptions extends BuildUrlOptions {
   /** Output width. Falls back to a populated doc's intrinsic width, else 1280. */
   width?: number
+  /** Prefix for absolute URLs. Defaults to `NEXT_PUBLIC_SERVER_URL`; pass `''` for a relative URL. */
+  baseUrl?: string
 }
 
 /**
@@ -77,6 +80,10 @@ export interface GetImageUrlOptions extends BuildUrlOptions {
  * automatically — so you don't re-implement the resolve-and-`deriveVersion` dance every time
  * you need a raw URL (OG tags, CSS backgrounds, emails). Returns null when there's no id.
  * For a responsive `<img>`, prefer `<ResponsiveImage>` / {@link buildSrcset}.
+ *
+ * Because these URLs are usually for external/shareable contexts (OG, email), `baseUrl` defaults
+ * to `process.env.NEXT_PUBLIC_SERVER_URL` so the result is absolute with no extra wiring. Pass an
+ * explicit `baseUrl` to override, or `baseUrl: ''` to force a relative same-origin URL.
  */
 export const getImageUrl = (resource: ImageResource, o: GetImageUrlOptions = {}): string | null => {
   if (resource == null) return null
@@ -84,7 +91,11 @@ export const getImageUrl = (resource: ImageResource, o: GetImageUrlOptions = {})
   const id = doc ? (doc.id == null ? '' : String(doc.id)) : String(resource)
   if (!id) return null
   const width = o.width ?? doc?.width ?? 1280
-  return buildVariantUrl(id, width, { ...o, version: o.version ?? deriveVersion(doc) })
+  return buildVariantUrl(id, width, {
+    ...o,
+    baseUrl: o.baseUrl ?? (process.env.NEXT_PUBLIC_SERVER_URL || undefined),
+    version: o.version ?? deriveVersion(doc),
+  })
 }
 
 export const buildVariantUrl = (id: string, width: number, o: BuildUrlOptions = {}): string => {

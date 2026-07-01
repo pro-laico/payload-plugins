@@ -12,13 +12,14 @@ import { getPayload, type Payload, type SanitizedConfig } from 'payload'
 
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { getOrCreateVariantBytes, type VariantSourceDoc } from '../transform/getVariantBytes'
+import { clampLqipQuality, resolveLqipWidth } from '../transform/lqip'
 import type { Fit, ParsedParams } from '../transform/params'
 
 interface PayloadImagesStash {
   sourceSlug?: string
   variantSlug?: string
   maxInputPixels?: number
-  placeholder?: false | { width: number; quality: number; format: 'webp' | 'jpeg' }
+  placeholder?: false | { width: number; quality: number; format: 'webp' | 'jpeg'; maxWidth: number }
 }
 
 export interface InlineLqipArgs {
@@ -29,12 +30,30 @@ export interface InlineLqipArgs {
   /** Render aspect ratio; omitted = the source's natural ratio. */
   ar?: number
   fit: Fit
+  /** Per-read width override (else the project default). Clamped per `untrusted`. */
+  width?: number
+  /** Per-read quality override (else the project default). Clamped to 20–70. */
+  quality?: number
+  /**
+   * Untrusted caller (the external `context.lqip` / `X-LQIP` door): clamp width to `maxWidth` and
+   * snap to /8. The trusted component path leaves this false and its width is honored up to a guard.
+   */
+  untrusted?: boolean
   /** Reuse an existing Payload instance (e.g. `req.payload` in a hook); otherwise `getPayload(config)`. */
   payload?: Payload
 }
 
 /** Returns a `data:` URI for the LQIP, or `undefined` when disabled / not generatable (caller renders no placeholder). */
-export const generateInlineLqip = async ({ config, source, ar, fit, payload: existing }: InlineLqipArgs): Promise<string | undefined> => {
+export const generateInlineLqip = async ({
+  config,
+  source,
+  ar,
+  fit,
+  width,
+  quality,
+  untrusted = false,
+  payload: existing,
+}: InlineLqipArgs): Promise<string | undefined> => {
   try {
     const stash = (config as { custom?: { payloadImages?: PayloadImagesStash } }).custom?.payloadImages
     const ph = stash?.placeholder
@@ -46,9 +65,10 @@ export const generateInlineLqip = async ({ config, source, ar, fit, payload: exi
     const maxInputPixels = stash?.maxInputPixels ?? 100_000_000
     const base = config.serverURL || getServerSideURL() || ''
 
-    const w = ph.width
+    const w = resolveLqipWidth(width, ph.width, ph.maxWidth, untrusted)
+    const q = clampLqipQuality(quality, ph.quality)
     const h = ar ? Math.max(1, Math.round(w / ar)) : undefined
-    const params: ParsedParams = { w, h, fit, q: ph.quality, fmt: ph.format }
+    const params: ParsedParams = { w, h, fit, q, fmt: ph.format }
 
     const res = await getOrCreateVariantBytes({ payload, source, params, format: ph.format, sourceSlug, variantSlug, base, maxInputPixels })
     if (!res.ok) return undefined
