@@ -1,0 +1,25 @@
+node_modules
+.next
+out
+
+# Local SQLite DB (created at runtime)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Uploaded files (written at runtime to local-disk storage): the images original store, the
+# on-demand generated variants, the icon SVGs, the served/optimized fonts, and any other media.
+/media/
+/images/
+/generated-images/
+/icon/
+/fontOptimized/
+/fontOriginal/
+
+# NOTE: everything under seed-assets/ IS committed — those are the source files the seed uploads.
+
+.env
+.env*.local
+next-env.d.ts
+*.tsbuildinfo

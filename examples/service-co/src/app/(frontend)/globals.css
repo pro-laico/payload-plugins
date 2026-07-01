@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Meridian's design tokens. Tailwind v4 generates the `bg-*`, `text-*`, `border-*`, `font-*`
+   utilities straight from these theme variables.
+
+   The font families map to the CSS variables payload-fonts exposes for the *active* selection
+   (`--font-set{Sans,Serif,Mono,Display}`) — set on <html> by next/font in production and by
+   <DevFonts /> at runtime in dev (see layout.tsx). Change the active typefaces in the admin and
+   every `font-serif` / `font-display` heading on the site follows. */
+@theme {
+  --font-sans: var(--font-setSans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-setSerif), ui-serif, Georgia, "Times New Roman", serif;
+  --font-display: var(--font-setDisplay), var(--font-setSerif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-setMono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* A warm, earthy editorial palette — clay primary, sage accent, paper background. */
+  --color-background: oklch(0.985 0.006 83);
+  --color-foreground: oklch(0.24 0.012 62);
+  --color-card: oklch(0.965 0.008 83);
+  --color-muted: oklch(0.945 0.009 83);
+  --color-muted-foreground: oklch(0.52 0.018 62);
+  --color-border: oklch(0.9 0.012 78);
+  --color-primary: oklch(0.55 0.115 48);
+  --color-primary-foreground: oklch(0.99 0.005 83);
+  --color-accent: oklch(0.5 0.055 152);
+  --color-accent-foreground: oklch(0.99 0.005 83);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-feature-settings: "kern", "liga";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

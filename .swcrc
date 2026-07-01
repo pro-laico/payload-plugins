@@ -1,7 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/swcrc",
   "sourceMaps": true,
-  "exclude": ["\\.spec\\.ts$"],
+  "exclude": [
+    "\\.spec\\.ts$"
+  ],
   "jsc": {
     "target": "esnext",
     "parser": {
@@ -12,9 +14,11 @@
       "react": {
         "runtime": "automatic"
       }
-    }
+    },
+    "baseUrl": "."
   },
   "module": {
-    "type": "es6"
+    "type": "es6",
+    "resolveFully": true
   }
 }

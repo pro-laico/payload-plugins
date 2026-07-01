@@ -1,0 +1,50 @@
+{
+  "name": "service-co",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3060",
+    "prebuild": "payload-fonts-download",
+    "build": "next build",
+    "start": "next start -p 3060",
+    "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",
+    "generate:types": "pnpm payload generate:types",
+    "generate:importmap": "pnpm payload generate:importmap",
+    "generate:fonts": "cross-env FONT_DOWNLOAD_URL=http://localhost:3060 payload-fonts-download",
+    "seed": "pnpm payload seed",
+    "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mux/mux-player-react": "^3.5.5",
+    "@payloadcms/db-sqlite": "^3.85.1",
+    "@payloadcms/next": "^3.85.1",
+    "@payloadcms/richtext-lexical": "^3.85.1",
+    "@payloadcms/ui": "^3.85.1",
+    "@pro-laico/payload-fonts": "workspace:*",
+    "@pro-laico/payload-icons": "workspace:*",
+    "@pro-laico/payload-images": "workspace:*",
+    "@pro-laico/payload-mux": "workspace:*",
+    "@pro-laico/payload-seed": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cross-env": "^10.1.0",
+    "graphql": "^16.14.2",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.2",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.1",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
