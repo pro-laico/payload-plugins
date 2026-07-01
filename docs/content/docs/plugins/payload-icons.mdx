@@ -17,7 +17,15 @@ from CSS. No sprite sheet, no wrapper file, no untrusted markup reaching the bro
 pnpm add @pro-laico/payload-icons
 ```
 
-## How it works
+## What's included
+
+A fully custom icon set, as easy to use as an off-the-shelf one:
+
+- **Add icons in the admin:** upload an `.svg` and the plugin optimizes, sanitizes, and themes it on save — designers and clients can extend the set without touching code or breaking anything.
+- **One drop-in component:** `<Icon name="arrow-right" />` inlines a real, recolorable `<svg>` — as easy as [Lucide](https://lucide.dev), but it's *your* set.
+- **Swappable icon sets:** a set maps lookup names to icons and one set is active, so activating a different set re-skins every icon at once (a seasonal pack, a heavier redraw, an A/B test).
+- **Never ship a missing icon:** the **Requested icons** panel scans your code and tracks runtime misses, surfacing exactly which icons you still need.
+- **Declarative seeding:** icons seed natively through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — no helper, no provider.
 
 <Callout type="info">
   **Mental model.** Icons are a shared pool of SVGs. An **icon set** maps a lookup `name`
@@ -27,15 +35,7 @@ pnpm add @pro-laico/payload-icons
   an **active, published** set points a name at it.
 </Callout>
 
-The pieces:
-
-- **An [`<Icon>` component](#icon):** resolves a name through the active set and inlines a real, recolorable `<svg>`.
-- **An [`icon` collection](#icon-1):** SVG-only uploads, optimized + sanitized + themed on save.
-- **An [`iconSet` collection](#iconset):** named `name → icon` mappings with a single-active toggle. The frontend renders the **active** set, so activating a different one re-skins every icon at once.
-- **[Icon usage detection](#icon-usage-detection):** the **Requested icons** panel scans your code (live in dev) plus tracks runtime misses, surfacing which icons you need and which a set is still missing.
-- **Declarative [seeding](#seeding):** icons seed natively via `defineSeed`, each record carrying its source SVG on `_file`; no helper, no provider.
-
-## Setup
+## Quickstart
 
 <Steps>
 
@@ -268,13 +268,6 @@ payload-icons-scan            # production/CI: scans ./src and ./app; -o sets th
   (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
 </Callout>
 
-## Revalidation
-
-The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
-rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
-the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
-`revalidatePath`) through the collections' [`hooks`](#options) option.
-
 ## Seeding
 
 Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
@@ -486,6 +479,27 @@ On by default (disable with `trackRequests: false`). A hidden diagnostics collec
 that fails to resolve at runtime is recorded (throttled, fire-and-forget) with a hit `count` and `first`/`lastRequestedAt`
 timestamps. It's the runtime counterpart to the static scan, capturing dynamic names a static pass can't
 see. Surfaced in the IconSet [usage panel](#icon-usage-detection), not browsed directly.
+
+## How it works
+
+The active set, the read path, and revalidation fit together like this.
+
+### Resolving an icon
+
+`<Icon name="arrow-right" />` looks the name up in the **active, published** `iconSet`, finds the
+`icon` doc it points at, and inlines that doc's stored `svgString` as a real `<svg>` — recolorable
+through `currentColor` and sized by your own classes. The lookup reads through `payload.find`,
+memoized per request, so repeating the same icon on a page costs one query. The name is the *set
+entry's* name, not the uploaded filename, which is why swapping the active set re-skins every icon at
+once. A name the active set doesn't cover renders a blank fallback and is recorded for the
+[Requested icons](#icon-usage-detection) panel.
+
+### Revalidation
+
+The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
+rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
+the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
+`revalidatePath`) through the collections' [`hooks`](#options) option.
 
 ## Exports
 

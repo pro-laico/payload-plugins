@@ -19,22 +19,17 @@ holds the data, and they stay in sync both ways. Upload, and it just plays.
 pnpm add @pro-laico/payload-mux
 ```
 
-## How it works
+## What's included
 
-Five pieces deliver that, and the rest of this page covers them in order:
+Video hosting that lives inside Payload, powered by Mux:
 
-- **A Videos collection.** You upload to **`mux-video`** (or extend a collection you name). Mux fills
-  in the read-only metadata; you set the title and an optional poster timestamp.
-- **Direct-to-Mux upload.** An admin uploader field posts the file straight to Mux via a pair of
-  upload endpoints, so the bytes never touch your server or database.
-- **Virtual playback URLs.** Every read computes `playbackUrl` (HLS `.m3u8`), `posterUrl`, and
-  `gifUrl` from the stored playback id, signing them automatically under a signed policy.
-- **A webhook.** Mux pushes encoding and delete events to one endpoint, which finishes slow-encoding
-  videos and mirrors dashboard deletes back into Payload.
-- **Server-side ingest + seeding.** Create a video from a local file or URL in code, or declare it as
-  a seed asset; both wait for the asset to finish and write full metadata, no webhook required.
+- **Upload and it just plays:** drop a clip in the admin and Mux encodes it to adaptive HLS with posters and preview GIFs — no media server, no huge files bloating your storage.
+- **Direct-to-Mux uploads:** the browser posts bytes straight to Mux, so video never touches your server or database.
+- **Playback URLs computed on read:** every video exposes virtual `playbackUrl` (HLS), `posterUrl`, and `gifUrl` from its stored playback id, JWT-signed automatically under a signed policy.
+- **Kept in sync both ways:** a webhook finishes slow-encoding videos and mirrors Mux-dashboard deletes back into Payload, so the two never drift.
+- **Server ingest + declarative seeding:** create a video from a file or URL in code, or seed one like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — both wait for the asset and write full metadata, no webhook required.
 
-## Setup
+## Quickstart
 
 <Steps>
 
@@ -328,14 +323,6 @@ left for the webhook.
   (`cloudflared tunnel --url http://localhost:3000` or ngrok) and set that URL as the webhook.
 </Callout>
 
-## Revalidation
-
-The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache, and some writes (the
-`video.asset.ready` / `deleted` webhook especially) land outside the request that rendered your page.
-Handle revalidation yourself with a Payload `afterChange` / `afterDelete` hook on `mux-video`: it fires
-for webhook writes, admin saves, and server-side ingest alike, so it's the one place to call
-`revalidateTag` / `revalidatePath` for the pages that embed videos.
-
 ## Server-side ingest
 
 Besides the browser uploader, a `mux-video` can be created **server-side** from a local file or URL,
@@ -374,6 +361,29 @@ both ways: the seed package never imports this one, nor the Mux SDK; the upload 
 hook. Playback policy comes from the plugin's configured policy, so seeded and admin-uploaded videos
 share one policy. See the
 [seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.
+
+## How it works
+
+The upload flow, virtual URLs, and webhook fit together like this.
+
+### The asset lifecycle
+
+When you upload, the admin field posts the bytes **straight to Mux** and the doc saves with just its
+`assetId` — the video never passes through your server. The `beforeChange` hook then polls the new
+asset for **~6 seconds**: a fast encode comes back with full playback metadata inline, and anything
+slower is left for the **webhook**, which fills that metadata in once Mux finishes (and mirrors
+dashboard deletes back into Payload). The `playbackUrl` / `posterUrl` / `gifUrl` fields aren't
+stored — they compute from the playback id on every read, signed on the fly under a signed policy.
+Server-side ingest and seeding skip the 6s window entirely: they wait for the asset to reach `ready`
+and write full metadata into the doc, so those videos play straight away whatever their length.
+
+### Revalidation
+
+The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache, and some writes (the
+`video.asset.ready` / `deleted` webhook especially) land outside the request that rendered your page.
+Handle revalidation yourself with a Payload `afterChange` / `afterDelete` hook on `mux-video`: it fires
+for webhook writes, admin saves, and server-side ingest alike, so it's the one place to call
+`revalidateTag` / `revalidatePath` for the pages that embed videos.
 
 ## Exports
 

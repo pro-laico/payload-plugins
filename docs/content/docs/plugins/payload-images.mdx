@@ -18,16 +18,17 @@ all driven from your CMS.
 pnpm add @pro-laico/payload-images
 ```
 
-## How it works
+## What's included
 
-What's in the box:
+A Sanity-style image pipeline, driven from your CMS:
 
-- **Two collections.** An `images` upload that stores only the original, plus a hidden cache of every generated size.
-- **A transform endpoint.** `/api/img/:id` resizes, crops, and re-encodes on request, then caches the result.
-- **Focal-point cropping.** Set the subject once; every crop, at any ratio, stays centered on it.
-- **A responsive component.** `<ResponsiveImage>` and virtual `src`/`srcset` fields request the exact size each layout needs.
+- **Never bigger than it needs to be:** every layout requests the exact size, crop, and format it needs; the endpoint renders it once on demand, then caches it forever.
+- **Focal-point cropping:** mark the subject once and every crop, at any aspect ratio, stays centered on it — no more lopped-off heads.
+- **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
+- **Resize, recrop, reformat from anywhere:** point a `<ResponsiveImage>` or a virtual `srcset` at any ratio in code, or drag the focal point / replace the file in the admin.
+- **Self-busting cache + declarative seeding:** content-addressed URLs refresh themselves when a file or focal point changes, and seeded media (focal point and all) is declared in code through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
-## Setup
+## Quickstart
 
 <Callout type="info">
   **Built for Next.js.** The transform endpoint persists variants with Next's `after()` and the cache
@@ -585,19 +586,6 @@ default OG can just use `image.src`. Reach for `getImageUrl` only when you need 
 ratio the presets don't cover, like OG's 1200×630; `buildSrcset` / `buildVariantUrl` are there for
 a hand-rolled `<img>` / `<picture>`.
 
-## Revalidation
-
-**The optimized images revalidate themselves, with nothing to configure.** Every transform URL is immutable and
-content-addressed: its `v` token is a hash of the source's filename + focal point. Replace the file or
-move the focal point and the URL changes, so browsers and CDNs fetch the updated image automatically (no
-manual purge), while the now-stale variants are dropped by the collection's change/delete hooks.
-
-The one thing the plugin *doesn't* touch is your **Next.js page cache**, but that isn't
-image-specific. A page that cached an image doc keeps serving the old URL until you revalidate that
-route, exactly as it would for any Payload content. Handle it however you already do (a
-`revalidatePath` / `revalidateTag` in an `afterChange` hook, or a dynamic route). There's nothing
-extra to add for images.
-
 ## Focal-point cropping
 
 Optimization is only half the job: a 16:9 hero and a 1:1 thumbnail of the same photo need
@@ -612,7 +600,7 @@ that must stay in frame) once per image, and the endpoint crops around it at eve
 - **Move it and stale crops refresh.** Changing the focal point purges that image's cached variants
   and bumps its `v` token, so anything already served refetches the new crop.
 
-## Payload Seed
+## Seeding
 
 Because `images` is a plain Payload upload collection, it seeds **natively** through
 [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — no special provider needed. You seed it
@@ -645,6 +633,33 @@ subject the moment the transform endpoint serves them. See the
 [`examples/images-sandbox`](https://github.com/pro-laico/payload-plugins) app, a full working
 setup with a visual gallery page that renders every seeded image focal-cropped at multiple
 aspect ratios.
+
+## How it works
+
+The endpoint, the cache, and the content-addressed URLs fit together like this.
+
+### The transform pipeline
+
+The transform endpoint (`/api/img/:id`) takes an id plus size / crop / format params, renders that
+variant once with Sharp, and persists it with Next's `after()` so the response isn't blocked — every
+later request for the same URL serves the cached bytes. URLs are **content-addressed** by a `v` token,
+a hash of the source's filename and focal point, so a variant URL is immutable and safe to cache
+forever, while the collection's change / delete hooks drop the variants a new file or focal point made
+stale. Nothing is pre-generated: the hidden `generated-images` collection fills in lazily, one
+requested size at a time.
+
+### Revalidation
+
+**The optimized images revalidate themselves, with nothing to configure.** Because every URL is
+content-addressed, replacing the file or moving the focal point changes the URL, so browsers and CDNs
+fetch the updated image automatically (no manual purge) while the stale variants are dropped by the
+hooks.
+
+The one thing the plugin *doesn't* touch is your **Next.js page cache**, but that isn't
+image-specific. A page that cached an image doc keeps serving the old URL until you revalidate that
+route, exactly as it would for any Payload content. Handle it however you already do (a
+`revalidatePath` / `revalidateTag` in an `afterChange` hook, or a dynamic route). There's nothing
+extra to add for images.
 
 ## Exports
 

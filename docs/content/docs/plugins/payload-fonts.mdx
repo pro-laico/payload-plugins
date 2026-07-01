@@ -11,20 +11,17 @@ and saving you time.
 pnpm add @pro-laico/payload-fonts
 ```
 
-## How it works
+## What's included
 
-The plugin is a few standard Payload pieces, and the rest of this page covers them in order:
+Custom, self-hosted fonts with none of the usual setup:
 
-- **Three collections.** You edit **`font`** (the typeface); it subsets each uploaded file through
-  two hidden collections — `fontOriginal` (raw bytes) → `fontOptimized` (served WOFF2) — on save.
-- **A `fontSet` global.** Choose which uploaded typeface fills each family; that selection is the
-  source of truth both serving paths read.
-- **Two serving paths.** `next/font/local` in production (an export endpoint + a CLI) and the
-  `<DevFonts>` runtime component in development — they never both fire.
-- **Server ingest + seeding.** `ingestFont()` creates a typeface from a file; `fontAssetProvider()`
-  registers `font` as a seed asset provider so a typeface seeds declaratively like any doc.
+- **Automatic optimization:** every uploaded font is subsetted to a lean, web-ready WOFF2 on save — smaller files, no manual tooling or command-line fontkit.
+- **Fonts chosen in the CMS:** pick which typeface is your sans / serif / mono / display (or your own families) from the admin, and swap them anytime with no code change.
+- **Self-hosted, no third-party CDN:** fonts are served from your own app through [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) — fast, private, preloaded, and size-adjusted against layout shift.
+- **Zero-config in dev, optimized in prod:** a runtime component serves the live selection while you work; a build step bakes `next/font` for production. The two paths never both fire.
+- **Server ingest + declarative seeding:** create a typeface from a file or URL in code with `ingestFont`, or seed one like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
-## Setup
+## Quickstart
 
 <Steps>
 
@@ -398,19 +395,6 @@ export const devFontsProps = [
 
 </Tabs>
 
-## Revalidation & caching
-
-How a `fontSet` change reaches the browser depends on the serving path, by design.
-
-- **Production** bakes fonts at build time, so there's no runtime cache to bust and **no
-  `revalidatePath`/`revalidateTag`**; that's the tradeoff for stock `next/font`. Publish a change by
-  re-running the download and rebuilding (`payload-fonts-download` → `next build`). To automate it,
-  trigger a redeploy from a `fontSetOverrides.hooks.afterChange` deploy hook. The export endpoint is
-  `Cache-Control: no-store`, so each run sees the current selection.
-- **Development** reads the live selection on every render, so just keep the route dynamic
-  (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches
-  the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface.
-
 ## Server ingest
 
 Besides the admin slots, a typeface can be created **server-side** from a local file or URL, which is
@@ -467,6 +451,33 @@ export const fontSet = defineSeed('fontSet', ({ ref }) => ({
 A reseed clears the `font` collection via `payload.delete`, so its cascade removes the old originals
 + optimized too (idempotent). See the
 [seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.
+
+## How it works
+
+The three collections and two serving paths fit together like this.
+
+### The subset pipeline
+
+You only ever edit the `font` typeface. Its uploaded files are stored raw in `fontOriginal` — the
+**archive of truth** — and subsetted to served `fontOptimized` WOFF2s on every save. Keeping the
+untouched originals is deliberate: the output is lossy (subsetted to your `charset`), so holding the
+source bytes lets it be re-derived later — widen `charset`, and the next save re-subsets from the
+originals with no re-upload. A delete cascades through both derived layers, and the whole flow runs in
+the `font` collection's hooks (`getFontSourceHook` → `optimizeFromOriginals`), so there's no separate
+build step to run and nothing to keep in sync by hand.
+
+### Revalidation & caching
+
+How a `fontSet` change reaches the browser depends on the serving path, by design.
+
+- **Production** bakes fonts at build time, so there's no runtime cache to bust and **no
+  `revalidatePath`/`revalidateTag`**; that's the tradeoff for stock `next/font`. Publish a change by
+  re-running the download and rebuilding (`payload-fonts-download` → `next build`). To automate it,
+  trigger a redeploy from a `fontSetOverrides.hooks.afterChange` deploy hook. The export endpoint is
+  `Cache-Control: no-store`, so each run sees the current selection.
+- **Development** reads the live selection on every render, so just keep the route dynamic
+  (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches
+  the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface.
 
 ## Exports
 
