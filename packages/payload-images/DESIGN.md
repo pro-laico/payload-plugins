@@ -47,9 +47,9 @@ GET /api/img/:id?w&h&ar&fit&q&fmt
 
 Key design points carried over from the original:
 
-1. **Original-only storage, on-demand everything.** Uploads don't pre-generate a size
-   ladder by default (`pregenerateSizes` opts into a built-in 7-size ladder). Every
-   variant is built lazily and cached, so storage scales with what's actually requested.
+1. **Original-only storage, on-demand everything.** Uploads never pre-generate a size
+   ladder — the original is stored untouched. Every variant is built lazily and cached, so
+   storage scales with what's actually requested.
 2. **Deterministic variant keys.** `variantCacheKey` folds source id + filename + focal +
    transform params + resolved format into a short hash. The key goes stale exactly when
    the purge hook fires (file replace / focal edit), so unreachable variants are removed
@@ -61,7 +61,7 @@ Key design points carried over from the original:
 4. **Single-flight coalescing.** A cold page fires every srcset width at once. The source
    read is deduped per id, and variant generation is coalesced per cache key, so the
    expensive read+encode runs once under a thundering herd.
-5. **Storage-adapter agnostic.** Both collections are uploads, so variant bytes flow
+5. **Storage-adapter agnostic.** Both collections are uploads, so each variant is stored
    through whatever adapter is configured. Local reads hit `staticDir`; cloud/relative
    reads self-fetch Payload's own file route — which is why the endpoint needs an origin. It
    uses Payload's `config.serverURL`, falling back to `NEXT_PUBLIC_SERVER_URL` and then the live
@@ -94,7 +94,7 @@ script. See `examples/images-sandbox`.
   reading (SSRF-guarded), the concurrency gate, the lazy Sharp loader, single-flight.
 - `variants/key.ts` — the deterministic cache key.
 - `hooks/purge.ts` — stale-on-change + all-on-delete variant purging.
-- `components/buildSrcset.ts` — isomorphic URL/srcset builders (client-safe).
+- `utils/urls.ts` — isomorphic URL/srcset builders (client-safe).
 - `components/image.tsx` — `<ResponsiveImage>` (server-rendered, LQIP placeholder).
 - `components/admin/*` — the focal-point picker and purge button (client components).
 - `lib/*` — the inlined `mergeCollection` + `getServerSideURL`.

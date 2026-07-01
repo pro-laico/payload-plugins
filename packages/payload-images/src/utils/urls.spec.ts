@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths } from './buildSrcset'
+import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths } from './urls'
 
 describe('buildVariantUrl', () => {
   it('bakes settings into a same-origin query URL', () => {
@@ -44,8 +44,8 @@ describe('stepWidths', () => {
   it('steps by pixelStep up to the source width (the 100px example)', () => {
     expect(stepWidths(100, 50)).toEqual([50, 100])
   })
-  it('never exceeds the largest step multiple at or below the source width', () => {
-    expect(stepWidths(120, 50)).toEqual([50, 100]) // 120 → cap at 100 (no upscale)
+  it('tops out at the exact source width, not the largest step multiple below it', () => {
+    expect(stepWidths(120, 50)).toEqual([50, 100, 120]) // 120 itself caps it (no upscale past native)
   })
   it('emits every pixelStep multiple up to the source — a bigger step means fewer widths', () => {
     expect(stepWidths(600, 200)).toEqual([200, 400, 600])
@@ -55,9 +55,29 @@ describe('stepWidths', () => {
     expect(w[w.length - 1]).toBe(200)
     expect(w.every((x) => x % 50 === 0)).toBe(true)
   })
+
+  describe('explicit width ladder (array pixelStep)', () => {
+    it('keeps the ladder widths below the source, then tops out at the exact source width', () => {
+      expect(stepWidths(1000, [200, 450, 750, 1200, 2000])).toEqual([200, 450, 750, 1000])
+    })
+    it('sorts, dedupes, and drops non-positive / over-max values', () => {
+      expect(stepWidths(900, [750, 200, 200, -5, 450])).toEqual([200, 450, 750, 900])
+      expect(stepWidths(5000, [200, 9999], 4096)).toEqual([200, 4096]) // 9999 > maxWidth, source clamps to 4096
+    })
+    it('uses the ladder as-is (keeping its author-chosen cap) when no source width is given', () => {
+      expect(stepWidths(undefined, [200, 450, 750])).toEqual([200, 450, 750])
+    })
+    it('collapses to a single source-width candidate when every ladder width exceeds the source', () => {
+      expect(stepWidths(160, [200, 450])).toEqual([160])
+    })
+  })
 })
 
 describe('getImageUrl', () => {
+  // baseUrl defaults to NEXT_PUBLIC_SERVER_URL; pin it empty so the relative-URL cases are deterministic.
+  beforeEach(() => vi.stubEnv('NEXT_PUBLIC_SERVER_URL', ''))
+  afterEach(() => vi.unstubAllEnvs())
+
   it('returns null for an empty resource', () => {
     expect(getImageUrl(null)).toBeNull()
     expect(getImageUrl(undefined)).toBeNull()
@@ -73,6 +93,12 @@ describe('getImageUrl', () => {
     const url = getImageUrl({ id: 'abc', width: 900, filename: 'a.png', focalX: 50, focalY: 50 })
     const v = deriveVersion({ filename: 'a.png', focalX: 50, focalY: 50 })
     expect(url).toBe(`/api/img/abc?w=900&fit=cover&q=75&fmt=auto&v=${v}`)
+  })
+  it('defaults baseUrl to NEXT_PUBLIC_SERVER_URL (absolute), overridable with an explicit baseUrl or ""', () => {
+    vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://site.com')
+    expect(getImageUrl('abc')).toBe('https://site.com/api/img/abc?w=1280&fit=cover&q=75&fmt=auto')
+    expect(getImageUrl('abc', { baseUrl: '' })).toBe('/api/img/abc?w=1280&fit=cover&q=75&fmt=auto') // opt out → relative
+    expect(getImageUrl('abc', { baseUrl: 'https://cdn.example.com' })).toMatch(/^https:\/\/cdn\.example\.com\/api\/img\//)
   })
 })
 

@@ -9,29 +9,24 @@
  * segment isn't a collection/global slug — so the default `/img` base is safe as
  * long as no collection is named `img`.
  */
-import { after } from 'next/server'
-
 import type { CollectionSlug, Endpoint, Payload, PayloadRequest } from 'payload'
 
 import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
 import { purgeVariantsForSource } from '../hooks/purge'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { createSingleFlight } from '../transform/coalesce'
+import { type GenBytes, getOrCreateVariantBytes } from '../transform/getVariantBytes'
 import { setTransformConcurrency } from '../transform/limit'
 import {
   DEFAULT_CONSTRAINTS,
-  extForFormat,
   type Format,
-  mimeForFormat,
   negotiateFormat,
   type OutputFormat,
   parseTransformParams,
   type TransformConstraints,
 } from '../transform/params'
-import { transformImage, type TransformOutput } from '../transform/sharp'
 import { setSharpConcurrency } from '../transform/sharpInstance'
-import { readBytes, resolveStaticDir, type UploadDocLike } from '../transform/source'
-import { variantCacheKey } from '../variants/key'
+import type { UploadDocLike } from '../transform/source'
 
 export interface TransformEndpointConfig extends Partial<TransformConstraints> {
   /** Source image collection slug. Default `images`. */
@@ -47,8 +42,6 @@ export interface TransformEndpointConfig extends Partial<TransformConstraints> {
 }
 
 type SourceDoc = UploadDocLike & { id: string | number; focalX?: number | null; focalY?: number | null }
-
-type GenResult = { ok: true; out: TransformOutput } | { ok: false; status: number; msg: string }
 
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const PRIVATE_IMMUTABLE = 'private, max-age=31536000, immutable'
@@ -85,8 +78,6 @@ const routeId = (req: PayloadRequest): string => {
   return raw == null ? '' : String(raw)
 }
 
-const isDuplicateKeyError = (err: unknown): boolean => /duplicate|unique/i.test(err instanceof Error ? err.message : String(err))
-
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
 export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endpoint => {
   const path = '/img'
@@ -100,7 +91,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
   // Per-endpoint single-flight maps: dedupe the source read across one <img>'s srcset
   // widths, and coalesce variant generation under a thundering herd. See ./coalesce.
   const sourceFlight = createSingleFlight<string, SourceDoc | null>()
-  const genFlight = createSingleFlight<string, GenResult>()
+  const genFlight = createSingleFlight<string, GenBytes>()
 
   return {
     path: `${path}/:id`,
@@ -108,9 +99,12 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
     handler: async (req: PayloadRequest): Promise<Response> => {
       const { payload } = req
 
-      // Origin used to self-fetch an original served from a relative/cloud URL. Prefer the
-      // `serverURL` the app already set in buildConfig, then the env fallback, then the live
-      // request origin — so no separate NEXT_PUBLIC_SERVER_URL is needed when serverURL is set.
+      //NOTE: This origin is ONLY used to self-fetch an original from *relative-URL* storage.
+      //NOTE: Absolute-URL adapters (Vercel Blob, S3-public) fetch doc.url directly, and local disk
+      //NOTE: reads the filesystem — both paths ignore `base` entirely. The chain self-resolves per
+      //NOTE: environment (serverURL -> env -> req.origin -> localhost), so it works zero-config and
+      //NOTE: a missing serverURL is NOT a general 502 risk. The fallbacks are intentional — do not
+      //NOTE: "harden" this by requiring serverURL; relative-URL storage is the only case that needs it.
       const base = payload.config.serverURL || getServerSideURL() || req.origin || 'http://localhost:3000'
 
       const id = routeId(req)
@@ -139,83 +133,21 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
       const format: OutputFormat = isAuto
         ? negotiateFormat(req.headers.get('accept'), constraints.formats, constraints.preferAvif)
         : (p.fmt as Exclude<Format, 'auto'>)
-      const key = variantCacheKey({ id: src.id, filename: src.filename, focalX: src.focalX, focalY: src.focalY }, p, format)
 
-      try {
-        const hit = await payload.find({
-          collection: variantSlug,
-          where: { cacheKey: { equals: key } },
-          limit: 1,
-          depth: 0,
-          overrideAccess: true,
-        })
-        const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined
-        if (variant) {
-          const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base)
-          if (bytes) return new Response(toBody(bytes), { headers: buildHeaders(mimeForFormat(format), key, isAuto, cdn, isPublic) })
-        }
-      } catch {}
-
-      // Coalesce generation by cache key: a thundering herd of identical requests reads
-      // the original + encodes once. The runner schedules the single persist; awaiters
-      // just receive the bytes. Returns a union so the shared promise carries error status.
-      const result = await genFlight(key, async (): Promise<GenResult> => {
-        const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base)
-        if (!original) {
-          payload.logger.warn(`[payload-images] source ${id} unreadable (filename=${src.filename ?? 'none'}, url=${src.url ?? 'none'})`)
-          return { ok: false, status: 502, msg: 'Source unavailable' }
-        }
-
-        let out: TransformOutput
-        try {
-          out = await transformImage(original, {
-            w: p.w,
-            h: p.h,
-            fit: p.fit,
-            quality: p.q,
-            format,
-            focalX: src.focalX,
-            focalY: src.focalY,
-            maxInputPixels: constraints.maxInputPixels,
-          })
-        } catch (err) {
-          payload.logger.error(`[payload-images] transform failed for ${id}: ${String(err)}`)
-          return { ok: false, status: 500, msg: 'Transform failed' }
-        }
-
-        const persist = async (): Promise<void> => {
-          try {
-            await payload.create({
-              collection: variantSlug,
-              file: { data: out.data, mimetype: out.mimeType, name: `${key}.${extForFormat(format)}`, size: out.data.byteLength },
-              data: {
-                source: src.id as never,
-                cacheKey: key,
-                fit: p.fit,
-                format,
-                quality: p.q,
-                focalX: src.focalX ?? null,
-                focalY: src.focalY ?? null,
-              },
-              overwriteExistingFiles: true,
-              overrideAccess: true,
-            })
-          } catch (err) {
-            if (!isDuplicateKeyError(err))
-              payload.logger.warn(`[payload-images] failed to persist variant ${key} for source ${id}: ${String(err)}`)
-          }
-        }
-        try {
-          after(persist)
-        } catch {
-          void persist()
-        }
-
-        return { ok: true, out }
+      const result = await getOrCreateVariantBytes({
+        payload,
+        source: src,
+        params: p,
+        format,
+        sourceSlug,
+        variantSlug,
+        base,
+        maxInputPixels: constraints.maxInputPixels,
+        genFlight,
       })
 
       if (!result.ok) return new Response(result.msg, { status: result.status })
-      return new Response(toBody(result.out.data), { headers: buildHeaders(result.out.mimeType, key, isAuto, cdn, isPublic) })
+      return new Response(toBody(result.data), { headers: buildHeaders(result.mimeType, result.key, isAuto, cdn, isPublic) })
     },
   }
 }

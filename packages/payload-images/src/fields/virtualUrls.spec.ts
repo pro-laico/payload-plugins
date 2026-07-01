@@ -48,4 +48,14 @@ describe('virtualUrlFields', () => {
     expect(read('src', { width: 800 })).toBeNull()
     expect(read('src', { id: 'x' })).toBeNull()
   })
+
+  it('blurDataURL is a gated, defaultPopulate-excluded field that no-ops unless a read opts in', async () => {
+    const f = fieldByName('blurDataURL')
+    expect(f.virtual).toBe(true)
+    expect(f.admin?.hidden).toBe(true)
+    expect(VIRTUAL_URL_FIELDS).not.toContain('blurDataURL') // never rides along in relationship population
+    const hook = f.hooks?.afterRead?.[0] as FieldHook
+    // No req.context.lqip / X-LQIP → cheap no-op, even with a fully populated doc.
+    await expect(hook({ data: doc, req: {} } as never)).resolves.toBeNull()
+  })
 })

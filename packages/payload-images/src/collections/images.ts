@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail, ImageSize, ImageUploadFormatOptions } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 'payload'
 
 import { anyone, authd } from '../access'
 import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
@@ -6,28 +6,11 @@ import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hoo
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
 
-const formatOptions: ImageUploadFormatOptions = { format: 'webp', options: { nearLossless: true, quality: 75 } }
-
 /** Admin component subpaths (referenced by the Payload import map). */
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
 export const PurgeVariantsFieldPath = '@pro-laico/payload-images/admin/purgeVariants'
 
-/** Built-in size ladder used when `pregenerateSizes: true` — Payload's classic on-upload sizes. */
-const DEFAULT_SIZE_LADDER: ImageSize[] = [
-  { formatOptions, name: 'thumbnail', width: 300 },
-  { formatOptions, name: 'square', width: 500, height: 500 },
-  { formatOptions, name: 'small', width: 600 },
-  { formatOptions, name: 'medium', width: 900 },
-  { formatOptions, name: 'large', width: 1400 },
-  { formatOptions, name: 'xlarge', width: 1920 },
-  { formatOptions, name: 'og', width: 1200, height: 630, crop: 'center' },
-]
-
 export interface CreateImagesOptions {
-  /** Opt into Payload's classic on-upload size ladder instead of on-demand transforms. Off by
-   *  default (uploads store only the original; every size is generated on demand). `true` uses a
-   *  built-in 7-size ladder; pass an array for a custom one. */
-  pregenerateSizes?: boolean | ImageSize[]
   /** Render the focal-point + ratio-preview field and the purge-variants button. Default true. */
   focalUI?: boolean
   /** Aspect ratios shown in the focal preview tiles. */
@@ -44,6 +27,15 @@ export interface CreateImagesOptions {
   virtualFields?: boolean
   /** Mark the `alt` field `localized: true` (requires Payload localization). Default false. */
   localizeAlt?: boolean
+  /** Accepted upload mime types. Defaults to the raster formats the transform pipeline can
+   *  process ({@link IMAGE_MIME_TYPES}: avif/webp/jpeg/png). Override to widen or narrow what
+   *  the collection accepts — but the endpoint only meaningfully transforms raster images. */
+  mimeTypes?: string[]
+  /** Enable Payload's native folder organization on the collection (adds a folder relationship). Default false. */
+  folders?: boolean
+  /** Cap the *stored* original's longest edge (px) via `upload.resizeOptions`, applied once on upload.
+   *  Off by default — the original is kept untouched. Set it only to bound storage. */
+  maxOriginalSize?: number
 }
 
 /**
@@ -97,7 +89,7 @@ const adminUIFields = (focalUI: boolean, variantSlug: CollectionSlug, previewRat
  * mime whitelist so it never clobbers a collection it's merged onto.
  */
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders } = opts
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
   return {
     // Admin UI is gated by focalUI; the virtual URL fields are for API consumers, so they're
@@ -108,6 +100,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
     upload: { focalPoint: true },
+    ...(folders ? { folders: true } : {}),
   }
 }
 
@@ -116,12 +109,11 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * default); keeps Payload's built-in `focalPoint` (the focal component enhances it). The
  * on-demand transform endpoint serves every rendered variant and records it in the
  * generated-images collection, surfaced here via the `variants` join and purged by the
- * change/delete hooks. The LQIP placeholder is derived on the frontend from the smallest
- * transform variant — there's no stored placeholder field.
+ * change/delete hooks. The LQIP placeholder is generated on demand by `<ResponsiveImage>` (a tiny
+ * inline base64 via the shared variant cache) — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
-  const { pregenerateSizes = false, virtualFields = true, localizeAlt = false } = opts
-  const imageSizes = pregenerateSizes === true ? DEFAULT_SIZE_LADDER : Array.isArray(pregenerateSizes) ? pregenerateSizes : undefined
+  const { virtualFields = true, localizeAlt = false, folders, maxOriginalSize } = opts
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail)
   const enh = imageEnhancements(opts)
 
@@ -147,6 +139,7 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
     },
     defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
     ...(forceSelect ? { forceSelect: forceSelect as CollectionConfig['forceSelect'] } : {}),
+    ...(folders ? { folders: true } : {}),
     fields: [
       {
         name: 'alt',
@@ -161,9 +154,12 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
     upload: {
       focalPoint: true,
       displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
-      mimeTypes: IMAGE_MIME_TYPES,
+      mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
-      ...(imageSizes ? { imageSizes } : {}),
+      // Off by default — the stored original is kept untouched; only downsize when asked, to bound storage.
+      ...(maxOriginalSize
+        ? { resizeOptions: { width: maxOriginalSize, height: maxOriginalSize, fit: 'inside', withoutEnlargement: true } }
+        : {}),
     },
   }
 }

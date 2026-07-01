@@ -37,10 +37,10 @@
         "types": "./dist/components/image.d.ts",
         "default": "./dist/components/image.js"
       },
-      "./components/buildSrcset": {
-        "import": "./dist/components/buildSrcset.js",
-        "types": "./dist/components/buildSrcset.d.ts",
-        "default": "./dist/components/buildSrcset.js"
+      "./utils/urls": {
+        "import": "./dist/utils/urls.js",
+        "types": "./dist/utils/urls.d.ts",
+        "default": "./dist/utils/urls.js"
       },
       "./admin/focalPreview": {
         "import": "./dist/components/admin/focalPreview.js",
@@ -67,10 +67,10 @@
       "types": "./src/components/image.tsx",
       "default": "./src/components/image.tsx"
     },
-    "./components/buildSrcset": {
-      "import": "./src/components/buildSrcset.ts",
-      "types": "./src/components/buildSrcset.ts",
-      "default": "./src/components/buildSrcset.ts"
+    "./utils/urls": {
+      "import": "./src/utils/urls.ts",
+      "types": "./src/utils/urls.ts",
+      "default": "./src/utils/urls.ts"
     },
     "./admin/focalPreview": {
       "import": "./src/components/admin/focalPreview.tsx",

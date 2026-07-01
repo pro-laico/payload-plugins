@@ -112,12 +112,13 @@ For a full-bleed hero or any element that sets its own height, pass `fill`:
 ```
 
 Need a single URL (OG tags, CSS backgrounds, emails)? Use `getImageUrl` from the
-`components/buildSrcset` subpath:
+`utils/urls` subpath:
 
 ```ts
-import { getImageUrl } from '@pro-laico/payload-images/components/buildSrcset'
+import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 
-const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: process.env.NEXT_PUBLIC_SERVER_URL })
+// baseUrl defaults to NEXT_PUBLIC_SERVER_URL, so the OG URL is absolute with nothing to pass.
+const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1200/630' })
 ```
 
 ## Options
@@ -130,13 +131,16 @@ const ogUrl = getImageUrl(image, { width: 1200, aspectRatio: '1.91:1', baseUrl: 
 | `extendCollection` | `string` | — | Slug of an existing **upload** collection to add the pipeline to, instead of creating `images`. |
 | `imagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks deep-merged onto the Images collection (`upload`/`access`/`admin` merged, `fields`/`hooks` appended). |
 | `generatedImagesOverrides` | `Partial<CollectionConfig>` | — | Tweaks for the hidden variant-cache collection. |
-| `pregenerateSizes` | `boolean \| ImageSize[]` | `false` | Opt into Payload's classic on-upload size ladder instead of on-demand. `true` = built-in 7-size ladder; array = custom. |
-| `pixelStep` | `number` | `50` | Project-wide srcset width increment + the endpoint's snap grid. One value, set once; bigger = fewer widths/variants, `maxDimension` caps the total. |
+| `pixelStep` | `number \| number[]` | `50` | Project-wide srcset widths. A number is the step (+ the endpoint's snap grid); an array is an explicit ladder (keep to multiples of 50). `maxDimension` caps the total. |
 | `transform` | `TransformEndpointConfig \| false` | `{}` | Transform + purge endpoint config; `false` registers neither. |
 | `focalUI` | `boolean` | `true` | Render the focal picker + ratio preview and the Purge button. |
 | `previewRatios` | `string[]` | `['16:9','9:16','1:1','4:3','3:2','21:9']` | Aspect ratios shown as focal-preview tiles. |
 | `virtualFields` | `boolean` | `true` | Add computed `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields to every read. |
 | `localizeAlt` | `boolean` | `false` | Mark `alt` `localized` (needs Payload localization). Ignored with `extendCollection`. |
+| `mimeTypes` | `string[]` | raster set | Accepted upload mime types (defaults to avif/webp/jpeg/png). Ignored with `extendCollection`. |
+| `folders` | `boolean` | `false` | Enable Payload's native folder organization on the managed collection (created `images`, or the `extendCollection` target). |
+| `maxOriginalSize` | `number` | — | Cap the stored original's longest edge (px), applied once on upload. Off by default — the original stays untouched. Ignored with `extendCollection`. |
+| `placeholder` | `false \| { width?, quality?, format?, maxWidth? }` | `{ width: 24, quality: 40, format: 'webp', maxWidth: 64 }` | Inline LQIP for `<ResponsiveImage>` — a faithful (per ratio + focal) base64 placeholder generated server-side and painted instantly. `width`/`quality`/`format` set the defaults; `maxWidth` caps per-read overrides from the untrusted `context.lqip` / `X-LQIP` door. `false` disables it. |
 
 `transform` keys (all optional): `sourceSlug` (`'images'`), `variantSlug`
 (`'generated-images'`), `cdnCacheControl` (`true`), `maxDimension` (`4096`),
@@ -157,8 +161,8 @@ imagesPlugin({ extendCollection: 'media' })
 
 The transform endpoint then serves `/api/img/:id` for `media` docs, and the variant cache
 relates back to `media`. The target must be an upload collection (the plugin throws a clear
-error otherwise). `pregenerateSizes` is ignored in this mode — your collection already owns its
-`imageSizes`.
+error otherwise); your collection keeps full ownership of its own `upload` config, including
+any `imageSizes`.
 
 > **Custom API route or Next `basePath`?** The transform URLs default to `/api/img`. If you've
 > changed Payload's `routes.api` (or set a Next `basePath`), pass `path` to the component once via

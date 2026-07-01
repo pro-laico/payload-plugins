@@ -1,8 +1,9 @@
 /**
- * Pure, isomorphic URL builders for the on-demand transform endpoint. NO Node /
- * Sharp / server imports — safe to bundle into client components. Produces
- * same-origin relative URLs by default; pass `baseUrl` for absolute contexts (OG
- * tags, emails).
+ * Isomorphic URL builders for the on-demand transform endpoint. NO Node / Sharp / server imports —
+ * safe to bundle into client components. `buildVariantUrl` / `buildSrcset` produce same-origin
+ * relative URLs by default (pass `baseUrl` for absolute); `getImageUrl` — the one-off/shareable
+ * helper — instead defaults `baseUrl` to `process.env.NEXT_PUBLIC_SERVER_URL` (a Next build-time
+ * constant, inlined in client bundles) so OG/email URLs come out absolute with no extra wiring.
  */
 import { DEFAULT_PIXEL_STEP, type Fit, type Format, parseAspectRatio } from '../transform/params'
 
@@ -69,6 +70,8 @@ export type ImageResource = string | number | ({ id: string | number; width?: nu
 export interface GetImageUrlOptions extends BuildUrlOptions {
   /** Output width. Falls back to a populated doc's intrinsic width, else 1280. */
   width?: number
+  /** Prefix for absolute URLs. Defaults to `NEXT_PUBLIC_SERVER_URL`; pass `''` for a relative URL. */
+  baseUrl?: string
 }
 
 /**
@@ -77,6 +80,10 @@ export interface GetImageUrlOptions extends BuildUrlOptions {
  * automatically — so you don't re-implement the resolve-and-`deriveVersion` dance every time
  * you need a raw URL (OG tags, CSS backgrounds, emails). Returns null when there's no id.
  * For a responsive `<img>`, prefer `<ResponsiveImage>` / {@link buildSrcset}.
+ *
+ * Because these URLs are usually for external/shareable contexts (OG, email), `baseUrl` defaults
+ * to `process.env.NEXT_PUBLIC_SERVER_URL` so the result is absolute with no extra wiring. Pass an
+ * explicit `baseUrl` to override, or `baseUrl: ''` to force a relative same-origin URL.
  */
 export const getImageUrl = (resource: ImageResource, o: GetImageUrlOptions = {}): string | null => {
   if (resource == null) return null
@@ -84,7 +91,11 @@ export const getImageUrl = (resource: ImageResource, o: GetImageUrlOptions = {})
   const id = doc ? (doc.id == null ? '' : String(doc.id)) : String(resource)
   if (!id) return null
   const width = o.width ?? doc?.width ?? 1280
-  return buildVariantUrl(id, width, { ...o, version: o.version ?? deriveVersion(doc) })
+  return buildVariantUrl(id, width, {
+    ...o,
+    baseUrl: o.baseUrl ?? (process.env.NEXT_PUBLIC_SERVER_URL || undefined),
+    version: o.version ?? deriveVersion(doc),
+  })
 }
 
 export const buildVariantUrl = (id: string, width: number, o: BuildUrlOptions = {}): string => {
@@ -102,16 +113,40 @@ export const buildVariantUrl = (id: string, width: number, o: BuildUrlOptions = 
 }
 
 /**
- * The widths for a srcset: every `pixelStep` multiple up to the source's intrinsic
- * width (so we never request a larger-than-original image). With no source width,
- * falls back to stepping up to `maxWidth`. The entry count is bounded by
- * `min(sourceWidth, maxWidth) / pixelStep` — i.e. the size ceiling caps it, so a
- * bigger `pixelStep` (or a smaller `maxWidth`/source) yields fewer widths.
+ * The widths for a srcset. Two modes via `pixelStep`:
+ *
+ *  - a **number** (the step): every multiple of it up to the source's intrinsic width,
+ *    then the exact source width as the final candidate (so the srcset always tops out
+ *    at the true native resolution, not the largest step multiple below it). With no
+ *    source width, steps up to `maxWidth`.
+ *  - an **array** (an explicit, possibly non-linear ladder à la a curated width list):
+ *    the ladder values that fall below the source width, then the exact source width on
+ *    top. With no source width, the ladder is used as-is (its author-chosen cap is kept).
+ *
+ * Either way no width exceeds the source (no upscaling) or `maxWidth`. The entry count is
+ * bounded by the size ceiling: a bigger step / a shorter ladder / a smaller source yields
+ * fewer widths (and so fewer cached variants).
  */
-export const stepWidths = (sourceWidth?: number, pixelStep = DEFAULT_PIXEL_STEP, maxWidth = 4096): number[] => {
+export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = DEFAULT_PIXEL_STEP, maxWidth = 4096): number[] => {
+  const known = sourceWidth && sourceWidth > 0 ? Math.min(maxWidth, Math.round(sourceWidth)) : undefined
+
+  if (Array.isArray(pixelStep)) {
+    const ladder = [
+      ...new Set(
+        pixelStep
+          .filter((w) => Number.isFinite(w) && w > 0)
+          .map((w) => Math.round(w))
+          .filter((w) => w <= maxWidth),
+      ),
+    ].sort((a, b) => a - b)
+    if (known == null) return ladder.length ? ladder : [maxWidth]
+    const widths = ladder.filter((w) => w < known)
+    widths.push(known) // exact source width as the top candidate
+    return widths
+  }
+
   const step = pixelStep > 0 ? pixelStep : DEFAULT_PIXEL_STEP
-  const cap = sourceWidth && sourceWidth > 0 ? Math.max(step, Math.floor(sourceWidth / step) * step) : maxWidth
-  const top = Math.min(maxWidth, cap)
+  const top = known ?? maxWidth
   const widths: number[] = []
   for (let w = step; w < top; w += step) widths.push(w)
   widths.push(top)
@@ -119,8 +154,12 @@ export const stepWidths = (sourceWidth?: number, pixelStep = DEFAULT_PIXEL_STEP,
 }
 
 export interface BuildSrcsetOptions extends BuildUrlOptions {
-  /** Width increment for the srcset (the project pixel step). Default 50; bigger = fewer widths. */
-  pixelStep?: number
+  /**
+   * The srcset widths. A number is the step increment (default 50; bigger = fewer widths).
+   * An array is an explicit, curated ladder of widths (e.g. `[200, 450, 750, 1200, 2000]`)
+   * — non-linear, denser where it matters, fewer entries than a fine linear step.
+   */
+  pixelStep?: number | number[]
   /** The source image's intrinsic width — caps the srcset (no upscaling). */
   sourceWidth?: number
   /** Hard ceiling. Default 4096. */

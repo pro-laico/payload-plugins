@@ -14,14 +14,9 @@ describe('createImagesCollection', () => {
       formatOptions?: unknown
     }
     expect(upload).toBeTruthy()
-    expect(upload.imageSizes).toBeUndefined() // no pre-generated sizes
+    expect(upload.imageSizes).toBeUndefined() // on-demand only — never pre-generates sizes
     expect(upload.focalPoint).toBe(true)
     expect(upload.formatOptions).toBeUndefined() // stored as-uploaded
-  })
-
-  it('uses the built-in 7-size ladder when pregenerateSizes is true', () => {
-    const c = createImagesCollection({ pregenerateSizes: true })
-    expect((c.upload as { imageSizes?: unknown[] }).imageSizes).toHaveLength(7)
   })
 
   it('exposes a `variants` join onto the generated-images collection', () => {
@@ -76,10 +71,12 @@ describe('createImagesCollection', () => {
     expect((byName(createImagesCollection().fields, 'alt') as { localized?: boolean }).localized).toBe(false)
   })
 
-  it('stores no LQIP placeholder field or beforeChange hook (the placeholder is derived on the frontend)', () => {
+  it('generates no placeholder at upload (no beforeChange hook); blurDataURL is virtual, not stored', () => {
     const c = createImagesCollection()
-    expect(byName(c.fields, 'blurDataUrl')).toBeUndefined()
     expect(c.hooks?.beforeChange ?? []).toHaveLength(0)
+    // The LQIP is generated on demand, never stored — the blurDataURL field is virtual.
+    const blur = byName(c.fields, 'blurDataURL') as { virtual?: boolean } | undefined
+    expect(blur?.virtual).toBe(true)
   })
 
   it('renders the focal + purge UI and the variants join only when focalUI is on', () => {

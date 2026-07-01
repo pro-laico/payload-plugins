@@ -67,7 +67,7 @@ export default async function ResponsivePage() {
 
       {/* Full-bleed: break out of the centered column so `sizes="100vw"` is honest. */}
       <div style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', marginTop: 24 }}>
-        <ResponsiveImage image={img} sizes="100vw" priority />
+        <ResponsiveImage image={img} sizes="100vw" loading="eager" fetchPriority="high" />
       </div>
 
       <h2>The srcset it emitted</h2>
