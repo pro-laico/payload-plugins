@@ -1,14 +1,7 @@
 # docs
 
-The documentation site for the Payload Plugins monorepo — a [fumadocs](https://fumadocs.dev/)
-(Next.js + MDX) app.
+Documentation site for the Payload Plugins monorepo — a [fumadocs](https://fumadocs.dev/) (Next.js + MDX) app, deployed at [payload-plugins.prolaico.com](https://payload-plugins.prolaico.com).
 
 ```bash
-pnpm docs          # from the repo root, or:
-pnpm --filter docs dev
+pnpm docs        # run locally from the repo root
 ```
-
-Runs on [http://localhost:42120](http://localhost:42120).
-
-Content lives in `content/docs/*.mdx`, with sidebar order controlled by `meta.json`
-files. Add a page for each plugin under `content/docs/plugins/`.
