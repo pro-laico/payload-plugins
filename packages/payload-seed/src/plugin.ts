@@ -19,7 +19,7 @@ function binScriptPath(name: string): string {
  * - `payload seed` — runs the seed (behind the `ENABLE_SEED` guard).
  * - `POST /api/seed` + the optional admin button — the in-app way to run it.
  * - typed refs — injects the `SeedRegistry` into `payload-types.ts` via Payload's
- *   `typescript.postProcess`, so `ref()`/`asset()` keys are checked. Rides `generate:types`.
+ *   `typescript.postProcess`, so `ref()` keys are checked. Rides `generate:types`.
  *
  *   seedPlugin({ definitions: [assets, services, posts], adminButton: true })
  */

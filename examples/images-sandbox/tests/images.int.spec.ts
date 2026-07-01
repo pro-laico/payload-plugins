@@ -2,8 +2,11 @@ import { seed } from '@pro-laico/payload-seed'
 import { createLocalReq, getPayload, type Payload, type PayloadRequest } from 'payload'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { seedOptions } from '../src/plugins'
 import config from '../src/payload.config'
+import images from '../src/seed/images'
+import pages from '../src/seed/pages'
+
+const seedOptions = { definitions: [images, pages], assetsDir: 'seed-assets' }
 
 /** Build a minimal PayloadRequest the transform endpoint understands (id + query + Accept). */
 const makeReq = (payload: Payload, id: string, query: string, accept?: string): PayloadRequest =>
@@ -161,7 +164,7 @@ describe('payload-images wiring', () => {
     expect(lighthouse?.srcset).toContain('/api/img/')
     expect(lighthouse?.placeholderURL).toContain('w=32')
 
-    // The page resolved its `asset('lighthouse')` token to the uploaded image's id.
+    // The page resolved its `ref('images', 'lighthouse')` token to the seeded image doc's id.
     const page = (await payload.find({ collection: 'pages', depth: 0, overrideAccess: true })).docs[0] as
       | { heroImage?: string | number }
       | undefined

@@ -11,14 +11,14 @@ import videos from '../seed/videos'
 // NEXT_PUBLIC_SERVER_URL. Pass options only to override.
 //
 // seedPlugin: registers mux-video as an asset provider, so a video is seeded like an image
-// asset — declared with `video('clip.mp4')` and run by the normal seed flow (POST /api/seed
+// asset — declared with `_file: file('clip.mp4')` and run by the normal seed flow (POST /api/seed
 // or the admin button). No custom script. Source files live in `seed-assets/videos/`.
 export const plugins: Plugin[] = [
   muxVideoPlugin(),
   seedPlugin({
     adminButton: true,
     definitions: [videos, pages],
-    assets: { dir: 'seed-assets' },
-    assetProviders: [muxAssetProvider({ sourceDir: 'videos' })],
+    assetsDir: 'seed-assets',
+    assetProviders: [muxAssetProvider({ subdir: 'videos' })],
   }),
 ]

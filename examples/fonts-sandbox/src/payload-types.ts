@@ -493,7 +493,6 @@ declare module '@pro-laico/payload-seed' {
       'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
     }
     globals: 'fontSet'
-    assets: never
   }
 }
 

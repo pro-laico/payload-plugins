@@ -1,4 +1,4 @@
-import type { RegistryAsset, RegistryCollectionSlug, RegistryCollections, RegistryKey } from './registry'
+import type { RegistryCollectionSlug, RegistryCollections, RegistryKey } from './registry'
 
 /**
  * A typed reference to another seeded document, used in place of a raw id inside seed
@@ -13,40 +13,28 @@ export interface Ref<C extends RegistryCollectionSlug = RegistryCollectionSlug> 
   readonly key: RegistryKey<C>
 }
 
-/** A typed reference to an uploaded asset (see the media registry). Resolved to the
- *  created upload doc's id at create time. */
-export interface AssetRef {
-  readonly __seedRef: 'asset'
-  readonly key: RegistryAsset
-}
-
-/** Options carried by a {@link SourceRef} — forwarded to the provider collection's ingest. */
-export interface SourceOptions {
-  playbackPolicy?: 'public' | 'signed'
-  posterTimestamp?: number
-}
-
 /**
- * A source-file token for an asset-provider collection (e.g. a Mux video). Unlike {@link Ref}
- * / {@link AssetRef} it does NOT point at another node — it carries a local source file the
- * owning collection ingests. The engine resolves it to `{ file: <abs path>, ...options }`,
- * which the collection's hook turns into the stored asset. Created via the provider's builder
- * token (e.g. `video('intro.mp4')`).
+ * A file attached to a seeded upload/provider doc via its `_file` meta-key. Carries a source
+ * filename (resolved under the assets dir at seed time) plus optional provider-specific options.
+ * How the file is delivered depends on the doc's collection:
+ *  - an **upload collection** → the bytes are read and passed as the created doc's upload.
+ *  - a registered **provider collection** (e.g. Mux, fonts) → the resolved path + options are
+ *    handed to the collection's ingest hook via its source field.
  */
-export interface SourceRef {
-  readonly __seedRef: 'source'
-  /** Provider/builder token name (e.g. `'video'`). */
-  readonly token: string
-  /** Source filename, relative to the provider's source dir under the assets dir. */
-  readonly file: string
-  readonly options: SourceOptions
+export interface FileToken {
+  readonly __seedRef: 'file'
+  /** Source filename, resolved under the assets dir (native: searched subdirs; provider: its subdir). */
+  readonly name: string
+  /** Provider-specific ingest options (e.g. a font `weight`), merged into the provider source field.
+   *  Ignored for native uploads. */
+  readonly options: Record<string, unknown>
 }
 
-/** A reference to another seeded node (doc or asset). Drives the dependency graph. */
-export type AnyRef = Ref | AssetRef
+/** Any edge-creating reference (drives the dependency graph). Only doc refs create edges. */
+export type AnyRef = Ref
 
-/** Any seed token that may appear in record data — node references plus source files. */
-export type AnyToken = AnyRef | SourceRef
+/** Any seed token that may appear in record data. */
+export type AnyToken = Ref | FileToken
 
 /**
  * Reference a seeded document by collection slug and local `_key`. Type-checked against
@@ -60,42 +48,27 @@ export function ref<C extends RegistryCollectionSlug>(collection: C, key: Regist
 }
 
 /**
- * Reference an uploaded asset by its registry key. The engine uploads all referenced
- * assets first, then resolves this to the upload doc's id.
+ * Attach a source file to a seeded doc via its `_file` meta-key. The engine resolves the file
+ * under the assets dir and — depending on the doc's collection — either uploads the bytes
+ * (native upload collection) or hands the path to the collection's ingest hook (provider).
  *
- *   image: asset('serviceA')
+ *   { _key: 'lighthouse', _file: file('lighthouse.png'), alt: 'A lighthouse' }   // native upload
+ *   { _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }                   // Mux provider
+ *   { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), family: 'sans' } // fonts provider
  */
-export function asset(key: RegistryAsset): AssetRef {
-  return { __seedRef: 'asset', key }
-}
-
-/**
- * Reference a local source video for an asset-provider collection (Mux). The engine resolves
- * the file under the provider's source dir and hands it to the collection, which uploads it.
- *
- *   source: video('intro.mp4', { playbackPolicy: 'public' })
- */
-export function video(file: string, options: SourceOptions = {}): SourceRef {
-  return { __seedRef: 'source', token: 'video', file, options }
+export function file(name: string, options: Record<string, unknown> = {}): FileToken {
+  return { __seedRef: 'file', name, options }
 }
 
 export function isRef(value: unknown): value is Ref {
   return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'doc'
 }
 
-export function isAssetRef(value: unknown): value is AssetRef {
-  return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'asset'
+export function isFileToken(value: unknown): value is FileToken {
+  return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'file'
 }
 
-export function isSourceRef(value: unknown): value is SourceRef {
-  return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'source'
-}
-
-export function isAnyRef(value: unknown): value is AnyRef {
-  return isRef(value) || isAssetRef(value)
-}
-
-/** Any seed token (node reference or source file). */
+/** Any seed token (doc reference or file). */
 export function isAnyToken(value: unknown): value is AnyToken {
-  return isRef(value) || isAssetRef(value) || isSourceRef(value)
+  return isRef(value) || isFileToken(value)
 }

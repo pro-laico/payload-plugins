@@ -7,13 +7,13 @@ import { seedDefinitions } from '@/plugins'
 
 // Integration test: boots the real example config against a temp SQLite DB and drives the REAL
 // seed engine via the Local API — the automated analog of the admin "Seed your database" flow.
-// It exercises the whole fonts chain end to end: fontSource() tokens → font ingest hook uploads
+// It exercises the whole fonts chain end to end: `_file` tokens → font ingest hook uploads
 // to fontOriginal → optimize hook subsets to fontOptimized → fontSet wired by ref() → the export
 // endpoint hands back the served bytes.
 
 let payload: Payload
 
-const seedOptions = { definitions: seedDefinitions, assets: { dir: 'seed-assets' }, assetProviders: [fontAssetProvider()] }
+const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetProviders: [fontAssetProvider()] }
 const ROLES = ['sans', 'serif', 'mono', 'display'] as const
 
 beforeAll(async () => {

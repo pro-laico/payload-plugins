@@ -74,8 +74,8 @@ describe('payload-mux wiring', () => {
 
   it('exposes the server-side ingest API and the seed asset provider', () => {
     expect(typeof ingestMuxVideo).toBe('function')
-    expect(muxAssetProvider()).toEqual({ token: 'video', collection: 'mux-video', sourceDir: 'video' })
-    expect(muxAssetProvider({ sourceDir: 'videos' }).sourceDir).toBe('videos')
+    expect(muxAssetProvider()).toEqual({ collection: 'mux-video', subdir: 'video' })
+    expect(muxAssetProvider({ subdir: 'videos' }).subdir).toBe('videos')
   })
 
   it('stashes plugin options on config.custom (so tooling can build a Mux client from payload)', () => {

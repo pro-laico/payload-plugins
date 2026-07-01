@@ -7,8 +7,8 @@ export { ingestFont } from './lib/ingest'
 export type { IngestFontOptions } from './lib/ingest'
 
 // Declarative seeding — register `font` as a @pro-laico/payload-seed asset provider
-export { fontAssetProvider, fontSource } from './seed'
-export type { FontAssetProvider, FontAssetProviderOptions, FontSourceTokenOptions } from './seed'
+export { fontAssetProvider } from './seed'
+export type { FontAssetProvider, FontAssetProviderOptions } from './seed'
 
 // Frontend serving. The dev-only runtime component lives at the `@pro-laico/payload-fonts/DevFonts`
 // subpath; `extractFonts` collects the generated next/font/local classes for `<html>`. The two

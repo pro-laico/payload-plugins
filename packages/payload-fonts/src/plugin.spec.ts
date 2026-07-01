@@ -2,7 +2,7 @@ import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { fontsPlugin } from './plugin'
-import { fontAssetProvider, fontSource } from './seed'
+import { fontAssetProvider } from './seed'
 
 describe('fontsPlugin (unit)', () => {
   // fontsPlugin is synchronous; the Plugin signature is Config | Promise<Config>.
@@ -46,15 +46,9 @@ describe('fontsPlugin (unit)', () => {
     expect(fontsPlugin({ enabled: false })(config)).toBe(config)
   })
 
-  it('exposes a decoupled seed provider + source token', () => {
-    expect(fontAssetProvider()).toEqual({ token: 'font', collection: 'font', sourceDir: 'fonts' })
-    expect(fontAssetProvider({ sourceDir: 'webfonts' }).sourceDir).toBe('webfonts')
-    expect(fontSource('inter.woff2', { weight: '400' })).toEqual({
-      __seedRef: 'source',
-      token: 'font',
-      file: 'inter.woff2',
-      options: { weight: '400' },
-    })
+  it('exposes a decoupled seed provider', () => {
+    expect(fontAssetProvider()).toEqual({ collection: 'font', subdir: 'fonts' })
+    expect(fontAssetProvider({ subdir: 'webfonts' }).subdir).toBe('webfonts')
   })
 
   it('trims `font` defaultPopulate so a populated relationship omits the private upload slots', () => {

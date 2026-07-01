@@ -1,8 +1,7 @@
-import { defineSeed } from '@pro-laico/payload-seed'
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-// A mux-video seeded like an image asset: the `video()` source token points at a file in
-// `seed-assets/videos/`; the mux plugin's collection hook uploads it to Mux at create time and
-// fills in assetId + playback metadata. Reference it from any collection via ref('mux-video', …).
-export default defineSeed('mux-video', ({ video }) => [
-  { _key: 'sample', title: 'Sample Clip', source: video('sample.mp4', { playbackPolicy: 'public' }) },
-])
+// A mux-video seeded like any collection: the clip rides on the `_file` meta-key and — since
+// `mux-video` is a registered asset provider — is handed to the collection's ingest hook, which
+// uploads it to Mux at create time and fills in assetId + playback metadata. Reference it from any
+// collection via ref('mux-video', …). Playback policy comes from muxVideoPlugin's uploadSettings.
+export default defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'sample', _file: file('sample.mp4'), title: 'Sample Clip' }])

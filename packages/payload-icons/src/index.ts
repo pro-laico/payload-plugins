@@ -17,9 +17,8 @@ export { extractSvgContent, extractSvgProps } from './lib/extractSVG'
 export { getIcon } from './lib/getIcon'
 export type { GetIconOptions } from './lib/getIcon'
 
-// Seed integration — declare icons as seed assets for @pro-laico/payload-seed
-export { iconAssets } from './seed'
-export type { IconAssetSpec, IconAssetsOptions } from './seed'
+// Icons seed like any collection via @pro-laico/payload-seed — `defineCollectionSeed('icon', …)`
+// with each SVG on the record's `_file` meta-key. No icon-specific helper needed.
 
 // Types
 export type { IconAccess, IconDoc, IconsPluginOptions } from './types'

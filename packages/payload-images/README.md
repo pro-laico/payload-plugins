@@ -244,29 +244,32 @@ collection you'd build yourself:
 
 The `images` collection is a normal Payload upload, so it seeds natively through
 [`@pro-laico/payload-seed`](../payload-seed) — no asset provider needed (unlike
-`@pro-laico/payload-mux`, whose bytes live in Mux). Point the seed plugin's asset uploads
-at the `images` collection and declare each source with `asset()`:
+`@pro-laico/payload-mux`, whose bytes live in Mux). Seed it like any collection:
+`defineCollectionSeed('images', …)`, each record carrying its source file on `_file`
+via the `file()` token, and referenced from a page with `ref('images', …)`:
 
 ```ts
-import { defineAssets, defineSeed, seedPlugin } from '@pro-laico/payload-seed'
+import { defineCollectionSeed, seedPlugin } from '@pro-laico/payload-seed'
 import { imagesPlugin } from '@pro-laico/payload-images'
 
-// seed/assets.ts — uploaded FIRST; focal points drive the on-demand crops
-const assets = defineAssets({
-  hero: { file: 'hero.jpg', alt: 'Hero', focalX: 78, focalY: 32 },
-})
+// seed/images.ts — each doc carries its file on `_file`; focal points drive the on-demand crops
+const images = defineCollectionSeed('images', ({ file }) => [
+  { _key: 'hero', _file: file('hero.jpg'), alt: 'Hero', focalX: 78, focalY: 32 },
+])
 
-// seed/pages.ts — reference an uploaded image by token
-const pages = defineSeed('pages', ({ asset }) => [{ _key: 'home', title: 'Home', heroImage: asset('hero') }])
+// seed/pages.ts — reference a seeded image by ref (an upload-field relationship)
+const pages = defineCollectionSeed('pages', ({ ref }) => [
+  { _key: 'home', title: 'Home', heroImage: ref('images', 'hero') },
+])
 
 plugins: [
   imagesPlugin(),
-  // upload assets into `images` (not the default `media`)
-  seedPlugin({ definitions: [assets, pages], assets: { dir: 'seed-assets', collection: 'images' } }),
+  seedPlugin({ definitions: [images, pages], assetsDir: 'seed-assets' }),
 ]
 ```
 
-`focalX`/`focalY` on a spec set the upload's focal point, so the seeded images crop to
+`alt`/`focalX`/`focalY` are ordinary record fields, type-checked against the `images`
+collection. `focalX`/`focalY` set the upload's focal point, so the seeded images crop to
 the right subject the moment the transform endpoint serves them. See
 [`examples/images-sandbox`](../../examples/images-sandbox) for a full working setup.
 

@@ -41,7 +41,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
-    beforeValidate: [getBeforeValidateHook(mux)],
+    beforeValidate: [getBeforeValidateHook(mux, options)],
     beforeChange: [getBeforeChangeHook(mux, (options.extendCollection as string) ?? 'mux-video')],
   },
   fields: [

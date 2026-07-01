@@ -74,11 +74,11 @@ Key design points carried over from the original:
 
 Unlike `@pro-laico/payload-mux` (whose bytes live in Mux and so needs a seed *asset
 provider* seam), `images` is a plain Payload upload collection. So it seeds **natively**
-through `@pro-laico/payload-seed`: point the seed plugin's asset uploads at the `images`
-collection (`assets: { collection: 'images' }`) and declare each source with `asset()`.
-The spec's `focalX`/`focalY` set the upload's focal point, so seeded images crop
-correctly on first render. No provider, no custom script. See
-`examples/images-sandbox`.
+through `@pro-laico/payload-seed`, like any collection: `defineCollectionSeed('images', …)`,
+each record carrying its source file on `_file` via the `file()` token, and referenced
+elsewhere with `ref('images', …)`. The record's `focalX`/`focalY` fields set the upload's
+focal point, so seeded images crop correctly on first render. No provider, no custom
+script. See `examples/images-sandbox`.
 
 ## Module map
 

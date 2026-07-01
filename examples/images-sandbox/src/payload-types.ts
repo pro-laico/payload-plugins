@@ -448,10 +448,10 @@ export interface Auth {
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
+      'images': 'apple' | 'balloon' | 'lighthouse'
       'pages': 'home'
     }
     globals: never
-    assets: 'apple' | 'balloon' | 'lighthouse'
   }
 }
 

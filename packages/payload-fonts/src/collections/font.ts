@@ -123,7 +123,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
     // Transient server-side ingest input (a local path / URL via `{ file, weight, style,
     // variable }`). The `getFontSourceHook` beforeValidate uploads it to `fontOriginal`, wires
     // the slot, and strips it — never persisted. Lets a typeface be created from a file without
-    // the admin's upload slot (imports, migrations, seeding via `fontSource(...)`).
+    // the admin's upload slot (imports, migrations, seeding via a doc's `_file`).
     { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
     {
       name: 'variable',

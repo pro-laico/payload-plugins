@@ -2,6 +2,7 @@ import type Mux from '@mux/mux-node'
 import type { CollectionBeforeValidateHook } from 'payload'
 import { getAssetMetadata } from '../lib/getAssetMetadata'
 import { ingestMuxAsset, type MuxSource } from '../lib/ingest'
+import type { MuxVideoPluginOptions } from '../types'
 
 /** The transient `source` a caller sets to ingest server-side: a string path/URL, or an
  *  object carrying the path/URL plus per-video options. Never persisted. */
@@ -37,9 +38,13 @@ function normalizeSource(source: unknown): NormalizedSource | null {
  * lands before `assetId`'s required check. The `source` key is always stripped so it never
  * persists. Docs that already carry an `assetId` (the admin direct-upload flow, webhook
  * backfill, or pre-resolved seed data) skip ingest entirely.
+ *
+ * Playback policy (and the rest of `new_asset_settings`) come from the plugin's `uploadSettings`
+ * — the same config the admin direct-upload path uses — so a seeded video matches an admin-uploaded
+ * one. A per-video `source.playbackPolicy` overrides it.
  */
 export const getBeforeValidateHook =
-  (mux: Mux): CollectionBeforeValidateHook =>
+  (mux: Mux, options: MuxVideoPluginOptions = {}): CollectionBeforeValidateHook =>
   async ({ data }) => {
     const d = (data ?? {}) as Record<string, unknown>
     if (!('source' in d)) return data
@@ -48,7 +53,11 @@ export const getBeforeValidateHook =
     const norm = d.assetId ? null : normalizeSource(source)
     if (!norm) return rest
 
-    const asset = await ingestMuxAsset(mux, norm.ref, { playbackPolicy: norm.playbackPolicy, corsOrigin: norm.corsOrigin })
+    const asset = await ingestMuxAsset(mux, norm.ref, {
+      newAssetSettings: options.uploadSettings?.new_asset_settings,
+      playbackPolicy: norm.playbackPolicy,
+      corsOrigin: norm.corsOrigin ?? options.uploadSettings?.cors_origin,
+    })
     return {
       ...rest,
       assetId: asset.id,

@@ -368,10 +368,10 @@ export interface Auth {
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
+      'icon': 'arrow-right' | 'check' | 'star'
       'pages': 'home'
     }
     globals: never
-    assets: 'arrow-right' | 'check' | 'star'
   }
 }
 

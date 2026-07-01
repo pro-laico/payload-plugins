@@ -30,11 +30,11 @@ per-weight files, and the save hook subsets each to a served WOFF2 (visible on t
 
 ## Seeding fonts from local files
 
-This sandbox wires up the seed plugin so a typeface seeds **like an image asset** — declared with
-a `fontSource()` token and run by the normal seed flow, no custom script. See
-`src/plugins/index.ts` (registers `fontAssetProvider()`), `src/seed/fonts.ts` (four typefaces from
-files in `seed-assets/fonts/`), and `src/seed/fontSet.ts` (the active selection wired with
-`ref('font', …)`).
+This sandbox wires up the seed plugin so a typeface seeds **like any doc** — each `font` record
+carries its source file on `_file` with the `file()` token and runs by the normal seed flow, no
+custom script. See `src/plugins/index.ts` (registers `fontAssetProvider()`), `src/seed/fonts.ts`
+(four typefaces from files in `seed-assets/fonts/`), and `src/seed/fontSet.ts` (the active selection
+wired with `ref('font', …)`).
 
 ```bash
 # Set ENABLE_SEED=true, start the app, and click "Seed your database" in the admin header
@@ -42,7 +42,7 @@ files in `seed-assets/fonts/`), and `src/seed/fontSet.ts` (the active selection 
 # and points the fontSet global at the four typefaces.
 ```
 
-Under the hood the seed engine resolves each `fontSource()` to the file under `seed-assets/fonts/`
+Under the hood the seed engine resolves each record's `_file` to the file under `seed-assets/fonts/`
 and hands it to the `font` collection, whose `beforeValidate` hook uploads it and wires the slot —
 the seed engine needs no font-specific code. Reseeds clear the `font` collection via
 `payload.delete`, so its `afterDelete` cascade removes the old originals + optimized too
@@ -72,7 +72,7 @@ pnpm --filter fonts-sandbox test
 ```
 
 `tests/fonts.int.spec.ts` boots this config against a temporary SQLite DB and drives the real
-seed engine end to end: `fontSource()` tokens → the ingest hook uploads to `fontOriginal` → the
+seed engine end to end: `file()` tokens on `_file` → the ingest hook uploads to `fontOriginal` → the
 optimize hook subsets to `fontOptimized` → the `fontSet` global is wired by `ref()` → the export
 endpoint returns the served WOFF2 bytes per role (and rejects a bad secret).
 

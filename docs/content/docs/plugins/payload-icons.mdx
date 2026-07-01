@@ -21,8 +21,9 @@ Three pieces deliver that, and the rest of this page covers them in order:
   theming — and stored as an inline-ready `svgString`.
 - **An [`<Icon>` component](#icon-1).** A drop-in server component that fetches an icon by name and
   inlines its SVG, so a class-driven, recolorable icon is one import away.
-- **Declarative [seeding](#seeding).** List your source files with `iconAssets` and they seed
-  natively through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — no script, no provider.
+- **Declarative [seeding](#seeding).** Seed icons like any collection with `defineCollectionSeed`,
+  each record carrying its source SVG on `_file` — natively through
+  [`@pro-laico/payload-seed`](/docs/plugins/payload-seed), no script, no provider.
 
 ## Setup
 
@@ -283,32 +284,47 @@ and tone axes.
 ## Seeding
 
 Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
-`payload-mux`) no asset provider. Drop your source `.svg` files in the seed assets dir (the loader
-searches the `svg/` subdir, so `assets/svg/arrow-right.svg` resolves from `'arrow-right.svg'`) and
-declare them with `iconAssets`:
+`payload-mux`) no asset provider. Seed it like any other collection with `defineCollectionSeed`:
+each record carries its source SVG on the `_file` meta-key via the `file()` token. Drop your source
+`.svg` files in the seed assets dir (the loader searches the `svg/` subdir, so `assets/svg/star.svg`
+resolves from `file('star.svg')`):
 
 ```ts
-import { defineAssets } from '@pro-laico/payload-seed'
-import { iconAssets } from '@pro-laico/payload-icons'
+// seed/icons.ts — each icon doc carries its SVG on `_file`
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-// assets/svg/arrow-right.svg, assets/svg/check.svg
-export default defineAssets(iconAssets(['arrow-right.svg', 'check.svg']))
+// assets/svg/star.svg, assets/svg/check.svg
+export default defineCollectionSeed('icon', ({ file }) => [
+  { _key: 'star', _file: file('star.svg') },
+  { _key: 'check', _file: file('check.svg') },
+])
 ```
 
-Each entry is referenceable elsewhere in the seed as `asset('arrow-right')` / `asset('check')`, and
-every file is optimized on upload via the same `formatSVGHook`. Wire the definition into the seed
-plugin as usual:
+Each doc is optimized on upload via the same `formatSVGHook`, and referenceable elsewhere in the
+seed with `ref('icon', 'star')` — e.g. a page's icon relationship:
+
+```ts
+// seed/pages.ts
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
+
+export default defineCollectionSeed('pages', ({ ref }) => [
+  { _key: 'home', title: 'Home', icon: ref('icon', 'star') },
+])
+```
+
+Wire the definitions into the seed plugin as usual:
 
 ```ts
 import { iconsPlugin } from '@pro-laico/payload-icons'
 import { seedPlugin } from '@pro-laico/payload-seed'
 import icons from './seed/icons'
+import pages from './seed/pages'
 
-plugins: [iconsPlugin(), seedPlugin({ definitions: [icons /*, pages, … */] })]
+plugins: [iconsPlugin(), seedPlugin({ definitions: [icons, pages] })]
 ```
 
-`iconAssets` returns plain data — this package never imports the seed package, so the two stay
-decoupled. Renamed the collection? Pass `iconAssets([...], { collection: 'my-icon' })`. See the
+Because `icon` is a real collection, its seed records are type-checked and other docs reference them
+with `ref()` — this package never imports the seed package, so the two stay decoupled. See the
 [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
 
 ## Exports
@@ -321,5 +337,4 @@ decoupled. Renamed the collection? Pass `iconAssets([...], { collection: 'my-ico
 | `formatSVGHook` | `@pro-laico/payload-icons` | The SVG-optimizing `beforeChange` hook — attach it to your own collection for the same behavior. |
 | `getIcon` | `@pro-laico/payload-icons` | Server-side lookup of a stored icon by name. |
 | `extractSvgContent` / `extractSvgProps` | `@pro-laico/payload-icons` | Inline an icon's `svgString` as a real `<svg>` when rendering it yourself. |
-| `iconAssets` | `@pro-laico/payload-icons` | Declare icons as seed assets for `@pro-laico/payload-seed`. |
 | `Icon` (component) | `@pro-laico/payload-icons/components/Icon` | The drop-in `<Icon name="…" />` server component. |

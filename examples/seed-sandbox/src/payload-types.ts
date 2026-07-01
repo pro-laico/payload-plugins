@@ -429,11 +429,11 @@ export interface Auth {
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
+      'media': 'logo' | 'post' | 'serviceA' | 'serviceB'
       'posts': 'launch'
       'services': 'consulting' | 'implementation'
     }
     globals: 'site-settings'
-    assets: 'logo' | 'post' | 'serviceA' | 'serviceB'
   }
 }
 

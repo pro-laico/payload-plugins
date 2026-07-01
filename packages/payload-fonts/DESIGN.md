@@ -87,18 +87,19 @@ Seeding rides that seam through `@pro-laico/payload-seed`, mirroring the Mux plu
 pattern:
 
 - `fontAssetProvider()` returns the structural `SeedAssetProvider` shape
-  (`{ token: 'font', collection: 'font', sourceDir: 'fonts' }`). The seed engine resolves the
-  token's file under `<assetsDir>/fonts/` first (like image-asset uploads) and clears the `font`
-  collection via `payload.delete` so its `afterDelete` cascade removes the originals + optimized.
-- `fontSource('inter.woff2', { weight, style, variable })` is a `SourceRef`-shaped token the
-  engine resolves to `{ file: <abs path>, ...options }` — exactly the `source` value the hook
-  consumes. It's exported from THIS package, so the seed engine needs zero font-specific code.
+  (`{ collection: 'font', subdir: 'fonts' }`). The seed engine resolves a `font` record's `_file`
+  under `<assetsDir>/fonts/` first (like image-asset uploads) and clears the `font` collection via
+  `payload.delete` so its `afterDelete` cascade removes the originals + optimized.
+- A typeface is seeded like any doc: `defineCollectionSeed('font', ({ file }) => [...])` with the
+  file on `_file` via the seed package's `file('inter.woff2', { weight, style, variable })` token.
+  The engine resolves it to `{ file: <abs path>, ...options }` and hands it to the provider — exactly
+  the `source` value the hook consumes — so the seed engine needs zero font-specific code.
 - The `fontSet` global is seeded with the ordinary `ref('font', _key)` token, so the active
   selection is wired declaratively alongside the typefaces.
 
 Decoupled both ways: the seed package never imports this one (nor `fontkit`/`subset-font`), and
 this package consumes nothing from the seed package — alignment is the `source` field contract
-plus the structural provider/token shapes.
+plus the structural provider shape.
 
 ## What was dropped from the Atomic port
 
@@ -110,9 +111,10 @@ plus the structural provider/token shapes.
 
 ## Open / later
 
-- **Multi-weight seeding from one token.** `fontSource` seeds one file → one slot (a static
-  weight or a variable upright/italic). A typeface with many static weights is still expressible
-  through several typefaces or the admin UI; a future token could carry an array of files.
+- **Multi-weight seeding from one record.** A `font` record's `_file` seeds one file → one slot (a
+  static weight or a variable upright/italic). A typeface with many static weights is still
+  expressible through several typefaces or the admin UI; a future `_file` shape could carry an array
+  of files.
 - **`@font-face` CSS endpoint for non-Next consumers.** `<DevFonts />` covers the Next dev path;
   `buildFontFaceCss()` (pure) + `getActiveFontFaces()` are exported so a project on another
   framework can serve the same `@font-face` CSS from its own route. A first-party

@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
-/** Upload collection that the seed's `asset()` references resolve to. */
+/** Upload collection seeded via `defineCollectionSeed('media', …)`; other docs point at its docs
+ *  with `ref('media', …)`. */
 export const Media: CollectionConfig = {
   slug: 'media',
   access: { read: () => true },

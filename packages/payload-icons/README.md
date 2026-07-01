@@ -110,21 +110,25 @@ without consumers stripping the extension client-side. A `forceSelect` keeps its
 
 ## Seeding with `@pro-laico/payload-seed`
 
-Because `icon` is a standard upload collection, it seeds **natively** — no script. Put your source
-`.svg` files in the seed assets dir (the loader searches the `svg/` subdir, so
-`assets/svg/arrow-right.svg` resolves from `'arrow-right.svg'`) and declare them with `iconAssets`:
+Because `icon` is a standard upload collection, it seeds **natively** — no script. Seed it like any
+other collection with `defineCollectionSeed`: each record carries its source SVG on the `_file`
+meta-key via the `file()` token. Put your source `.svg` files in the seed assets dir (the loader
+searches the `svg/` subdir, so `assets/svg/star.svg` resolves from `file('star.svg')`):
 
 ```ts
-import { defineAssets } from '@pro-laico/payload-seed'
-import { iconAssets } from '@pro-laico/payload-icons'
+// seed/icons.ts — each icon doc carries its SVG on `_file`
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-// assets/svg/arrow-right.svg, assets/svg/check.svg
-export default defineAssets(iconAssets(['arrow-right.svg', 'check.svg']))
+// assets/svg/star.svg, assets/svg/check.svg
+export default defineCollectionSeed('icon', ({ file }) => [
+  { _key: 'star', _file: file('star.svg') },
+  { _key: 'check', _file: file('check.svg') },
+])
 ```
 
-Each entry is referenceable elsewhere in the seed as `asset('arrow-right')` / `asset('check')`, and
-every file is optimized on upload via the same `formatSVGHook`. Wire the definition into the seed
-plugin as usual:
+Each doc is optimized on upload via the same `formatSVGHook`, and referenceable elsewhere in the
+seed with `ref('icon', 'star')` (e.g. a page's icon relationship). Wire the definitions into the
+seed plugin as usual:
 
 ```ts
 import { iconsPlugin } from '@pro-laico/payload-icons'
@@ -134,8 +138,8 @@ import icons from './seed/icons'
 plugins: [iconsPlugin(), seedPlugin({ definitions: [icons /*, pages, … */] })]
 ```
 
-`iconAssets` returns plain data — this package never imports the seed package, so the two stay
-decoupled. Renamed the collection? Pass `iconAssets([...], { collection: 'my-icon' })`.
+Because `icon` is a real collection, its seed records are type-checked and other docs reference them
+with `ref()` — this package never imports the seed package, so the two stay decoupled.
 
 ## License
 

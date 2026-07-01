@@ -42,7 +42,7 @@ The home page is a self-contained test harness — no admin digging required:
   off-center subject in frame across ratios, with the blur-up placeholder and a sample
   transform URL under each.
 - **Pages** — the seeded `pages.heroImage` rendered through the same component, confirming
-  the upload relationship + `asset()` resolution end to end.
+  the upload relationship + `ref('images', …)` resolution end to end.
 - **`/responsive`** — one image full-bleed with `sizes="100vw"`; open the Network tab and
   resize to watch the browser pick a different `?w=` variant per screen width.
 
@@ -60,19 +60,19 @@ The home page is a self-contained test harness — no admin digging required:
 ## Seeding images
 
 This sandbox wires up [`@pro-laico/payload-seed`](../../packages/payload-seed). Because
-`images` is a native Payload upload collection, it seeds with the normal `asset()` flow —
-**no asset provider** (that seam is only for external bytes like Mux). `src/plugins/index.ts`
-just points the seed plugin's asset uploads at `images` (`assets.collection: 'images'`);
-`src/seed/assets.ts` declares the three committed sample photos (with focal points), and
-`src/seed/pages.ts` creates a page referencing one of them.
+`images` is a native Payload upload collection, it seeds like any collection —
+**no asset provider** (that seam is only for external bytes like Mux). `src/seed/images.ts`
+declares the three committed sample photos as `images` records, each carrying its file on
+`_file` (with focal points as ordinary fields), and `src/seed/pages.ts` creates a page
+referencing one of them with `ref('images', …)`.
 
 ```bash
 # 1. Set ENABLE_SEED=true in .env.local
 # 2. Start the app and click "Seed your database" in the admin header (or POST /api/seed)
 ```
 
-The engine uploads `seed-assets/image/*.png` into `images` (carrying each spec's focal
-point), then creates the page and resolves `asset('lighthouse')` to the uploaded id.
+The engine uploads `seed-assets/image/*.png` into `images` (carrying each record's focal
+point), then creates the page and resolves `ref('images', 'lighthouse')` to the created id.
 Reseeds clear the collections via `payload.delete`, so variants cascade away too.
 
 ## Tests

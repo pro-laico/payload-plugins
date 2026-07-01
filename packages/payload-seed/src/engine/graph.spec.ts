@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { asset, ref } from '../refs'
+import { ref } from '../refs'
 import { type BuiltModel, buildGraph } from './graph'
 
 const model = (over: Partial<BuiltModel> = {}): BuiltModel => ({
-  assetKeys: [],
   collections: [],
   globals: [],
   ...over,
@@ -23,15 +22,17 @@ describe('buildGraph', () => {
     expect(graph.order.indexOf('services:consulting')).toBeLessThan(graph.order.indexOf('posts:launch'))
   })
 
-  it('captures edges from refs and assets, including from globals', () => {
+  it('captures ref edges, including from globals', () => {
     const graph = buildGraph(
       model({
-        assetKeys: ['logo'],
-        collections: [{ slug: 'services', records: [{ key: 'a', data: { image: asset('logo') } }] }],
+        collections: [
+          { slug: 'services', records: [{ key: 'a', data: {} }] },
+          { slug: 'posts', records: [{ key: 'p', data: { service: ref('services', 'a') } }] },
+        ],
         globals: [{ slug: 'site', data: { featured: ref('services', 'a') } }],
       }),
     )
-    expect(graph.edges).toContainEqual({ from: 'services:a', to: 'asset:logo' })
+    expect(graph.edges).toContainEqual({ from: 'posts:p', to: 'services:a' })
     expect(graph.edges).toContainEqual({ from: 'global:site', to: 'services:a' })
     // globals are not part of the doc create order (they're updated after all docs)
     expect(graph.order).not.toContain('global:site')

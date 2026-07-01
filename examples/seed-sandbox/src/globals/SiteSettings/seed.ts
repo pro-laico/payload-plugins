@@ -1,7 +1,7 @@
 import { defineGlobalSeed } from '@pro-laico/payload-seed'
 
-export default defineGlobalSeed('site-settings', ({ ref, asset }) => ({
+export default defineGlobalSeed('site-settings', ({ ref }) => ({
   siteName: 'Seed Sandbox',
-  logo: asset('logo'),
+  logo: ref('media', 'logo'),
   featuredService: ref('services', 'implementation'),
 }))

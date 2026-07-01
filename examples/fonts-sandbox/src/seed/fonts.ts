@@ -1,13 +1,12 @@
-import { fontSource } from '@pro-laico/payload-fonts'
-import { defineSeed } from '@pro-laico/payload-seed'
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-// Four typefaces seeded like image assets: the `fontSource()` token points at a file in
-// `seed-assets/fonts/`; the fonts plugin's `font` collection hook uploads it to `fontOriginal`
-// at create time and subsets it into a served `fontOptimized` WOFF2. Reference a typeface from
-// the fontSet global (or any collection) via ref('font', <_key>).
-export default defineSeed('font', () => [
-  { _key: 'inter', title: 'Inter', family: 'sans', source: fontSource('inter.woff2', { weight: '400' }) },
-  { _key: 'lora', title: 'Lora', family: 'serif', source: fontSource('lora.woff2', { weight: '400' }) },
-  { _key: 'jetbrains-mono', title: 'JetBrains Mono', family: 'mono', source: fontSource('jetbrains-mono.woff2', { weight: '400' }) },
-  { _key: 'abril-fatface', title: 'Abril Fatface', family: 'display', source: fontSource('abril-fatface.woff2', { weight: '400' }) },
+// Four typefaces seeded like any collection: each carries its font file on the `_file` meta-key,
+// with `weight` passed through to the `font` provider's ingest hook (which uploads to fontOriginal
+// and subsets it into a served fontOptimized WOFF2). Reference a typeface — e.g. from the fontSet
+// global — via ref('font', <_key>). Files live in `seed-assets/fonts/`.
+export default defineCollectionSeed('font', ({ file }) => [
+  { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
+  { _key: 'lora', _file: file('lora.woff2', { weight: '400' }), title: 'Lora', family: 'serif' },
+  { _key: 'jetbrains-mono', _file: file('jetbrains-mono.woff2', { weight: '400' }), title: 'JetBrains Mono', family: 'mono' },
+  { _key: 'abril-fatface', _file: file('abril-fatface.woff2', { weight: '400' }), title: 'Abril Fatface', family: 'display' },
 ])

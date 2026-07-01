@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import { seed } from '@pro-laico/payload-seed'
 import { getImageUrl, ResponsiveImage } from '@pro-laico/payload-images/components/image'
-import { seedOptions } from '@/plugins'
+import images from '@/seed/images'
+import pages from '@/seed/pages'
+
+const seedOptions = { definitions: [images, pages], assetsDir: 'seed-assets' }
 
 type ImageDoc = {
   id: string | number
@@ -100,8 +103,8 @@ export default async function HomePage() {
           </p>
         )}
         <p className="empty" style={{ marginTop: 12, marginBottom: 0 }}>
-          The seed runs through <code>@pro-laico/payload-seed</code>: three real photos (landscape, portrait, square) upload into{' '}
-          <code>images</code> with focal points, then a <code>pages</code> doc references one via <code>asset()</code> — the same data the admin{' '}
+          The seed runs through <code>@pro-laico/payload-seed</code>: three real photos (landscape, portrait, square) seed into{' '}
+          <code>images</code> with focal points, then a <code>pages</code> doc references one via <code>ref()</code> — the same data the admin{' '}
           <strong>Seed your database</strong> button creates.
         </p>
       </div>
@@ -139,7 +142,7 @@ export default async function HomePage() {
         Pages <small style={{ color: 'var(--muted)', fontWeight: 400 }}>({pages.length})</small>
       </h2>
       <p className="lead" style={{ marginBottom: 12 }}>
-        Confirms the relationship + seed <code>asset()</code> resolution end to end: a <code>pages</code> doc&apos;s <code>heroImage</code> (an{' '}
+        Confirms the relationship + seed <code>ref()</code> resolution end to end: a <code>pages</code> doc&apos;s <code>heroImage</code> (an{' '}
         <code>upload</code> field to <code>images</code>) rendered through the same component.
       </p>
       {pages.length === 0 ? (

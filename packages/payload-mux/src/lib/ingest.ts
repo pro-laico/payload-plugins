@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, Payload } from 'payload'
+import type { MuxVideoNewAssetSettings } from '../types'
 import { delay } from './delay'
 
 /** A server-side video source: a local file path or an `http(s)` URL. */
@@ -29,10 +30,30 @@ async function readSourceBytes(source: MuxSource): Promise<ArrayBuffer> {
 }
 
 export interface IngestMuxAssetOptions {
-  /** Playback policy for the created asset. @default 'public' */
+  /** Base new-asset settings — normally the plugin's `uploadSettings.new_asset_settings`, so a
+   *  server-side ingest produces the same asset config as the admin direct-upload path. */
+  newAssetSettings?: MuxVideoNewAssetSettings
+  /** Playback policy override for this asset. When set, wins over `newAssetSettings`'s policy;
+   *  otherwise the configured policy applies (falling back to `'public'`). */
   playbackPolicy?: 'public' | 'signed'
   /** CORS origin for the direct upload. @default '*' */
   corsOrigin?: string
+}
+
+/**
+ * Resolve the `new_asset_settings` for an ingest, mirroring the admin path (`upload.ts`): a
+ * `['public']` default, overlaid with the plugin's configured `newAssetSettings`, with a per-call
+ * `playbackPolicy` winning last. Keeps seeded/ingested videos in sync with admin uploads.
+ */
+export function resolveNewAssetSettings(
+  newAssetSettings?: MuxVideoNewAssetSettings,
+  playbackPolicy?: 'public' | 'signed',
+): MuxVideoNewAssetSettings {
+  return {
+    playback_policy: ['public'],
+    ...newAssetSettings,
+    ...(playbackPolicy ? { playback_policy: [playbackPolicy] } : {}),
+  }
 }
 
 /**
@@ -40,11 +61,15 @@ export interface IngestMuxAssetOptions {
  * local path or an `http(s)` URL), and poll until the asset is `ready`. The programmatic
  * counterpart to the admin uploader's client-side direct upload — used for seeding, imports,
  * and migrations. Returns the ready asset.
+ *
+ * `new_asset_settings` are resolved by {@link resolveNewAssetSettings} — the plugin's configured
+ * `newAssetSettings` over a `['public']` default, with `playbackPolicy` as a per-call override —
+ * so seeded videos honor the same playback policy as admin uploads.
  */
 export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMuxAssetOptions = {}): Promise<Mux.Video.Assets.Asset> {
   const upload = await mux.video.uploads.create({
     cors_origin: opts.corsOrigin ?? '*',
-    new_asset_settings: { playback_policy: [opts.playbackPolicy ?? 'public'] },
+    new_asset_settings: resolveNewAssetSettings(opts.newAssetSettings, opts.playbackPolicy),
   })
   if (!upload.url) throw new Error(`[payload-mux] Mux did not return an upload URL for '${source}'`)
 
@@ -73,7 +98,7 @@ export interface IngestMuxVideoOptions {
   source: MuxSource
   /** Title for the created `mux-video` doc (must be unique within the collection). */
   title: string
-  /** Playback policy for the uploaded asset. @default 'public' */
+  /** Playback policy override for the uploaded asset. @default the plugin's configured policy */
   playbackPolicy?: 'public' | 'signed'
   /** Optional poster timestamp (seconds). */
   posterTimestamp?: number

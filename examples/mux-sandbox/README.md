@@ -32,19 +32,19 @@ account** — set `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, and `MUX_WEBHOOK_SECRET` i
 ## Seeding videos from local files
 
 This sandbox wires up [`@pro-laico/payload-seed`](../../packages/payload-seed) so a `mux-video`
-seeds **like an image asset** — declared with a `video()` source token and run by the normal
-seed flow, no custom script. See `src/plugins/index.ts` (registers `muxAssetProvider()`) and
-`src/seed/videos.ts` + `src/seed/pages.ts` (a video and a page that references it).
+seeds **like any other doc** — its clip rides on the record's `_file` (the `file()` token) and the
+normal seed flow runs it, no custom script. See `src/plugins/index.ts` (registers `muxAssetProvider()`) and
+`src/seed/videos.ts` + `src/seed/pages.ts` (a video and a page that references it via `ref('mux-video', …)`).
 
 ```bash
 # 1. Put your real Mux credentials in .env.local (MUX_TOKEN_ID / MUX_TOKEN_SECRET)
-# 2. Drop a clip in seed-assets/videos/ (gitignored) and point video('…') at it in src/seed/videos.ts
+# 2. Drop a clip in seed-assets/videos/ (gitignored) and point _file: file('…') at it in src/seed/videos.ts
 # 3. Set ENABLE_SEED=true, start the app, and click "Seed your database" in the admin header
 #    (or POST /api/seed). The seed uploads the clip to Mux, waits for it to be ready, and
 #    creates the mux-video + page docs.
 ```
 
-Under the hood the seed engine resolves the `video()` source to the file under `seed-assets/videos/`,
+Under the hood the seed engine resolves each doc's `_file` to the matching clip under `seed-assets/videos/`,
 hands it to the `mux-video` collection, and the **mux plugin's** `beforeValidate` hook uploads it
 to Mux and folds in the asset metadata — the two plugins stay decoupled. Reseeds clear the
 `mux-video` collection via `payload.delete`, so the `afterDelete` hook removes the old Mux assets

@@ -79,8 +79,9 @@ ready, fills in the metadata, and discards `source` (it's never stored):
 ```ts
 import { ingestMuxVideo } from '@pro-laico/payload-mux'
 
-await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro', playbackPolicy: 'public' })
+await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro' })
 // or a URL: ingestMuxVideo(payload, { source: 'https://example.com/intro.mp4', title: 'Intro' })
+// playback policy comes from the plugin's uploadSettings; pass { playbackPolicy: 'signed' } to override one video
 ```
 
 The lower-level `ingestMuxAsset(mux, source, opts)` (create upload → PUT bytes → poll until
@@ -88,19 +89,23 @@ ready → return the asset) is exported too.
 
 ### Seeding with `@pro-laico/payload-seed`
 
-For declarative seeding, this plugin exports `muxAssetProvider()` so `mux-video` seeds **like an
-image asset** via [`@pro-laico/payload-seed`](../payload-seed#external-assets-mux-video) — declared
-with a `video('clip.mp4')` token and run by the normal seed flow, no script:
+For declarative seeding, this plugin exports `muxAssetProvider()` so a `mux-video` seeds **like any
+other doc** via [`@pro-laico/payload-seed`](../payload-seed#external-assets-mux-video) — its clip rides
+on the record's `_file` (the `file()` token) and the normal seed flow runs it, no script:
 
 ```ts
 import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
 import { seedPlugin } from '@pro-laico/payload-seed'
 
 plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
+
+// in a seed file — the engine hands the _file to the mux-video ingest hook:
+// defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 ```
 
-The provider is plain config — the seed package never imports this one, nor the Mux SDK; the
-upload runs in this plugin's hook. The two packages stay decoupled.
+`muxAssetProvider()` returns plain config — `{ collection: 'mux-video', subdir: 'video' }` — the seed
+package never imports this one, nor the Mux SDK; the upload runs in this plugin's hook. The two packages
+stay decoupled.
 
 ## Use a video
 

@@ -1,16 +1,16 @@
 import type { SeedAssetProvider, SeedDefinition } from './types'
 
 export interface SeedPluginOptions {
-  /** The seed definitions (from `defineSeed` / `defineGlobalSeed` / `defineAssets`).
-   *  They feed both the seed run and the typed `SeedRegistry` injected into
-   *  `payload-types.ts`. */
+  /** The seed definitions (from `defineCollectionSeed` / `defineGlobalSeed`). They feed both the
+   *  seed run and the typed `SeedRegistry` injected into `payload-types.ts`. */
   definitions?: SeedDefinition[]
-  /** Source assets. `dir` holds the files (default `assets`); `collection` is the upload
-   *  collection they're created in (default `media`). */
-  assets?: { dir?: string; collection?: string }
-  /** External-asset providers (e.g. `muxAssetProvider()` from `@pro-laico/payload-mux`) that
-   *  let a plugin's collection seed source files like image assets — declared with a source
-   *  token (e.g. `video('clip.mp4')`) and run by the normal seed flow. */
+  /** The assets root where `_file` source files live, relative to the project root
+   *  (default `assets`). Native uploads are searched under it (and its `image`/`svg`/… subdirs);
+   *  providers look under their own subdir. */
+  assetsDir?: string
+  /** Asset providers (e.g. `muxAssetProvider()` from `@pro-laico/payload-mux`) — collections whose
+   *  `_file` bytes are ingested by an external service via the collection's own hook rather than
+   *  stored as a Payload upload. */
   assetProviders?: SeedAssetProvider[]
   /** Show the "Seed your database" button in the admin header. Default: false. */
   adminButton?: boolean
@@ -20,7 +20,6 @@ export interface SeedPluginOptions {
 export interface ResolvedSeedOptions {
   definitions?: SeedDefinition[]
   assetsDir: string
-  assetsCollection: string
   assetProviders: SeedAssetProvider[]
   adminButton: boolean
 }
@@ -28,8 +27,7 @@ export interface ResolvedSeedOptions {
 export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOptions {
   return {
     definitions: options.definitions,
-    assetsDir: options.assets?.dir ?? 'assets',
-    assetsCollection: options.assets?.collection ?? 'media',
+    assetsDir: options.assetsDir ?? 'assets',
     assetProviders: options.assetProviders ?? [],
     adminButton: options.adminButton ?? false,
   }

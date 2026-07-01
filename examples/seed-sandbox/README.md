@@ -7,10 +7,10 @@ DB), local-disk uploads, and just enough collections to exercise every seed feat
 
 ## What it exercises
 
-- **Typed seed data** — `src/collections/**/seed.ts` author records with `defineSeed`,
+- **Typed seed data** — `src/collections/**/seed.ts` author records with `defineCollectionSeed`,
   typed against this app's generated `payload-types.ts`.
-- **Asset references** — `src/seed/assets.ts` declares the uploadable assets; seed files
-  reference them with `asset('serviceA')`.
+- **Upload files** — `src/seed/media.ts` seeds `media` upload docs that carry their source file
+  on `_file` via `file('service-a.jpg')`; other docs reference them with `ref('media', …)`.
 - **Cross-file doc references** — `Posts/seed.ts` and `SiteSettings/seed.ts` point at
   Services docs with `ref('services', 'consulting')`, creating the dependency edges the
   engine sorts on.
@@ -51,9 +51,9 @@ pnpm --filter seed-sandbox test
 
 An integration test (`tests/seed.int.spec.ts`) boots this config against a temporary
 SQLite DB and runs the real engine via the Local API — the automated analog of the admin
-button. It asserts the seeded counts, that cross-file `ref()`/`asset()` tokens resolve to
-real ids, the topological create order, and idempotency (re-running clears + recreates
-without duplicating).
+button. It asserts the seeded counts, that cross-file `ref()` tokens and each doc's `_file`
+resolve to real ids, the topological create order, and idempotency (re-running clears +
+recreates without duplicating).
 
 ## Type-safe refs (in `payload-types.ts`)
 
@@ -63,8 +63,8 @@ and hands them to `seedPlugin({ definitions: [...] })`. From those, the plugin i
 `typescript.postProcess` hook — so it rides `payload generate:types` (and Payload's dev
 `autoGenerate`, which reruns on every server boot).
 
-That augmentation type-checks `ref('services', 'consulting')` / `asset('serviceA')` against
-the declared `_key`s. It's global (like Payload's own `GeneratedTypes`) — no import needed.
+That augmentation type-checks `ref('services', 'consulting')` against the declared `_key`s.
+It's global (like Payload's own `GeneratedTypes`) — no import needed.
 Rename or remove a seeded item and every stale reference becomes a TS error. Try it: change
 a `_key` in a `seed.ts` file, rerun `generate:types`, and `pnpm typecheck`.
 
@@ -73,7 +73,7 @@ a `_key` in a `seed.ts` file, rerun `generate:types`, and `pnpm typecheck`.
 | Collection / global | Purpose |
 | --- | --- |
 | `users` | Auth (admin login, endpoint gate). |
-| `media` | Upload target for `asset()` references. |
+| `media` | Upload docs (each carries its file on `_file`), referenced via `ref('media', …)`. |
 | `services` | Reference target (`ref('services', …)`). |
 | `posts` | References a service + a hero image. |
 | `site-settings` (global) | References a service + a logo. |

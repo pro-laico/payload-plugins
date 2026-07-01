@@ -2,14 +2,17 @@ import config from '@payload-config'
 import { seed } from '@pro-laico/payload-seed'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { seedDefinitions } from '@/plugins'
+import postsSeed from '@/collections/Posts/seed'
+import servicesSeed from '@/collections/Services/seed'
+import siteSettingsSeed from '@/globals/SiteSettings/seed'
+import mediaSeed from '@/seed/media'
 
 // Integration test: boots the real example config against a temp SQLite DB and drives the
 // REAL seed engine via the Local API — the automated analog of the admin SeedButton flow.
 
-let payload: Payload
+const seedOptions = { definitions: [mediaSeed, servicesSeed, postsSeed, siteSettingsSeed] }
 
-const seedOptions = { definitions: seedDefinitions, assets: { dir: 'assets', collection: 'media' } }
+let payload: Payload
 
 beforeAll(async () => {
   payload = await getPayload({ config })
@@ -36,7 +39,7 @@ describe('seed engine (integration)', () => {
 
     const consulting = services.docs.find((s) => s.slug === 'consulting')
     const implementation = services.docs.find((s) => s.slug === 'implementation')
-    expect(consulting?.image).toBeTruthy() // asset('serviceA') resolved to an upload id
+    expect(consulting?.image).toBeTruthy() // ref('media', 'serviceA') resolved to a media doc id
 
     // Cross-file ref: the post points at the Consulting service created earlier.
     const post = (await payload.find({ collection: 'posts', depth: 0 })).docs[0]

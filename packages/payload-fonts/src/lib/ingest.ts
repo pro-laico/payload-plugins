@@ -27,9 +27,9 @@ async function readSourceBytes(source: FontSource): Promise<Buffer> {
 
 /**
  * The transient `source` value a `font` typeface is created with for server-side ingest —
- * the shape the seed engine resolves a `fontSource(...)` token into, and what `ingestFont`
- * passes. A single file becomes one slot: a static `weights` row by default, or a `variable`
- * upright/italic slot when `variable` is set.
+ * the shape the seed engine builds from a doc's `_file` (`{ file, ...options }`), and what
+ * `ingestFont` passes. A single file becomes one slot: a static `weights` row by default, or a
+ * `variable` upright/italic slot when `variable` is set.
  */
 export interface FontSourceValue {
   /** Local file path or `http(s)` URL of the font file to ingest. */
@@ -52,7 +52,7 @@ export interface FontSourceHookOptions {
 
 /**
  * `beforeValidate` for the `font` typeface: turn a transient `source` (a local path / URL,
- * via {@link ingestFont} or a seed `fontSource(...)` token) into a real upload. It reads the
+ * via {@link ingestFont} or a seed doc's `_file`) into a real upload. It reads the
  * file, creates a `fontOriginal` upload, points the right slot at it (`variable.upright` /
  * `variable.italic`, or a `weights` row), and strips `source` so it's never persisted. The
  * collection's existing `afterChange` optimize hook then subsets it to a served WOFF2 — so a

@@ -24,7 +24,7 @@ The plugin is a few standard Payload pieces, and the rest of this page covers th
 - **Two serving paths.** `next/font/local` in production (an export endpoint + a CLI) and the
   `<DevFonts>` runtime component in development — they never both fire.
 - **Server ingest + seeding.** `ingestFont()` creates a typeface from a file; `fontAssetProvider()`
-  / `fontSource()` seed one declaratively.
+  registers `font` as a seed asset provider so a typeface seeds declaratively like any doc.
 
 ## Setup
 
@@ -310,11 +310,11 @@ await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', fami
 
 ## Seeding
 
-The plugin exports `fontAssetProvider()` so a typeface seeds **like an image asset** via
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers) — declared
-with a `fontSource('inter.woff2')` token and run by the normal seed flow, no script. The provider is
-plain config (the seed package never imports this one, nor `fontkit` / `subset-font`; the upload +
-subset run in this plugin's hooks), so the two packages stay decoupled.
+The plugin exports `fontAssetProvider()` so a typeface seeds **like any doc** via
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers) — a `font`
+record carries its source file on `_file` with the `file()` token, run by the normal seed flow, no
+script. The provider is plain config (the seed package never imports this one, nor `fontkit` /
+`subset-font`; the upload + subset run in this plugin's hooks), so the two packages stay decoupled.
 
 ```ts
 import { fontsPlugin, fontAssetProvider } from '@pro-laico/payload-fonts'
@@ -328,11 +328,10 @@ plugins: [
 
 ```ts
 // seed/fonts.ts — files live in <assetsDir>/fonts/
-import { defineSeed } from '@pro-laico/payload-seed'
-import { fontSource } from '@pro-laico/payload-fonts'
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-export default defineSeed('font', () => [
-  { _key: 'inter', title: 'Inter', family: 'sans', source: fontSource('inter.woff2', { weight: '400' }) },
+export default defineCollectionSeed('font', ({ file }) => [
+  { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
 ])
 
 // seed/fontSet.ts — pick the active typeface per role with ordinary ref() tokens

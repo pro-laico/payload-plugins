@@ -80,6 +80,8 @@
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck",
     "build:assets": "copyfiles -u 1 \"src/**/*.css\" dist"
@@ -103,7 +105,8 @@
     "payload": "^3.85.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=18"

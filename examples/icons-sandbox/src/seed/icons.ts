@@ -1,7 +1,10 @@
-import { iconAssets } from '@pro-laico/payload-icons'
-import { defineAssets } from '@pro-laico/payload-seed'
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-// Icons seed like any other upload asset: each SVG in `seed-assets/svg/` is uploaded to the
-// `icon` collection (running the optimize/sanitize hook) and is referenceable elsewhere by its
-// filename base — e.g. `asset('star')`. `iconAssets` just pre-targets the `icon` collection.
-export default defineAssets(iconAssets(['arrow-right.svg', 'check.svg', 'star.svg']))
+// Icons seed like any collection: each SVG rides on the record's `_file` meta-key — uploaded
+// natively into the `icon` collection (running the optimize/sanitize hook) — and is referenceable
+// elsewhere via ref('icon', <_key>). Files live in `seed-assets/svg/`.
+export default defineCollectionSeed('icon', ({ file }) => [
+  { _key: 'arrow-right', _file: file('arrow-right.svg') },
+  { _key: 'check', _file: file('check.svg') },
+  { _key: 'star', _file: file('star.svg') },
+])

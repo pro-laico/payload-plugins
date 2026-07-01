@@ -10,15 +10,15 @@ import pages from '../seed/pages'
 // + sanitizes every SVG on save and stores it as an inline `svgString`.
 //
 // seedPlugin: the `icon` collection is a standard upload collection, so icons seed NATIVELY — no
-// asset provider (unlike payload-mux, whose `mux-video` ingests to an external service). The
-// `icons` definition is just `defineAssets(iconAssets([...]))`; the engine uploads each SVG from
-// `seed-assets/svg/` through the normal flow (running the optimize hook), and a page references
-// one via `asset(...)`. Set ENABLE_SEED=true, then use the admin button or POST /api/seed.
+// asset provider (unlike payload-mux, whose `mux-video` ingests to an external service). `icons`
+// is just `defineCollectionSeed('icon', …)` with each SVG on its `_file` meta-key; the engine
+// uploads each from `seed-assets/svg/` through the normal flow (running the optimize hook), and a
+// page references one via `ref('icon', …)`. Set ENABLE_SEED=true, then use the admin button or POST /api/seed.
 export const plugins: Plugin[] = [
   iconsPlugin(),
   seedPlugin({
     adminButton: true,
     definitions: [icons, pages],
-    assets: { dir: 'seed-assets' },
+    assetsDir: 'seed-assets',
   }),
 ]

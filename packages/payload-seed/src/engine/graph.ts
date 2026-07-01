@@ -1,8 +1,10 @@
-import { isAssetRef, isRef } from '../refs'
-import { assetNodeId, collectTokens, docNodeId } from './tokens'
+import type { FileToken } from '../refs'
+import { collectTokens, docNodeId } from './tokens'
 
 export interface BuiltRecord {
   key: string
+  /** The record's `_file` meta-key, if it attaches a source file. */
+  file?: FileToken
   data: Record<string, unknown>
 }
 export interface BuiltCollection {
@@ -14,12 +16,11 @@ export interface BuiltGlobal {
   data: Record<string, unknown>
 }
 export interface BuiltModel {
-  assetKeys: string[]
   collections: BuiltCollection[]
   globals: BuiltGlobal[]
 }
 
-export type GraphNodeType = 'asset' | 'doc' | 'global'
+export type GraphNodeType = 'doc' | 'global'
 export interface GraphNode {
   id: string
   type: GraphNodeType
@@ -39,18 +40,14 @@ export interface SeedGraph {
   order: string[]
 }
 
-/** Build the dependency graph: asset/doc/global nodes, edges from each doc/global to the
- *  docs and assets it references, plus the topologically sorted doc create order. */
+/** Build the dependency graph: doc/global nodes, edges from each doc/global to the docs it
+ *  references, plus the topologically sorted doc create order. */
 export function buildGraph(model: BuiltModel): SeedGraph {
   const nodes: GraphNode[] = []
   const edges: GraphEdge[] = []
   const docIds = new Set<string>()
   // dependency adjacency among doc nodes only (dependent → dependency)
   const docDeps = new Map<string, Set<string>>()
-
-  for (const key of model.assetKeys) {
-    nodes.push({ id: assetNodeId(key), type: 'asset', label: key, key })
-  }
 
   for (const coll of model.collections) {
     for (const rec of coll.records) {
@@ -63,8 +60,7 @@ export function buildGraph(model: BuiltModel): SeedGraph {
 
   const addEdgesFor = (fromId: string, data: unknown, trackDocDep: boolean) => {
     for (const token of collectTokens(data)) {
-      const to = isRef(token) ? docNodeId(token.collection, token.key) : isAssetRef(token) ? assetNodeId(token.key) : null
-      if (!to) continue
+      const to = docNodeId(token.collection, token.key)
       edges.push({ from: fromId, to })
       if (trackDocDep && docIds.has(to)) docDeps.get(fromId)?.add(to)
     }

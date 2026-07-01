@@ -102,8 +102,8 @@ await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', fami
 
 ### Seeding with `@pro-laico/payload-seed`
 
-This plugin exports `fontAssetProvider()` so a typeface seeds **like an image asset** — declared
-with a `fontSource('inter.woff2')` token and run by the normal seed flow, no script:
+This plugin exports `fontAssetProvider()` so a typeface seeds **like any doc** — a `font` record
+carries its source file on `_file` with the `file()` token, run by the normal seed flow, no script:
 
 ```ts
 import { fontsPlugin, fontAssetProvider } from '@pro-laico/payload-fonts'
@@ -117,11 +117,10 @@ plugins: [
 
 ```ts
 // seed/fonts.ts — files live in <assetsDir>/fonts/
-import { defineSeed } from '@pro-laico/payload-seed'
-import { fontSource } from '@pro-laico/payload-fonts'
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-export default defineSeed('font', () => [
-  { _key: 'inter', title: 'Inter', family: 'sans', source: fontSource('inter.woff2', { weight: '400' }) },
+export default defineCollectionSeed('font', ({ file }) => [
+  { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
 ])
 
 // seed/fontSet.ts — pick the active typeface per role

@@ -398,7 +398,6 @@ declare module '@pro-laico/payload-seed' {
       'pages': 'home'
     }
     globals: never
-    assets: never
   }
 }
 

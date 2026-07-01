@@ -7,14 +7,13 @@
  *     interface SeedRegistry {
  *       collections: { services: 'consulting' | 'implementation'; posts: 'launch' }
  *       globals: 'header' | 'footer'
- *       assets: 'hero' | 'serviceA' | 'post'
  *     }
  *   }
  *
- * Once augmented, `ref()` / `asset()` keys are checked against these unions — remove a
- * seeded item's `_key` and every reference to it becomes a TS error. Before types are
- * generated (interface empty), the resolvers below fall back to permissive `string` keys, so
- * refs are runtime-validated only. Progressive: safe without it, fully safe with it.
+ * Once augmented, `ref()` keys are checked against these unions — remove a seeded item's
+ * `_key` and every reference to it becomes a TS error. Before types are generated (interface
+ * empty), the resolvers below fall back to permissive `string` keys, so refs are
+ * runtime-validated only. Progressive: safe without it, fully safe with it.
  */
 // Intentionally empty — augmented in the project's payload-types.ts during generate:types.
 export interface SeedRegistry {}
@@ -33,6 +32,3 @@ export type RegistryKey<C extends RegistryCollectionSlug> = RegistryCollections[
 
 /** Union of declared global slugs. */
 export type RegistryGlobal = Resolve<'globals', string>
-
-/** Union of declared asset keys. */
-export type RegistryAsset = Resolve<'assets', string>

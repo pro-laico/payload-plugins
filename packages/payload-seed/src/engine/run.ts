@@ -1,15 +1,14 @@
-import { createLocalReq, type CollectionSlug, type Payload, type PayloadRequest } from 'payload'
+import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
-import { asset, ref, video } from '../refs'
-import type { AssetSpec, SeedDefinition } from '../types'
-import { uploadAssets } from './assets'
-import { type BuiltCollection, type BuiltGlobal, type BuiltModel, buildGraph } from './graph'
-import { collectSourceRefs, resolveSourceFiles } from './sources'
+import { file, isFileToken, ref } from '../refs'
+import type { SeedAssetProvider, SeedDefinition } from '../types'
+import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph } from './graph'
+import { resolveFilePath, readFileAsUpload } from './files'
 import { docNodeId, resolveTokens } from './tokens'
 import { validateModel } from './validate'
 
 export interface SeedResult {
-  /** Created doc counts keyed by collection slug (includes uploaded assets). */
+  /** Created doc counts keyed by collection slug. */
   created: Record<string, number>
   /** The computed topological create order (doc node ids, `collection:_key`). */
   order: string[]
@@ -23,30 +22,26 @@ export interface RunSeedArgs {
   definitions?: SeedDefinition[]
 }
 
-const tokens = { ref, asset, video }
+const tokens = { ref, file }
 
-/** Split definitions by kind and build the concrete model (records/globals/assets). */
-function buildModel(definitions: SeedDefinition[]): { model: BuiltModel; specs: Record<string, AssetSpec> } {
-  const specs: Record<string, AssetSpec> = {}
+/** Split definitions by kind and build the concrete model (records + their `_file`, and globals). */
+function buildModel(definitions: SeedDefinition[]): BuiltModel {
   const collections: BuiltCollection[] = []
   const globals: BuiltGlobal[] = []
 
   for (const def of definitions) {
-    if (def.kind === 'assets') Object.assign(specs, def.specs)
-  }
-  for (const def of definitions) {
     if (def.kind === 'collection') {
-      const built = def.build(tokens).map((rec) => {
-        const { _key, ...data } = rec as { _key: string } & Record<string, unknown>
-        return { key: _key, data }
+      const records: BuiltRecord[] = def.build(tokens).map((rec) => {
+        const { _key, _file, ...data } = rec as { _key: string; _file?: unknown } & Record<string, unknown>
+        return { key: _key, file: isFileToken(_file) ? _file : undefined, data }
       })
-      collections.push({ slug: def.slug, records: built })
+      collections.push({ slug: def.slug, records })
     } else if (def.kind === 'global') {
       globals.push({ slug: def.slug, data: def.build(tokens) as Record<string, unknown> })
     }
   }
 
-  return { model: { assetKeys: Object.keys(specs), collections, globals }, specs }
+  return { collections, globals }
 }
 
 async function clearCollection(payload: Payload, req: PayloadRequest, collection: string, withHooks: boolean): Promise<void> {
@@ -69,20 +64,27 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
 }
 
 /**
- * The seed engine. Takes the seed definitions, builds the model, validates references
- * against the live config, topologically sorts the dependency graph, clears the seeded
- * collections, uploads assets, creates docs (resolving ref/asset tokens to ids) in order,
- * and updates globals.
+ * The seed engine. Takes the seed definitions, builds the model, validates references against
+ * the live config, topologically sorts the dependency graph, clears the seeded collections, then
+ * creates docs in order — resolving `ref` tokens to ids and delivering each doc's `_file` as a
+ * native upload (upload collections) or a provider source (registered asset-provider collections).
+ * Globals are updated last.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
   const defs = definitions ?? options.definitions ?? []
   if (defs.length === 0) payload.logger.warn('[payload-seed] no seed definitions: pass `definitions` to seedPlugin() or seed().')
 
-  const { model, specs } = buildModel(defs)
+  const model = buildModel(defs)
   const collectionSlugs = new Set(Object.keys(payload.collections))
 
-  // Valid top-level field names per node, read from the live config — for unknown-field
-  // detection at runtime (the counterpart to the compile-time exactness check).
+  const isUpload = (slug: string): boolean => Boolean(payload.collections[slug as CollectionSlug]?.config.upload)
+  const providerBySlug = new Map<string, SeedAssetProvider>(options.assetProviders.map((p) => [p.collection, p]))
+
+  // Collections a `_file` may sit on: every upload collection plus registered providers.
+  const fileCollections = new Set<string>([...collectionSlugs].filter(isUpload))
+  for (const p of options.assetProviders) fileCollections.add(p.collection)
+
+  // Valid top-level field names per node, read from the live config — for unknown-field detection.
   const fieldNames = new Map<string, Set<string>>()
   for (const coll of model.collections) {
     const cfg = payload.collections[coll.slug as CollectionSlug]?.config
@@ -93,56 +95,63 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     if (cfg) fieldNames.set(`global:${g.slug}`, new Set(cfg.flattenedFields.map((f) => f.name)))
   }
 
-  // Validate references + fields, build/sort the dependency graph (cycle detection here).
-  validateModel({ model, collectionSlugs, fieldNames })
+  validateModel({ model, collectionSlugs, fileCollections, fieldNames })
   const { order } = buildGraph(model)
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
-  // Provider collections (e.g. mux-video) clear via payload.delete so their hooks fire
-  // (the owning plugin's afterDelete removes the external asset).
-  const providerCollections = new Set(options.assetProviders.map((p) => p.collection))
-
-  // Clear: every collection we seed into, plus the asset upload collections.
-  const assetCollections = new Set(Object.values(specs).map((s) => s.collection ?? options.assetsCollection))
-  const seededCollections = [...new Set([...assetCollections, ...model.collections.map((c) => c.slug)])]
+  // Clear every seeded collection. Upload + provider collections clear via `payload.delete` so
+  // their hooks fire (e.g. external-asset cleanup); plain collections are wiped directly.
+  const seededCollections = [...new Set(model.collections.map((c) => c.slug))]
   payload.logger.info('[payload-seed] clearing collections...')
-  for (const slug of seededCollections) await clearCollection(payload, req, slug, providerCollections.has(slug))
+  for (const slug of seededCollections) await clearCollection(payload, req, slug, providerBySlug.has(slug))
 
-  // Upload image assets first; resolve provider source files (e.g. videos) to absolute paths.
-  payload.logger.info('[payload-seed] uploading assets...')
-  const assetIds = await uploadAssets({ payload, req, specs, assetsRoot: options.assetsDir, defaultCollection: options.assetsCollection })
-  const sourceRefs = [
-    ...model.collections.flatMap((c) => c.records.flatMap((r) => collectSourceRefs(r.data))),
-    ...model.globals.flatMap((g) => collectSourceRefs(g.data)),
-  ]
-  const sources = await resolveSourceFiles({ payload, refs: sourceRefs, providers: options.assetProviders, assetsRoot: options.assetsDir })
-
-  // Create docs in dependency order, resolving tokens to ids.
+  // Create docs in dependency order, resolving ref tokens to ids and delivering each `_file`.
   const docIds = new Map<string, string | number>()
-  const recordIndex = new Map<string, { slug: string; data: Record<string, unknown> }>()
+  const recordIndex = new Map<string, { slug: string; record: BuiltRecord }>()
   for (const coll of model.collections)
-    for (const rec of coll.records) recordIndex.set(docNodeId(coll.slug, rec.key), { slug: coll.slug, data: rec.data })
+    for (const rec of coll.records) recordIndex.set(docNodeId(coll.slug, rec.key), { slug: coll.slug, record: rec })
 
   const created: Record<string, number> = {}
-  if (assetIds.size) created[options.assetsCollection] = assetIds.size
 
   payload.logger.info('[payload-seed] seeding documents...')
   for (const nodeId of order) {
     const entry = recordIndex.get(nodeId)
     if (!entry) continue
-    const data = resolveTokens(entry.data, { docs: docIds, assets: assetIds, sources, where: nodeId }) as Record<string, unknown>
-    const doc = (await payload.create({ collection: entry.slug as CollectionSlug, data: data as never, ...baseArgs })) as {
-      id: string | number
+    const { slug, record } = entry
+    let data = resolveTokens(record.data, { docs: docIds, where: nodeId }) as Record<string, unknown>
+    let uploadFile: Awaited<ReturnType<typeof readFileAsUpload>> | undefined
+
+    if (record.file) {
+      const provider = providerBySlug.get(slug)
+      if (provider) {
+        const path = await resolveFilePath(record.file.name, options.assetsDir, provider.subdir ?? 'source')
+        if (path) data = { ...data, [provider.sourceField ?? 'source']: { file: path, ...record.file.options } }
+        else
+          payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+      } else if (isUpload(slug)) {
+        const path = await resolveFilePath(record.file.name, options.assetsDir)
+        if (path) uploadFile = await readFileAsUpload(path)
+        else
+          payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+      }
     }
+
+    payload.logger.info(`[payload-seed] seeding '${nodeId}'`)
+    const doc = (await payload.create({
+      collection: slug as CollectionSlug,
+      data: data as never,
+      ...(uploadFile ? { file: uploadFile } : {}),
+      ...baseArgs,
+    })) as { id: string | number }
     docIds.set(nodeId, doc.id)
-    created[entry.slug] = (created[entry.slug] ?? 0) + 1
+    created[slug] = (created[slug] ?? 0) + 1
   }
 
   // Update globals after all docs exist.
   for (const g of model.globals) {
     payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
-    const data = resolveTokens(g.data, { docs: docIds, assets: assetIds, sources, where: `global:${g.slug}` }) as Record<string, unknown>
+    const data = resolveTokens(g.data, { docs: docIds, where: `global:${g.slug}` }) as Record<string, unknown>
     await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
   }
 

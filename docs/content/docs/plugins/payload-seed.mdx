@@ -1,30 +1,29 @@
 ---
 title: "payload-seed"
-description: "Type-safe, dependency-ordered seeding for Payload CMS — declare seed data in files and let the plugin order, upload, and create it."
+description: "Type-safe, dependency-ordered seeding for Payload CMS. Declare seed data in files and let the plugin order, upload, and create it."
 ---
 
 `@pro-laico/payload-seed` is an automatic, type-safe helper for writing seed values for your
 collections, globals, and more. It rides the same `payload generate:types` you already run, so the
-typing stays accurate and up to date on its own — which means you **and** your AI tools get real
-feedback while writing seed content, instead of guessing at shapes.
+typing stays accurate and up to date on its own, which means you **and** your AI tools get real
+feedback while writing seed content, instead of guessing at shapes. It also handles relationships
+and assets for you, so you never have to worry about upload order or ending up with empty references.
 
-It also ties into the other Pro Laico plugins, so uploading assets — and working with those plugins
-in general — just falls into place.
+It also ties into the other Pro Laico plugins, so uploading assets (and working with those plugins
+in general) just falls into place.
 
 ```bash
 pnpm add @pro-laico/payload-seed
 ```
 
-## How it works
+## What's included
 
-The plugin is a handful of standard pieces:
+Everything you need to seed Payload CMS as easily as possible.
 
-- **Seed files** — one `defineSeed` / `defineGlobalSeed` export per collection or global, typed against your Payload types.
-- **Typed tokens** — `ref()` and `asset()` point at other docs and uploads by handle, not raw ids.
-- **Assets** — `defineAssets` declares the files to upload; they upload first so `asset()` resolves.
-- **The plugin** — `seedPlugin` registers the command, endpoint, optional admin button, and ref-checking types.
-- **Run order** — one engine validates, graphs the dependencies, topo-sorts, clears, uploads, and creates.
-- **External assets** — a provider seam lets a collection whose bytes live outside Payload (e.g. Mux) seed like an image asset.
+- **Typed seed helper functions:** payload-seed automatically generates types for the collections and globals you use. With one of this package's helper functions, you can write type-safe seed data for anything.
+- **Relationship handling:** You don't have to deal with empty references in your seeded docs anymore. payload-seed handles reference seed order automatically.
+- **Asset handling:** Dedicated asset upload handlers can be attached to payload-seed from other plugins, on top of a standard Payload upload handler built into our type-safe helper functions.
+- **Seed anywhere:** Seed locally via the CLI, by pinging the seed endpoint, or with the included seed button right in your Payload admin dashboard.
 
 ## Setup
 
@@ -33,18 +32,20 @@ The plugin is a handful of standard pieces:
 <Step>
 **Add the plugin**
 
-Hand it your `definitions` — every `seed.ts` export plus the `defineAssets` export. The same array
-drives the run and the injected types.
+Register `seedPlugin` in your Payload config. Leave `definitions` empty for now; you'll fill it in
+once your seed files exist.
 
 ```ts
 import { buildConfig } from 'payload'
 import { seedPlugin } from '@pro-laico/payload-seed'
-import services from './collections/Services/seed'
-import posts from './collections/Posts/seed'
-import assets from './seed/assets'
 
 export default buildConfig({
-  plugins: [seedPlugin({ definitions: [assets, services, posts], adminButton: true })],
+  plugins: [
+    seedPlugin({
+      definitions: [],
+      adminButton: true,
+    }),
+  ],
   // ...
 })
 ```
@@ -62,21 +63,85 @@ pnpm payload generate:importmap
 </Step>
 
 <Step>
+**Define your data**
+
+Write one `seed.ts` per collection with `defineCollectionSeed`. Each record needs a `_key` (a local
+handle other files point at); upload collections carry their file on `_file`, and relationship fields
+point at other records with `ref()`.
+
+```ts
+// collections/Media/seed.ts
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
+
+export default defineCollectionSeed('media', ({ file }) => [
+  { _key: 'serviceImg', _file: file('service-a.jpg'), alt: 'Consulting' },
+])
+```
+
+```ts
+// collections/Services/seed.ts
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
+
+export default defineCollectionSeed('services', () => [
+  { _key: 'consulting', title: 'Consulting' },
+])
+```
+
+```ts
+// collections/Posts/seed.ts
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
+
+export default defineCollectionSeed('posts', ({ ref }) => [
+  {
+    _key: 'launch',
+    title: 'We launched',
+    heroImage: ref('media', 'serviceImg'),
+    relatedService: ref('services', 'consulting'),
+  },
+])
+```
+</Step>
+
+<Step>
+**Add them to the plugin**
+
+Import each `seed.ts` export and hand the whole set to `definitions`. The same array drives the run
+and the injected types.
+
+```ts
+import { buildConfig } from 'payload'
+import { seedPlugin } from '@pro-laico/payload-seed'
+import media from './collections/Media/seed'
+import services from './collections/Services/seed'
+import posts from './collections/Posts/seed'
+
+export default buildConfig({
+  plugins: [
+    seedPlugin({
+      definitions: [media, services, posts],
+      adminButton: true,
+    }),
+  ],
+  // ...
+})
+```
+</Step>
+
+<Step>
 **Enable, then run**
 
 The seed is gated by the `ENABLE_SEED` kill switch (off by default). Set it, then run the seed one
-of three ways — the bundled command, the admin button (`adminButton: true`), or the endpoint:
+of three ways: the bundled command, the admin button (`adminButton: true`), or the endpoint:
 
 ```bash
 ENABLE_SEED=true pnpm payload seed   # CLI (Local API)
 # or click "Seed your database" in the admin header
-# or POST /api/seed  (authenticated admin user)
+# or POST /api/seed  (any authenticated user)
 ```
 
 <Callout type="warn">
-  The seed is **destructive** — it clears and recreates the seeded collections (and the asset
-  upload collections). `ENABLE_SEED` is off by default: opt in per-environment while iterating,
-  and never set it in production.
+  The seed is **destructive**. It clears and recreates every seeded collection. `ENABLE_SEED` is
+  off by default: opt in per-environment while iterating, and never set it in production.
 </Callout>
 </Step>
 
@@ -84,30 +149,21 @@ ENABLE_SEED=true pnpm payload seed   # CLI (Local API)
 
 ## Plugin
 
-`seedPlugin(options?)` is the single entry point — one call registers the `payload seed` command,
+`seedPlugin(options?)` is the single entry point. One call registers the `payload seed` command,
 the `POST /api/seed` endpoint, the optional admin button, and the type augmentation that checks your
 refs (all detailed below). It does nothing useful without `definitions`.
 
 ### Options
 
 export const options = [
-  { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions — your defineSeed / defineGlobalSeed exports plus the defineAssets export. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do.` },
-  {
-    name: 'assets',
-    type: '{ dir?: string; collection?: string }',
-    default: "{ dir: 'assets', collection: 'media' }",
-    description: `Where source files live and which upload collection they are created in.`,
-    options: [
-      { name: 'dir', type: 'string', default: "'assets'", description: `Directory holding the source files, relative to the project root.` },
-      { name: 'collection', type: 'string', default: "'media'", description: `Default upload collection assets are created in. A per-file spec can override it.` },
-    ],
-  },
-  { name: 'assetProviders', type: 'SeedAssetProvider[]', default: '[]', description: `External-asset providers, such as muxAssetProvider() from the Mux plugin. Each adds a builder source token (e.g. video) so a collection whose bytes live outside Payload can seed like an image asset. See External assets below.` },
+  { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions: your defineCollectionSeed / defineGlobalSeed exports. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do.` },
+  { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. Native uploads are searched under it (and its image/svg/… subdirs); providers look under their own subdir.` },
+  { name: 'assetProviders', type: 'SeedAssetProvider[]', default: '[]', description: `Asset providers, such as muxAssetProvider() from the Mux plugin: collections whose _file bytes are ingested by an external service via the collection's own hook rather than stored as a Payload upload. See External assets below.` },
   { name: 'adminButton', type: 'boolean', default: 'false', description: `Render the Seed your database button in the admin header.` },
 ]
 
-The **Reference** tab is the interactive view (`assets` expands to its nested options);
-**TypeScript** is the same shape in code, every option at its default.
+The **Reference** tab is the interactive view; **TypeScript** is the same shape in code, every option
+at its default.
 
 <Tabs items={['Reference', 'TypeScript']}>
 
@@ -124,8 +180,8 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 
 // Every option at its default.
 seedPlugin({
-  // definitions: [assets, services, posts], // no default — the seed.ts exports + the defineAssets export
-  assets: { dir: 'assets', collection: 'media' },
+  // definitions: [media, services, posts], // no default; your seed.ts exports
+  assetsDir: 'assets',
   assetProviders: [],
   adminButton: false,
 })
@@ -135,39 +191,54 @@ seedPlugin({
 
 </Tabs>
 
-## Defining seeds
-
-`defineSeed(slug, build)` — one default export per collection. Give each record a `_key` (a local
-reference handle), and point at other docs / uploads with the `ref()` / `asset()` tokens (supplied
-to the builder) instead of raw ids:
-
-<Tabs items={['Services', 'Posts']}>
-
-<Tab value="Services">
+## `defineCollectionSeed`
 
 ```ts
-// collections/Services/seed.ts
-import { defineSeed } from '@pro-laico/payload-seed'
+defineCollectionSeed(slug, build)
+```
 
-export default defineSeed('services', ({ asset }) => [
-  { _key: 'consulting', title: 'Consulting', slug: 'consulting', image: asset('serviceA') },
+Declares the records for one collection, one `export default` per `seed.ts` file. Returns a seed
+definition you add to `seedPlugin({ definitions })`.
+
+export const defineSeedParams = [
+  { name: 'slug', type: 'CollectionSlug', required: true, description: `The collection these records seed into. Typed against your Payload collections, so an unknown slug is a TypeScript error.` },
+  { name: 'build', type: '(tokens) => Record[]', required: true, description: `Returns the array of records to create. Receives the { ref, file } tokens as its argument, so you point at other docs and attach files inline, with nothing to import.` },
+]
+
+<ConfigOptions items={defineSeedParams} />
+
+**Each record** is the collection's own data plus a required **`_key`** (a local handle other seed
+files target with `ref(slug, key)`) and, for upload / provider collections, an optional **`_file`**
+carrying its source file. Point relationship fields at other records with `ref()`; attach a file with
+`file()` on `_file`:
+
+<Tabs items={['Media (an upload collection)', 'Posts (references them)']}>
+
+<Tab value="Media (an upload collection)">
+
+```ts
+// collections/Media/seed.ts: each doc carries its file on `_file`
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
+
+export default defineCollectionSeed('media', ({ file }) => [
+  { _key: 'serviceImg', _file: file('service-a.jpg'), alt: 'Consulting' },
 ])
 ```
 
 </Tab>
 
-<Tab value="Posts">
+<Tab value="Posts (references them)">
 
 ```ts
-// collections/Posts/seed.ts
-import { defineSeed } from '@pro-laico/payload-seed'
+// collections/Posts/seed.ts: point at other seeded docs by ref
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-export default defineSeed('posts', ({ ref, asset }) => [
+export default defineCollectionSeed('posts', ({ ref }) => [
   {
     _key: 'launch',
     title: 'We launched',
-    heroImage: asset('post'),
-    relatedService: ref('services', 'consulting'), // typed dependency edge across files
+    heroImage: ref('media', 'serviceImg'),          // upload-field relationship, resolved by ref
+    relatedService: ref('services', 'consulting'),  // typed dependency edge across files
   },
 ])
 ```
@@ -176,152 +247,87 @@ export default defineSeed('posts', ({ ref, asset }) => [
 
 </Tabs>
 
-Records are typed against your app's generated Payload types
-(`RequiredDataFromCollectionSlug<slug>`), except relationship and upload fields are widened to also
-accept `ref()` / `asset()` tokens. Change a collection's fields and the seed file shows a TS error
-until it matches; unknown fields are rejected too. The producing side (`_key`) stays a free string;
-only the consuming side (`ref` / `asset`) is checked.
+Records are typed against your generated Payload types (`RequiredDataFromCollectionSlug<slug>`), with
+relationship fields widened to also accept `ref()` tokens. Change a collection's fields and the seed
+file shows a TS error until it matches; unknown fields are rejected too. The producing side (`_key`)
+stays a free string; only the consuming side (`ref`) is checked.
 
-## Assets
-
-`defineAssets(specs)` — declare the uploadable files. Each key becomes an `asset(key)` reference;
-its spec points at a file in the assets dir (default `assets/`) plus the upload-doc data. The engine
-uploads these **first**, so `asset()` tokens resolve to real ids before any content is created.
+## `defineGlobalSeed`
 
 ```ts
-// seed/assets.ts
-import { defineAssets } from '@pro-laico/payload-seed'
-
-export default defineAssets({
-  serviceA: { file: 'service-a.jpg', alt: 'Consulting' },
-  hero: { file: 'hero.jpg', alt: 'Hero', focalX: 78, focalY: 32 },
-})
+defineGlobalSeed(slug, build)
 ```
 
-Each spec is an `AssetSpec`:
-
-export const assetSpec = [
-  { name: 'file', type: 'string', required: true, description: `Filename within the assets dir. The loader tolerates an extension mismatch — a spec naming foo.png picks up foo.jpg if that is what is on disk.` },
-  { name: 'collection', type: 'CollectionSlug', description: `Upload collection to create this asset in. Defaults to the plugin's assets.collection.` },
-  { name: 'alt', type: 'string', description: `Alt text set on the created upload doc.` },
-  { name: 'focalX', type: 'number', description: `Focal point X, a percentage measured from the left.` },
-  { name: 'focalY', type: 'number', description: `Focal point Y, a percentage measured from the top.` },
-  { name: 'data', type: 'Record<string, unknown>', description: `Extra fields to set on the created upload doc.` },
-]
-
-<ConfigOptions items={assetSpec} />
-
-`focalX` / `focalY` set the upload's focal point, so seeded images crop to the right subject the
-moment they're served (e.g. by [`@pro-laico/payload-images`](/docs/plugins/payload-images)).
-
-## Globals
-
-Globals seed through a sibling helper, `defineGlobalSeed(slug, build)` — a singleton, so no `_key`.
-The builder gets the same tokens, and globals are **updated after** all their dependencies exist:
+Declares the seed data for one global, the sibling of `defineCollectionSeed` for singletons, so there's no
+`_key`. The builder gets the same tokens, and globals are **updated after** all their dependencies
+exist:
 
 ```ts
 // globals/SiteSettings/seed.ts
 import { defineGlobalSeed } from '@pro-laico/payload-seed'
 
 export default defineGlobalSeed('site-settings', ({ ref }) => ({
-  /* SiteSettings data — ref('services', 'consulting') etc. */
+  /* SiteSettings data; ref('services', 'consulting') etc. */
 }))
 ```
 
-## Typed references
+## Files (`_file`)
 
-Run `payload generate:types` and the plugin injects a `SeedRegistry` into `payload-types.ts`, so
-`ref('services', 'consulting')` is checked against your real `_key`s — rename or remove a seeded
-item and every stale reference becomes a TS error. Unknown collections and unknown asset keys error
-too.
+An asset is just a seeded doc that carries a file. Put it on the record's **`_file`** meta-key with
+the `file()` token. How the file is delivered depends on the doc's collection. The engine decides,
+you don't:
 
-It's injected via Payload's own `typescript.postProcess` hook and rides the same `generate:types`
-command you already run, so the augmentation is **global with no import** — exactly like Payload's
-generated `GeneratedTypes`. Without codegen, refs fall back to runtime validation — safe either way,
-fully safe with it.
-
-## Run order
-
-The CLI `payload seed` and `POST /api/seed` share one engine:
-
-1. **Build the model** from the definitions — asset specs, collection records, globals.
-2. **Validate** — every `ref` targets a real collection and resolves to a seeded doc, every `asset`
-   resolves to a declared key, no duplicate `_key` within a collection, no unknown top-level fields.
-   All issues are collected and thrown at once, naming the collection, `_key`, and field.
-3. **Build the dependency graph** — every `ref(collection, key)` is an edge — and **topo-sort** it
-   (depth-first). A cycle is a hard error that names the cycle.
-4. **Clear** the seeded collections (plus the asset upload collections). Upload collections and
-   asset-provider collections clear via `payload.delete` so their hooks fire (e.g. external-asset
-   cleanup); plain collections are wiped directly.
-5. **Upload assets first**, resolving `asset()` keys to ids, and resolve any provider source files
-   to absolute paths.
-6. **Create** docs in sorted order, resolving `ref` / `asset` / source tokens to real ids at create
-   time.
-7. **Update globals** after their dependencies exist.
-
-## Running from code
-
-The CLI, endpoint, and admin button are the usual triggers, but the same engine is exported as
-`seed()` for scripts, tests, and migrations — anywhere you already have a `payload` instance. It
-builds a Local API `req` if you don't pass one and resolves the plugin options:
+- **An upload collection** (e.g. `media`, `images`, `icon`) → the bytes are read and uploaded as the
+  doc's file.
+- **A registered provider collection** (Mux, fonts) → the resolved path + options are handed to the
+  collection's own ingest hook (see [External assets](#external-assets-asset-providers)).
 
 ```ts
-import { seed } from '@pro-laico/payload-seed'
+// collections/Media/seed.ts
+import { defineCollectionSeed } from '@pro-laico/payload-seed'
 
-const result = await seed({ payload, options: { definitions: [assets, services, posts] } })
-// result.created → { media: 3, services: 2, posts: 1 }  (counts per collection, incl. assets)
-// result.order   → ['services:consulting', 'posts:launch', …]  (the topo-sorted create order)
+export default defineCollectionSeed('media', ({ file }) => [
+  { _key: 'hero', _file: file('hero.jpg'), alt: 'Hero', focalX: 78, focalY: 32 },
+])
 ```
 
-`seed()` returns a `SeedResult` — the same `{ created, order }` the `POST /api/seed` response carries
-(alongside `success: true`) and the CLI logs on completion. Unlike the CLI and endpoint, `seed()` is
-**not** behind the `ENABLE_SEED` guard — the gate lives on the entry points, so a test can drive the
-real seed directly. It's still destructive; call it deliberately.
+`file(name, options?)`: `name` is the source filename (resolved below); `options` is an optional bag
+merged into the provider source field (e.g. a font `weight`) and ignored for native uploads. The
+doc's own fields (`alt`, focal point, `title`, …) are ordinary record fields, typed against the
+collection, so an upload collection that requires `alt` makes the seed record require it too. Focal
+points set the upload's focal point, so seeded images crop to the right subject the moment they're
+served (e.g. by [`@pro-laico/payload-images`](/docs/plugins/payload-images)).
 
-## Revalidation
+### Where files live
 
-Next.js caches aggressively, so Payload apps usually wire revalidation hooks — `afterChange` /
-`afterDelete` handlers that call `revalidatePath` / `revalidateTag` to push fresh content to the
-front end. A seed clears and recreates every seeded collection, so firing those hooks per doc would
-be a revalidation storm — and under the CLI there is no request scope, so `revalidatePath` can't run
-at all.
+A `_file` name resolves on disk like this:
 
-So the engine sets `context: { disableRevalidate: true }` on every create, update, and delete it
-performs. Revalidate hooks that follow Payload's convention — early-returning when
-`context.disableRevalidate` is set — skip automatically during a seed:
-
-```ts
-// collections/Posts/hooks/revalidatePost.ts
-export const revalidatePost: CollectionAfterChangeHook = ({ doc, context }) => {
-  if (!context.disableRevalidate) revalidatePath(`/posts/${doc.slug}`)
-  return doc
-}
-```
-
-The seed does **not** revalidate at the end. After it finishes, revalidate once yourself — a
-redeploy, your own revalidation call, or nothing at all when it's a local/dev database you're about
-to hit fresh.
+- **The assets dir.** Names resolve from the plugin's `assetsDir` (default `assets/`, relative to
+  the project root). Keep your files in a subfolder by setting it, e.g.
+  `seedPlugin({ assetsDir: 'src/seed/assets' })`.
+- **Type subdirs, searched automatically** (native uploads). Under that dir the loader also looks in
+  `image/`, `images/`, `svg/`, `font/`, and `fonts/`, so a file at `<dir>/image/hero.jpg` resolves
+  from a bare `file('hero.jpg')`. A provider looks under its own `subdir` instead.
+- **A name is a filename, not a path.** A nested `file('logos/brand.svg')` won't match. For a file
+  outside the tree, pass an **absolute path**; those are used as-is.
 
 ## External assets (asset providers)
 
-Some collections store their "file" in an external service rather than a Payload upload — e.g.
-[`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`, whose bytes live in Mux. An
-**asset provider** lets such a collection seed **like an image asset**: declared with a source token
-and referenced anywhere, all within the normal seed run — no custom script.
+Some collections keep their "file" in an external service instead of a Payload upload, e.g.
+[`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`, whose bytes live in Mux. A
+`_file` on such a doc can't be a native upload, so you **register the collection as an asset
+provider** and the engine hands the file to the collection's own ingest hook instead. Two pieces:
 
-Responsibilities split by ownership: the **ingest** (the SDK work) lives in the owning plugin, the
-**orchestration** stays in the seed engine. A `SeedAssetProvider` is plain config
-(`{ token, collection, sourceDir }`) — the owning plugin returns it without importing the seed
-package, and the seed engine consumes it without importing the plugin or its SDK. The two stay fully
-decoupled.
+- **Register the provider.** Pass it to `seedPlugin({ assetProviders })`. A `SeedAssetProvider` is
+  plain config (`{ collection, subdir?, sourceField? }`), decoupled both ways: the owning plugin
+  returns it without importing the seed package, and the engine consumes it without importing the
+  plugin or its SDK. The provider's ingest hook lives in that plugin.
+- **Seed the doc like any other.** `defineCollectionSeed(collection, …)` with a `_file`. Because it's
+  a real collection, the record's fields are type-checked, and other docs reference it with `ref()`.
 
 ### Mux video
 
-Register the provider (the mux plugin exports it) and seed a video with the `video()` source token.
-The provider adds the token, resolves its file under `assets.dir/<sourceDir>` first, and hands it to
-the `mux-video` collection — whose `beforeValidate` hook uploads it to Mux, waits for the asset to
-be ready, and folds in the metadata. Because it waits for `ready`, seeded videos carry full
-`playbackOptions` and are **immediately playable — no Mux webhook required**.
+Register the provider, then seed a `mux-video` doc with a `_file`; reference it like any doc:
 
 ```ts
 import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
@@ -333,48 +339,139 @@ plugins: [
   muxVideoPlugin(),
   seedPlugin({
     definitions: [videos, pages],
-    assets: { dir: 'seed-assets' },          // video files live under seed-assets/videos/
-    assetProviders: [muxAssetProvider()],    // token 'video', collection 'mux-video', dir 'video'
+    assetsDir: 'seed-assets',                // video files live under seed-assets/video/
+    assetProviders: [muxAssetProvider()],    // collection 'mux-video', subdir 'video'
   }),
 ]
 ```
 
 ```ts
-// seed/videos.ts — declared like an image asset
-export default defineSeed('mux-video', ({ video }) => [
-  { _key: 'intro', title: 'Intro', source: video('intro.mp4', { playbackPolicy: 'public', posterTimestamp: 3 }) },
+// seed/videos.ts: a mux-video doc; its file rides on `_file`
+export default defineCollectionSeed('mux-video', ({ file }) => [
+  { _key: 'intro', _file: file('intro.mp4'), title: 'Intro', posterTimestamp: 3 },
 ])
 
-// seed/pages.ts — referenced like any other doc; the engine seeds the video first
-export default defineSeed('pages', ({ ref }) => [
+// seed/pages.ts: referenced like any other doc; the engine seeds the video first
+export default defineCollectionSeed('pages', ({ ref }) => [
   { _key: 'home', title: 'Home', heroVideo: ref('mux-video', 'intro') },
 ])
 ```
 
-Run the seed (admin button / `POST /api/seed` / `payload seed`) and each `video()` source is
-uploaded to Mux, the `mux-video` doc created with its metadata, then every `ref('mux-video', …)`
-resolved. Reseeds clear the provider collection via `payload.delete`, so the mux plugin's
-`afterDelete` hook removes the old Mux assets too. For one-off programmatic creation outside seeding,
-the mux plugin also exports `ingestMuxVideo()`.
+Playback policy comes from `muxVideoPlugin`'s `uploadSettings.new_asset_settings` (the same config
+the admin uploader uses), so seeded and hand-uploaded videos share one policy; nothing to set here.
+
+**On run,** each `mux-video` doc's `_file` is uploaded to Mux (via the collection's hook), the doc
+created with its metadata, then every `ref('mux-video', …)` resolves. Ingest waits for the asset to
+be **ready**, so seeded videos play immediately, with **no Mux webhook needed**. Reseeds clear the
+collection via `payload.delete`, so the mux plugin's `afterDelete` removes the old Mux assets.
+(One-off creation outside seeding: `ingestMuxVideo()`.)
+
+## Tokens
+
+Inside a `build` callback you get two tokens. The engine resolves them at create time, and `ref`
+doubles as the dependency edge that orders the run.
+
+export const tokens = [
+  { name: 'ref', type: '(collection, key) => Ref', description: `Point at another seeded doc by its _key, e.g. ref('services', 'consulting'). Records a dependency edge so the target is created first. Both arguments are checked against the SeedRegistry once types are generated. Use it for any relationship / upload field.` },
+  { name: 'file', type: '(name, options?) => FileToken', description: `Attach a source file to a doc, on its _file meta-key, e.g. file('hero.jpg'). Delivered as a native upload or a provider ingest depending on the collection (see Files). options is an optional bag for provider ingest (e.g. a font weight).` },
+]
+
+<ConfigOptions items={tokens} />
+
+You never import either; they're handed to every `build` callback (`({ ref, file }) => …`), so they
+can't drift from the data they point at. `file` goes on the record's `_file` meta-key; everything
+else is an ordinary field.
+
+## Typed references
+
+Run `payload generate:types` and the plugin injects a `SeedRegistry` into `payload-types.ts`, so
+`ref('services', 'consulting')` is checked against your real `_key`s; rename or remove a seeded
+item and every stale reference becomes a TS error. Unknown collections error too.
+
+It's injected via Payload's own `typescript.postProcess` hook and rides the same `generate:types`
+command you already run, so the augmentation is **global with no import**, exactly like Payload's
+generated `GeneratedTypes`. Without codegen, refs fall back to runtime validation: safe either way,
+fully safe with it.
+
+## Running the seed
+
+Four entry points run the same engine:
+
+- **`payload seed`:** the bundled CLI, over the Local API.
+- **`POST /api/seed`:** in-app, for any authenticated user.
+- **The admin button:** "Seed your database" in the header, with `adminButton: true`.
+- **`seed({ payload })`:** call the engine directly from a script, test, or migration.
+
+The first three are gated by the `ENABLE_SEED` kill switch and are destructive; see [Setup](#setup)
+for enabling and running them. The fourth, `seed()`, is the in-code path: it builds a Local API `req`
+if you don't pass one and resolves the plugin options.
+
+```ts
+import { seed } from '@pro-laico/payload-seed'
+
+const result = await seed({ payload, options: { definitions: [media, services, posts] } })
+// result.created → { media: 3, services: 2, posts: 1 }  (created doc counts per collection)
+// result.order   → ['media:hero', 'services:consulting', 'posts:launch', …]  (the topo-sorted create order)
+```
+
+`seed()` returns `{ created, order }`, the same shape the `POST /api/seed` response carries
+(alongside `success: true`) and the CLI logs on completion. Unlike the other three, it is **not**
+behind the `ENABLE_SEED` guard; the gate lives on those entry points, so a test can drive the real
+seed directly. It's still destructive; call it deliberately.
+
+## Run order
+
+Every entry point runs the same engine. The pipeline, step by step:
+
+1. **Build the model** from the definitions: collection records (with their `_file`) and globals.
+2. **Validate.** Every `ref` targets a real collection and resolves to a seeded doc, every `_file`
+   sits on an upload or provider collection, no duplicate `_key` within a collection, no unknown
+   top-level fields. All issues are collected and thrown at once, naming the collection, `_key`, and field.
+3. **Build the dependency graph** (every `ref(collection, key)` is an edge) and **topo-sort** it
+   (depth-first). A cycle is a hard error that names the cycle.
+4. **Clear** the seeded collections. Upload collections and asset-provider collections clear via
+   `payload.delete` so their hooks fire (e.g. external-asset cleanup); plain collections are wiped directly.
+5. **Create** docs in sorted order, resolving `ref` tokens to ids and delivering each doc's `_file`
+   as a native upload (upload collections) or a provider ingest (registered providers).
+6. **Update globals** after their dependencies exist.
+
+## Revalidation
+
+Next.js caches aggressively, so Payload apps usually wire revalidation hooks: `afterChange` /
+`afterDelete` handlers that call `revalidatePath` / `revalidateTag` to push fresh content to the
+front end. A seed clears and recreates every seeded collection, so firing those hooks per doc would
+be a revalidation storm, and under the CLI there is no request scope, so `revalidatePath` can't run
+at all.
+
+So the engine sets `context: { disableRevalidate: true }` on every create, update, and delete it
+performs. Revalidate hooks that follow Payload's convention (early-returning when
+`context.disableRevalidate` is set) skip automatically during a seed:
+
+```ts
+// collections/Posts/hooks/revalidatePost.ts
+export const revalidatePost: CollectionAfterChangeHook = ({ doc, context }) => {
+  if (!context.disableRevalidate) revalidatePath(`/posts/${doc.slug}`)
+  return doc
+}
+```
+
+The seed does **not** revalidate at the end. After it finishes, revalidate once yourself: a
+redeploy, your own revalidation call, or nothing at all when it's a local/dev database you're about
+to hit fresh.
 
 ## Example
 
 The [`examples/seed-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/seed-sandbox)
-app is a full working setup — `seed.ts` files with `ref()` / `asset()` tokens, a `defineAssets`
-export, and the plugin wired with `adminButton: true`.
+app is a full working setup: `seed.ts` files with `ref()` / `file()` tokens (a seeded media library,
+a global, cross-file refs), and the plugin wired with `adminButton: true`.
 
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
 | `seedPlugin` | `@pro-laico/payload-seed` | The plugin factory. |
-| `SeedPluginOptions` | `@pro-laico/payload-seed` | The plugin options type (for typing a wrapper / shared factory). |
-| `defineSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records (one default export per collection). |
+| `defineCollectionSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records (one default export per collection). |
 | `defineGlobalSeed` | `@pro-laico/payload-seed` | Declare a global's seed data (a singleton, no `_key`). |
-| `defineAssets` | `@pro-laico/payload-seed` | Declare the uploadable files each `asset(key)` resolves to. |
-| `seed` | `@pro-laico/payload-seed` | Run the seed from a script / test / migration (see [Running from code](#running-from-code)). |
-| `SeedResult` | `@pro-laico/payload-seed` | The `{ created, order }` shape `seed()` and the endpoint return. |
-| `SeedDefinition` | `@pro-laico/payload-seed` | The union a `defineSeed` / `defineGlobalSeed` / `defineAssets` export produces — for typing a `definitions` array. |
-| `SeedAssetProvider` | `@pro-laico/payload-seed` | The external-asset provider type (what `muxAssetProvider()` / `fontAssetProvider()` return). |
-| `SeedRegistry` | `@pro-laico/payload-seed` | The augmentable interface generated types fill in, so `ref()` / `asset()` keys are checked. |
+| `seed` | `@pro-laico/payload-seed` | Run the seed from a script / test / migration (see [Running the seed](#running-the-seed)). |
+| `SeedRegistry` | `@pro-laico/payload-seed` | Augmentable interface `generate:types` fills in, so `ref()` keys are checked. Not imported by name. |
 | `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (wired via the import map when `adminButton` is on). |
