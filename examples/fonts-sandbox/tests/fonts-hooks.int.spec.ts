@@ -218,7 +218,7 @@ describe('font collection hooks (integration)', () => {
     await payload.updateGlobal({ slug: 'fontSet', overrideAccess: true, data: { sans: font.id } } as Parameters<typeof payload.updateGlobal>[0])
 
     const active = await getActiveFontFaces(payload)
-    const sans = active.find((a) => a.role === 'sans')
+    const sans = active.find((a) => a.family === 'sans')
     expect(sans).toBeDefined()
     expect(sans?.id).toBe(font.id)
     expect(sans?.faces[0]?.filename).toMatch(/\.woff2$/)

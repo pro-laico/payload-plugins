@@ -7,7 +7,7 @@ import { exportFontsEndpoint } from './endpoints/exportFonts'
 import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
 import type { Charset } from './hooks/optimizeFont'
 import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
-import { type FontRoleConfig, resolveFontRoles } from './lib/roles'
+import { type FontFamilyConfig, resolveFontFamilies } from './lib/families'
 
 export interface FontsPluginOptions {
   /** When false, the plugin is a no-op. Defaults to true. */
@@ -19,14 +19,14 @@ export interface FontsPluginOptions {
    */
   charset?: Charset
   /**
-   * The font *roles* (slots) the plugin exposes end-to-end — the `family` options on the `font`
+   * The font *families* (slots) the plugin exposes end-to-end — the `family` options on the `font`
    * collection, the relationship slots on the `fontSet` global, the keys in the export JSON, and
    * (capitalised) the generated `font<Key>` / `--font-set<Key>` names. Defaults to the built-in
    * `sans / serif / mono / display`. Pass your own list to replace, extend, drop, or reorder them
    * — e.g. `[{ key: 'sans' }, { key: 'display' }, { key: 'brand', fallback: 'Georgia, serif' }]`.
    * Each entry is `{ key, label?, fallback? }`; only `key` is required.
    */
-  roles?: FontRoleConfig[]
+  families?: FontFamilyConfig[]
   /** Merged onto the visible `font` (typeface) collection. */
   fontOverrides?: Partial<CollectionConfig>
   /**
@@ -67,7 +67,7 @@ export const fontsPlugin =
     const {
       enabled = true,
       charset,
-      roles,
+      families,
       fontOverrides,
       fontOriginalOverrides,
       fontOptimizedOverrides,
@@ -76,22 +76,24 @@ export const fontsPlugin =
     } = opts
     if (!enabled) return config
 
-    const roleKeys = resolveFontRoles(roles).map((r) => r.key)
+    const familyKeys = resolveFontFamilies(families).map((r) => r.key)
 
     const collections = [
       ...(config.collections ?? []),
       mergeCollection(
-        createFontCollection({ charset, roles, originalSlug: FONT_ORIGINAL_SLUG, optimizedSlug: FONT_OPTIMIZED_SLUG }),
+        createFontCollection({ charset, families, originalSlug: FONT_ORIGINAL_SLUG, optimizedSlug: FONT_OPTIMIZED_SLUG }),
         fontOverrides,
       ),
       mergeCollection(createFontOriginalCollection(), fontOriginalOverrides),
       mergeCollection(createFontOptimizedCollection({ fontSlug: 'font', originalSlug: FONT_ORIGINAL_SLUG }), fontOptimizedOverrides),
     ]
 
-    const globals = includeFontSet ? [...(config.globals ?? []), mergeGlobal(createFontSetGlobal({ roles }), fontSetOverrides)] : config.globals
+    const globals = includeFontSet
+      ? [...(config.globals ?? []), mergeGlobal(createFontSetGlobal({ families }), fontSetOverrides)]
+      : config.globals
     const endpoints = [
       ...(config.endpoints ?? []),
-      exportFontsEndpoint({ fontSetGlobalSlug: FONT_SET_SLUG, fontOptimizedSlug: FONT_OPTIMIZED_SLUG, roles: roleKeys }),
+      exportFontsEndpoint({ fontSetGlobalSlug: FONT_SET_SLUG, fontOptimizedSlug: FONT_OPTIMIZED_SLUG, families: familyKeys }),
     ]
 
     return { ...config, collections, globals, endpoints }

@@ -1,37 +1,37 @@
 import config from '@payload-config'
-import { type FontRole, getActiveFontFaces } from '@pro-laico/payload-fonts'
+import { getActiveFontFaces } from '@pro-laico/payload-fonts'
 import { getPayload } from 'payload'
 import { SeedControls } from '@/components/SeedControls'
 
 // Read the active selection fresh each render so a seed/edit shows up on reload.
 export const dynamic = 'force-dynamic'
 
-const ROLE_LABEL: Record<FontRole, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
+const FAMILY_LABEL: Record<string, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-const roleVar = (role: FontRole) => `var(--font-set${cap(role)})`
+const familyVar = (family: string) => `var(--font-set${cap(family)})`
 
-type ActiveEntry = { role: FontRole; title: string; files: string[] }
+type ActiveEntry = { family: string; title: string; files: string[] }
 
-/** The active typefaces (role, title, served filenames) — the fonts the layout makes available as
+/** The active typefaces (family, title, served filenames) — the fonts the layout makes available as
  *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */
 async function getActive(): Promise<ActiveEntry[]> {
   const payload = await getPayload({ config })
   const faces = await getActiveFontFaces(payload)
 
-  const titleByRole = new Map<FontRole, string>()
+  const titleByFamily = new Map<string, string>()
   try {
     const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as unknown as Partial<
-      Record<FontRole, { title?: string } | null>
+      Record<string, { title?: string } | null>
     >
-    for (const role of ['sans', 'serif', 'mono', 'display'] as FontRole[]) {
-      const doc = fontSet?.[role]
-      if (doc && typeof doc === 'object' && doc.title) titleByRole.set(role, doc.title)
+    for (const family of ['sans', 'serif', 'mono', 'display']) {
+      const doc = fontSet?.[family]
+      if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)
     }
   } catch {
     // no fontSet global
   }
 
-  return faces.map((f) => ({ role: f.role, title: titleByRole.get(f.role) ?? f.role, files: f.faces.map((x) => x.filename) }))
+  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, files: f.faces.map((x) => x.filename) }))
 }
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
@@ -41,15 +41,14 @@ export default async function Home() {
 
   return (
     <main className="shell">
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static page chrome, no user input. */}
       <style dangerouslySetInnerHTML={{ __html: CHROME }} />
 
       <header>
-        <h1 className="h1" style={{ fontFamily: roleVar('display') }}>
+        <h1 className="h1" style={{ fontFamily: familyVar('display') }}>
           Fonts Sandbox
         </h1>
         <p className="lead">
-          Each sample below is rendered with <code>font-family: var(--font-set…)</code> — the role variables the layout exposes via{' '}
+          Each sample below is rendered with <code>font-family: var(--font-set…)</code> — the family variables the layout exposes via{' '}
           <code>&lt;DevFonts /&gt;</code> in dev and <code>next/font</code> in production. Same CSS, both environments. If the headings render
           in distinct fonts, the whole pipeline works: upload → subset → serve → render.
         </p>
@@ -58,7 +57,7 @@ export default async function Home() {
 
       {active.length === 0 ? (
         <section className="card">
-          <h2 className="h2" style={{ fontFamily: roleVar('display') }}>
+          <h2 className="h2" style={{ fontFamily: familyVar('display') }}>
             No fonts seeded yet
           </h2>
           <p className="muted">
@@ -69,16 +68,16 @@ export default async function Home() {
         </section>
       ) : (
         active.map((entry) => (
-          <section key={entry.role} className="specimen">
+          <section key={entry.family} className="specimen">
             <div className="specimen__head">
-              <span className="specimen__name" style={{ fontFamily: roleVar(entry.role) }}>
+              <span className="specimen__name" style={{ fontFamily: familyVar(entry.family) }}>
                 {entry.title}
               </span>
               <span className="badge">
-                {ROLE_LABEL[entry.role]} · var(--font-set{cap(entry.role)})
+                {FAMILY_LABEL[entry.family]} · var(--font-set{cap(entry.family)})
               </span>
             </div>
-            <p className="specimen__sample" style={{ fontFamily: roleVar(entry.role) }}>
+            <p className="specimen__sample" style={{ fontFamily: familyVar(entry.family) }}>
               {SAMPLE}
             </p>
             <p className="specimen__files">{entry.files.join(' · ')}</p>

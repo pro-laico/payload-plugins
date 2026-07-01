@@ -14,7 +14,7 @@ import { seedDefinitions } from '@/plugins'
 let payload: Payload
 
 const seedOptions = { definitions: seedDefinitions, assets: { dir: 'seed-assets' }, assetProviders: [fontAssetProvider()] }
-const ROLES = ['sans', 'serif', 'mono', 'display'] as const
+const FAMILIES = ['sans', 'serif', 'mono', 'display'] as const
 
 beforeAll(async () => {
   payload = await getPayload({ config })
@@ -69,13 +69,13 @@ describe('payload-fonts seeding (integration)', () => {
     expect(fontSet.sans?.title).toBe('Inter')
   })
 
-  it('serves the active fonts as base64 WOFF2 bytes per role from the export endpoint', async () => {
+  it('serves the active fonts as base64 WOFF2 bytes per family from the export endpoint', async () => {
     const res = await callExport()
     expect(res.status).toBe(200)
     const json = (await res.json()) as ExportFontsResponse
-    for (const role of ROLES) {
-      const files = json.fonts[role]
-      expect(files, `role ${role}`).toBeDefined()
+    for (const family of FAMILIES) {
+      const files = json.fonts[family]
+      expect(files, `family ${family}`).toBeDefined()
       expect((files ?? []).length).toBeGreaterThan(0)
       expect(files?.[0]?.mimeType).toBe('font/woff2')
       expect(files?.[0]?.data.length ?? 0).toBeGreaterThan(0)

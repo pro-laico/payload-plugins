@@ -4,7 +4,7 @@ import path from 'node:path'
 import dotenv from 'dotenv'
 
 import type { ExportFontsResponse } from '../endpoints/exportFonts'
-import { roleExportName, roleVarSuffix } from '../lib/roles'
+import { familyExportName, familyVarSuffix } from '../lib/families'
 
 const colors = {
   blue: (t: string) => `\x1b[34m${t}\x1b[0m`,
@@ -13,11 +13,11 @@ const colors = {
   orange: (t: string) => `\x1b[33m${t}\x1b[0m`,
 }
 
-// A role key. `sans`/`serif`/`mono`/`display` by default, but the plugin's `roles` option can
-// replace or extend them — so this CLI never hardcodes the list; it discovers the active roles
-// from the keys of the export response and derives each role's `next/font` export name + CSS
+// A family key. `sans`/`serif`/`mono`/`display` by default, but the plugin's `families` option can
+// replace or extend them — so this CLI never hardcodes the list; it discovers the active families
+// from the keys of the export response and derives each family's `next/font` export name + CSS
 // variable from the same shared convention (`sans` → `fontSans` / `--font-setSans`).
-type Role = string
+type Family = string
 
 /** A written weight file, ready to emit into a generated `localFont` `src` array. */
 type WeightFile = { path: string; weight: string; style: string }
@@ -77,14 +77,14 @@ export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Pro
   const FONT_DEFINITION_FILE = opts.definitionFile
   const localPrefix = opts.localFontSrcPrefix.replace(/\/$/, '')
 
-  function generateFontDefinitions(roleFiles: Record<Role, WeightFile[]>): void {
-    // One `localFont()` per role with files, each with an array of weighted `src` entries — so
-    // multiple weights collapse into a single CSS variable for that role. The export name +
-    // variable are derived from the role key by the shared convention (`sans` → `fontSans` /
+  function generateFontDefinitions(familyFiles: Record<Family, WeightFile[]>): void {
+    // One `localFont()` per family with files, each with an array of weighted `src` entries — so
+    // multiple weights collapse into a single CSS variable for that family. The export name +
+    // variable are derived from the family key by the shared convention (`sans` → `fontSans` /
     // `<prefix>Sans`).
-    const configs = Object.entries(roleFiles)
+    const configs = Object.entries(familyFiles)
       .filter(([, files]) => files.length > 0)
-      .map(([role, files]) => ({ name: roleExportName(role), files, variable: `${opts.cssVariablePrefix}${roleVarSuffix(role)}` }))
+      .map(([family, files]) => ({ name: familyExportName(family), files, variable: `${opts.cssVariablePrefix}${familyVarSuffix(family)}` }))
 
     const declarations = configs
       .map((c) => {
@@ -177,14 +177,14 @@ export default fonts
 
     wipeFontFiles()
 
-    // Discover the active roles from the response keys (the plugin's `roles` option drives them).
-    const roles: Role[] = Object.keys(fonts)
-    const roleFiles: Record<Role, WeightFile[]> = {}
+    // Discover the active families from the response keys (the plugin's `families` option drives them).
+    const families: Family[] = Object.keys(fonts)
+    const familyFiles: Record<Family, WeightFile[]> = {}
     let count = 0
-    for (const role of roles) {
+    for (const family of families) {
       const bucket: WeightFile[] = []
-      roleFiles[role] = bucket
-      const files = fonts[role]
+      familyFiles[family] = bucket
+      const files = fonts[family]
       if (!files) continue
       for (let i = 0; i < files.length; i++) {
         const font = files[i]
@@ -197,20 +197,21 @@ export default fonts
           // slug (sans-100-900). The emitted `weight` below keeps the range.
           const weightSlug = weight.replace(/\s+/g, '-')
           // Distinct filename per weight/style; append the index if two files share one.
-          const base = `${role}-${weightSlug}${style === 'italic' ? '-italic' : ''}`
+          const base = `${family}-${weightSlug}${style === 'italic' ? '-italic' : ''}`
           const fileName = bucket.some((f) => f.path.endsWith(`/${base}.${ext}`)) ? `${base}-${i}` : base
           fs.writeFileSync(path.join(FONT_FILES_DIR, `${fileName}.${ext}`), Buffer.from(font.data, 'base64'))
           bucket.push({ path: `${localPrefix}/${fileName}.${ext}`, weight, style })
           count++
         } catch (err) {
-          console.warn(colors.red(`Failed to write ${role} font (weight ${font.weight ?? '?'})`))
+          console.warn(colors.red(`Failed to write ${family} font (weight ${font.weight ?? '?'})`))
           if (opts.verbose) console.warn(err)
         }
       }
-      if (bucket.length) console.log(`${colors.green('✓')} Downloaded ${role} font (${bucket.length} weight${bucket.length === 1 ? '' : 's'})`)
+      if (bucket.length)
+        console.log(`${colors.green('✓')} Downloaded ${family} font (${bucket.length} weight${bucket.length === 1 ? '' : 's'})`)
     }
 
-    generateFontDefinitions(roleFiles)
+    generateFontDefinitions(familyFiles)
 
     if (count === 0) console.log(colors.orange('\nNo active fonts returned — generated an empty definition.\n'))
     else console.log(colors.green(`\n✓ Font definitions generated (${count} font file${count === 1 ? '' : 's'})\n`))

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runDownloadFonts } from './downloadFonts'
 
 // A definition.ts as a previous SUCCESSFUL run would have written it — one localFont() call per
-// role, importing files under public/fonts. The bug being guarded: on a later FAILED run, this
+// family, importing files under public/fonts. The bug being guarded: on a later FAILED run, this
 // stale file (which imports font files a fresh checkout doesn't have) must be reset to empty.
 const POPULATED_DEFINITION = `import localFont from 'next/font/local'
 const fontSans = localFont({ src: [{ path: '../../public/fonts/sans-400.woff2', weight: '400', style: 'normal' }], variable: '--font-setSans' })
@@ -111,9 +111,9 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
     expect(fs.readFileSync(definitionFile, 'utf8')).toContain('--font-setSans')
   })
 
-  it('generates a font<Key> export + --font-set<Key> var for a custom role key', () => {
+  it('generates a font<Key> export + --font-set<Key> var for a custom family key', () => {
     process.env.PAYLOAD_SECRET = 'secret'
-    // The export endpoint keys the response by whatever roles the plugin was configured with; the
+    // The export endpoint keys the response by whatever families the plugin was configured with; the
     // CLI must discover them from the response, not a hardcoded sans/serif/mono/display list.
     const manifest = {
       fonts: {

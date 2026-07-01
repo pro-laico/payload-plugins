@@ -4,7 +4,7 @@ import { authd } from '../access/authd'
 import { cleanupFontAssetsHook, optimizeFromOriginalsHook, originalIdsFromDoc } from '../hooks/optimizeFromOriginals'
 import type { Charset } from '../hooks/optimizeFont'
 import { getFontSourceHook } from '../lib/ingest'
-import { type FontRoleConfig, resolveFontRoles } from '../lib/roles'
+import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
@@ -28,8 +28,8 @@ export interface CreateFontCollectionOptions {
   originalSlug?: string
   /** Slug of the optimized (served) upload collection. Default 'fontOptimized'. */
   optimizedSlug?: string
-  /** Generic-family roles offered by the `family` field. Default sans/serif/mono/display. */
-  roles?: FontRoleConfig[]
+  /** Generic-family families offered by the `family` field. Default sans/serif/mono/display. */
+  families?: FontFamilyConfig[]
 }
 
 type VariableGroup = { upright?: unknown; italic?: unknown }
@@ -96,7 +96,7 @@ const makeRejectSharedOriginals =
   }
 
 /**
- * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four role slots
+ * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four family slots
  * (sans/serif/mono/display) select one of these each.
  *
  * It is NOT itself an upload collection. Editors drop font files into standard Payload `upload`
@@ -113,7 +113,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   const fontSlug = 'font'
   const originalSlug = (opts.originalSlug || FONT_ORIGINAL_SLUG) as CollectionSlug
   const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
-  const roles = resolveFontRoles(opts.roles)
+  const families = resolveFontFamilies(opts.families)
 
   const fields: Field[] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
@@ -123,7 +123,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       required: true,
       label: 'Preferred Family',
       interfaceName: 'GenericFontFamily',
-      options: roles.map((r) => ({ label: r.label, value: r.key })),
+      options: families.map((r) => ({ label: r.label, value: r.key })),
     },
     // Transient server-side ingest input (a local path / URL via `{ file, weight, style,
     // variable }`). The `getFontSourceHook` beforeValidate uploads it to `fontOriginal`, wires

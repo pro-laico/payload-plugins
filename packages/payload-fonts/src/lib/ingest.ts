@@ -95,7 +95,7 @@ export interface IngestFontOptions {
   source: FontSource
   /** Typeface title (unique-ish identifier in the admin list). */
   title: string
-  /** Generic family role the typeface fills (a configured `roles` key). */
+  /** Generic family family the typeface fills (a configured `families` key). */
   family: string
   /** Static weight for the created row. @default '400' (ignored when `variable`). */
   weight?: string

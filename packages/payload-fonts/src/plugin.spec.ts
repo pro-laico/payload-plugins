@@ -64,7 +64,7 @@ describe('fontsPlugin (unit)', () => {
     expect(font?.defaultPopulate).toEqual({ title: true, family: true })
   })
 
-  describe('custom roles', () => {
+  describe('custom families', () => {
     // Pull the option values off the `family` radio field.
     const familyValues = (config: Config): string[] => {
       const font = (config.collections ?? []).find((c) => c.slug === 'font')
@@ -86,14 +86,14 @@ describe('fontsPlugin (unit)', () => {
     })
 
     it('replaces, extends, and reorders both the family options and the fontSet slots in lockstep', () => {
-      const roles = [{ key: 'display' }, { key: 'sans' }, { key: 'brand', fallback: 'Georgia, serif' }]
-      const config = apply(fontsPlugin({ roles }))
+      const families = [{ key: 'display' }, { key: 'sans' }, { key: 'brand', fallback: 'Georgia, serif' }]
+      const config = apply(fontsPlugin({ families }))
       expect(familyValues(config)).toEqual(['display', 'sans', 'brand'])
       expect(slotNames(config)).toEqual(['display', 'sans', 'brand'])
     })
 
-    it('labels a custom role by capitalising its key unless a label is given', () => {
-      const config = apply(fontsPlugin({ roles: [{ key: 'brand' }, { key: 'mono', label: 'Code' }] }))
+    it('labels a custom family by capitalising its key unless a label is given', () => {
+      const config = apply(fontsPlugin({ families: [{ key: 'brand' }, { key: 'mono', label: 'Code' }] }))
       const global = (config.globals ?? []).find((g) => g.slug === 'fontSet')
       const slots = (global?.fields ?? []).flatMap((row) => ('fields' in row ? row.fields : [])) as Array<{
         name?: string
