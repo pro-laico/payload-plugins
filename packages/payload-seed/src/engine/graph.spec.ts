@@ -56,4 +56,58 @@ describe('buildGraph', () => {
     expect(graph.order).toEqual(['a:x'])
     expect(graph.edges).toHaveLength(0)
   })
+
+  it('breaks a cycle by deferring an optional field (both docs still ordered)', () => {
+    const graph = buildGraph(
+      model({
+        collections: [
+          { slug: 'a', records: [{ key: 'x', data: { r: ref('b', 'y') } }] },
+          { slug: 'b', records: [{ key: 'y', data: { r: ref('a', 'x') } }] },
+        ],
+      }),
+      { isRequired: () => false },
+    )
+    expect(graph.order).toEqual(expect.arrayContaining(['a:x', 'b:y']))
+    expect(graph.order).toHaveLength(2)
+    expect(graph.deferred).toHaveLength(1)
+    expect(['a:x', 'b:y']).toContain(graph.deferred[0]?.node)
+    expect(graph.deferred[0]?.field).toBe('r')
+  })
+
+  it('breaks the cycle at the optional edge, not the required one', () => {
+    // a.b is required (b must exist before a); b.a is optional, so it's the one deferred.
+    const graph = buildGraph(
+      model({
+        collections: [
+          { slug: 'a', records: [{ key: 'x', data: { b: ref('b', 'y') } }] },
+          { slug: 'b', records: [{ key: 'y', data: { a: ref('a', 'x') } }] },
+        ],
+      }),
+      { isRequired: (collection, field) => collection === 'a' && field === 'b' },
+    )
+    expect(graph.order.indexOf('b:y')).toBeLessThan(graph.order.indexOf('a:x'))
+    expect(graph.deferred).toEqual([{ node: 'b:y', field: 'a' }])
+  })
+
+  it('defers a self-reference', () => {
+    const graph = buildGraph(model({ collections: [{ slug: 'a', records: [{ key: 'x', data: { self: ref('a', 'x') } }] }] }), {
+      isRequired: () => false,
+    })
+    expect(graph.order).toEqual(['a:x'])
+    expect(graph.deferred).toEqual([{ node: 'a:x', field: 'self' }])
+  })
+
+  it('still throws when every field in the cycle is required', () => {
+    expect(() =>
+      buildGraph(
+        model({
+          collections: [
+            { slug: 'a', records: [{ key: 'x', data: { r: ref('b', 'y') } }] },
+            { slug: 'b', records: [{ key: 'y', data: { r: ref('a', 'x') } }] },
+          ],
+        }),
+        { isRequired: () => true },
+      ),
+    ).toThrow(/cycle detected/i)
+  })
 })

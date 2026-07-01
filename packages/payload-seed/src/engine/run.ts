@@ -2,7 +2,7 @@ import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest 
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
 import { file, isFileToken, ref } from '../refs'
 import type { SeedAssetMarker, SeedDefinition } from '../types'
-import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph } from './graph'
+import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph, type DeferredField } from './graph'
 import { resolveFilePath, readFileAsUpload } from './files'
 import { docNodeId, resolveTokens } from './tokens'
 import { validateModel } from './validate'
@@ -12,6 +12,8 @@ export interface SeedResult {
   created: Record<string, number>
   /** The computed topological create order (doc node ids, `collection:_key`). */
   order: string[]
+  /** Fields deferred to break a `ref` cycle: created null, then set in a second pass. */
+  deferred: DeferredField[]
 }
 
 export interface RunSeedArgs {
@@ -93,8 +95,9 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
  * The seed engine. Takes the seed definitions, builds the model, validates references against
  * the live config, topologically sorts the dependency graph, clears the seeded collections, then
  * creates docs in order — resolving `ref` tokens to ids and delivering each doc's `_file` as a
- * native upload (upload collections) or a source-field value (`custom.seedAsset` collections).
- * Globals are updated last.
+ * native upload (upload collections) or a source-field value (`custom.seedAsset` collections). A
+ * `ref` cycle is broken by deferring an optional field, which a second pass sets once every doc
+ * exists (a cycle with only required fields is a hard error). Globals are updated last.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
   const defs = definitions ?? options.definitions ?? []
@@ -110,11 +113,15 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   const fileCollections = new Set<string>([...collectionSlugs].filter(isUpload))
   for (const slug of assetBySlug.keys()) fileCollections.add(slug)
 
-  // Valid top-level field names per node, read from the live config — for unknown-field detection.
+  // Valid top-level field names per node (for unknown-field detection) plus the required ones (so a
+  // ref cycle can only be broken by deferring an optional field) — read from the live config.
   const fieldNames = new Map<string, Set<string>>()
+  const requiredFields = new Map<string, Set<string>>()
   for (const coll of model.collections) {
     const cfg = payload.collections[coll.slug as CollectionSlug]?.config
-    if (cfg) fieldNames.set(coll.slug, new Set(cfg.flattenedFields.map((f) => f.name)))
+    if (!cfg) continue
+    fieldNames.set(coll.slug, new Set(cfg.flattenedFields.map((f) => f.name)))
+    requiredFields.set(coll.slug, new Set(cfg.flattenedFields.filter((f) => (f as { required?: boolean }).required).map((f) => f.name)))
   }
   for (const g of model.globals) {
     const cfg = payload.config.globals.find((gc) => gc.slug === g.slug)
@@ -122,7 +129,16 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   }
 
   validateModel({ model, collectionSlugs, fileCollections, fieldNames })
-  const { order } = buildGraph(model)
+  const isRequired = (collection: string, field: string): boolean => requiredFields.get(collection)?.has(field) ?? false
+  const { order, deferred } = buildGraph(model, { isRequired })
+
+  // Fields nulled at create time (their refs point into a cycle) and set in a second pass below.
+  const deferredByNode = new Map<string, Set<string>>()
+  for (const d of deferred) {
+    const set = deferredByNode.get(d.node) ?? new Set<string>()
+    set.add(d.field)
+    deferredByNode.set(d.node, set)
+  }
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
@@ -145,7 +161,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     const entry = recordIndex.get(nodeId)
     if (!entry) continue
     const { slug, record } = entry
-    let data = resolveTokens(record.data, { docs: docIds, where: nodeId }) as Record<string, unknown>
+    // Drop any deferred fields before resolving: their refs point into a cycle and aren't created
+    // yet. The second pass below sets them once every doc exists.
+    const deferFields = deferredByNode.get(nodeId)
+    const source = deferFields ? Object.fromEntries(Object.entries(record.data).filter(([k]) => !deferFields.has(k))) : record.data
+    let data = resolveTokens(source, { docs: docIds, where: nodeId }) as Record<string, unknown>
     let uploadFile: Awaited<ReturnType<typeof readFileAsUpload>> | undefined
 
     if (record.file) {
@@ -176,6 +196,18 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     created[slug] = (created[slug] ?? 0) + 1
   }
 
+  // Second pass: now every doc exists, resolve and set the fields deferred to break cycles.
+  if (deferred.length) {
+    payload.logger.info(`[payload-seed] resolving ${deferred.length} deferred reference(s)...`)
+    for (const { node, field } of deferred) {
+      const entry = recordIndex.get(node)
+      const id = docIds.get(node)
+      if (!entry || id === undefined) continue
+      const value = resolveTokens(entry.record.data[field], { docs: docIds, where: `${node}.${field}` })
+      await payload.update({ collection: entry.slug as CollectionSlug, id, data: { [field]: value } as never, ...baseArgs })
+    }
+  }
+
   // Update globals after all docs exist.
   for (const g of model.globals) {
     payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
@@ -184,7 +216,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   }
 
   payload.logger.info('[payload-seed] seed complete.')
-  return { created, order }
+  return { created, order, deferred }
 }
 
 /**

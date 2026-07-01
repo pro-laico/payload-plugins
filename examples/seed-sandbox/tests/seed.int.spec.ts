@@ -50,6 +50,12 @@ describe('seed engine (integration)', () => {
     const settings = await payload.findGlobal({ slug: 'site-settings', depth: 0 })
     expect(settings.featuredService).toBe(implementation?.id)
     expect(settings.logo).toBeTruthy()
+
+    // Circular refs: the two services reference each other. The engine defers one side's `related`
+    // to break the cycle, then sets it in the second pass — so both end up wired.
+    expect(result.deferred.length).toBeGreaterThan(0)
+    expect(consulting?.related).toContain(implementation?.id)
+    expect(implementation?.related).toContain(consulting?.id)
   })
 
   it('is idempotent — re-running clears and recreates without duplicating', async () => {

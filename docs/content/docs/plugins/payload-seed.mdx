@@ -527,9 +527,10 @@ A few things to keep in mind:
 - **Nothing runs without `ENABLE_SEED`.** The admin button, endpoint, and CLI all no-op (`403`) unless
   `ENABLE_SEED` is exactly `"true"`. The in-code `seed()` is the exception — it skips the gate, so it will
   wipe whatever database it's handed. Guard your script / test setup accordingly.
-- **No circular references.** `ref()` builds a dependency graph, so two docs that reference each other are
-  a hard error naming the cycle (`posts:a -> authors:b -> posts:a`). Break the loop — drop one side's `ref`
-  or restructure the data.
+- **Circular references need an optional field.** Two docs that reference each other are fine — the engine
+  breaks the cycle by deferring one side's `ref` and setting it in a second pass once both docs exist. That
+  field just has to be **optional** (it's created null first). A cycle where every ref sits on a *required*
+  field is a hard error naming it (`posts:a -> authors:b -> posts:a`) — make one side optional to break it.
 - **A missing source file only warns.** If a `_file` isn't found under `<assetsDir>/<subdir>/`, the engine
   logs `_file '…' not found` and keeps going — the doc is still created (and an upload collection that
   requires a file may then error downstream). Watch the logs for typos. The subdir defaults to the
@@ -570,7 +571,7 @@ issues are collected and thrown at once, naming the collection, `_key`, and fiel
 **Build the dependency graph & topo-sort**
 
 Every `ref(collection, key)` becomes an edge; a depth-first sort orders each doc after the docs it
-references. A cycle is a hard error that names the cycle.
+references. A cycle is broken by deferring an optional field; an all-required cycle is a hard error naming it.
 </Step>
 
 <Step>
@@ -584,7 +585,13 @@ Upload collections and any collection with delete hooks clear via `payload.delet
 **Create docs in dependency order**
 
 Resolve each doc's `ref` tokens to real ids and deliver its `_file` — a native upload, or a source-field
-value for a `custom.seedAsset` collection's ingest hook.
+value for a `custom.seedAsset` collection's ingest hook. A field deferred to break a cycle is created null.
+</Step>
+
+<Step>
+**Resolve deferred references**
+
+If a cycle was broken, set each deferred field now that every doc exists — one `update` per deferred field.
 </Step>
 
 <Step>

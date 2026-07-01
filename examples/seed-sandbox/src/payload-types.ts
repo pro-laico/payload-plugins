@@ -179,6 +179,7 @@ export interface Service {
   slug: string;
   summary?: string | null;
   image?: (number | null) | Media;
+  related?: (number | Service)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -327,6 +328,7 @@ export interface ServicesSelect<T extends boolean = true> {
   slug?: T;
   summary?: T;
   image?: T;
+  related?: T;
   updatedAt?: T;
   createdAt?: T;
 }
