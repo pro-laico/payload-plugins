@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { ingestMuxVideo, muxAssetProvider } from '@pro-laico/payload-mux'
+import { ingestMuxVideo } from '@pro-laico/payload-mux'
 import { createLocalReq, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import config from '../src/payload.config'
@@ -72,10 +72,10 @@ describe('payload-mux wiring', () => {
     expect(heroVideo).toMatchObject({ type: 'relationship', relationTo: 'mux-video' })
   })
 
-  it('exposes the server-side ingest API and the seed asset provider', () => {
+  it('exposes the server-side ingest API and marks mux-video as a seed asset collection', () => {
     expect(typeof ingestMuxVideo).toBe('function')
-    expect(muxAssetProvider()).toEqual({ collection: 'mux-video', subdir: 'video' })
-    expect(muxAssetProvider({ subdir: 'videos' }).subdir).toBe('videos')
+    const muxVideo = payload.config.collections.find((c) => c.slug === 'mux-video')
+    expect(muxVideo?.custom?.seedAsset).toEqual({ sourceField: 'source' })
   })
 
   it('stashes plugin options on config.custom (so tooling can build a Mux client from payload)', () => {

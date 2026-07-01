@@ -39,7 +39,7 @@ describe('validateModel', () => {
     ).toThrow(/unknown collection 'widgets'/)
   })
 
-  it('allows a _file on an upload/provider collection', () => {
+  it('allows a _file on an upload/asset collection', () => {
     expect(() =>
       run({
         collections: [{ slug: 'media', records: [{ key: 'hero', file: file('hero.jpg'), data: { alt: 'Hero' } }] }],
@@ -48,13 +48,13 @@ describe('validateModel', () => {
     ).not.toThrow()
   })
 
-  it('flags a _file on a collection that is neither upload nor provider', () => {
+  it('flags a _file on a collection that is neither upload nor a custom.seedAsset collection', () => {
     expect(() =>
       run({
         collections: [{ slug: 'services', records: [{ key: 'a', file: file('x.jpg'), data: {} }] }],
         globals: [],
       }),
-    ).toThrow(/not an upload collection or a registered asset provider/)
+    ).toThrow(/not an upload collection or a custom\.seedAsset collection/)
   })
 
   it('flags duplicate _keys within a collection', () => {

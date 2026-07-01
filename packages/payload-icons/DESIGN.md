@@ -52,9 +52,9 @@ collection (`upload.mimeTypes = ['image/svg+xml']`), three things come for free:
   seeded doc that carries its SVG on `_file`, uploaded via `payload.create({ file })`, which runs
   `formatSVGHook` just like an admin upload would. Nothing icon-specific to add: you seed the `icon`
   collection with `defineSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }])`
-  and reference a doc with `ref('icon', 'star')`. (Contrast `@pro-laico/payload-mux`, which needs a
-  real *asset provider* seam because `mux-video` is **not** an upload collection — it ingests to an
-  external service via a `source` field. Icons need none of that.)
+  and reference a doc with `ref('icon', 'star')`. (Contrast `@pro-laico/payload-mux`, whose
+  `mux-video` marks itself with `custom: { seedAsset: … }` because it is **not** an upload collection —
+  it ingests to an external service via a `source` field. Icons, being a plain upload, need none of that.)
 - **The admin uploader, list view, and file storage** are Payload's, not ours.
 - **Identity** is the filename. `getIcon(payload, 'arrow-right')` matches `arrow-right` or
   `arrow-right.svg`. No extra `name` field, no slugging — less to keep in sync.

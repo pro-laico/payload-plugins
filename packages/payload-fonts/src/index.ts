@@ -9,10 +9,6 @@ export type { FontFamilyConfig } from './lib/families'
 // Server-side ingest — create a `font` typeface from a local file / URL (imports, migrations).
 export { ingestFont } from './lib/ingest'
 
-// Declarative seeding — register `font` as a @pro-laico/payload-seed asset provider.
-export { fontAssetProvider } from './seed'
-export type { FontAssetProvider, FontAssetProviderOptions } from './seed'
-
 // Frontend serving. The dev-only runtime component lives at the `@pro-laico/payload-fonts/DevFonts`
 // subpath; `extractFonts` collects the generated next/font/local classes for `<html>`;
 // `getActiveFontFaces` resolves the active `fontSet` selection to its served files (the read behind

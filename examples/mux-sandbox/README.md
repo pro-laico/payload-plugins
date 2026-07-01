@@ -33,8 +33,10 @@ account** — set `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, and `MUX_WEBHOOK_SECRET` i
 
 This sandbox wires up [`@pro-laico/payload-seed`](../../packages/payload-seed) so a `mux-video`
 seeds **like any other doc** — its clip rides on the record's `_file` (the `file()` token) and the
-normal seed flow runs it, no custom script. See `src/plugins/index.ts` (registers `muxAssetProvider()`) and
-`src/seed/videos.ts` + `src/seed/pages.ts` (a video and a page that references it via `ref('mux-video', …)`).
+normal seed flow runs it, no custom script. `mux-video` self-declares `custom.seedAsset` (set by
+`muxVideoPlugin()`), so `seedPlugin({ definitions })` needs no extra registration. See
+`src/plugins/index.ts` and `src/seed/videos.ts` + `src/seed/pages.ts` (a video and a page that
+references it via `ref('mux-video', …)`).
 
 ```bash
 # 1. Put your real Mux credentials in .env.local (MUX_TOKEN_ID / MUX_TOKEN_SECRET)

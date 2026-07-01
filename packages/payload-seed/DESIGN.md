@@ -102,8 +102,8 @@ export default defineSeed('header', ({ ref }) => ({ /* HeaderGlobal data */ }))
   not augmented, the registry defaults to `Record<string, string>` and refs are
   runtime-validated only. Progressive: safe without codegen, fully safe with it.
 - `file(name, options?)` returns a `FileToken` carried on a record's `_file` meta-key. It
-  attaches a source file to an upload or provider doc; `options` is an optional bag merged
-  into a provider's source field (e.g. a font `weight`) and ignored for native uploads.
+  attaches a source file to an upload doc or a `custom.seedAsset` collection's doc; `options` is
+  an optional bag merged into a seed-asset collection's source field and ignored for native uploads.
 
 ## Typed refs (injected into `payload-types.ts`)
 
@@ -141,19 +141,19 @@ Run order (CLI `seed()` or `POST /api/seed`):
    records (each with its optional `_file`) and globals. No separate asset phase and no
    asset key registry — a file is just a doc's `_file`.
 2. **Validate** — every `ref` targets a real collection and resolves to a seeded doc, every
-   `_file` sits on an upload or provider collection, no duplicate `_key` within a
+   `_file` sits on an upload or `custom.seedAsset` collection, no duplicate `_key` within a
    collection, and (against the live config's `flattenedFields`) no unknown top-level field.
    Collects all issues and throws once, naming the collection, `_key`, and field.
    (Required-field and ref-target-*permission* checks are not yet done — see "Open / later".)
 3. **Build DAG + topo-sort** — every `ref(collection, key)` is an edge `dependent →
    dependency`; sort depth-first (dependencies first). Detect cycles → hard error naming the cycle.
 4. **Clear** — seeded collections in reverse-dependency order. Upload collections and
-   asset-provider collections clear via `payload.delete` (fires hooks / cascades, e.g. the
+   `custom.seedAsset` collections clear via `payload.delete` (fires hooks / cascades, e.g. the
    fonts cascade, external-asset cleanup); others via `db.deleteMany`. Versioned collections
    also clear versions. Read all of this from the config, not a hand-maintained array.
 5. **Create** — each doc in sorted order, threading created ids; resolve `ref` tokens to
-   real ids and **deliver its `_file`** as a native upload (upload collections) or a provider
-   ingest (registered providers) at create time. Globals updated after their dependencies.
+   real ids and **deliver its `_file`** as a native upload (upload collections) or a source-field
+   ingest (collections marked `custom.seedAsset`) at create time. Globals updated after their dependencies.
 
 Every write passes `context: { disableRevalidate: true }`, so app revalidate hooks that
 honor the flag skip during a seed (avoids a per-doc revalidation storm; `revalidatePath`
@@ -170,16 +170,19 @@ revalidates after seeding (redeploy / manual), or it's a local/dev DB.
 - Running `payload generate:types` after changing seed `_key`s — the same command already
   run after schema changes; it re-injects the `SeedRegistry`.
 
-## External-asset providers
+## External-asset collections (`custom.seedAsset`)
 
 Some collections store their "file" in an external service rather than a Payload upload — e.g.
 `@pro-laico/payload-mux`'s `mux-video`, whose bytes live in Mux. A `_file` on such a doc can't
-be a native upload, so **registering the collection as a provider** lets the engine hand the
-file to the collection's own ingest hook — the doc still seeds like any other, through the
-normal engine run (no script):
+be a native upload, so the collection **declares itself** as a seed asset collection — a marker on
+its own Payload config — and the engine hands the file to the collection's own ingest hook. The
+doc still seeds like any other, through the normal engine run (no script):
 
 ```ts
-seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })
+// on the collection config (set by the owning plugin):
+custom: { seedAsset: { sourceField: 'source' } } // or `seedAsset: true` for all defaults
+
+seedPlugin({ definitions: [videos, pages] }) // no registration; the engine discovers the marker
 
 defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 defineSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
@@ -193,21 +196,23 @@ the **orchestration** lives here:
   Mux, waits for the asset to be ready, folds in the metadata, and strips the field (it's never
   persisted). So the seed engine needs no Mux SDK and no credentials — and the same capability
   is reusable outside seeding (`ingestMuxVideo()`, for imports/migrations).
-- **The engine owns orchestration.** A `SeedAssetProvider` (`{ collection, subdir?, sourceField? }`)
-  is plain config: when a doc in that collection carries a `_file`, the engine resolves the file
-  under `assetsDir/<subdir>` and writes `{ ...options, file }` to the collection's `sourceField`
-  — which the owning collection's hook turns into the stored asset. The provider collection is
-  cleared via `payload.delete` so its `afterDelete` hook removes the external asset; no
-  per-record tagging needed (the doc lifecycle owns the asset lifecycle). There's no `external`
-  token and no `SeedProviders` interface — a provider doc is a plain seed doc with a `_file`, so
-  it's type-checked like any other collection.
-- **Decoupled both ways.** The provider is structural config: the mux plugin returns it without
-  importing this package, and this package consumes it without importing the mux plugin or its
-  SDK. Alignment is by the `config.custom` stash + the collection's `sourceField` contract, not types.
+- **The engine owns orchestration.** The marker (`SeedAssetMarker = true | { sourceField?: string;
+  subdir?: string }`) is plain config on `collection.custom.seedAsset`: when a doc in that
+  collection carries a `_file`, the engine resolves the file under `assetsDir/<subdir>` (the subdir
+  defaults to the collection slug, overridable via `assetSubDirs`) and writes `{ ...options, file }`
+  to the collection's `sourceField` (default `'source'`) — which the owning collection's hook turns
+  into the stored asset. The marked collection is cleared via `payload.delete` so its `afterDelete`
+  hook removes the external asset; no per-record tagging needed (the doc lifecycle owns the asset
+  lifecycle). There's no `external` token and no `SeedProviders` interface — a marked doc is a plain
+  seed doc with a `_file`, so it's type-checked like any other collection.
+- **Decoupled both ways.** The marker is structural config living on the collection: the mux plugin
+  sets it without importing this package, and this package discovers it by scanning the live config
+  without importing the mux plugin or its SDK. Alignment is by the `custom.seedAsset` marker + the
+  collection's `sourceField` contract, not types.
 
-Adding a provider for another service = the service's plugin gains a server-side source-field
-ingest + a `…AssetProvider()` helper; the seed engine is unchanged. Source-file resolution is
-generic (`engine/sources.ts`); `mux-video` (subdir `video`) is the reference implementation.
+Adding this for another service = the service's plugin marks its collection with `custom.seedAsset`
+and provides a server-side source-field ingest hook; the seed engine is unchanged. Source-file
+resolution is generic (`engine/sources.ts`); `mux-video` is the reference implementation.
 
 > Trade-off: a reseed cleans external assets via the doc lifecycle (clear docs → `afterDelete`),
 > so an external asset can orphan if the DB is wiped without a normal clear — the same property

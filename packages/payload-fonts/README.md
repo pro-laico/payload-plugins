@@ -102,28 +102,40 @@ await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', fami
 
 ### Seeding with `@pro-laico/payload-seed`
 
-This plugin exports `fontAssetProvider()` so a typeface seeds **like any doc** — a `font` record
-carries its source file on `_file` with the `file()` token, run by the normal seed flow, no script:
+`fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** like any
+image — no asset marker, no glue. Each `font` typeface then **references** its original with
+`ref('fontOriginal', <key>)` in a weights row, and the collection's `afterChange` hook subsets the
+referenced original into a served `fontOptimized` WOFF2. Point the seed engine at both definitions and
+map `fontOriginal`'s source folder with `assetSubDirs`:
 
 ```ts
-import { fontsPlugin, fontAssetProvider } from '@pro-laico/payload-fonts'
+import { fontsPlugin } from '@pro-laico/payload-fonts'
 import { seedPlugin } from '@pro-laico/payload-seed'
 
 plugins: [
   fontsPlugin(),
   seedPlugin({
-    definitions: [fonts, fontSet],
-    assetProviders: [fontAssetProvider()],
+    definitions: [fontOriginals, fonts, fontSet],
+    assetSubDirs: { fontOriginal: 'font' }, // font files live in <assetsDir>/font/, not /fontOriginal/
   }),
 ]
 ```
 
 ```ts
-// seed/fonts.ts: files live in <assetsDir>/fonts/
+// seed/fontOriginals.ts: raw font files, seeded natively like any upload (files live in <assetsDir>/font/)
 import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineSeed('font', ({ file }) => [
-  { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
+export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
+  { _key: 'inter', _file: file('inter.woff2') },
+])
+```
+
+```ts
+// seed/fonts.ts: each typeface refs its original in a weights row
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('font', ({ ref }) => [
+  { _key: 'inter', title: 'Inter', family: 'sans', weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'inter') }] },
 ])
 ```
 
@@ -136,8 +148,8 @@ export const fontSet = defineSeed('fontSet', ({ ref }) => ({
 }))
 ```
 
-The provider is plain config: the seed package never imports this one, nor `fontkit`/`subset-font`;
-the upload + subset run in this plugin's hooks. The two packages stay decoupled.
+Nothing font-specific touches the seed engine: `fontOriginal` seeds like any upload, the typefaces ref
+those originals, and the subset runs in this plugin's `afterChange` hook. The two packages stay decoupled.
 
 ## Serving the fonts on your frontend
 

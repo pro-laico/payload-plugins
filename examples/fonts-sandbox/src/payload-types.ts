@@ -156,6 +156,8 @@ export interface User {
   collection: 'users';
 }
 /**
+ * Upload typefaces here to add them to your library. Uploading alone doesn’t put a font on your site — activate it by picking it in Font Set.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "font".
  */
@@ -172,6 +174,10 @@ export interface Font {
     | number
     | boolean
     | null;
+  /**
+   * Web-ready files generated from your uploads. 0 means nothing was served yet — re-save; if it stays 0, the upload may have failed to optimize (check server logs).
+   */
+  servedFiles?: number | null;
   /**
    * One file covering many weights. Use this OR specific weights below — not both.
    */
@@ -346,6 +352,7 @@ export interface FontSelect<T extends boolean = true> {
   title?: T;
   family?: T;
   source?: T;
+  servedFiles?: T;
   variable?:
     | T
     | {
@@ -443,6 +450,8 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   createdAt?: T;
 }
 /**
+ * Choose which uploaded typeface fills each slot. This is what actually puts a font on your site — upload in Font first, then activate it here.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "fontSet".
  */
@@ -491,6 +500,7 @@ declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
       'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
+      'fontOriginal': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
     }
     globals: 'fontSet'
   }

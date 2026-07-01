@@ -13,7 +13,7 @@ export interface ValidateArgs {
   model: BuiltModel
   /** Slugs of collections that actually exist in the Payload config. */
   collectionSlugs: Set<string>
-  /** Slugs that can carry a `_file`: upload collections plus registered provider collections. */
+  /** Slugs that can carry a `_file`: upload collections plus `custom.seedAsset` collections. */
   fileCollections: Set<string>
   /** Valid top-level field names per node (`collection` slug, or `global:<slug>`), from the
    *  live config's `flattenedFields`. When provided, unknown record fields are flagged —
@@ -27,7 +27,7 @@ const ALLOWED_NON_FIELDS = new Set(['_status'])
 /**
  * Validate the built model against the declared docs and the live config: every `ref()`
  * resolves to a seeded doc and references a real collection; every `_file` sits on a collection
- * that can take one (an upload or provider collection); no duplicate `_key` within a collection;
+ * that can take one (an upload or `custom.seedAsset` collection); no duplicate `_key` within a collection;
  * and (when `fieldNames` is supplied) every record field exists in the schema. Collects ALL issues
  * and throws once. (Cycle detection happens in the graph topo-sort.)
  */
@@ -50,11 +50,11 @@ export function validateModel({ model, collectionSlugs, fileCollections, fieldNa
   for (const coll of model.collections) for (const rec of coll.records) check(`${coll.slug}:${rec.key}`, rec.data)
   for (const g of model.globals) check(`global:${g.slug}`, g.data)
 
-  // A `_file` only makes sense on an upload collection or a registered provider collection.
+  // A `_file` only makes sense on an upload collection or a `custom.seedAsset` collection.
   for (const coll of model.collections) {
     for (const rec of coll.records) {
       if (rec.file && !fileCollections.has(coll.slug)) {
-        issues.push(`${coll.slug}:${rec.key}: _file set, but '${coll.slug}' is not an upload collection or a registered asset provider.`)
+        issues.push(`${coll.slug}:${rec.key}: _file set, but '${coll.slug}' is not an upload collection or a custom.seedAsset collection.`)
       }
     }
   }

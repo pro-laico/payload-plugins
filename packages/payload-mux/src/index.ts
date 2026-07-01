@@ -8,10 +8,6 @@ export { MuxVideo } from './collections/MuxVideo'
 export { ingestMuxVideo } from './lib/ingest'
 export type { IngestMuxVideoOptions } from './lib/ingest'
 
-// Seed integration — register mux-video as a @pro-laico/payload-seed asset provider
-export { muxAssetProvider } from './seed'
-export type { MuxAssetProviderOptions } from './seed'
-
 // Types
 export type {
   MuxVideoInitSettings,

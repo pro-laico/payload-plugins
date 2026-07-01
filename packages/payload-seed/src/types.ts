@@ -41,21 +41,25 @@ export interface SeedTokens {
 }
 
 /**
- * Registers a collection whose bytes are ingested by an external service rather than stored as a
- * Payload upload — e.g. `@pro-laico/payload-mux`'s `mux-video` (Mux) or `@pro-laico/payload-fonts`'s
- * `font`. Tells the seed engine that a `_file` on a doc in this collection should be resolved under
- * `subdir` and handed to the collection's own ingest hook via `sourceField`, instead of uploaded as
- * bytes. Plain config: the actual ingest lives in the owning plugin's hook, so the seed engine stays
- * decoupled from that plugin and its SDK.
+ * A collection's `custom.seedAsset` marker: declares a collection whose `_file` bytes are ingested
+ * by the collection's own hook rather than stored as a Payload upload — e.g. `@pro-laico/payload-mux`'s
+ * `mux-video` (uploaded to Mux). Set on the collection config:
+ *
+ *   { slug: 'mux-video', custom: { seedAsset: { sourceField: 'source' } }, ... }
+ *
+ * Instead of uploading bytes, the seed engine resolves the `_file` under `subdir` and sets it as
+ * `{ file, ...options }` on the doc's `sourceField`, for the collection's ingest hook to consume.
+ * `true` is shorthand for the defaults (`sourceField: 'source'`, `subdir`: the collection slug).
+ * Plain config — no import of the seed package needed, so the owning plugin stays decoupled from it.
  */
-export interface SeedAssetProvider {
-  /** The collection these source files are ingested into (e.g. `'mux-video'`). */
-  collection: string
-  /** Subdirectory under the assets dir holding the source files. @default 'source' */
-  subdir?: string
-  /** Doc field the engine sets to `{ file, ...options }` for the ingest hook to consume. @default 'source' */
-  sourceField?: string
-}
+export type SeedAssetMarker =
+  | true
+  | {
+      /** Doc field the engine sets to `{ file, ...options }` for the ingest hook. @default 'source' */
+      sourceField?: string
+      /** Subdirectory under the assets dir holding the source files. @default the collection slug */
+      subdir?: string
+    }
 
 /** A seed builder receives the ref/file tokens and returns the seed data. Deferred
  *  (not eager data) so refs resolve against the full definition set. */

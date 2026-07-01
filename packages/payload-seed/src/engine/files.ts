@@ -3,7 +3,7 @@ import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import type { File } from 'payload'
 
 // MIME type derived from the file's real extension — we upload whatever the source is
-// (JPEG/PNG/WebP/SVG/…), not an assumed format.
+// (JPEG/PNG/WebP/SVG/WOFF2/…), not an assumed format.
 const MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -12,7 +12,16 @@ const MIME_BY_EXT: Record<string, string> = {
   '.avif': 'image/avif',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
 }
+
+// Extensions eligible for the same-basename sibling fallback in `resolveFilePath` — image formats
+// only, where `foo.png` picking up `foo.jpg` is a convenience. Fonts are matched by exact name so a
+// requested format is never silently swapped for another.
+const TOLERANT_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif', '.svg'])
 
 const stripExt = (name: string) => name.slice(0, name.length - extname(name).length)
 
@@ -39,7 +48,7 @@ export async function resolveFilePath(name: string, assetsRoot: string, subdirs:
       continue
     }
     if (entries.includes(fileName)) return join(dir, fileName)
-    const sibling = entries.find((e) => stripExt(e) === wantBase && extname(e).toLowerCase() in MIME_BY_EXT)
+    const sibling = entries.find((e) => stripExt(e) === wantBase && TOLERANT_EXTS.has(extname(e).toLowerCase()))
     if (sibling) return join(dir, sibling)
   }
   return null

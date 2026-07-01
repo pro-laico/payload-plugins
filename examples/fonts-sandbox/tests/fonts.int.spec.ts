@@ -1,5 +1,5 @@
 import config from '@payload-config'
-import { type ExportFontsResponse, fontAssetProvider } from '@pro-laico/payload-fonts'
+import type { ExportFontsResponse } from '@pro-laico/payload-fonts'
 import { seed } from '@pro-laico/payload-seed'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -7,13 +7,13 @@ import { seedDefinitions } from '@/plugins'
 
 // Integration test: boots the real example config against a temp SQLite DB and drives the REAL
 // seed engine via the Local API — the automated analog of the admin "Seed your database" flow.
-// It exercises the whole fonts chain end to end: `_file` tokens → font ingest hook uploads
-// to fontOriginal → optimize hook subsets to fontOptimized → fontSet wired by ref() → the export
-// endpoint hands back the served bytes.
+// It exercises the whole fonts chain end to end: raw files seeded natively into fontOriginal →
+// each typeface refs its original → the optimize hook subsets to fontOptimized → fontSet wired by
+// ref() → the export endpoint hands back the served bytes.
 
 let payload: Payload
 
-const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetProviders: [fontAssetProvider()] }
+const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }
 const FAMILIES = ['sans', 'serif', 'mono', 'display'] as const
 
 beforeAll(async () => {
@@ -40,20 +40,21 @@ describe('payload-fonts seeding (integration)', () => {
     expect(payload.config.globals.some((g) => g.slug === 'fontSet')).toBe(true)
   })
 
-  it('seeds typefaces from local files: upload → subset → fontSet wiring', async () => {
+  it('seeds typefaces from local files: native original upload → ref → subset → fontSet wiring', async () => {
     const result = await seed({ payload, options: seedOptions })
 
-    // Four typefaces created in dependency order (they carry no inter-doc deps).
+    // Four originals uploaded, then four typefaces created after them (the ref() edges order the graph).
+    expect(result.created.fontOriginal).toBe(4)
     expect(result.created.font).toBe(4)
-    expect(result.order).toContain('font:inter')
+    expect(result.order.indexOf('fontOriginal:inter')).toBeLessThan(result.order.indexOf('font:inter'))
 
-    // Each typeface ingested its source into fontOriginal and produced a served fontOptimized.
+    // Each typeface refs an uploaded original and produced a served fontOptimized.
     expect(await payload.find({ collection: 'font', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(4)
     expect(await payload.find({ collection: 'fontOriginal', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(4)
     const optimized = await payload.find({ collection: 'fontOptimized', limit: 0, depth: 0 })
     expect(optimized.totalDocs).toBe(4)
 
-    // The ingest hook turned `source` into a real weights row pointing at an uploaded original.
+    // The ref() wired a real weights row pointing at the uploaded original.
     const inter = (await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0 })).docs[0] as {
       family?: string
       weights?: Array<{ file?: unknown; weight?: string }>

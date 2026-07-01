@@ -1,7 +1,7 @@
 import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
 import { file, isFileToken, ref } from '../refs'
-import type { SeedAssetProvider, SeedDefinition } from '../types'
+import type { SeedAssetMarker, SeedDefinition } from '../types'
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph } from './graph'
 import { resolveFilePath, readFileAsUpload } from './files'
 import { docNodeId, resolveTokens } from './tokens'
@@ -24,6 +24,28 @@ export interface RunSeedArgs {
 
 const tokens = { ref, file }
 
+/** A `custom.seedAsset` collection, resolved to its effective source field (subdir defaults are
+ *  applied at lookup, alongside `assetSubDirs`, so they match native uploads). */
+interface AssetCollection {
+  sourceField: string
+  subdir?: string
+}
+
+/** Discover asset collections from the live config: any collection whose `custom.seedAsset` is set.
+ *  A `_file` on one of these is handed to the collection's ingest hook via `sourceField` instead of
+ *  uploaded as bytes. Replaces the old `assetProviders` plugin option — declaration now lives on the
+ *  collection, so the seed plugin needs no knowledge of the owning plugins. */
+function discoverAssetCollections(payload: Payload): Map<string, AssetCollection> {
+  const map = new Map<string, AssetCollection>()
+  for (const slug of Object.keys(payload.collections)) {
+    const marker = payload.collections[slug as CollectionSlug]?.config.custom?.seedAsset as SeedAssetMarker | undefined
+    if (!marker) continue
+    const m = marker === true ? {} : marker
+    map.set(slug, { sourceField: m.sourceField ?? 'source', subdir: m.subdir })
+  }
+  return map
+}
+
 /** Split definitions by kind and build the concrete model (records + their `_file`, and globals). */
 function buildModel(definitions: SeedDefinition[]): BuiltModel {
   const collections: BuiltCollection[] = []
@@ -44,11 +66,15 @@ function buildModel(definitions: SeedDefinition[]): BuiltModel {
   return { collections, globals }
 }
 
-async function clearCollection(payload: Payload, req: PayloadRequest, collection: string, withHooks: boolean): Promise<void> {
+async function clearCollection(payload: Payload, req: PayloadRequest, collection: string): Promise<void> {
   const config = payload.collections[collection as CollectionSlug]?.config
   if (!config) return
   payload.logger.info(`[payload-seed] clearing ${collection}`)
-  if (config.upload || withHooks) {
+  // Delete via the Local API (firing hooks) when clearing must cascade — an upload collection (to
+  // remove stored bytes) or any collection with a before/after-delete hook (e.g. `mux-video`'s Mux
+  // cleanup, `font`'s cascade to its originals + optimized). Otherwise wipe rows directly.
+  const withHooks = Boolean(config.upload || config.hooks?.beforeDelete?.length || config.hooks?.afterDelete?.length)
+  if (withHooks) {
     await payload.delete({
       collection: collection as CollectionSlug,
       where: { id: { exists: true } },
@@ -67,7 +93,7 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
  * The seed engine. Takes the seed definitions, builds the model, validates references against
  * the live config, topologically sorts the dependency graph, clears the seeded collections, then
  * creates docs in order — resolving `ref` tokens to ids and delivering each doc's `_file` as a
- * native upload (upload collections) or a provider source (registered asset-provider collections).
+ * native upload (upload collections) or a source-field value (`custom.seedAsset` collections).
  * Globals are updated last.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
@@ -78,11 +104,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   const collectionSlugs = new Set(Object.keys(payload.collections))
 
   const isUpload = (slug: string): boolean => Boolean(payload.collections[slug as CollectionSlug]?.config.upload)
-  const providerBySlug = new Map<string, SeedAssetProvider>(options.assetProviders.map((p) => [p.collection, p]))
+  const assetBySlug = discoverAssetCollections(payload)
 
-  // Collections a `_file` may sit on: every upload collection plus registered providers.
+  // Collections a `_file` may sit on: every upload collection plus every `custom.seedAsset` collection.
   const fileCollections = new Set<string>([...collectionSlugs].filter(isUpload))
-  for (const p of options.assetProviders) fileCollections.add(p.collection)
+  for (const slug of assetBySlug.keys()) fileCollections.add(slug)
 
   // Valid top-level field names per node, read from the live config — for unknown-field detection.
   const fieldNames = new Map<string, Set<string>>()
@@ -100,11 +126,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
-  // Clear every seeded collection. Upload + provider collections clear via `payload.delete` so
-  // their hooks fire (e.g. external-asset cleanup); plain collections are wiped directly.
+  // Clear every seeded collection. `clearCollection` fires delete hooks when the collection needs
+  // a cascade (uploads / external-asset cleanup); plain collections are wiped directly.
   const seededCollections = [...new Set(model.collections.map((c) => c.slug))]
   payload.logger.info('[payload-seed] clearing collections...')
-  for (const slug of seededCollections) await clearCollection(payload, req, slug, providerBySlug.has(slug))
+  for (const slug of seededCollections) await clearCollection(payload, req, slug)
 
   // Create docs in dependency order, resolving ref tokens to ids and delivering each `_file`.
   const docIds = new Map<string, string | number>()
@@ -123,20 +149,19 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     let uploadFile: Awaited<ReturnType<typeof readFileAsUpload>> | undefined
 
     if (record.file) {
-      const provider = providerBySlug.get(slug)
-      if (provider) {
-        const path = await resolveFilePath(record.file.name, options.assetsDir, [provider.subdir ?? 'source', ''])
-        if (path) data = { ...data, [provider.sourceField ?? 'source']: { file: path, ...record.file.options } }
-        else
-          payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+      // Both branches resolve the file the same way — under the per-collection subdir (a
+      // `custom.seedAsset` `subdir`, else `assetSubDirs`, else the slug), then the assets root.
+      const asset = assetBySlug.get(slug)
+      const subdir = asset?.subdir ?? options.assetSubDirs[slug] ?? slug
+      const path = await resolveFilePath(record.file.name, options.assetsDir, [subdir, ''])
+      if (!path) {
+        payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+      } else if (asset) {
+        // Hand the resolved path + options to the collection's ingest hook via its source field
+        // instead of uploading bytes.
+        data = { ...data, [asset.sourceField]: { file: path, ...record.file.options } }
       } else if (isUpload(slug)) {
-        // A native upload resolves under its per-collection subdir (defaulting to the slug), then the
-        // assets root. Override the folder name with `assetSubDirs`.
-        const subdir = options.assetSubDirs[slug] ?? slug
-        const path = await resolveFilePath(record.file.name, options.assetsDir, [subdir, ''])
-        if (path) uploadFile = await readFileAsUpload(path)
-        else
-          payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+        uploadFile = await readFileAsUpload(path)
       }
     }
 

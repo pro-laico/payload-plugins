@@ -2,7 +2,6 @@ import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { fontsPlugin } from './plugin'
-import { fontAssetProvider } from './seed'
 
 describe('fontsPlugin (unit)', () => {
   // fontsPlugin is synchronous; the Plugin signature is Config | Promise<Config>.
@@ -44,11 +43,6 @@ describe('fontsPlugin (unit)', () => {
   it('is a no-op when disabled', () => {
     const config = { collections: [] } as unknown as Config
     expect(fontsPlugin({ enabled: false })(config)).toBe(config)
-  })
-
-  it('exposes a decoupled seed provider', () => {
-    expect(fontAssetProvider()).toEqual({ collection: 'font', subdir: 'fonts' })
-    expect(fontAssetProvider({ subdir: 'webfonts' }).subdir).toBe('webfonts')
   })
 
   it('trims `font` defaultPopulate so a populated relationship omits the private upload slots', () => {

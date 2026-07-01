@@ -43,7 +43,7 @@ inline and tinted via CSS `color`.
 ## Seeding icons
 
 Because `icon` is a standard upload collection, it seeds **natively** through
-[`@pro-laico/payload-seed`](../../packages/payload-seed) — no asset provider, no custom script. The
+[`@pro-laico/payload-seed`](../../packages/payload-seed) — no `custom.seedAsset` marker, no custom script. The
 sample SVGs live in `seed-assets/icon/` (committed), declared in `src/seed/icons.ts` with
 `defineSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }, …])`;
 `src/seed/pages.ts` references one via `ref('icon', 'star')`.

@@ -247,8 +247,8 @@ collection you'd build yourself:
 ## Seeding with `@pro-laico/payload-seed`
 
 The `images` collection is a normal Payload upload, so it seeds natively through
-[`@pro-laico/payload-seed`](../payload-seed) — no asset provider needed (unlike
-`@pro-laico/payload-mux`, whose bytes live in Mux). Seed it like any collection:
+[`@pro-laico/payload-seed`](../payload-seed) — no `custom.seedAsset` marker needed; `image` is a plain
+upload, unlike Mux's `mux-video`. Seed it like any collection:
 `defineSeed('images', …)`, each record carrying its source file on `_file`
 via the `file()` token, and referenced from a page with `ref('images', …)`:
 

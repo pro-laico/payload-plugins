@@ -30,10 +30,12 @@ per-weight files, and the save hook subsets each to a served WOFF2 (visible on t
 
 ## Seeding fonts from local files
 
-This sandbox wires up the seed plugin so a typeface seeds **like any doc** — each `font` record
-carries its source file on `_file` with the `file()` token and runs by the normal seed flow, no
-custom script. See `src/plugins/index.ts` (registers `fontAssetProvider()`), `src/seed/fonts.ts`
-(four typefaces from files in `seed-assets/fonts/`), and `src/seed/fontSet.ts` (the active selection
+This sandbox wires up the seed plugin so fonts seed by the normal seed flow, no custom script.
+`fontOriginal` is a plain upload collection, so `src/seed/fonts.ts` seeds the raw font files into
+`fontOriginal` **natively** and each `font` typeface **refs** its original with `ref('fontOriginal', …)`;
+the collection's save hook subsets it into a served WOFF2. See `src/plugins/index.ts` (the seed plugin
+uses `assetSubDirs: { fontOriginal: 'font' }` so the files resolve from `seed-assets/font/`),
+`src/seed/fonts.ts` (four typefaces + their originals), and `src/seed/fontSet.ts` (the active selection
 wired with `ref('font', …)`).
 
 ```bash
@@ -42,7 +44,7 @@ wired with `ref('font', …)`).
 # and points the fontSet global at the four typefaces.
 ```
 
-Under the hood the seed engine resolves each record's `_file` to the file under `seed-assets/fonts/`
+Under the hood the seed engine resolves each record's `_file` to the file under `seed-assets/font/`
 and hands it to the `font` collection, whose `beforeValidate` hook uploads it and wires the slot —
 the seed engine needs no font-specific code. Reseeds clear the `font` collection via
 `payload.delete`, so its `afterDelete` cascade removes the old originals + optimized too
@@ -86,5 +88,5 @@ endpoint returns the served WOFF2 bytes per role (and rejects a bad secret).
 | `fontOptimized` | Hidden — served, subsetted WOFF2s. |
 | `fontSet` (global) | The active sans/serif/mono/display selection. |
 
-The bundled `seed-assets/fonts/*.woff2` are open-source (OFL) Google fonts — see
-`seed-assets/fonts/LICENSES.md`.
+The bundled `seed-assets/font/*.woff2` are open-source (OFL) Google fonts — see
+`seed-assets/font/LICENSES.md`.

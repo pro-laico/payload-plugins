@@ -83,23 +83,23 @@ The `font` collection carries a transient `source` JSON field. When set to
 file with no browser uploader. `ingestFont(payload, …)` is the programmatic entry; imports and
 migrations use the same seam.
 
-Seeding rides that seam through `@pro-laico/payload-seed`, mirroring the Mux plugin's provider
-pattern:
+Seeding through `@pro-laico/payload-seed` uses no asset-collection seam at all — `fontOriginal` is a
+plain Payload upload collection, so the raw font files seed **natively**, and each typeface refs its
+original:
 
-- `fontAssetProvider()` returns the structural `SeedAssetProvider` shape
-  (`{ collection: 'font', subdir: 'fonts' }`). The seed engine resolves a `font` record's `_file`
-  under `<assetsDir>/fonts/` first (like image-asset uploads) and clears the `font` collection via
-  `payload.delete` so its `afterDelete` cascade removes the originals + optimized.
-- A typeface is seeded like any doc: `defineSeed('font', ({ file }) => [...])` with the
-  file on `_file` via the seed package's `file('inter.woff2', { weight, style, variable })` token.
-  The engine resolves it to `{ file: <abs path>, ...options }` and hands it to the provider — exactly
-  the `source` value the hook consumes — so the seed engine needs zero font-specific code.
+- `fontOriginal` is seeded like any upload: `defineSeed('fontOriginal', ({ file }) => [...])` with the
+  raw bytes on `_file`. The files live under `<assetsDir>/font/`, mapped via
+  `assetSubDirs: { fontOriginal: 'font' }` (otherwise the engine would look under `<assetsDir>/fontOriginal/`).
+- A `font` typeface refs its original with the ordinary `ref('fontOriginal', _key)` token in a `weights`
+  row (or the `variable` slot), so the upload slot is wired declaratively. On create, the `font`
+  collection's `afterChange` hook subsets the referenced original into a served `fontOptimized` WOFF2 —
+  exactly the admin-save path — so the seed engine needs zero font-specific code.
 - The `fontSet` global is seeded with the ordinary `ref('font', _key)` token, so the active
   selection is wired declaratively alongside the typefaces.
 
 Decoupled both ways: the seed package never imports this one (nor `fontkit`/`subset-font`), and
-this package consumes nothing from the seed package — alignment is the `source` field contract
-plus the structural provider shape.
+this package consumes nothing from the seed package — the typefaces just ref native `fontOriginal`
+uploads and the subset runs in the `font` collection's own hook.
 
 ## What was dropped from the Atomic port
 

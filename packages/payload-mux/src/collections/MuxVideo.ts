@@ -68,6 +68,10 @@ const signableUrlField = (
 export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
   slug: (options.extendCollection as string) ?? 'mux-video',
   labels: { singular: 'Video', plural: 'Videos' },
+  // Declares this as a `@pro-laico/payload-seed` asset collection: instead of uploading bytes,
+  // the seed engine hands a doc's `_file` to the `source` field below, whose beforeValidate hook
+  // uploads it to Mux. Plain config — payload-mux doesn't import the seed package.
+  custom: { seedAsset: { sourceField: 'source' } },
   access: { read: ({ req }) => isAllowed(options, req) },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
   hooks: {

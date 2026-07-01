@@ -61,7 +61,8 @@ The home page is a self-contained test harness — no admin digging required:
 
 This sandbox wires up [`@pro-laico/payload-seed`](../../packages/payload-seed). Because
 `images` is a native Payload upload collection, it seeds like any collection —
-**no asset provider** (that seam is only for external bytes like Mux). `src/seed/images.ts`
+**no `custom.seedAsset` marker** (that seam is only for external-ingest collections like Mux's
+`mux-video`). `src/seed/images.ts`
 declares the three committed sample photos as `images` records, each carrying its file on
 `_file` (with focal points as ordinary fields), and `src/seed/pages.ts` creates a page
 referencing one of them with `ref('images', …)`.

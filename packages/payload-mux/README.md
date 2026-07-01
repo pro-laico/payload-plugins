@@ -87,23 +87,25 @@ Local paths stream from disk, so ingesting a large file never loads it all into 
 
 ### Seeding with `@pro-laico/payload-seed`
 
-For declarative seeding, this plugin exports `muxAssetProvider()` so a `mux-video` seeds **like any
-other doc** via [`@pro-laico/payload-seed`](../payload-seed#external-assets-mux-video) — its clip rides
-on the record's `_file` (the `file()` token) and the normal seed flow runs it, no script:
+For declarative seeding, `muxVideoPlugin()` marks the `mux-video` collection with
+`custom: { seedAsset: { sourceField: 'source' } }`, so a `mux-video` seeds **like any other doc** via
+[`@pro-laico/payload-seed`](../payload-seed#external-asset-collections) — its clip rides on the record's
+`_file` (the `file()` token) and the normal seed flow runs it, no script. The seed engine auto-discovers
+the marker from the live config, so there's nothing to register:
 
 ```ts
-import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxVideoPlugin } from '@pro-laico/payload-mux'
 import { seedPlugin } from '@pro-laico/payload-seed'
 
-plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
+plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages] })]
 
 // in a seed file — the engine hands the _file to the mux-video ingest hook:
 // defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 ```
 
-`muxAssetProvider()` returns plain config — `{ collection: 'mux-video', subdir: 'video' }` — the seed
-package never imports this one, nor the Mux SDK; the upload runs in this plugin's hook. The two packages
-stay decoupled.
+The `custom.seedAsset` marker is plain config on the collection — the seed package never imports this one,
+nor the Mux SDK; when it sees a `_file` on `mux-video` it writes the file to the collection's `source`
+field and this plugin's `beforeValidate` hook does the upload. The two packages stay decoupled.
 
 ## Use a video
 

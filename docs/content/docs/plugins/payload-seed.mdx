@@ -339,127 +339,43 @@ A `_file` name resolves on disk like this:
   theirs only so the demos run in CI.)
 </Callout>
 
-## Asset providers
+## External-asset collections
 
-Not every collection takes a plain Payload upload. Some have a non-standard ingest for their `_file`:
-the bytes might live in an external service (e.g. [`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s
-`mux-video`, stored in Mux), or the upload might need custom processing before it's stored (e.g.
-[`@pro-laico/payload-fonts`](/docs/plugins/payload-fonts)'s `font`). A native upload won't do, so the
-collection **registers an asset provider** and the seed engine hands the file to the collection's own
-ingest hook instead. Two pieces:
-
-- **Register the provider.** Pass it to `seedPlugin({ assetProviders })`. A `SeedAssetProvider` is
-  plain config (`{ collection, subdir?, sourceField? }`), decoupled both ways: the owning plugin
-  returns it without importing the seed package, and the engine consumes it without importing the
-  plugin or its SDK. The provider's ingest hook lives in that plugin.
-- **Seed the doc like any other.** `defineSeed(collection, …)` with a `_file`. Because it's
-  a real collection, the record's fields are type-checked, and other docs reference it with `ref()`.
-
-Mux and fonts both ship a provider (`muxAssetProvider()`, `fontAssetProvider()`) plus a matching
-one-off ingest helper for use outside seeding (`ingestMuxVideo()`, `ingestFont()`). Mux is shown
-below as the worked example.
-
-### Mux video
-
-Register the provider, then seed a `mux-video` doc with a `_file`; reference it like any doc:
+Most collections take a plain Payload upload for their `_file` and seed natively. A few don't: the bytes
+are ingested by the collection's **own hook** into an external service (e.g.
+[`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`, stored in Mux) rather than stored as
+a Payload upload. To seed one of those, mark the collection's own Payload config so the engine hands the
+`_file` to that hook instead of trying to upload bytes:
 
 ```ts
-import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
-import { seedPlugin } from '@pro-laico/payload-seed'
-import videos from './seed/videos'
-import pages from './seed/pages'
-
-plugins: [
-  muxVideoPlugin(),
-  seedPlugin({
-    definitions: [videos, pages],
-    assetsDir: 'seed-assets',                // video files live under seed-assets/video/
-    assetProviders: [muxAssetProvider()],    // collection 'mux-video', subdir 'video'
-  }),
-]
+// in the collection's own config — usually set by its plugin, not by you
+{
+  slug: 'mux-video',
+  custom: { seedAsset: { sourceField: 'source' } }, // or: seedAsset: true for the defaults
+  fields: [
+    { name: 'source', type: 'json', admin: { hidden: true } }, // the field the ingest hook reads
+    // ...
+  ],
+}
 ```
 
-```ts
-// seed/videos.ts: a mux-video doc; its file rides on `_file`
-export default defineSeed('mux-video', ({ file }) => [
-  {
-    _key: 'intro',
-    _file: file('intro.mp4'), // seed-assets/video/intro.mp4
-    title: 'Intro',
-    posterTimestamp: 3,
-  },
-])
+The marker takes:
 
-// seed/pages.ts: referenced like any other doc; the engine seeds the video first
-export default defineSeed('pages', ({ ref }) => [
-  {
-    _key: 'home',
-    title: 'Home',
-    heroVideo: ref('mux-video', 'intro'),
-  },
-])
-```
+- **`sourceField`** — the field the engine sets to `{ file, ...options }` for the ingest hook to consume. Default `'source'`.
+- **`subdir`** — source-file folder under `assetsDir`. Default the collection slug; override per-collection with `assetSubDirs`.
+- **`seedAsset: true`** — shorthand for both defaults.
 
-Playback policy comes from `muxVideoPlugin`'s `uploadSettings.new_asset_settings` (the same config
-the admin uploader uses), so seeded and hand-uploaded videos share one policy; nothing to set here.
+The engine **auto-discovers** the marker by scanning the live config — there's no plugin option to
+register, and the owning plugin never imports payload-seed. A marked collection then seeds **like any
+other doc**: give the record a `_file`, reference it with `ref()`. On run, the engine resolves the file
+under `assetsDir/<subdir>`, writes it to `sourceField`, and the collection's own hook turns that into the
+stored asset. Reseeds clear it via `payload.delete`, so any `afterDelete` cleanup (e.g. removing the
+external asset) fires.
 
-**On run,** each `mux-video` doc's `_file` is uploaded to Mux (via the collection's hook), the doc
-created with its metadata, then every `ref('mux-video', …)` resolves. Ingest waits for the asset to
-be **ready**, so seeded videos play immediately, with **no Mux webhook needed**. Reseeds clear the
-collection via `payload.delete`, so the mux plugin's `afterDelete` removes the old Mux assets.
-(One-off creation outside seeding: `ingestMuxVideo()`.)
-
-### Fonts
-
-[`@pro-laico/payload-fonts`](/docs/plugins/payload-fonts) is a provider of the other flavor: nothing
-lives elsewhere, but a `font` upload is subsetted into a served WOFF2 by the collection's save hook,
-so it isn't a plain upload either. Register `fontAssetProvider()`, then seed a `font` doc whose `_file`
-carries the source file. This is where the `file()` **options bag** earns its keep: per-file ingest
-options (`weight`, `style`, `variable`) ride along to the provider's hook.
-
-```ts
-import { fontAssetProvider, fontsPlugin } from '@pro-laico/payload-fonts'
-import { seedPlugin } from '@pro-laico/payload-seed'
-import fonts from './seed/fonts'
-import fontSet from './seed/fontSet'
-
-plugins: [
-  fontsPlugin(),
-  seedPlugin({
-    definitions: [fonts, fontSet],
-    assetsDir: 'seed-assets',                // font files live under seed-assets/fonts/
-    assetProviders: [fontAssetProvider()],   // collection 'font', subdir 'fonts'
-  }),
-]
-```
-
-```ts
-// seed/fonts.ts: each typeface carries its file on `_file`; `weight` rides the file() options bag
-export default defineSeed('font', ({ file }) => [
-  {
-    _key: 'inter',
-    _file: file('inter.woff2', { weight: '400' }), // seed-assets/fonts/inter.woff2
-    title: 'Inter',
-    family: 'sans',
-  },
-  {
-    _key: 'lora',
-    _file: file('lora.woff2', { weight: '400' }), // seed-assets/fonts/lora.woff2
-    title: 'Lora',
-    family: 'serif',
-  },
-])
-
-// seed/fontSet.ts: a global that picks the active typeface per role by ref
-export default defineSeed('fontSet', ({ ref }) => ({
-  sans: ref('font', 'inter'),
-  serif: ref('font', 'lora'),
-}))
-```
-
-**On run,** each `font` doc's `_file` is uploaded and subsetted into a served WOFF2 by the collection's
-save hook, then every `ref('font', …)` resolves (e.g. from the `fontSet` global). One-off creation
-outside seeding: `ingestFont()`.
+Set the marker on your own collection when its `_file` needs this non-standard ingest. For a full worked
+example, see [payload-mux → Seeding](/docs/plugins/payload-mux). Plugins whose asset lives in a plain
+upload collection (e.g. payload-fonts' `fontOriginal`, payload-images' `image`) need **no** marker — they
+seed natively and other docs just `ref()` them.
 
 ## Plugin options
 
@@ -470,8 +386,7 @@ refs. It does nothing useful without `definitions`.
 export const options = [
   { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions: your defineSeed exports. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do.` },
   { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. A native upload's file is looked up under its per-collection subdir (see assetSubDirs) then the root; providers look under their own subdir.` },
-  { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a native upload collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' }.` },
-  { name: 'assetProviders', type: 'SeedAssetProvider[]', default: '[]', description: `Asset providers, such as muxAssetProvider() from the Mux plugin: collections whose _file needs a non-standard ingest via the collection's own hook rather than a plain Payload upload. See Asset providers.` },
+  { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' } or { fontOriginal: 'font' }.` },
   { name: 'adminButton', type: 'boolean', default: 'false', description: `Render the Seed your database button in the admin header.` },
 ]
 
@@ -496,7 +411,6 @@ seedPlugin({
   // definitions: [media, services, posts], // no default; your seed.ts exports
   assetsDir: 'assets',
   assetSubDirs: {}, // default folder per collection is its slug; override here, e.g. { media: 'images' }
-  assetProviders: [],
   adminButton: false,
 })
 ```

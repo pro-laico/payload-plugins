@@ -341,26 +341,28 @@ Local paths stream from disk, so ingesting a large file doesn't load it all into
 
 ### Declarative seeding
 
-For declarative seeding, the plugin exports `muxAssetProvider()` so a `mux-video` seeds **like any
-other doc** via [`@pro-laico/payload-seed`](/docs/plugins/payload-seed#asset-providers) —
-its clip rides on the record's `_file` (the `file()` token) and the normal seed flow runs it, no script:
+For declarative seeding, `muxVideoPlugin()` marks the `mux-video` collection with
+`custom: { seedAsset: { sourceField: 'source' } }`, so a `mux-video` seeds **like any other doc** via
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-asset-collections) — its clip rides on the
+record's `_file` (the `file()` token) and the normal seed flow runs it, no script. The seed engine
+auto-discovers the marker from the live config, so there's nothing to register:
 
 ```ts
-import { muxAssetProvider, muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxVideoPlugin } from '@pro-laico/payload-mux'
 import { seedPlugin } from '@pro-laico/payload-seed'
 
-plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
+plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages] })]
 
 // then in a seed file — the engine hands the _file to the mux-video ingest hook:
 // defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 // reference it from other docs with ref('mux-video', 'intro')
 ```
 
-`muxAssetProvider()` returns plain config — `{ collection: 'mux-video', subdir: 'video' }` — decoupled
-both ways: the seed package never imports this one, nor the Mux SDK; the upload runs in this plugin's
-hook. Playback policy comes from the plugin's configured policy, so seeded and admin-uploaded videos
-share one policy. See the
-[seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.
+The `custom.seedAsset` marker is plain config on the collection — the seed package never imports this
+one, nor the Mux SDK; when it sees a `_file` on `mux-video` it writes the file to the collection's
+`source` field and this plugin's hook does the upload. Playback policy comes from the plugin's configured
+policy, so seeded and admin-uploaded videos share one policy. See the
+[seed plugin docs](/docs/plugins/payload-seed#external-asset-collections) for the full reference.
 
 ## How it works
 
@@ -393,6 +395,5 @@ for webhook writes, admin saves, and server-side ingest alike, so it's the one p
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxVideo` | `@pro-laico/payload-mux` | The collection factory, for advanced configs assembled by hand. |
 | `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a `mux-video` doc from a local file / URL (seeding, imports, migrations). |
-| `muxAssetProvider` | `@pro-laico/payload-mux` | Register `mux-video` as a `@pro-laico/payload-seed` asset provider. |
 | `MuxUploaderField` | `@pro-laico/payload-mux/components/MuxUploaderField` | Admin uploader + player field (wired via the import map). |
 | `MuxVideoGifCell` / `MuxVideoImageCell` | `@pro-laico/payload-mux/components/*` | List-view thumbnail cells selected by `adminThumbnail`. |
