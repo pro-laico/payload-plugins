@@ -6,7 +6,7 @@ import type { CollectionSlug, Where } from 'payload'
 import { getPayloadClient } from '../lib/getPayloadClient'
 
 /** A `name → svgString` map for the active set's icons. */
-export type IconSetMap = Record<string, string>
+type IconSetMap = Record<string, string>
 
 /**
  * The active icon set's `name → svgString` map, resolved in a SINGLE query and
@@ -20,7 +20,7 @@ export type IconSetMap = Record<string, string>
  * In draft mode it reads the draft-lane active set. The `_status` filter is only
  * applied when the collection actually has drafts (safe if `drafts: false`).
  */
-export const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
+const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
   const payload = await getPayloadClient()
   const hasDrafts = Boolean(
     (payload.collections as Record<string, { config?: { versions?: { drafts?: unknown } } }>)?.iconSet?.config?.versions?.drafts,

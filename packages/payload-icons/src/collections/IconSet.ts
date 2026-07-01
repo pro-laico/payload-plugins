@@ -14,9 +14,6 @@ const IconUsagePanelPath = '@pro-laico/payload-icons/admin/iconUsagePanel'
 /** Admin import-map path for the per-row label inside `iconsArray`. */
 const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
 
-/** Default scan command surfaced in the panel's empty state. */
-const DEFAULT_SCAN_COMMAND = 'npx payload-icons-scan'
-
 /** Inline title field so the collection has no template dependency. */
 const titleField = (defaultValue = 'New Icon Set'): Field => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
 
@@ -41,33 +38,21 @@ export interface IconSetCollectionOverrides {
   fields?: Field[]
   /** Extra fields appended to each `iconsArray` row, after the built-in `name` + `icon`. */
   iconRowFields?: Field[]
-  /**
-   * Adds the "Requested icons" panel to the Settings tab — a live diff between
-   * the names your repo requests (collected by `payload-icons-scan`) and the
-   * names defined in this set, each flagged with its `file:line`. @default false
-   */
-  usagePanel?: boolean
-  /**
-   * Path to the usage manifest the panel reads. Falls back to the
-   * `ICON_USAGE_MANIFEST` env var, then `icon-usage-manifest.json` under the
-   * server's working directory. Only meaningful when {@link usagePanel} is `true`.
-   */
-  usageManifestPath?: string
-  /** Command shown in the panel's empty state. @default 'npx payload-icons-scan' */
-  usageScanCommand?: string
   /** Enable drafts/versions on the collection (per-set draft → publish). @default true */
   drafts?: boolean
 }
 
 /**
- * Builds the `iconSet` collection. The frontend `<Icon name>` resolves through
- * the set named by the `iconSettings` global's `activeSet`, so swapping that
- * relationship re-skins every icon site-wide — no per-set flag, no invariant.
+ * Builds the `iconSet` collection — a named `name → icon` mapping with a
+ * single-active toggle; the frontend renders the active set.
  *
- * `iconSlug` is wired by the plugin from the icon collection's slug; it isn't
- * part of the public override surface.
+ * `iconSlug` and `usagePanel` are wired by the plugin (from the icon collection's
+ * slug and the top-level `usagePanel` option); they aren't part of the public
+ * override surface.
  */
-export const createIconSetCollection = (opts: IconSetCollectionOverrides & { iconSlug?: string } = {}): CollectionConfig => {
+export const createIconSetCollection = (
+  opts: IconSetCollectionOverrides & { iconSlug?: string; usagePanel?: boolean } = {},
+): CollectionConfig => {
   const {
     slug = ICON_SET_SLUG,
     iconSlug = 'icon',
@@ -76,27 +61,14 @@ export const createIconSetCollection = (opts: IconSetCollectionOverrides & { ico
     hooks,
     fields: extraFields = [],
     iconRowFields = [],
-    usagePanel = false,
-    usageManifestPath,
-    usageScanCommand = DEFAULT_SCAN_COMMAND,
+    usagePanel = true,
     drafts = true,
   } = opts
 
-  // Opt-in "requested icons" panel — a server UI field that reads the build-time
-  // usage manifest and diffs it against this set's icons.
-  const usageField: Field[] = usagePanel
-    ? [
-        {
-          name: 'iconUsage',
-          type: 'ui',
-          admin: {
-            components: {
-              Field: { path: IconUsagePanelPath, serverProps: { manifestPath: usageManifestPath, scanCommand: usageScanCommand } },
-            },
-          },
-        },
-      ]
-    : []
+  // The "Requested icons" panel — a server UI field that scans usage (live in dev,
+  // manifest in prod) and diffs it against this set's icons. Config-free: the panel
+  // uses its defaults (ICON_USAGE_MANIFEST env for the manifest path in prod).
+  const usageField: Field[] = usagePanel ? [{ name: 'iconUsage', type: 'ui', admin: { components: { Field: IconUsagePanelPath } } }] : []
 
   return {
     slug,

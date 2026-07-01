@@ -7,15 +7,14 @@ import type { IconCollectionOverrides } from './types'
 
 /**
  * Options for {@link iconsPlugin}. Composes the `icon` upload collection, the
- * `iconSet` grouping collection, and (optionally) the `iconRequest` diagnostic
- * collection.
+ * `iconSet` grouping collection, and the `iconRequest` diagnostic collection.
+ * The usage panel and request tracking are on by default.
  *
  * @example
  * ```ts
  * iconsPlugin({
  *   iconOverrides: { fields: [{ name: 'note', type: 'text' }] },
- *   iconSetOverrides: { usagePanel: true },
- *   trackRequests: true,
+ *   trackRequests: false, // omit the iconRequest collection
  * })
  * ```
  */
@@ -38,24 +37,30 @@ export interface IconsPluginOptions {
   includeIconSet?: boolean
   /**
    * Overrides for the `iconSet` collection — live preview, additive hooks,
-   * set-level fields, per-row fields, the usage panel. See
+   * set-level fields, per-row fields, a drafts toggle. See
    * {@link IconSetCollectionOverrides}.
    */
   iconSetOverrides?: IconSetCollectionOverrides
   /**
-   * When `true`, registers the `iconRequest` diagnostic collection AND the
-   * `<Icon>` server component records every name that fails to resolve at
-   * runtime — throttled, deferred via `after()`, fire-and-forget. These live
-   * misses (including dynamic `name={…}` ones a static scan can't see) surface
-   * in the IconSet "Requested icons" panel alongside the build-time manifest.
-   *
-   * Force-disable the recorder at runtime with `ICON_USAGE_TRACKING=false`.
-   * @default false
+   * The IconSet "Requested icons" panel — shows which icons your code needs
+   * versus what a set provides (scanned live in dev, from the manifest in prod,
+   * plus runtime misses when {@link trackRequests}). Set `false` to omit it.
+   * @default true
+   */
+  usagePanel?: boolean
+  /**
+   * Registers the `iconRequest` diagnostic collection AND makes the `<Icon>`
+   * server component record every name that fails to resolve at runtime —
+   * throttled, deferred via `after()`, fire-and-forget. These misses (including
+   * dynamic `name={…}` ones a static scan can't see) surface in the usage panel.
+   * Set `false` to omit it, or force-disable only the recorder at runtime with
+   * `ICON_USAGE_TRACKING=false`.
+   * @default true
    */
   trackRequests?: boolean
   /**
    * Overrides for the `iconRequest` collection. Only meaningful when
-   * {@link trackRequests} is `true`.
+   * {@link trackRequests} isn't `false`.
    */
   iconRequestOverrides?: IconRequestCollectionOverrides
 }
@@ -69,7 +74,7 @@ export interface IconsPluginOptions {
  * - **`iconSet`** — named `name → icon` mappings with a single-active toggle and
  *   drafts/versions. The frontend renders the active set, so activating a
  *   different set re-skins every icon at once.
- * - **`iconRequest`** (opt-in via {@link IconsPluginOptions.trackRequests}) —
+ * - **`iconRequest`** (on by default; {@link IconsPluginOptions.trackRequests} `false` to omit) —
  *   runtime miss diagnostics surfaced in the IconSet usage panel.
  *
  * Self-contained: no `@pro-laico/core` / `@pro-laico/atomic` dependency. The
@@ -88,11 +93,19 @@ export interface IconsPluginOptions {
 export const iconsPlugin =
   (opts: IconsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const { enabled = true, iconOverrides, includeIconSet = true, iconSetOverrides, trackRequests = false, iconRequestOverrides } = opts
+    const {
+      enabled = true,
+      iconOverrides,
+      includeIconSet = true,
+      iconSetOverrides,
+      usagePanel = true,
+      trackRequests = true,
+      iconRequestOverrides,
+    } = opts
     if (!enabled) return config
 
     const additions: CollectionConfig[] = [Icon(iconOverrides)]
-    if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', ...iconSetOverrides }))
+    if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', usagePanel, ...iconSetOverrides }))
     if (trackRequests) additions.push(createIconRequestCollection(iconRequestOverrides))
 
     return { ...config, collections: [...(config.collections ?? []), ...additions] }

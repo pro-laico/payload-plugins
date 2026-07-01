@@ -39,11 +39,6 @@
         "types": "./dist/cache/index.d.ts",
         "default": "./dist/cache/index.js"
       },
-      "./scan": {
-        "import": "./dist/scan/index.js",
-        "types": "./dist/scan/index.d.ts",
-        "default": "./dist/scan/index.js"
-      },
       "./admin/iconRowLabel": {
         "import": "./dist/components/admin/iconRowLabel.js",
         "types": "./dist/components/admin/iconRowLabel.d.ts",
@@ -76,11 +71,6 @@
       "import": "./src/cache/index.ts",
       "types": "./src/cache/index.ts",
       "default": "./src/cache/index.ts"
-    },
-    "./scan": {
-      "import": "./src/scan/index.ts",
-      "types": "./src/scan/index.ts",
-      "default": "./src/scan/index.ts"
     },
     "./admin/iconRowLabel": {
       "import": "./src/components/admin/iconRowLabel.tsx",
