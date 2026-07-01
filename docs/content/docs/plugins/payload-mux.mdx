@@ -1,13 +1,19 @@
 ---
 title: "payload-mux"
-description: "Mux Video for Payload CMS — upload, store, and play back video without leaving the admin."
+description: "Mux Video for Payload CMS. Upload, store, and play back video without leaving the admin."
 ---
 
-`@pro-laico/payload-mux` exists to make video a first-class upload in Payload. You drop a clip into
-the admin (or seed one server-side), and the plugin pushes the bytes straight to [Mux](https://www.mux.com/),
-keeps a `mux-video` doc in sync with the encoded asset, and hands you ready-to-play HLS, poster, and
-GIF URLs on every read — public or signed. No media server, no storage adapter for the heavy bytes:
-the originals live in Mux, the metadata lives in Payload, and deleting either side removes the other.
+<Callout type="info">
+**Based on [`@oversightstudio/mux-video`](https://github.com/oversightstudio/payload-plugins) (MIT)**,
+originally created by [Idan Yekutiel](https://github.com/idanyekutiel). A port of that Mux plugin,
+restructured to our conventions and kept as a first-party package so we can track Payload and Mux
+updates directly. Full credit and thanks to the original author.
+</Callout>
+
+Video in Payload, done right. Drop a clip into the admin and it streams everywhere (adaptive HLS,
+posters, preview GIFs, public or signed), powered by [Mux](https://www.mux.com/), the video platform
+the pros use. No media server to run, no huge files bloating your storage: Mux holds the video, Payload
+holds the data, and they stay in sync both ways. Upload, and it just plays.
 
 ```bash
 pnpm add @pro-laico/payload-mux
@@ -20,13 +26,13 @@ Five pieces deliver that, and the rest of this page covers them in order:
 - **A Videos collection.** You upload to **`mux-video`** (or extend a collection you name). Mux fills
   in the read-only metadata; you set the title and an optional poster timestamp.
 - **Direct-to-Mux upload.** An admin uploader field posts the file straight to Mux via a pair of
-  upload endpoints — the bytes never touch your server or database.
+  upload endpoints, so the bytes never touch your server or database.
 - **Virtual playback URLs.** Every read computes `playbackUrl` (HLS `.m3u8`), `posterUrl`, and
   `gifUrl` from the stored playback id, signing them automatically under a signed policy.
 - **A webhook.** Mux pushes encoding and delete events to one endpoint, which finishes slow-encoding
   videos and mirrors dashboard deletes back into Payload.
 - **Server-side ingest + seeding.** Create a video from a local file or URL in code, or declare it as
-  a seed asset — both wait for the asset to finish and write full metadata, no webhook required.
+  a seed asset; both wait for the asset to finish and write full metadata, no webhook required.
 
 ## Setup
 
@@ -49,7 +55,7 @@ MUX_WEBHOOK_SECRET=...        # signed playback also: MUX_SIGNING_KEY, MUX_PRIVA
 **Add the plugin**
 
 Zero-config reads the env vars above and defaults uploads' `cors_origin` to `NEXT_PUBLIC_SERVER_URL`.
-Pass options only to override — a non-standard env var name, a custom CORS origin, or signed playback.
+Pass options only to override: a non-standard env var name, a custom CORS origin, or signed playback.
 
 <Tabs items={['Public playback', 'Signed playback']}>
 
@@ -71,9 +77,7 @@ export default buildConfig({
 ```ts
 // also set MUX_SIGNING_KEY + MUX_PRIVATE_KEY in the env
 muxVideoPlugin({
-  uploadSettings: {
-    new_asset_settings: { playback_policy: ['signed'] }, // all new videos upload as signed
-  },
+  playbackPolicy: 'signed',               // new videos upload as signed
   signedUrlOptions: { expiration: '1d' }, // signed URL lifetime
 })
 ```
@@ -90,7 +94,7 @@ The virtual `playbackUrl` / `posterUrl` / `gifUrl` are then JWT-signed on every 
 **Point a Mux webhook at the endpoint**
 
 In the Mux dashboard, send webhooks to `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if
-you've customized Payload's API route). It needs a publicly reachable URL — see [Webhook](#webhook).
+you've customized Payload's API route). It needs a publicly reachable URL; see [Webhook](#webhook).
 </Step>
 
 <Step>
@@ -108,14 +112,14 @@ pnpm payload generate:importmap
 
 ## Plugin
 
-`muxVideoPlugin(options?)` is the single entry point — one call registers the `mux-video` collection,
+`muxVideoPlugin(options?)` is the single entry point. One call registers the `mux-video` collection,
 the upload + webhook endpoints, and the admin uploader. It's zero-config: every option falls back to a
 `MUX_*` env var or a sensible default.
 
 ### Options
 
 export const options = [
-  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing — no collection, endpoints, or hooks.` },
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing: no collection, endpoints, or hooks.` },
   {
     name: 'initSettings',
     type: 'MuxVideoInitSettings',
@@ -134,12 +138,13 @@ export const options = [
     type: 'MuxVideoUploadSettings',
     description: `Settings applied to every upload.`,
     options: [
-      { name: 'cors_origin', type: 'string', default: 'NEXT_PUBLIC_SERVER_URL, then *', description: `CORS origin for the direct-upload URL — usually your site URL.` },
-      { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy — set it to ['signed'] for signed playback (defaults to ['public']).` },
+      { name: 'cors_origin', type: 'string', default: 'NEXT_PUBLIC_SERVER_URL, then *', description: `CORS origin for the direct-upload URL, usually your site URL.` },
+      { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy; the top-level playbackPolicy option is the shorthand, and an explicit value here wins.` },
     ],
   },
+  { name: 'playbackPolicy', type: "'public' | 'signed'", default: "'public'", description: `Playback policy for newly uploaded videos. Shorthand for uploadSettings.new_asset_settings.playback_policy; set 'signed' (plus MUX_SIGNING_KEY / MUX_PRIVATE_KEY) for JWT-signed URLs.` },
   { name: 'extendCollection', type: 'keyof TypedCollection', description: `Slug of an existing collection to extend with the Mux fields, hooks, and uploader instead of creating the mux-video collection.` },
-  { name: 'access', type: '(req) => boolean | Promise<boolean>', default: 'logged-in admin', description: `Gate who may request an upload and read videos. Defaults to logged-in admins.` },
+  { name: 'access', type: '(req) => boolean | Promise<boolean>', default: 'logged-in admin', description: `Gate who may request an upload and read videos. Create / update / delete fall back to Payload's collection access. Defaults to logged-in admins.` },
   { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
   { name: 'posterExtension', type: "'webp' | 'jpg' | 'png'", default: "'png'", description: `Image format for the poster (posterUrl).` },
   { name: 'animatedGifExtension', type: "'gif' | 'webp'", default: "'gif'", description: `Format for the animated preview (gifUrl).` },
@@ -147,7 +152,7 @@ export const options = [
   { name: 'autoCreateOnWebhook', type: 'boolean', default: 'false', description: `When true, the webhook backfills a Payload doc for an asset uploaded directly in Mux (on created / ready / updated for an asset Payload doesn't have yet).` },
 ]
 
-Pass options to customize — the **Reference** tab is the interactive view (`initSettings` /
+Pass options to customize. The **Reference** tab is the interactive view (`initSettings` /
 `uploadSettings` expand to their nested fields); **TypeScript** is the same shape in code, every option
 at its default.
 
@@ -171,6 +176,7 @@ muxVideoPlugin({
   // uploadSettings: { /* … */ }, // optional — cors_origin defaults to NEXT_PUBLIC_SERVER_URL
   // extendCollection: 'media',   // optional, no default — extend an existing collection instead of creating `mux-video`
   // access: (req) => Boolean(req.user), // default — logged-in admin
+  // playbackPolicy: 'signed',   // optional — default 'public'; 'signed' issues JWT-signed URLs
   signedUrlOptions: { expiration: '1d' },
   posterExtension: 'png',
   animatedGifExtension: 'gif',
@@ -185,23 +191,23 @@ muxVideoPlugin({
 
 ## Collections
 
-The plugin registers one collection — or, with `extendCollection`, folds the same fields, hooks, and
-uploader into a collection you already have.
+The plugin registers one collection. With `extendCollection`, it instead folds the same fields, hooks,
+and uploader into a collection you already have.
 
 ### `mux-video`
 
 The Videos collection, and the only one you touch. You set `title` and an optional `posterTimestamp`;
 Mux fills in everything else (asset id, duration, dimensions, playback ids) through the upload poll and
 the webhook. Read is gated by the `access` option (**logged-in admin** by default). Pass a transient
-`source` to create one server-side — see [Server-side ingest](#server-side-ingest).
+`source` to create one server-side; see [Server-side ingest](#server-side-ingest).
 
 **Fields**
 
 <TypeTable
   type={{
     muxUploader: { description: "The admin uploader + player (label 'Video Preview'). Its list-view Cell is the gif / image / none thumbnail set by adminThumbnail.", type: "ui" },
-    source: { description: "Transient server-side ingest input — a local path / URL, or { file|url, playbackPolicy, posterTimestamp }. Uploaded by beforeValidate then stripped; never persisted.", type: "json" },
-    title: { description: "Unique, required. The admin title; de-duped and mirrored onto the upload filename.", type: "text" },
+    source: { description: "Transient server-side ingest input: a local path / URL, or { file|url, playbackPolicy, posterTimestamp }. Uploaded by beforeValidate then stripped; never persisted.", type: "json" },
+    title: { description: "Unique, required. The admin title; auto-deduped to stay unique (and mirrored onto the filename when extending an upload collection).", type: "text" },
     assetId: { description: "Mux asset id. Read-only, filled by the hooks.", type: "text" },
     duration: { description: "Length in seconds. Read-only, from Mux.", type: "number" },
     posterTimestamp: { description: "Seconds into the video for the poster image. Defaults to the middle; validated against duration.", type: "number" },
@@ -217,20 +223,20 @@ the webhook. Read is gated by the `access` option (**logged-in admin** by defaul
 <TypeTable
   type={{
     beforeValidate: { description: "Server-side ingest: if the doc carries a transient `source` and no assetId, upload it to Mux, wait until ready, fold in the metadata, and strip source. Skipped when an assetId is already present.", type: "beforeValidate" },
-    beforeChange: { description: "On a new/changed assetId: delete the previous asset (on update), poll the new one for ~6s while it's preparing, fold in ready metadata, and de-dupe title/filename. A still-preparing asset is left to the webhook; an errored asset is deleted and the save rejected.", type: "beforeChange" },
+    beforeChange: { description: "On a new/changed assetId: delete the previous asset (on update), poll the new one for ~6s while it's preparing, fold in ready metadata, and de-dupe the title (mirrored onto filename on an upload collection). A still-preparing asset is left to the webhook; an errored asset is deleted and the save rejected.", type: "beforeChange" },
     afterDelete: { description: "Payload → Mux delete: when a doc is deleted, delete its Mux asset too (a not_found is ignored).", type: "afterDelete" },
   }}
 />
 
 <Callout type="info">
-  The resolved options are stashed on `config.custom.payloadMux`, so external tooling (e.g. the seed
-  asset provider) can build a Mux client from the configured credentials given just `payload` — read
-  by string key, no import, so other packages stay decoupled.
+  The resolved options are stashed at `config.custom.payloadMux.options`, so external tooling can build
+  a Mux client from the configured credentials given just `payload`, read by string key with no import,
+  so other packages stay decoupled.
 </Callout>
 
 ## Use a video
 
-Relate to `mux-video` from any collection, then play it back however you like — `playbackId` and the
+Relate to `mux-video` from any collection, then play it back however you like. `playbackId` and the
 virtual `playbackUrl` (an HLS `.m3u8`) work with any Mux frontend or a custom HLS player. The example
 uses [`@mux/mux-player-react`](https://www.npmjs.com/package/@mux/mux-player-react) (`pnpm add
 @mux/mux-player-react` if you go that route):
@@ -256,17 +262,32 @@ async function Page() {
 export default Page
 ```
 
-The URLs compute on read from the stored playback id, so already-populated videos need no extra calls —
+The URLs compute on read from the stored playback id, so already-populated videos need no extra calls,
 and under a signed policy each one arrives JWT-signed with the `signedUrlOptions` lifetime.
+
+<Callout type="info">
+  Under a **signed** policy each read signs all three URLs (`playbackUrl` / `posterUrl` / `gifUrl`), and
+  JWT signing isn't free. If you only render one (e.g. just the player), `select` it (alongside the
+  `playbackId` / `playbackPolicy` it's built from) so the other two aren't signed:
+
+  ```ts
+  payload.find({
+    collection: 'mux-video',
+    select: { playbackOptions: { playbackId: true, playbackPolicy: true, playbackUrl: true } },
+  })
+  ```
+
+  Public playback does no signing, so this doesn't apply there.
+</Callout>
 
 ## Endpoints
 
 The plugin registers three endpoints under Payload's API route (the upload pair is gated by `access`):
 
-- `POST /api/mux/upload` — mint a Mux direct-upload (the admin uploader posts files to it).
-- `GET /api/mux/upload?id=…` — read a direct-upload, to pick up its `asset_id`.
-- `POST /api/mux/webhook` — verify and apply Mux events: set metadata on ready/updated, delete on
-  deleted, log on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux.
+- `POST /api/mux/upload`: mint a Mux direct-upload (the admin uploader posts files to it).
+- `GET /api/mux/upload?id=…`: read a direct-upload, to pick up its `asset_id`.
+- `POST /api/mux/webhook`: verify and apply Mux events, setting metadata on ready/updated, deleting on
+  deleted, logging on errored, and (with `autoCreateOnWebhook`) backfilling assets uploaded in Mux.
 
 ## Webhook
 
@@ -278,22 +299,22 @@ left for the webhook.
 
 <Tab value="Needs the webhook">
 
-- **Metadata for videos that take longer than ~6s to encode** — the common case. Without the webhook
+- **Metadata for videos that take longer than ~6s to encode.** The common case. Without the webhook
   they're saved without `playbackOptions`, so they never become playable (the poll gave up, and
   re-saving won't re-fetch).
-- **Mux → Payload delete sync** — deleting an asset in the Mux dashboard removes the Payload doc only
+- **Mux → Payload delete sync.** Deleting an asset in the Mux dashboard removes the Payload doc only
   via the `video.asset.deleted` event.
-- **`autoCreateOnWebhook` backfill** — importing assets you uploaded directly in Mux.
+- **`autoCreateOnWebhook` backfill.** Importing assets you uploaded directly in Mux.
 
 </Tab>
 
 <Tab value="Works without it">
 
 - The upload itself, and metadata for short videos (set synchronously by the 6s poll).
-- **Payload → Mux delete** — handled by the collection's `afterDelete` hook, not the webhook.
-- **Server-side ingest / seeding** — the 6s limit doesn't apply; ingest waits for `ready` and writes
+- **Payload → Mux delete.** Handled by the collection's `afterDelete` hook, not the webhook.
+- **Server-side ingest / seeding.** The 6s limit doesn't apply; ingest waits for `ready` and writes
   full metadata into the doc, so these play straight away whatever their length.
-- Playback of already-populated videos — the URLs compute on read from the stored playback id.
+- Playback of already-populated videos: the URLs compute on read from the stored playback id.
 
 </Tab>
 
@@ -301,15 +322,23 @@ left for the webhook.
 
 <Callout type="warn">
   **The webhook needs a publicly reachable URL.** Mux *pushes* events to your endpoint, so its servers
-  must be able to POST to it; the SDK only verifies the signature on receipt — it can't make Mux reach
+  must be able to POST to it; the SDK only verifies the signature on receipt, and it can't make Mux reach
   `localhost`. In production, set `MUX_WEBHOOK_SECRET` and point the dashboard at
   `https://your-site/api/mux/webhook`. For local dev, expose localhost with a tunnel
   (`cloudflared tunnel --url http://localhost:3000` or ngrok) and set that URL as the webhook.
 </Callout>
 
+## Revalidation
+
+The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache, and some writes (the
+`video.asset.ready` / `deleted` webhook especially) land outside the request that rendered your page.
+Handle revalidation yourself with a Payload `afterChange` / `afterDelete` hook on `mux-video`: it fires
+for webhook writes, admin saves, and server-side ingest alike, so it's the one place to call
+`revalidateTag` / `revalidatePath` for the pages that embed videos.
+
 ## Server-side ingest
 
-Besides the browser uploader, a `mux-video` can be created **server-side** from a local file or URL —
+Besides the browser uploader, a `mux-video` can be created **server-side** from a local file or URL,
 handy for imports, migrations, and seeding. Pass a `source`; the `beforeValidate` hook uploads it to
 Mux, waits for the asset to be ready, fills in the metadata, and discards `source`:
 
@@ -321,8 +350,7 @@ await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro' })
 // playback policy comes from the plugin's uploadSettings; pass { playbackPolicy: 'signed' } to override one video
 ```
 
-The lower-level `ingestMuxAsset(mux, source, opts)` — create upload → PUT bytes → poll until ready →
-return the asset — is exported too, for when you have a Mux client and want the raw asset.
+Local paths stream from disk, so ingesting a large file doesn't load it all into memory.
 
 ### Declarative seeding
 
@@ -343,8 +371,8 @@ plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProv
 
 `muxAssetProvider()` returns plain config — `{ collection: 'mux-video', subdir: 'video' }` — decoupled
 both ways: the seed package never imports this one, nor the Mux SDK; the upload runs in this plugin's
-hook. Playback policy comes from the plugin's `uploadSettings.new_asset_settings`, so seeded and
-admin-uploaded videos share one policy. See the
+hook. Playback policy comes from the plugin's configured policy, so seeded and admin-uploaded videos
+share one policy. See the
 [seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.
 
 ## Exports
@@ -355,7 +383,6 @@ admin-uploaded videos share one policy. See the
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxVideo` | `@pro-laico/payload-mux` | The collection factory, for advanced configs assembled by hand. |
 | `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a `mux-video` doc from a local file / URL (seeding, imports, migrations). |
-| `ingestMuxAsset` | `@pro-laico/payload-mux` | Lower-level: ingest a video into Mux and return the ready asset. |
 | `muxAssetProvider` | `@pro-laico/payload-mux` | Register `mux-video` as a `@pro-laico/payload-seed` asset provider. |
 | `MuxUploaderField` | `@pro-laico/payload-mux/components/MuxUploaderField` | Admin uploader + player field (wired via the import map). |
 | `MuxVideoGifCell` / `MuxVideoImageCell` | `@pro-laico/payload-mux/components/*` | List-view thumbnail cells selected by `adminThumbnail`. |

@@ -54,7 +54,11 @@ export const getBeforeValidateHook =
     if (!norm) return rest
 
     const asset = await ingestMuxAsset(mux, norm.ref, {
-      newAssetSettings: options.uploadSettings?.new_asset_settings,
+      // Mirror the admin direct-upload path (`upload.ts`): the plugin-level `playbackPolicy`
+      // shorthand is the base default, overlaid by the full `uploadSettings.new_asset_settings`,
+      // with a per-video `source.playbackPolicy` winning last — so seeded and admin-uploaded
+      // videos share one policy.
+      newAssetSettings: { playback_policy: [options.playbackPolicy ?? 'public'], ...options.uploadSettings?.new_asset_settings },
       playbackPolicy: norm.playbackPolicy,
       corsOrigin: norm.corsOrigin ?? options.uploadSettings?.cors_origin,
     })

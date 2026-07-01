@@ -1,9 +1,9 @@
 import type Mux from '@mux/mux-node'
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 import { getAfterDeleteHook } from '../hooks/afterDelete'
 import { getBeforeChangeHook } from '../hooks/beforeChange'
 import { getBeforeValidateHook } from '../hooks/beforeValidate'
-import { defaultAccess } from '../lib/defaultAccess'
+import { isAllowed } from '../lib/isAllowed'
 import type { MuxVideoPluginOptions } from '../types'
 
 const C = '@pro-laico/payload-mux/components'
@@ -32,17 +32,48 @@ const signIfNeeded = async (
   url.searchParams.set('token', token)
 }
 
+/** Build one virtual, read-only URL field (`playbackUrl` / `posterUrl` / `gifUrl`). On read it
+ *  builds the Mux URL from the sibling `playbackId`, stamps the poster `time` for thumbnail/gif,
+ *  and signs it when the policy is `signed`. Returns null until a playback id exists. */
+const signableUrlField = (
+  mux: Mux,
+  options: MuxVideoPluginOptions,
+  name: string,
+  label: string,
+  type: 'video' | 'thumbnail' | 'gif',
+  buildUrl: (playbackId: string) => URL,
+): Field => ({
+  name,
+  label,
+  type: 'text',
+  virtual: true,
+  admin: { hidden: true },
+  hooks: {
+    afterRead: [
+      async ({ data, siblingData }) => {
+        const playbackId = siblingData?.playbackId
+        if (!playbackId) return null
+        const posterTimestamp = type !== 'video' && typeof data?.posterTimestamp === 'number' ? data.posterTimestamp : undefined
+        const url = buildUrl(playbackId)
+        if (posterTimestamp !== undefined) url.searchParams.set('time', posterTimestamp.toString())
+        await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, type, posterTimestamp)
+        return url.toString()
+      },
+    ],
+  },
+})
+
 /** The Videos collection: an uploader field, identifying metadata Mux fills in, and a
  *  `playbackOptions` array whose virtual fields resolve to signed-or-public Mux URLs. */
 export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
   slug: (options.extendCollection as string) ?? 'mux-video',
   labels: { singular: 'Video', plural: 'Videos' },
-  access: { read: ({ req }) => options.access?.(req) ?? defaultAccess(req) },
+  access: { read: ({ req }) => isAllowed(options, req) },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
     beforeValidate: [getBeforeValidateHook(mux, options)],
-    beforeChange: [getBeforeChangeHook(mux, (options.extendCollection as string) ?? 'mux-video')],
+    beforeChange: [getBeforeChangeHook(mux)],
   },
   fields: [
     {
@@ -66,7 +97,8 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
     // Not `required`: it's filled by the beforeValidate (server-side ingest) / beforeChange
     // (admin upload) hooks before the row is written. Marking it required would reject a
     // create that supplies a `source` instead of an already-resolved `assetId`.
-    { name: 'assetId', type: 'text', admin: { readOnly: true, condition: (data) => data.assetId } },
+    // Indexed: the webhook looks a doc up by assetId on every Mux event.
+    { name: 'assetId', type: 'text', index: true, admin: { readOnly: true, condition: (data) => data.assetId } },
     { name: 'duration', label: 'Duration', type: 'number', admin: { readOnly: true, condition: (data) => data.duration } },
     {
       name: 'posterTimestamp',
@@ -80,7 +112,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       },
       validate: (value: number | null | undefined, { siblingData }: { siblingData: Partial<{ duration: number }> }) => {
         if (!siblingData.duration || !value) return true
-        return siblingData.duration >= value || 'Poster timestamp must be less than the video duration.'
+        return siblingData.duration > value || 'Poster timestamp must be less than the video duration.'
       },
     },
     { name: 'aspectRatio', label: 'Aspect Ratio', type: 'text', admin: { readOnly: true, condition: (data) => data.aspectRatio } },
@@ -102,64 +134,23 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
           ],
           admin: { readOnly: true },
         },
-        {
-          name: 'playbackUrl',
-          label: 'Playback URL',
-          type: 'text',
-          virtual: true,
-          admin: { hidden: true },
-          hooks: {
-            afterRead: [
-              async ({ siblingData }) => {
-                const playbackId = siblingData?.playbackId
-                if (!playbackId) return null
-                const url = new URL(`https://stream.mux.com/${playbackId}.m3u8`)
-                await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, 'video')
-                return url.toString()
-              },
-            ],
-          },
-        },
-        {
-          name: 'posterUrl',
-          label: 'Poster URL',
-          type: 'text',
-          virtual: true,
-          admin: { hidden: true },
-          hooks: {
-            afterRead: [
-              async ({ data, siblingData }) => {
-                const playbackId = siblingData?.playbackId
-                if (!playbackId) return null
-                const posterTimestamp = data?.posterTimestamp
-                const url = new URL(`https://image.mux.com/${playbackId}/thumbnail.${options.posterExtension ?? 'png'}`)
-                if (typeof posterTimestamp === 'number') url.searchParams.set('time', posterTimestamp.toString())
-                await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, 'thumbnail', posterTimestamp)
-                return url.toString()
-              },
-            ],
-          },
-        },
-        {
-          name: 'gifUrl',
-          label: 'Gif URL',
-          type: 'text',
-          virtual: true,
-          admin: { hidden: true },
-          hooks: {
-            afterRead: [
-              async ({ data, siblingData }) => {
-                const playbackId = siblingData?.playbackId
-                if (!playbackId) return null
-                const posterTimestamp = data?.posterTimestamp
-                const url = new URL(`https://image.mux.com/${playbackId}/animated.${options.animatedGifExtension ?? 'gif'}`)
-                if (typeof posterTimestamp === 'number') url.searchParams.set('time', posterTimestamp.toString())
-                await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, 'gif', posterTimestamp)
-                return url.toString()
-              },
-            ],
-          },
-        },
+        signableUrlField(mux, options, 'playbackUrl', 'Playback URL', 'video', (id) => new URL(`https://stream.mux.com/${id}.m3u8`)),
+        signableUrlField(
+          mux,
+          options,
+          'posterUrl',
+          'Poster URL',
+          'thumbnail',
+          (id) => new URL(`https://image.mux.com/${id}/thumbnail.${options.posterExtension ?? 'png'}`),
+        ),
+        signableUrlField(
+          mux,
+          options,
+          'gifUrl',
+          'Gif URL',
+          'gif',
+          (id) => new URL(`https://image.mux.com/${id}/animated.${options.animatedGifExtension ?? 'gif'}`),
+        ),
       ],
     },
   ],

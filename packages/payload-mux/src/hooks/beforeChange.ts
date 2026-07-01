@@ -15,8 +15,8 @@ const POLL_LIMIT_MS = 6000
  * requires a unique filename).
  */
 export const getBeforeChangeHook =
-  (mux: Mux, collection: string): CollectionBeforeChangeHook =>
-  async ({ req, data: incomingData, operation, originalDoc }) => {
+  (mux: Mux): CollectionBeforeChangeHook =>
+  async ({ req, data: incomingData, operation, originalDoc, collection }) => {
     let data = { ...incomingData }
     const previousAssetId: string | undefined = originalDoc?.assetId
 
@@ -47,18 +47,28 @@ export const getBeforeChangeHook =
         data = { ...data, ...getAssetMetadata(asset) }
       }
 
-      // Override Payload's built-in upload file data; the "file" is the Mux asset.
-      data.url = ''
-
-      // The filename must be unique, so de-dupe the title and mirror it onto filename.
-      const existing = await req.payload.find({
-        collection: collection as CollectionSlug,
-        where: { title: { contains: data.title } },
-        pagination: false,
-      })
-      const uniqueTitle = `${data.title}${existing.totalDocs > 0 ? ` (${existing.totalDocs})` : ''}`
+      // `title` is unique: probe `base`, then `base (1)`, `base (2)` … until one is free.
+      // Exact-match probing avoids counting unrelated titles, and excluding the current doc
+      // (on update) keeps a replace-the-video save from renaming itself.
+      const base = data.title as string
+      let uniqueTitle = base
+      for (let n = 1; ; n++) {
+        const titleClause = { title: { equals: uniqueTitle } }
+        const where =
+          operation === 'update' && originalDoc?.id != null ? { and: [titleClause, { id: { not_equals: originalDoc.id } }] } : titleClause
+        const { totalDocs } = await req.payload.count({ collection: collection.slug as CollectionSlug, where })
+        if (totalDocs === 0) break
+        uniqueTitle = `${base} (${n})`
+      }
       data.title = uniqueTitle
-      data.filename = uniqueTitle
+
+      // When extending an actual upload collection, the Mux asset stands in for the file: blank
+      // the url and mirror the unique title onto the (required, unique) filename. No-op for the
+      // default `mux-video` collection, which is not an upload collection and has neither field.
+      if (collection.upload) {
+        data.url = ''
+        data.filename = uniqueTitle
+      }
     } catch (err) {
       req.payload.logger.error({ err, msg: `[payload-mux] Error preparing Mux asset for '${data.filename ?? data.title}'` })
       throw err

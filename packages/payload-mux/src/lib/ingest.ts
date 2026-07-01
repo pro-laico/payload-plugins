@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, Payload } from 'payload'
 import type { MuxVideoNewAssetSettings } from '../types'
@@ -18,15 +19,16 @@ async function pollUntil<T>(fetch: () => Promise<T>, done: (value: T) => boolean
   return value
 }
 
-/** Read a source's bytes: fetched for an `http(s)` URL, read from disk for a local path. */
-async function readSourceBytes(source: MuxSource): Promise<ArrayBuffer> {
+/** Build the PUT body for the Mux upload. A local path streams from disk with a Content-Length
+ *  (so a large video never sits fully in memory); an `http(s)` URL is fetched and forwarded. */
+async function buildUploadBody(source: MuxSource): Promise<{ body: BodyInit; headers?: Record<string, string> }> {
   if (/^https?:\/\//i.test(source)) {
     const res = await fetch(source)
     if (!res.ok) throw new Error(`[payload-mux] failed to fetch source '${source}': ${res.status} ${res.statusText}`)
-    return res.arrayBuffer()
+    return { body: new Blob([await res.arrayBuffer()]) }
   }
-  const buf = await readFile(source)
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+  const { size } = await stat(source)
+  return { body: createReadStream(source) as unknown as BodyInit, headers: { 'Content-Length': String(size) } }
 }
 
 export interface IngestMuxAssetOptions {
@@ -73,7 +75,9 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
   })
   if (!upload.url) throw new Error(`[payload-mux] Mux did not return an upload URL for '${source}'`)
 
-  const res = await fetch(upload.url, { method: 'PUT', body: new Blob([await readSourceBytes(source)]) })
+  const { body, headers } = await buildUploadBody(source)
+  // `duplex: 'half'` is required when streaming a request body (the local-file path).
+  const res = await fetch(upload.url, { method: 'PUT', body, headers, duplex: 'half' } as RequestInit & { duplex: 'half' })
   if (!res.ok) throw new Error(`[payload-mux] upload PUT failed for '${source}': ${res.status} ${res.statusText}`)
 
   const ready = await pollUntil(

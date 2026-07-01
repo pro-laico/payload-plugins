@@ -1,6 +1,6 @@
 import type Mux from '@mux/mux-node'
 import type { PayloadHandler } from 'payload'
-import { defaultAccess } from '../lib/defaultAccess'
+import { isAllowed } from '../lib/isAllowed'
 import type { MuxVideoPluginOptions } from '../types'
 
 /** `POST /api/mux/upload` — create a Mux direct-upload and return it (the admin uploader
@@ -8,12 +8,11 @@ import type { MuxVideoPluginOptions } from '../types'
 export const createMuxUploadHandler =
   (mux: Mux, pluginOptions: MuxVideoPluginOptions): PayloadHandler =>
   async (req) => {
-    const allowed = (await pluginOptions.access?.(req)) ?? defaultAccess(req)
-    if (!allowed) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(pluginOptions, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     const upload = await mux.video.uploads.create({
       cors_origin: pluginOptions.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
-      new_asset_settings: { playback_policy: ['public'], ...pluginOptions.uploadSettings?.new_asset_settings },
+      new_asset_settings: { playback_policy: [pluginOptions.playbackPolicy ?? 'public'], ...pluginOptions.uploadSettings?.new_asset_settings },
     })
 
     return Response.json(upload)
@@ -24,8 +23,7 @@ export const createMuxUploadHandler =
 export const getMuxUploadHandler =
   (mux: Mux, pluginOptions: MuxVideoPluginOptions): PayloadHandler =>
   async (req) => {
-    const allowed = (await pluginOptions.access?.(req)) ?? defaultAccess(req)
-    if (!allowed) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(pluginOptions, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     const id = req.query?.id as string | undefined
     if (!id) return Response.json({ error: 'Missing upload id.' }, { status: 400 })
