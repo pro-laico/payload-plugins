@@ -1,7 +1,10 @@
 import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
 
-export type FontRole = 'sans' | 'serif' | 'mono' | 'display'
-export const FONT_ROLES: FontRole[] = ['sans', 'serif', 'mono', 'display']
+import { refId } from './refs'
+import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
+
+/** A family key. `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
+export type FontFamily = string
 
 /** One served, subsetted WOFF2 file (a `fontOptimized` doc). */
 export interface ActiveFace {
@@ -11,25 +14,30 @@ export interface ActiveFace {
   style: 'normal' | 'italic'
 }
 
-/** The typeface active for a role, plus its served faces. */
+/** The typeface active for a family, plus its served faces. */
 export interface ActiveTypeface {
-  role: FontRole
+  family: FontFamily
   id: string | number
   faces: ActiveFace[]
 }
-
-const refId = (v: unknown): string | number | undefined =>
-  v && typeof v === 'object' ? (v as { id?: string | number }).id : (v as string | number | undefined)
 
 export interface GetActiveFontFacesOptions {
   /** Slug of the standalone font-selection global. @default 'fontSet' */
   fontSetSlug?: string
   /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
   optimizedSlug?: string
+  /** Family keys to read. Omit to auto-discover them from the `fontSet` global's own slots. */
+  families?: FontFamily[]
 }
 
+/** Payload global meta keys that aren't family slots — filtered out when auto-discovering. */
+const GLOBAL_META_KEYS = new Set(['id', 'globalType', 'createdAt', 'updatedAt'])
+/** The family slots on a `fontSet` global doc: its own keys, minus Payload's metadata. */
+const familyKeysFromGlobal = (global: Record<string, unknown> | null | undefined): FontFamily[] =>
+  global ? Object.keys(global).filter((k) => !k.startsWith('_') && !GLOBAL_META_KEYS.has(k)) : []
+
 /**
- * Resolve the active `fontSet` selection to each role's served `fontOptimized` files. Used by the
+ * Resolve the active `fontSet` selection to each family's served `fontOptimized` files. Used by the
  * {@link DevFonts} component (and available for custom font-serving) to build `@font-face` rules
  * from CMS data at runtime. Returns `[]` if no global / no selection.
  */
@@ -37,61 +45,80 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   const fontSetSlug = (opts.fontSetSlug ?? 'fontSet') as GlobalSlug
   const optimizedSlug = (opts.optimizedSlug ?? 'fontOptimized') as CollectionSlug
 
-  let selection: Partial<Record<FontRole, unknown>>
+  let selection: Partial<Record<FontFamily, unknown>>
   try {
-    selection = (await payload.findGlobal({ slug: fontSetSlug, depth: 0, overrideAccess: true })) as Partial<Record<FontRole, unknown>>
+    // `as unknown as` — in a project with generated types findGlobal resolves to the concrete
+    // fontSet interface, which doesn't structurally overlap a string-keyed record.
+    selection = (await payload.findGlobal({ slug: fontSetSlug, depth: 0, overrideAccess: true })) as unknown as Partial<
+      Record<FontFamily, unknown>
+    >
   } catch {
     return [] // fontSet global not registered
   }
 
+  // Explicit list, else auto-discover the family slots from the global itself — so a custom
+  // `families` set works here with no extra config (the global's slots are the source of truth).
+  const families = opts.families ?? familyKeysFromGlobal(selection as Record<string, unknown>)
+
+  // Resolve each family's selected typeface id once, then fetch every family's served files in a
+  // single query (grouped by typeface) rather than one round-trip per family.
+  const familyIds = families
+    .map((family) => ({ family, id: refId(selection?.[family]) }))
+    .filter((r): r is { family: FontFamily; id: string | number } => r.id != null)
+  if (!familyIds.length) return []
+
+  const uniqueIds = [...new Set(familyIds.map((r) => r.id))]
+  const res = await payload.find({ collection: optimizedSlug, where: { font: { in: uniqueIds } }, depth: 0, limit: 1000, overrideAccess: true })
+
+  const facesByFont = new Map<string | number, ActiveFace[]>()
+  for (const d of res.docs as unknown as Array<Record<string, unknown>>) {
+    if (typeof d.filename !== 'string') continue
+    const fontId = refId(d.font)
+    if (fontId == null) continue
+    const face: ActiveFace = { filename: d.filename, weight: (d.weight as string) || '400', style: d.style === 'italic' ? 'italic' : 'normal' }
+    const bucket = facesByFont.get(fontId)
+    if (bucket) bucket.push(face)
+    else facesByFont.set(fontId, [face])
+  }
+
   const out: ActiveTypeface[] = []
-  for (const role of FONT_ROLES) {
-    const id = refId(selection?.[role])
-    if (id == null) continue
-    const res = await payload.find({ collection: optimizedSlug, where: { font: { equals: id } }, depth: 0, limit: 100, overrideAccess: true })
-    const faces = (res.docs as unknown as Array<Record<string, unknown>>)
-      .filter((d): d is Record<string, unknown> & { filename: string } => typeof d.filename === 'string')
-      .map(
-        (d): ActiveFace => ({
-          filename: d.filename,
-          weight: (d.weight as string) || '400',
-          style: d.style === 'italic' ? 'italic' : 'normal',
-        }),
-      )
-    if (faces.length) out.push({ role, id, faces })
+  for (const { family, id } of familyIds) {
+    const faces = facesByFont.get(id)
+    if (faces?.length) out.push({ family, id, faces })
   }
   return out
 }
 
-/** Generic CSS fallback stack per role, appended after the served family in the role variable. */
-const GENERIC_FALLBACK: Record<FontRole, string> = {
-  sans: 'ui-sans-serif, system-ui, sans-serif',
-  serif: 'ui-serif, Georgia, serif',
-  mono: 'ui-monospace, SFMono-Regular, monospace',
-  display: 'ui-serif, Georgia, serif',
-}
+/** Generic CSS fallback stack for the built-in families, appended after the served family in the
+ *  family variable. Overridable per family via {@link BuildFontFaceCssOptions.fallbacks}. */
+const GENERIC_FALLBACK: Record<string, string> = Object.fromEntries(DEFAULT_FONT_FAMILIES.map((r) => [r.key, r.fallback]))
+/** Used for a custom family with no declared fallback. */
+const DEFAULT_FALLBACK = 'ui-sans-serif, system-ui, sans-serif'
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 /** Payload serves an upload file at `/api/<slug>/file/<filename>` (public read on `fontOptimized`). */
 const faceUrl = (filename: string, slug: string) => `/api/${slug}/file/${encodeURIComponent(filename)}`
 
 export interface BuildFontFaceCssOptions {
-  /** Prefix for the emitted CSS role variables; the capitalised role is appended (`--font-setSans`).
+  /** Prefix for the emitted CSS family variables; the capitalised family is appended (`--font-setSans`).
    *  Must match the download CLI's `cssVariablePrefix`. @default '--font-set' */
   cssVarPrefix?: string
   /** Slug used to build the served file URL. @default 'fontOptimized' */
   optimizedSlug?: string
+  /** Per-family CSS fallback stack override (`{ brand: 'Georgia, serif' }`). Falls back to the
+   *  built-in family defaults, then a generic sans stack. */
+  fallbacks?: Record<string, string>
 }
 
 /**
- * Build the `@font-face` rules + the `:root` role-variable mapping for a set of active typefaces.
- * Pure (no IO) so it's easy to test; {@link DevFonts} wraps it with the CMS read. The role
+ * Build the `@font-face` rules + the `:root` family-variable mapping for a set of active typefaces.
+ * Pure (no IO) so it's easy to test; {@link DevFonts} wraps it with the CMS read. The family
  * variables (`--font-setSans`, …) point at each typeface's served family, so the same
  * `font-family: var(--font-setSans)` your app uses in production resolves identically in dev.
  */
 export function buildFontFaceCss(typefaces: ActiveTypeface[], opts: BuildFontFaceCssOptions = {}): string {
   const cssVarPrefix = opts.cssVarPrefix ?? '--font-set'
   const optimizedSlug = opts.optimizedSlug ?? 'fontOptimized'
+  const fallbackFor = (family: FontFamily) => opts.fallbacks?.[family] ?? GENERIC_FALLBACK[family] ?? DEFAULT_FALLBACK
   if (!typefaces.length) return ''
 
   const faces = typefaces
@@ -102,6 +129,6 @@ export function buildFontFaceCss(typefaces: ActiveTypeface[], opts: BuildFontFac
       ),
     )
     .join('')
-  const vars = typefaces.map((tf) => `${cssVarPrefix}${cap(tf.role)}:'pl-font-${tf.id}',${GENERIC_FALLBACK[tf.role]};`).join('')
+  const vars = typefaces.map((tf) => `${cssVarPrefix}${familyVarSuffix(tf.family)}:'pl-font-${tf.id}',${fallbackFor(tf.family)};`).join('')
   return `${faces}:root{${vars}}`
 }

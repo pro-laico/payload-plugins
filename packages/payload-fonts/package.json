@@ -41,11 +41,6 @@
         "import": "./dist/components/DevFonts.js",
         "types": "./dist/components/DevFonts.d.ts",
         "default": "./dist/components/DevFonts.js"
-      },
-      "./scripts/downloadFonts": {
-        "import": "./dist/scripts/downloadFonts.js",
-        "types": "./dist/scripts/downloadFonts.d.ts",
-        "default": "./dist/scripts/downloadFonts.js"
       }
     }
   },
@@ -69,11 +64,6 @@
       "import": "./src/components/DevFonts.tsx",
       "types": "./src/components/DevFonts.tsx",
       "default": "./src/components/DevFonts.tsx"
-    },
-    "./scripts/downloadFonts": {
-      "import": "./src/scripts/downloadFonts.ts",
-      "types": "./src/scripts/downloadFonts.ts",
-      "default": "./src/scripts/downloadFonts.ts"
     }
   },
   "files": [

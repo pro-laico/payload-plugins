@@ -10,9 +10,9 @@ import type { Access } from 'payload'
  *
  * ```ts
  * fontsPlugin({
- *   fontOptions: { access: { create: adminOnly, update: adminOnly, delete: adminOnly } },
+ *   fontOverrides: { access: { create: adminOnly, update: adminOnly, delete: adminOnly } },
  *   includeFontSet: true,
- *   fontSetOptions: { access: { update: adminOnly } },
+ *   fontSetOverrides: { access: { update: adminOnly } },
  * })
  * ```
  */

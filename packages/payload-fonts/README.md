@@ -27,8 +27,8 @@ export default buildConfig({
 })
 ```
 
-That registers three collections — `font` (the visible typeface) plus the hidden `fontOriginal`
-(raw uploads) and `fontOptimized` (served WOFF2s) — the `fontSet` global, and the
+That registers three collections: `font` (the visible typeface) plus the hidden `fontOriginal`
+(raw uploads) and `fontOptimized` (served WOFF2s). It also adds the `fontSet` global and the
 `GET /api/fonts/export` endpoint. Editors create a **Font**, drop in either a variable file or
 per-weight files, and the save hook subsets each to a served WOFF2.
 
@@ -50,7 +50,7 @@ const nextConfig = {
 export default withPayload(nextConfig)
 ```
 
-If you skip this, the plugin logs one loud, actionable error the first time a subset fails — so a
+If you skip this, the plugin logs one loud, actionable error the first time a subset fails, so a
 broken setup is obvious rather than silent.
 
 ## How it works
@@ -62,13 +62,13 @@ font (typeface)              fontOriginal (hidden)        fontOptimized (hidden)
   variable | weights[]         one per typeface slot        one per weight, linked back
 ```
 
-- **`font`** — one document per typeface. Not an upload collection itself; it holds Payload
+- **`font`**: one document per typeface. Not an upload collection itself; it holds Payload
   `upload` slots (a `variable` group _or_ a `weights` array) pointing at `fontOriginal`. On save,
   every referenced original is subsetted to a `fontOptimized` WOFF2 (variable fonts keep their
   `wght` axis range; static files take the row's weight/style). Delete cascades to both.
-- **`fontOriginal`** — the untouched archive. Carries no hooks, so it can be a client-upload
+- **`fontOriginal`**: the untouched archive. Carries no hooks, so it can be a client-upload
   (direct-to-Blob) collection in production. Each original belongs to exactly one typeface.
-- **`fontOptimized`** — the bytes the site serves. Derived, never hand-uploaded; public-read so
+- **`fontOptimized`**: the bytes the site serves. Derived, never hand-uploaded; public-read so
   the build-time export can fetch them.
 
 ## Options
@@ -78,19 +78,19 @@ font (typeface)              fontOriginal (hidden)        fontOptimized (hidden)
 | `enabled` | `boolean` | `true` | Set `false` to skip the plugin entirely. |
 | `charset` | `'latin' \| 'latin-ext' \| string` | `'latin'` | Characters the subsetter keeps (a preset, or an explicit string). |
 | `includeFontSet` | `boolean` | `true` | Register the `fontSet` global (the active selection the export endpoint reads). Set `false` only if you drive the selection some other way. |
-| `fontOptions` | `Partial<CollectionConfig>` | — | Merged onto the `font` collection (e.g. tighter `access`). |
-| `fontOriginalOptions` | `Partial<CollectionConfig>` | — | Merged onto `fontOriginal` (e.g. `upload: { staticDir }` or a client-uploads adapter). |
-| `fontOptimizedOptions` | `Partial<CollectionConfig>` | — | Merged onto `fontOptimized` (e.g. `upload: { staticDir }`). |
-| `fontSetOptions` | `Partial<GlobalConfig>` | — | Merged onto the `fontSet` global. |
+| `fontOverrides` | `Partial<CollectionConfig>` | — | Merged onto the `font` collection (e.g. tighter `access`). |
+| `fontOriginalOverrides` | `Partial<CollectionConfig>` | — | Merged onto `fontOriginal` (e.g. `upload: { staticDir }` or a client-uploads adapter). |
+| `fontOptimizedOverrides` | `Partial<CollectionConfig>` | — | Merged onto `fontOptimized` (e.g. `upload: { staticDir }`). |
+| `fontSetOverrides` | `Partial<GlobalConfig>` | — | Merged onto the `fontSet` global. |
 
 Overrides merge non-destructively: `fields` append, `access`/`admin`/`upload` shallow-merge,
-`hooks` merge per phase — so `fontOriginalOptions: { upload: { staticDir } }` keeps the built-in
+`hooks` merge per phase, so `fontOriginalOverrides: { upload: { staticDir } }` keeps the built-in
 font-mime whitelist.
 
 ## Creating a font from a file (server-side ingest)
 
-Besides the admin slots, a typeface can be created **server-side** from a local file or URL —
-handy for imports, migrations, and seeding. The `font` collection's `beforeValidate` hook
+Besides the admin slots, a typeface can be created **server-side** from a local file or URL,
+which is handy for imports, migrations, and seeding. The `font` collection's `beforeValidate` hook
 uploads the `source` to `fontOriginal`, wires the slot, and strips it:
 
 ```ts
@@ -111,31 +111,39 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 
 plugins: [
   fontsPlugin(),
-  seedPlugin({ definitions: [fonts, fontSet], assetProviders: [fontAssetProvider()] }),
+  seedPlugin({
+    definitions: [fonts, fontSet],
+    assetProviders: [fontAssetProvider()],
+  }),
 ]
 ```
 
 ```ts
-// seed/fonts.ts — files live in <assetsDir>/fonts/
+// seed/fonts.ts: files live in <assetsDir>/fonts/
 import { defineSeed } from '@pro-laico/payload-seed'
 
 export default defineSeed('font', ({ file }) => [
   { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
 ])
-
-// seed/fontSet.ts — pick the active typeface per role
-import { defineSeed } from '@pro-laico/payload-seed'
-export const fontSet = defineSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
 ```
 
-The provider is plain config — the seed package never imports this one, nor `fontkit`/`subset-font`;
+```ts
+// seed/fontSet.ts: pick the active typeface per family
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export const fontSet = defineSeed('fontSet', ({ ref }) => ({
+  sans: ref('font', 'inter'),
+}))
+```
+
+The provider is plain config: the seed package never imports this one, nor `fontkit`/`subset-font`;
 the upload + subset run in this plugin's hooks. The two packages stay decoupled.
 
 ## Serving the fonts on your frontend
 
 The active fonts are applied as the `--font-set{Sans,Serif,Mono,Display}` CSS variables, so your
 app just uses `font-family: var(--font-setSans)`. Those variables are produced **two ways that
-never both fire** — optimized in production, zero-config in development. Wire both in your root
+never both fire**: optimized in production, zero-config in development. Wire both in your root
 layout; each is a no-op in the other environment:
 
 ```tsx
@@ -154,11 +162,11 @@ import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 ### Production — `next/font/local`
 
 A build step fetches the active fonts and self-hosts them via
-[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) — precise
+[`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font), giving precise
 preloading, size-adjusted fallbacks, and content-hashed static assets:
 
 ```jsonc
-// package.json — set FONT_DOWNLOAD_URL (the running Payload URL) + PAYLOAD_SECRET
+// package.json: set FONT_DOWNLOAD_URL (the running Payload URL) + PAYLOAD_SECRET
 { "scripts": { "prebuild": "payload-fonts-download" } }
 ```
 
@@ -173,7 +181,7 @@ resets `definition.ts` to empty, so a failed/offline build never breaks on a sta
 `<DevFonts />` reads the active selection from Payload and inlines the matching `@font-face` +
 `--font-set*` variables **at runtime**, so seeding or editing a font shows up on refresh with no
 build step. It renders `null` in production, and stands down in dev once `definition.ts` is
-populated — so running `payload-fonts-download` against your dev server lets you preview the exact
+populated, so running `payload-fonts-download` against your dev server lets you preview the exact
 production path locally. (It's a server component; pass it your `@payload-config`.)
 
 Tune the output paths and the CSS-variable prefix with `PAYLOAD_FONTS_*` env vars (see

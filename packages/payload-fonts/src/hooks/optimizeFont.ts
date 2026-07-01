@@ -31,6 +31,9 @@ const CHARSET_PRESETS: Record<string, Array<[number, number]>> = {
   ],
 }
 
+/** The subsetter charset: a built-in preset name, or an explicit string of characters to keep. */
+export type Charset = 'latin' | 'latin-ext' | (string & {})
+
 const rangesToText = (ranges: Array<[number, number]>): string => {
   let text = ''
   for (const [start, end] of ranges) for (let cp = start; cp <= end; cp++) text += String.fromCodePoint(cp)
@@ -42,7 +45,7 @@ const rangesToText = (ranges: Array<[number, number]>): string => {
  * preset name ('latin' | 'latin-ext') expands to its ranges; any other string is treated
  * as an explicit, verbatim list of characters to retain.
  */
-export const resolveCharsetText = (charset = 'latin'): string => {
+export const resolveCharsetText = (charset: Charset = 'latin'): string => {
   const preset = CHARSET_PRESETS[charset]
   return preset ? rangesToText(preset) : charset
 }

@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { type ActiveTypeface, buildFontFaceCss } from './activeFonts'
+import { type ActiveTypeface, buildFontFaceCss, getActiveFontFaces } from './activeFonts'
 
 const typefaces: ActiveTypeface[] = [
-  { role: 'sans', id: 1, faces: [{ filename: 'inter.woff2', weight: '400', style: 'normal' }] },
+  { family: 'sans', id: 1, faces: [{ filename: 'inter.woff2', weight: '400', style: 'normal' }] },
   {
-    role: 'display',
+    family: 'display',
     id: 7,
     faces: [
       { filename: 'abril-400.woff2', weight: '400', style: 'normal' },
@@ -27,7 +27,7 @@ describe('buildFontFaceCss', () => {
     expect(css).toContain('font-weight:700')
   })
 
-  it('maps each role to a --font-set* variable pointing at its served family', () => {
+  it('maps each family to a --font-set* variable pointing at its served family', () => {
     const css = buildFontFaceCss(typefaces)
     expect(css).toContain("--font-setSans:'pl-font-1',ui-sans-serif")
     expect(css).toContain("--font-setDisplay:'pl-font-7',ui-serif")
@@ -42,7 +42,7 @@ describe('buildFontFaceCss', () => {
   it('emits italic style and a variable weight range verbatim', () => {
     const css = buildFontFaceCss([
       {
-        role: 'serif',
+        family: 'serif',
         id: 9,
         faces: [
           { filename: 'src-italic.woff2', weight: '400', style: 'italic' },
@@ -52,12 +52,76 @@ describe('buildFontFaceCss', () => {
     ])
     expect(css).toContain('font-style:italic')
     expect(css).toContain('font-weight:100 900')
-    // Both faces share the one family the role variable points at: 2 @font-face + the :root var.
+    // Both faces share the one family the family variable points at: 2 @font-face + the :root var.
     expect(css.match(/'pl-font-9'/g)).toHaveLength(3)
   })
 
   it('encodes filenames with spaces in the served URL', () => {
-    const css = buildFontFaceCss([{ role: 'mono', id: 3, faces: [{ filename: 'My Mono.woff2', weight: '400', style: 'normal' }] }])
+    const css = buildFontFaceCss([{ family: 'mono', id: 3, faces: [{ filename: 'My Mono.woff2', weight: '400', style: 'normal' }] }])
     expect(css).toContain('/api/fontOptimized/file/My%20Mono.woff2')
+  })
+
+  it('supports a custom family with a per-family fallback override, capitalising its var name', () => {
+    const css = buildFontFaceCss([{ family: 'brand', id: 5, faces: [{ filename: 'b.woff2', weight: '400', style: 'normal' }] }], {
+      fallbacks: { brand: 'Georgia, serif' },
+    })
+    expect(css).toContain("--font-setBrand:'pl-font-5',Georgia, serif")
+  })
+
+  it('falls back to a generic sans stack for a custom family with no declared fallback', () => {
+    const css = buildFontFaceCss([{ family: 'brand', id: 5, faces: [{ filename: 'b.woff2', weight: '400', style: 'normal' }] }])
+    expect(css).toContain("--font-setBrand:'pl-font-5',ui-sans-serif, system-ui, sans-serif")
+  })
+})
+
+describe('getActiveFontFaces', () => {
+  // A payload double: the fontSet global selection + the served fontOptimized docs the one
+  // batched find should return (filtered here by the `font: { in: [...] }` clause).
+  const makePayload = (selection: Record<string, unknown>, docs: Array<Record<string, unknown>>) => {
+    const find = vi.fn(async ({ where }: { where: { font: { in: Array<string | number> } } }) => ({
+      docs: docs.filter((d) => where.font.in.includes(d.font as string | number)),
+    }))
+    return { payload: { findGlobal: vi.fn(async () => selection), find } as never, find }
+  }
+
+  it('resolves each family to its served faces in ONE query, preserving family order', async () => {
+    const { payload, find } = makePayload({ sans: 1, mono: 2 }, [
+      { filename: 'inter.woff2', font: 1, weight: '400', style: 'normal' },
+      { filename: 'jbm.woff2', font: 2, weight: '400', style: 'normal' },
+    ])
+    const out = await getActiveFontFaces(payload, { families: ['sans', 'serif', 'mono'] })
+    expect(find).toHaveBeenCalledTimes(1) // batched, not one-per-family
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [1, 2] } })
+    expect(out.map((t) => t.family)).toEqual(['sans', 'mono']) // serif unselected → dropped, order kept
+    expect(out[0]?.faces).toEqual([{ filename: 'inter.woff2', weight: '400', style: 'normal' }])
+  })
+
+  it('handles a populated relationship object and two families sharing one typeface', async () => {
+    const { payload, find } = makePayload(
+      { sans: { id: 9 }, display: { id: 9 } }, // same typeface in two slots
+      [{ filename: 'x.woff2', font: 9, weight: '400', style: 'normal' }],
+    )
+    const out = await getActiveFontFaces(payload, { families: ['sans', 'display'] })
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [9] } }) // deduped id
+    expect(out.map((t) => t.family)).toEqual(['sans', 'display']) // both resolve
+  })
+
+  it('returns [] without querying when nothing is selected', async () => {
+    const { payload, find } = makePayload({}, [])
+    expect(await getActiveFontFaces(payload, { families: ['sans'] })).toEqual([])
+    expect(find).not.toHaveBeenCalled()
+  })
+
+  it('auto-discovers family slots from the global when `families` is omitted, skipping meta keys', async () => {
+    const { payload, find } = makePayload(
+      { id: 1, globalType: 'fontSet', createdAt: 'x', updatedAt: 'y', sans: 5, brand: 6 }, // meta + two slots
+      [
+        { filename: 's.woff2', font: 5, weight: '400', style: 'normal' },
+        { filename: 'b.woff2', font: 6, weight: '400', style: 'normal' },
+      ],
+    )
+    const out = await getActiveFontFaces(payload) // no families passed
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [5, 6] } }) // id/globalType/… filtered out
+    expect(out.map((t) => t.family)).toEqual(['sans', 'brand'])
   })
 })

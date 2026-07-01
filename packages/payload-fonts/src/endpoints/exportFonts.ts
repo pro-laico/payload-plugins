@@ -2,10 +2,13 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 
 import type { CollectionSlug, Endpoint, GlobalSlug } from 'payload'
 
+import { refId } from '../lib/refs'
+import { DEFAULT_FONT_FAMILIES } from '../lib/families'
 import { readUploadBytes } from '../lib/uploadBytes'
 
-type Role = 'sans' | 'serif' | 'mono' | 'display'
-const ROLES: Role[] = ['sans', 'serif', 'mono', 'display']
+/** A family key — `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
+type Family = string
+const DEFAULT_FAMILY_KEYS: Family[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
 
 export interface ExportFontsEndpointOptions {
   /** Mount path under the Payload API route. Default `/fonts/export` (→ `/api/fonts/export`). */
@@ -14,11 +17,13 @@ export interface ExportFontsEndpointOptions {
   fontSetGlobalSlug?: string
   /** Slug of the optimized (served) weight-file upload collection. Default `fontOptimized`. */
   fontOptimizedSlug?: string
+  /** Family keys to resolve from the `fontSet` global. Default sans/serif/mono/display. */
+  families?: Family[]
 }
 
-/** The selected typeface for a role: a populated `font` doc or its id. */
+/** The selected typeface for a family: a populated `font` doc or its id. */
 type TypefaceRef = { id?: string | number } | string | number | null
-type FontSelection = Partial<Record<Role, TypefaceRef | TypefaceRef[]>>
+type FontSelection = Partial<Record<Family, TypefaceRef | TypefaceRef[]>>
 
 /** A single exported weight file: filename, extension, mime, base64 bytes, and (optional) weight/style. */
 export type ExportedFont = {
@@ -29,10 +34,8 @@ export type ExportedFont = {
   weight?: string | null
   style?: string | null
 }
-/** JSON returned by the fonts export endpoint — an array of weight files per role. */
-export type ExportFontsResponse = { fonts: Partial<Record<Role, ExportedFont[]>> }
-
-const refId = (r: TypefaceRef): string | number | undefined => (r && typeof r === 'object' ? r.id : (r ?? undefined)) ?? undefined
+/** JSON returned by the fonts export endpoint — an array of weight files per family. */
+export type ExportFontsResponse = { fonts: Partial<Record<Family, ExportedFont[]>> }
 
 /**
  * Constant-time secret compare. Both sides are sha256-hashed to a fixed 32 bytes first, so the
@@ -45,13 +48,18 @@ function secretsMatch(provided: string, secret: string): boolean {
 }
 
 /**
- * `GET /api/fonts/export`. Resolves the active fonts from the `fontSet` global — each role
+ * `GET /api/fonts/export`. Resolves the active fonts from the `fontSet` global — each family
  * points at ONE `font` typeface — and returns the bytes of that typeface's served
  * `fontOptimized` files so the `payload-fonts-download` CLI can write them for
  * `next/font/local`. Secured by the project's `PAYLOAD_SECRET` (Bearer).
  */
 export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endpoint => {
-  const { path: endpointPath = '/fonts/export', fontSetGlobalSlug = 'fontSet', fontOptimizedSlug = 'fontOptimized' } = opts
+  const {
+    path: endpointPath = '/fonts/export',
+    fontSetGlobalSlug = 'fontSet',
+    fontOptimizedSlug = 'fontOptimized',
+    families = DEFAULT_FAMILY_KEYS,
+  } = opts
 
   return {
     path: endpointPath,
@@ -74,36 +82,51 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           slug: fontSetGlobalSlug as GlobalSlug,
           depth: 0,
           overrideAccess: true,
-        })) as FontSelection
-        selection = { sans: fontSetGlobal?.sans, serif: fontSetGlobal?.serif, mono: fontSetGlobal?.mono, display: fontSetGlobal?.display }
+          // `as unknown as` — in a project with generated types this resolves to the concrete
+          // fontSet interface, which doesn't structurally overlap a string-keyed record.
+        })) as unknown as FontSelection
+        selection = Object.fromEntries(families.map((family) => [family, fontSetGlobal?.[family]]))
       } catch {
         // no fontSet global in this project
       }
 
-      const fonts: Partial<Record<Role, ExportedFont[]>> = {}
+      const fonts: Partial<Record<Family, ExportedFont[]>> = {}
       if (selection) {
-        for (const role of ROLES) {
-          const ref = selection[role]
-          // One typeface per role (tolerate a stray array — take the first).
-          const typefaceId = refId((Array.isArray(ref) ? ref[0] : ref) ?? null)
-          if (typefaceId == null) continue
+        // One typeface per family (tolerate a stray array — take the first); fetch every family's
+        // served files in a single query grouped by typeface, rather than one round-trip per family.
+        const familyIds = families
+          .map((family) => ({
+            family,
+            id: refId((Array.isArray(selection[family]) ? (selection[family] as TypefaceRef[])[0] : selection[family]) ?? null),
+          }))
+          .filter((r): r is { family: Family; id: string | number } => r.id != null)
 
-          let optimized: Array<Record<string, unknown>> = []
+        const docsByFont = new Map<string | number, Array<Record<string, unknown>>>()
+        if (familyIds.length) {
+          const uniqueIds = [...new Set(familyIds.map((r) => r.id))]
           try {
             const res = await payload.find({
               collection: fontOptimizedSlug as CollectionSlug,
-              where: { font: { equals: typefaceId } },
+              where: { font: { in: uniqueIds } },
               depth: 0,
               limit: 1000,
               overrideAccess: true,
             })
-            optimized = res.docs as unknown as Array<Record<string, unknown>>
+            for (const doc of res.docs as unknown as Array<Record<string, unknown>>) {
+              const fontId = refId(doc.font)
+              if (fontId == null) continue
+              const bucket = docsByFont.get(fontId)
+              if (bucket) bucket.push(doc)
+              else docsByFont.set(fontId, [doc])
+            }
           } catch {
-            continue
+            // leave docsByFont empty — the response just carries no fonts
           }
+        }
 
+        for (const { family, id } of familyIds) {
           const exported: ExportedFont[] = []
-          for (const doc of optimized) {
+          for (const doc of docsByFont.get(id) ?? []) {
             const filename = typeof doc.filename === 'string' ? doc.filename : null
             if (!filename) continue
             const bytes = await readUploadBytes(payload, fontOptimizedSlug, doc as { filename?: string | null; url?: string | null })
@@ -117,7 +140,7 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
               style: (doc.style as string) ?? null,
             })
           }
-          if (exported.length) fonts[role] = exported
+          if (exported.length) fonts[family] = exported
         }
       }
 

@@ -28,7 +28,7 @@ export interface FontAssetProvider {
 }
 
 export interface FontAssetProviderOptions {
-  /** The `font` collection slug (match `fontOptions.slug` if you renamed it). @default 'font' */
+  /** The `font` collection slug (match `fontOverrides.slug` if you renamed it). @default 'font' */
   collection?: string
   /** Subdirectory under the seed assets dir holding font files. @default 'fonts' */
   subdir?: string

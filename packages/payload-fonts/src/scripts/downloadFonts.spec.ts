@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runDownloadFonts } from './downloadFonts'
 
 // A definition.ts as a previous SUCCESSFUL run would have written it — one localFont() call per
-// role, importing files under public/fonts. The bug being guarded: on a later FAILED run, this
+// family, importing files under public/fonts. The bug being guarded: on a later FAILED run, this
 // stale file (which imports font files a fresh checkout doesn't have) must be reset to empty.
 const POPULATED_DEFINITION = `import localFont from 'next/font/local'
 const fontSans = localFont({ src: [{ path: '../../public/fonts/sans-400.woff2', weight: '400', style: 'normal' }], variable: '--font-setSans' })
@@ -109,5 +109,37 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
 
     expect(hasFontDeclarations(definitionFile)).toBe(true)
     expect(fs.readFileSync(definitionFile, 'utf8')).toContain('--font-setSans')
+  })
+
+  it('generates a font<Key> export + --font-set<Key> var for a custom family key', () => {
+    process.env.PAYLOAD_SECRET = 'secret'
+    // The export endpoint keys the response by whatever families the plugin was configured with; the
+    // CLI must discover them from the response, not a hardcoded sans/serif/mono/display list.
+    const manifest = {
+      fonts: {
+        brand: [
+          {
+            filename: 'brand.woff2',
+            extension: 'woff2',
+            mimeType: 'font/woff2',
+            data: Buffer.from('abc').toString('base64'),
+            weight: '700',
+            style: 'normal',
+          },
+        ],
+      },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(manifest) } as Response)),
+    )
+
+    return runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' }).then(() => {
+      const out = fs.readFileSync(definitionFile, 'utf8')
+      expect(out).toContain('const fontBrand = localFont(')
+      expect(out).toContain("variable: '--font-setBrand'")
+      expect(out).toContain('const fonts = { fontBrand }')
+      expect(fs.existsSync(path.join(fontsOutputDir, 'brand-700.woff2'))).toBe(true)
+    })
   })
 })

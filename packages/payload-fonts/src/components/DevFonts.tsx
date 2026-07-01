@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 import { extractFonts } from '../extractFonts'
 import { buildFontFaceCss, getActiveFontFaces } from '../lib/activeFonts'
+import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
 
 export interface DevFontsProps {
   /** Your Payload config — the same `@payload-config` import you pass to `getPayload`. */
@@ -12,12 +13,15 @@ export interface DevFontsProps {
    * locally. Omit it and DevFonts always renders in dev.
    */
   definition?: Record<string, { variable?: string } | undefined>
-  /** CSS role-variable prefix; must match the download CLI's `cssVariablePrefix`. @default '--font-set' */
+  /** CSS family-variable prefix; must match the download CLI's `cssVariablePrefix`. @default '--font-set' */
   cssVarPrefix?: string
   /** Slug of the standalone font-selection global. @default 'fontSet' */
   fontSetSlug?: string
   /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
   optimizedSlug?: string
+  /** Optional. The family slots are auto-discovered from the `fontSet` global, so you only need this
+   *  if you set custom per-family `fallback` stacks and want the dev preview to match them. */
+  families?: FontFamilyConfig[]
 }
 
 /**
@@ -26,9 +30,9 @@ export interface DevFontsProps {
  * production path stock `next/font`: precise preloading, size-adjusted fallbacks, static assets.
  *
  * In development (`NODE_ENV !== 'production'`) it reads the active `fontSet` selection from Payload
- * and inlines the matching `@font-face` rules + the `--font-set*` role variables, so fonts show up
+ * and inlines the matching `@font-face` rules + the `--font-set*` family variables, so fonts show up
  * immediately with no build step — change a typeface in the admin, refresh, see it. Because it
- * emits the **same** role variables `next/font` defines in production, your app's
+ * emits the **same** family variables `next/font` defines in production, your app's
  * `font-family: var(--font-setSans)` resolves identically across environments.
  *
  * Drop it into your root layout alongside the production wiring — each is a no-op in the other
@@ -51,6 +55,7 @@ export async function DevFonts({
   cssVarPrefix,
   fontSetSlug,
   optimizedSlug,
+  families,
 }: DevFontsProps): Promise<React.ReactElement | null> {
   // Production self-hosts via next/font — never touch the runtime path there.
   if (process.env.NODE_ENV === 'production') return null
@@ -60,9 +65,13 @@ export async function DevFonts({
 
   let css = ''
   try {
+    // Only resolve `families` when explicitly given (custom fallbacks); otherwise let
+    // getActiveFontFaces auto-discover the slots from the global and use the default fallbacks.
+    const resolved = families ? resolveFontFamilies(families) : undefined
+    const fallbacks = resolved ? Object.fromEntries(resolved.map((r) => [r.key, r.fallback])) : undefined
     const payload = await getPayload({ config })
-    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug })
-    css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug })
+    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, families: resolved?.map((r) => r.key) })
+    css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug, fallbacks })
   } catch {
     return null // no DB / not seeded yet — render nothing rather than throw in the layout
   }

@@ -1,8 +1,18 @@
-import { APIError, type ArrayField, type CollectionBeforeValidateHook, type CollectionConfig, type CollectionSlug, type Field } from 'payload'
+import {
+  APIError,
+  type ArrayField,
+  type CollectionAfterReadHook,
+  type CollectionBeforeValidateHook,
+  type CollectionConfig,
+  type CollectionSlug,
+  type Field,
+} from 'payload'
 
 import { authd } from '../access/authd'
 import { cleanupFontAssetsHook, optimizeFromOriginalsHook, originalIdsFromDoc } from '../hooks/optimizeFromOriginals'
+import type { Charset } from '../hooks/optimizeFont'
 import { getFontSourceHook } from '../lib/ingest'
+import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
@@ -21,11 +31,13 @@ const createOnlyUpload = () => ({ components: { Field: { path: FontOriginalUploa
 
 export interface CreateFontCollectionOptions {
   /** Characters the subsetter keeps, or a preset ('latin' | 'latin-ext'). Default 'latin'. */
-  charset?: string
+  charset?: Charset
   /** Slug of the archival original upload collection. Default 'fontOriginal'. */
   originalSlug?: string
   /** Slug of the optimized (served) upload collection. Default 'fontOptimized'. */
   optimizedSlug?: string
+  /** The options offered by the `family` field. Default sans/serif/mono/display. */
+  families?: FontFamilyConfig[]
 }
 
 type VariableGroup = { upright?: unknown; italic?: unknown }
@@ -35,6 +47,32 @@ const hasVariable = (data: Record<string, unknown> | undefined): boolean => {
 }
 const hasWeights = (data: Record<string, unknown> | undefined): boolean =>
   Array.isArray(data?.weights) && (data.weights as Array<{ file?: unknown }>).some((w) => w?.file)
+
+/**
+ * `afterRead`: report how many served `fontOptimized` files this typeface produced, so an editor can
+ * see at a glance whether optimization succeeded — `0` means nothing was served (a swap/re-save is
+ * due, or the upload failed to subset). Skipped on list reads (`findMany`) so it's one count query
+ * on the edit view, not one per row. Populates the virtual `servedFiles` sidebar field.
+ */
+const servedFilesHook =
+  (optimizedSlug: string): CollectionAfterReadHook =>
+  async ({ doc, findMany, req }) => {
+    if (findMany || !req?.payload) return doc
+    const id = (doc as { id?: string | number }).id
+    if (id == null) return doc
+    try {
+      const { totalDocs } = await req.payload.count({
+        collection: optimizedSlug as CollectionSlug,
+        where: { font: { equals: id } },
+        overrideAccess: true,
+        req,
+      })
+      ;(doc as Record<string, unknown>).servedFiles = totalDocs
+    } catch {
+      // a count failure shouldn't break the read — just leave it unset
+    }
+    return doc
+  }
 
 /**
  * `beforeValidate`: a typeface needs at least one file, and can't mix a variable font with
@@ -92,7 +130,7 @@ const makeRejectSharedOriginals =
   }
 
 /**
- * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four role slots
+ * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four family slots
  * (sans/serif/mono/display) select one of these each.
  *
  * It is NOT itself an upload collection. Editors drop font files into standard Payload `upload`
@@ -109,6 +147,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   const fontSlug = 'font'
   const originalSlug = (opts.originalSlug || FONT_ORIGINAL_SLUG) as CollectionSlug
   const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
+  const families = resolveFontFamilies(opts.families)
 
   const fields: Field[] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
@@ -118,13 +157,28 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       required: true,
       label: 'Preferred Family',
       interfaceName: 'GenericFontFamily',
-      options: ['sans', 'serif', 'mono', 'display'],
+      options: families.map((r) => ({ label: r.label, value: r.key })),
     },
     // Transient server-side ingest input (a local path / URL via `{ file, weight, style,
     // variable }`). The `getFontSourceHook` beforeValidate uploads it to `fontOriginal`, wires
     // the slot, and strips it — never persisted. Lets a typeface be created from a file without
     // the admin's upload slot (imports, migrations, seeding via a doc's `_file`).
     { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
+    // Editor-facing status: how many web-ready files this typeface produced. Virtual (computed on
+    // read by `servedFilesHook`, never stored); shown only on an existing doc so a `0` after saving
+    // flags a failed/empty optimization instead of it failing silently.
+    {
+      name: 'servedFiles',
+      type: 'number',
+      virtual: true,
+      admin: {
+        readOnly: true,
+        position: 'sidebar',
+        description:
+          'Web-ready files generated from your uploads. 0 means nothing was served yet — re-save; if it stays 0, the upload may have failed to optimize (check server logs).',
+        condition: (data) => Boolean((data as { id?: unknown })?.id),
+      },
+    },
     {
       name: 'variable',
       type: 'group',
@@ -179,7 +233,14 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   return {
     slug: fontSlug,
     access: { create: authd, delete: authd, read: authd, update: authd },
-    admin: { group: 'Assets', useAsTitle: 'title', enableListViewSelectAPI: true, defaultColumns: ['title', 'family'] },
+    admin: {
+      group: 'Assets',
+      useAsTitle: 'title',
+      enableListViewSelectAPI: true,
+      defaultColumns: ['title', 'family'],
+      description:
+        'Upload typefaces here to add them to your library. Uploading alone doesn’t put a font on your site — activate it by picking it in Font Set.',
+    },
     timestamps: true,
     // When a font is populated as a relationship target (e.g. the `fontSet` global at depth),
     // return only its identifying metadata and NOT the `variable` / `weights` upload slots — which
@@ -194,12 +255,11 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       // On save, (re)build the served WOFF2 files from the referenced originals (and clean up
       // any original a swapped/removed slot de-referenced).
       afterChange: [optimizeFromOriginalsHook({ charset: opts.charset, originalSlug, optimizedSlug })],
+      // On read (edit view only), surface the served-file count so a failed optimize isn't silent.
+      afterRead: [servedFilesHook(optimizedSlug)],
       // Before delete, cascade to the served files + the archived originals (beforeDelete so the
       // `fontOptimized.font` relationship is still intact — see the hook).
       beforeDelete: [cleanupFontAssetsHook({ originalSlug, optimizedSlug })],
     },
   }
 }
-
-/** Default `Font` (typeface) collection. */
-export const Font: CollectionConfig = createFontCollection()

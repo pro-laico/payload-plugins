@@ -46,6 +46,3 @@ export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectio
     ],
   }
 }
-
-/** Default `fontOptimized` collection. */
-export const FontOptimized: CollectionConfig = createFontOptimizedCollection()
