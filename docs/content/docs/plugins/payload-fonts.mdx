@@ -91,8 +91,11 @@ The families are CSS variables. With Tailwind v4, map them once and use `font-sa
 <Step>
 **Generate fonts for production builds**
 
-Production self-hosts via `next/font/local`. Run the download before the build and commit an empty
-`definition.ts` so the import resolves on a fresh checkout ([reference](#serving)):
+Production self-hosts via `next/font/local`. The CLI writes the fonts + the `src/app/definition.ts`
+your layout imports — run it on `prebuild` (real fonts for the build) and `predev` (an empty stub so
+the import resolves before your dev server is up; `<DevFonts>` serves at runtime). Both outputs are
+generated, so **gitignore** `src/app/definition.ts` and `public/fonts/` — no file to hand-create
+([reference](#serving)):
 
 ```json
 // package.json
@@ -100,13 +103,14 @@ Production self-hosts via `next/font/local`. Run the download before the build a
   "scripts": {
     "build": "next build",
     "prebuild": "payload-fonts-download",
+    "predev": "payload-fonts-download",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap"
   }
 }
 ```
 
-`prebuild` authenticates against your running Payload instance, so set two env vars:
+`payload-fonts-download` authenticates against your running Payload instance, so set two env vars:
 
 ```bash
 # .env
@@ -300,8 +304,8 @@ import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
 fontsPlugin({ families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] })
 ```
 
-If you customise families, pass the same `families` to `<DevFonts>` so the dev preview reads the same
-slots and fallbacks.
+`<DevFonts>` auto-discovers the slots from the `fontSet` global, so custom families just work — pass
+`families` to it only if you set custom per-family `fallback` stacks and want the dev preview to match.
 
 ## Serving
 
@@ -342,8 +346,8 @@ precise preloading, size-adjusted fallbacks, content-hashed static assets. A bui
 { "scripts": { "prebuild": "payload-fonts-download" } }
 ```
 
-Commit an empty `definition.ts` (or add a `predev: payload-fonts-download`) so the import resolves
-before the first build.
+`definition.ts` and `public/fonts/` are generated — gitignore them. A `predev: payload-fonts-download`
+writes an empty stub so the import resolves before your dev server is up (no file to hand-create).
 
 The CLI reads these env vars. Only the first two are required:
 
@@ -382,7 +386,7 @@ export const devFontsProps = [
   { name: 'cssVarPrefix', type: 'string', default: "'--font-set'", description: `CSS family-variable prefix; must match the download CLI cssVariablePrefix.` },
   { name: 'fontSetSlug', type: 'string', default: "'fontSet'", description: `Slug of the font-selection global.` },
   { name: 'optimizedSlug', type: 'string', default: "'fontOptimized'", description: `Slug of the optimized (served) upload collection.` },
-  { name: 'families', type: 'FontFamilyConfig[]', default: 'sans / serif / mono / display', description: `Pass the same families you gave fontsPlugin, if you customised them — so the dev preview reads the same slots and per-family fallbacks. Omit it when using the default families.` },
+  { name: 'families', type: 'FontFamilyConfig[]', default: 'auto-discovered', description: `Optional. The slots are auto-discovered from the fontSet global, so you only need this to match custom per-family fallback stacks in the dev preview.` },
 ]
 
 <ConfigOptions items={devFontsProps} />

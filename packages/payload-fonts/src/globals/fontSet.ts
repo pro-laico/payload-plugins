@@ -21,7 +21,11 @@ export const createFontSetGlobal = ({
   families?: FontFamilyConfig[]
 } = {}): GlobalConfig => ({
   slug: FONT_SET_SLUG,
-  admin: { group: 'Assets' },
+  admin: {
+    group: 'Assets',
+    description:
+      'Choose which uploaded typeface fills each slot. This is what actually puts a font on your site — upload in Font first, then activate it here.',
+  },
   access: { read: authd, update: authd },
   fields: fontUploadFields({ fontSlug, families }),
 })

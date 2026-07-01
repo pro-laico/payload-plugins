@@ -19,8 +19,8 @@ export interface DevFontsProps {
   fontSetSlug?: string
   /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
   optimizedSlug?: string
-  /** The same `families` you passed to `fontsPlugin` — needed only if you customised them, so the
-   *  dev preview reads the same slots and fallbacks. @default sans/serif/mono/display */
+  /** Optional. The family slots are auto-discovered from the `fontSet` global, so you only need this
+   *  if you set custom per-family `fallback` stacks and want the dev preview to match them. */
   families?: FontFamilyConfig[]
 }
 
@@ -65,10 +65,12 @@ export async function DevFonts({
 
   let css = ''
   try {
-    const resolved = resolveFontFamilies(families)
-    const fallbacks = Object.fromEntries(resolved.map((r) => [r.key, r.fallback]))
+    // Only resolve `families` when explicitly given (custom fallbacks); otherwise let
+    // getActiveFontFaces auto-discover the slots from the global and use the default fallbacks.
+    const resolved = families ? resolveFontFamilies(families) : undefined
+    const fallbacks = resolved ? Object.fromEntries(resolved.map((r) => [r.key, r.fallback])) : undefined
     const payload = await getPayload({ config })
-    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, families: resolved.map((r) => r.key) })
+    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, families: resolved?.map((r) => r.key) })
     css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug, fallbacks })
   } catch {
     return null // no DB / not seeded yet — render nothing rather than throw in the layout

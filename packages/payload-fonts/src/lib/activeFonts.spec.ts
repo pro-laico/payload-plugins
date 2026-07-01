@@ -111,4 +111,17 @@ describe('getActiveFontFaces', () => {
     expect(await getActiveFontFaces(payload, { families: ['sans'] })).toEqual([])
     expect(find).not.toHaveBeenCalled()
   })
+
+  it('auto-discovers family slots from the global when `families` is omitted, skipping meta keys', async () => {
+    const { payload, find } = makePayload(
+      { id: 1, globalType: 'fontSet', createdAt: 'x', updatedAt: 'y', sans: 5, brand: 6 }, // meta + two slots
+      [
+        { filename: 's.woff2', font: 5, weight: '400', style: 'normal' },
+        { filename: 'b.woff2', font: 6, weight: '400', style: 'normal' },
+      ],
+    )
+    const out = await getActiveFontFaces(payload) // no families passed
+    expect(find.mock.calls[0]?.[0].where).toEqual({ font: { in: [5, 6] } }) // id/globalType/… filtered out
+    expect(out.map((t) => t.family)).toEqual(['sans', 'brand'])
+  })
 })

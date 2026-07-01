@@ -5,8 +5,6 @@ import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
 
 /** A family key. `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
 export type FontFamily = string
-/** Default family keys, used when {@link getActiveFontFaces} isn't given an explicit `families` list. */
-export const FONT_FAMILIES: FontFamily[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
 
 /** One served, subsetted WOFF2 file (a `fontOptimized` doc). */
 export interface ActiveFace {
@@ -28,9 +26,15 @@ export interface GetActiveFontFacesOptions {
   fontSetSlug?: string
   /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
   optimizedSlug?: string
-  /** Family keys to read from the selection. @default sans/serif/mono/display */
+  /** Family keys to read. Omit to auto-discover them from the `fontSet` global's own slots. */
   families?: FontFamily[]
 }
+
+/** Payload global meta keys that aren't family slots — filtered out when auto-discovering. */
+const GLOBAL_META_KEYS = new Set(['id', 'globalType', 'createdAt', 'updatedAt'])
+/** The family slots on a `fontSet` global doc: its own keys, minus Payload's metadata. */
+const familyKeysFromGlobal = (global: Record<string, unknown> | null | undefined): FontFamily[] =>
+  global ? Object.keys(global).filter((k) => !k.startsWith('_') && !GLOBAL_META_KEYS.has(k)) : []
 
 /**
  * Resolve the active `fontSet` selection to each family's served `fontOptimized` files. Used by the
@@ -40,7 +44,6 @@ export interface GetActiveFontFacesOptions {
 export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFacesOptions = {}): Promise<ActiveTypeface[]> {
   const fontSetSlug = (opts.fontSetSlug ?? 'fontSet') as GlobalSlug
   const optimizedSlug = (opts.optimizedSlug ?? 'fontOptimized') as CollectionSlug
-  const families = opts.families ?? FONT_FAMILIES
 
   let selection: Partial<Record<FontFamily, unknown>>
   try {
@@ -52,6 +55,10 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   } catch {
     return [] // fontSet global not registered
   }
+
+  // Explicit list, else auto-discover the family slots from the global itself — so a custom
+  // `families` set works here with no extra config (the global's slots are the source of truth).
+  const families = opts.families ?? familyKeysFromGlobal(selection as Record<string, unknown>)
 
   // Resolve each family's selected typeface id once, then fetch every family's served files in a
   // single query (grouped by typeface) rather than one round-trip per family.
