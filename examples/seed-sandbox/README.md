@@ -7,14 +7,14 @@ DB), local-disk uploads, and just enough collections to exercise every seed feat
 
 ## What it exercises
 
-- **Typed seed data** — `src/collections/**/seed.ts` author records with `defineCollectionSeed`,
+- **Typed seed data** — `src/collections/**/seed.ts` author records with `defineSeed`,
   typed against this app's generated `payload-types.ts`.
 - **Upload files** — `src/seed/media.ts` seeds `media` upload docs that carry their source file
   on `_file` via `file('service-a.jpg')`; other docs reference them with `ref('media', …)`.
 - **Cross-file doc references** — `Posts/seed.ts` and `SiteSettings/seed.ts` point at
   Services docs with `ref('services', 'consulting')`, creating the dependency edges the
   engine sorts on.
-- **Globals** — `site-settings` seeded via `defineGlobalSeed`.
+- **Globals** — `site-settings` seeded via `defineSeed`.
 - **Run infra** — the plugin's `POST /api/seed` endpoint + the admin SeedButton, plus a
   CLI runner (`pnpm seed`), both behind the `ENABLE_SEED` guard.
 

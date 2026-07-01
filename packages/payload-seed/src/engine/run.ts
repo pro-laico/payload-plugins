@@ -125,12 +125,15 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     if (record.file) {
       const provider = providerBySlug.get(slug)
       if (provider) {
-        const path = await resolveFilePath(record.file.name, options.assetsDir, provider.subdir ?? 'source')
+        const path = await resolveFilePath(record.file.name, options.assetsDir, [provider.subdir ?? 'source', ''])
         if (path) data = { ...data, [provider.sourceField ?? 'source']: { file: path, ...record.file.options } }
         else
           payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
       } else if (isUpload(slug)) {
-        const path = await resolveFilePath(record.file.name, options.assetsDir)
+        // A native upload resolves under its per-collection subdir (defaulting to the slug), then the
+        // assets root. Override the folder name with `assetSubDirs`.
+        const subdir = options.assetSubDirs[slug] ?? slug
+        const path = await resolveFilePath(record.file.name, options.assetsDir, [subdir, ''])
         if (path) uploadFile = await readFileAsUpload(path)
         else
           payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })

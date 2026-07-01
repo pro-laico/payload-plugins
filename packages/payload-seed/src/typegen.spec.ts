@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { defineCollectionSeed, defineGlobalSeed } from './defineCollectionSeed'
+import { defineSeed } from './defineSeed'
 import { buildSeedRegistry } from './typegen'
 
 describe('buildSeedRegistry', () => {
   const definitions = [
-    defineCollectionSeed('services' as never, () => [{ _key: 'consulting' }, { _key: 'implementation' }] as never),
-    defineCollectionSeed('posts' as never, () => [{ _key: 'launch' }] as never),
-    defineGlobalSeed('site-settings' as never, () => ({}) as never),
+    defineSeed('services' as never, () => [{ _key: 'consulting' }, { _key: 'implementation' }] as never),
+    defineSeed('posts' as never, () => [{ _key: 'launch' }] as never),
+    defineSeed('site-settings' as never, () => ({}) as never),
   ]
 
   it('augments SeedRegistry with sorted collection/global key unions', () => {
@@ -20,7 +20,7 @@ describe('buildSeedRegistry', () => {
   })
 
   it('emits `never` for empty globals', () => {
-    const out = buildSeedRegistry([defineCollectionSeed('services' as never, () => [{ _key: 'a' }] as never)])
+    const out = buildSeedRegistry([defineSeed('services' as never, () => [{ _key: 'a' }] as never)])
     expect(out).toContain('globals: never')
   })
 })

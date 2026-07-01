@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { extname, isAbsolute, join } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import type { File } from 'payload'
 
 // MIME type derived from the file's real extension — we upload whatever the source is
@@ -14,33 +14,32 @@ const MIME_BY_EXT: Record<string, string> = {
   '.svg': 'image/svg+xml',
 }
 
-const baseName = (name: string) => name.slice(0, name.length - extname(name).length)
-
-// Directories under the assets root to search for a native upload's file (in order), so a
-// record can name just `service-a.jpg` and the loader finds `assets/image/service-a.jpg`.
-const NATIVE_SUBDIRS = ['', 'image', 'images', 'svg', 'font', 'fonts']
+const stripExt = (name: string) => name.slice(0, name.length - extname(name).length)
 
 /**
- * Resolve a `_file` name to an absolute path on disk. A provider passes its `subdir` (searched
- * first, then the root); a native upload searches the built-in subdirs. Tolerates an extension
- * mismatch for image files (a name of `foo.png` picks up `foo.jpg`). Returns null when nothing
- * matches; an absolute name is returned as-is.
+ * Resolve a `_file` name to an absolute path on disk. `subdirs` is the ordered list of directories
+ * under the assets root to search — typically a collection's subdir then the root (`['media', '']`).
+ * The name may include a relative subpath (`portraits/jane.jpg`), resolved under each search dir, so
+ * a collection folder can be subdivided further. Tolerates an extension mismatch for image files (a
+ * name of `foo.png` picks up `foo.jpg`). Returns null when nothing matches; an absolute name is
+ * returned as-is.
  */
-export async function resolveFilePath(name: string, assetsRoot: string, subdir?: string): Promise<string | null> {
+export async function resolveFilePath(name: string, assetsRoot: string, subdirs: string[]): Promise<string | null> {
   if (isAbsolute(name)) return name
-  const dirs = subdir !== undefined ? [subdir, ''] : NATIVE_SUBDIRS
-  const wantBase = baseName(name)
   const { readdir } = await import('node:fs/promises')
-  for (const sub of dirs) {
-    const dir = sub ? join(assetsRoot, sub) : assetsRoot
+  const nameDir = dirname(name) // '.' for a bare filename, else the subpath (e.g. 'portraits')
+  const fileName = basename(name)
+  const wantBase = stripExt(fileName)
+  for (const sub of subdirs) {
+    const dir = join(assetsRoot, sub, nameDir)
     let entries: string[]
     try {
       entries = await readdir(dir)
     } catch {
       continue
     }
-    if (entries.includes(name)) return join(dir, name)
-    const sibling = entries.find((e) => baseName(e) === wantBase && extname(e).toLowerCase() in MIME_BY_EXT)
+    if (entries.includes(fileName)) return join(dir, fileName)
+    const sibling = entries.find((e) => stripExt(e) === wantBase && extname(e).toLowerCase() in MIME_BY_EXT)
     if (sibling) return join(dir, sibling)
   }
   return null

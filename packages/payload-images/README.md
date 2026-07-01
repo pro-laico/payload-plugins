@@ -245,20 +245,20 @@ collection you'd build yourself:
 The `images` collection is a normal Payload upload, so it seeds natively through
 [`@pro-laico/payload-seed`](../payload-seed) — no asset provider needed (unlike
 `@pro-laico/payload-mux`, whose bytes live in Mux). Seed it like any collection:
-`defineCollectionSeed('images', …)`, each record carrying its source file on `_file`
+`defineSeed('images', …)`, each record carrying its source file on `_file`
 via the `file()` token, and referenced from a page with `ref('images', …)`:
 
 ```ts
-import { defineCollectionSeed, seedPlugin } from '@pro-laico/payload-seed'
+import { defineSeed, seedPlugin } from '@pro-laico/payload-seed'
 import { imagesPlugin } from '@pro-laico/payload-images'
 
 // seed/images.ts — each doc carries its file on `_file`; focal points drive the on-demand crops
-const images = defineCollectionSeed('images', ({ file }) => [
+const images = defineSeed('images', ({ file }) => [
   { _key: 'hero', _file: file('hero.jpg'), alt: 'Hero', focalX: 78, focalY: 32 },
 ])
 
 // seed/pages.ts — reference a seeded image by ref (an upload-field relationship)
-const pages = defineCollectionSeed('pages', ({ ref }) => [
+const pages = defineSeed('pages', ({ ref }) => [
   { _key: 'home', title: 'Home', heroImage: ref('images', 'hero') },
 ])
 

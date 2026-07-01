@@ -51,7 +51,7 @@ collection (`upload.mimeTypes = ['image/svg+xml']`), three things come for free:
 - **Seeding** works through `@pro-laico/payload-seed`'s native upload path — an icon is just a
   seeded doc that carries its SVG on `_file`, uploaded via `payload.create({ file })`, which runs
   `formatSVGHook` just like an admin upload would. Nothing icon-specific to add: you seed the `icon`
-  collection with `defineCollectionSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }])`
+  collection with `defineSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }])`
   and reference a doc with `ref('icon', 'star')`. (Contrast `@pro-laico/payload-mux`, which needs a
   real *asset provider* seam because `mux-video` is **not** an upload collection — it ingests to an
   external service via a `source` field. Icons need none of that.)

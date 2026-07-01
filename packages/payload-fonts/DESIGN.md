@@ -90,7 +90,7 @@ pattern:
   (`{ collection: 'font', subdir: 'fonts' }`). The seed engine resolves a `font` record's `_file`
   under `<assetsDir>/fonts/` first (like image-asset uploads) and clears the `font` collection via
   `payload.delete` so its `afterDelete` cascade removes the originals + optimized.
-- A typeface is seeded like any doc: `defineCollectionSeed('font', ({ file }) => [...])` with the
+- A typeface is seeded like any doc: `defineSeed('font', ({ file }) => [...])` with the
   file on `_file` via the seed package's `file('inter.woff2', { weight, style, variable })` token.
   The engine resolves it to `{ file: <abs path>, ...options }` and hands it to the provider — exactly
   the `source` value the hook consumes — so the seed engine needs zero font-specific code.

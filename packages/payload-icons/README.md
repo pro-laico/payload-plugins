@@ -111,16 +111,16 @@ without consumers stripping the extension client-side. A `forceSelect` keeps its
 ## Seeding with `@pro-laico/payload-seed`
 
 Because `icon` is a standard upload collection, it seeds **natively** — no script. Seed it like any
-other collection with `defineCollectionSeed`: each record carries its source SVG on the `_file`
-meta-key via the `file()` token. Put your source `.svg` files in the seed assets dir (the loader
-searches the `svg/` subdir, so `assets/svg/star.svg` resolves from `file('star.svg')`):
+other collection with `defineSeed`: each record carries its source SVG on the `_file`
+meta-key via the `file()` token. Put your source `.svg` files in the collection's folder under the
+seed assets dir (named after the slug, so `assets/icon/star.svg` resolves from `file('star.svg')`):
 
 ```ts
 // seed/icons.ts — each icon doc carries its SVG on `_file`
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-// assets/svg/star.svg, assets/svg/check.svg
-export default defineCollectionSeed('icon', ({ file }) => [
+// assets/icon/star.svg, assets/icon/check.svg
+export default defineSeed('icon', ({ file }) => [
   { _key: 'star', _file: file('star.svg') },
   { _key: 'check', _file: file('check.svg') },
 ])

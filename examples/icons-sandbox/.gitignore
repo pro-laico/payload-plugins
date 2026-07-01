@@ -13,7 +13,7 @@ out
 /icon/
 media/
 
-# NOTE: seed-assets/svg/*.svg ARE committed — they're the small demo icons the seed uploads.
+# NOTE: seed-assets/icon/*.svg ARE committed — they're the small demo icons the seed uploads.
 
 .env
 .env*.local

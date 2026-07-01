@@ -100,7 +100,7 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
 
 // in a seed file — the engine hands the _file to the mux-video ingest hook:
-// defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
+// defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 ```
 
 `muxAssetProvider()` returns plain config — `{ collection: 'mux-video', subdir: 'video' }` — the seed

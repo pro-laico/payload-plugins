@@ -10,6 +10,8 @@
  *     Reference table and the TypeScript code, not a hidden tab).
  *   - `<Steps>` / `<Step>` / `<Cards>` → unwrapped (their markdown children kept).
  *   - `<Callout>` → a blockquote. `<Card title href>` → a markdown link.
+ *   - `<Accordion title="…">` → an `###` heading (the title) followed by its children, so a
+ *     collapsed section keeps its structure in the flattened markdown.
  *
  * The inline data (`export const …`) is pure literal config, so it's evaluated with `new Function`
  * at build time on our own trusted content. Anything unrecognized is unwrapped rather than dropped.
@@ -24,6 +26,7 @@ interface AnyNode {
   type: string
   name?: string
   value?: unknown
+  depth?: number
   children?: AnyNode[]
   attributes?: Array<{ type?: string; name?: string; value?: unknown }>
 }
@@ -143,6 +146,12 @@ function rewriteJsx(node: AnyNode, scope: Record<string, unknown>): AnyNode[] {
       const href = attrSource(node, 'href') ?? ''
       const desc = attrSource(node, 'description')
       return [html(`- [${title}](${href})${desc ? ` — ${desc}` : ''}`)]
+    }
+    case 'Accordion': {
+      // Keep the collapsed section's title as a heading so the flattened markdown stays structured.
+      const title = attrSource(node, 'title')
+      const heading: AnyNode = { type: 'heading', depth: 3, children: [{ type: 'text', value: title }] }
+      return [...(title ? [heading] : []), ...inner()]
     }
     default:
       // Tabs / Steps / Step / Cards / Accordions / anything unknown → unwrap, keep the children.

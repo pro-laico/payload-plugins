@@ -44,8 +44,8 @@ inline and tinted via CSS `color`.
 
 Because `icon` is a standard upload collection, it seeds **natively** through
 [`@pro-laico/payload-seed`](../../packages/payload-seed) — no asset provider, no custom script. The
-sample SVGs live in `seed-assets/svg/` (committed), declared in `src/seed/icons.ts` with
-`defineCollectionSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }, …])`;
+sample SVGs live in `seed-assets/icon/` (committed), declared in `src/seed/icons.ts` with
+`defineSeed('icon', ({ file }) => [{ _key: 'star', _file: file('star.svg') }, …])`;
 `src/seed/pages.ts` references one via `ref('icon', 'star')`.
 
 ```bash
@@ -54,7 +54,7 @@ sample SVGs live in `seed-assets/svg/` (committed), declared in `src/seed/icons.
 # icon collection (optimizing it), then creates the page that references one.
 ```
 
-The engine resolves each icon doc's `_file` to a file under `seed-assets/svg/`, uploads it to the
+The engine resolves each icon doc's `_file` to a file under `seed-assets/icon/`, uploads it to the
 `icon` collection (running the optimize hook), and resolves `ref('icon', 'star')` to the created
 icon's id. Reseeds clear the `icon` collection first, so the run is idempotent. Icons seed as
 ordinary docs — this sandbox's seed never couples the seed package to the icons package.

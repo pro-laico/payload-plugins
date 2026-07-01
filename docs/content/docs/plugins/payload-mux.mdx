@@ -327,7 +327,7 @@ return the asset — is exported too, for when you have a Mux client and want th
 ### Declarative seeding
 
 For declarative seeding, the plugin exports `muxAssetProvider()` so a `mux-video` seeds **like any
-other doc** via [`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers) —
+other doc** via [`@pro-laico/payload-seed`](/docs/plugins/payload-seed#asset-providers) —
 its clip rides on the record's `_file` (the `file()` token) and the normal seed flow runs it, no script:
 
 ```ts
@@ -337,7 +337,7 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })]
 
 // then in a seed file — the engine hands the _file to the mux-video ingest hook:
-// defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
+// defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
 // reference it from other docs with ref('mux-video', 'intro')
 ```
 
@@ -345,7 +345,7 @@ plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], assetProv
 both ways: the seed package never imports this one, nor the Mux SDK; the upload runs in this plugin's
 hook. Playback policy comes from the plugin's `uploadSettings.new_asset_settings`, so seeded and
 admin-uploaded videos share one policy. See the
-[seed plugin docs](/docs/plugins/payload-seed#external-assets-asset-providers) for the full reference.
+[seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.
 
 ## Exports
 

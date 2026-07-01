@@ -1,6 +1,6 @@
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('services', ({ ref }) => [
+export default defineSeed('services', ({ ref }) => [
   {
     _key: 'consulting',
     title: 'Consulting',

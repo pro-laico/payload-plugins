@@ -21,7 +21,7 @@ Three pieces deliver that, and the rest of this page covers them in order:
   theming — and stored as an inline-ready `svgString`.
 - **An [`<Icon>` component](#icon-1).** A drop-in server component that fetches an icon by name and
   inlines its SVG, so a class-driven, recolorable icon is one import away.
-- **Declarative [seeding](#seeding).** Seed icons like any collection with `defineCollectionSeed`,
+- **Declarative [seeding](#seeding).** Seed icons like any collection with `defineSeed`,
   each record carrying its source SVG on `_file` — natively through
   [`@pro-laico/payload-seed`](/docs/plugins/payload-seed), no script, no provider.
 
@@ -284,17 +284,17 @@ and tone axes.
 ## Seeding
 
 Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike
-`payload-mux`) no asset provider. Seed it like any other collection with `defineCollectionSeed`:
+`payload-mux`) no asset provider. Seed it like any other collection with `defineSeed`:
 each record carries its source SVG on the `_file` meta-key via the `file()` token. Drop your source
-`.svg` files in the seed assets dir (the loader searches the `svg/` subdir, so `assets/svg/star.svg`
-resolves from `file('star.svg')`):
+`.svg` files in the collection's folder under the seed assets dir (named after the slug, so
+`assets/icon/star.svg` resolves from `file('star.svg')`):
 
 ```ts
 // seed/icons.ts — each icon doc carries its SVG on `_file`
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-// assets/svg/star.svg, assets/svg/check.svg
-export default defineCollectionSeed('icon', ({ file }) => [
+// assets/icon/star.svg, assets/icon/check.svg
+export default defineSeed('icon', ({ file }) => [
   { _key: 'star', _file: file('star.svg') },
   { _key: 'check', _file: file('check.svg') },
 ])
@@ -305,9 +305,9 @@ seed with `ref('icon', 'star')` — e.g. a page's icon relationship:
 
 ```ts
 // seed/pages.ts
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('pages', ({ ref }) => [
+export default defineSeed('pages', ({ ref }) => [
   { _key: 'home', title: 'Home', icon: ref('icon', 'star') },
 ])
 ```

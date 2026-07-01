@@ -117,15 +117,15 @@ plugins: [
 
 ```ts
 // seed/fonts.ts — files live in <assetsDir>/fonts/
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('font', ({ file }) => [
+export default defineSeed('font', ({ file }) => [
   { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
 ])
 
 // seed/fontSet.ts — pick the active typeface per role
-import { defineGlobalSeed } from '@pro-laico/payload-seed'
-export const fontSet = defineGlobalSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
+import { defineSeed } from '@pro-laico/payload-seed'
+export const fontSet = defineSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
 ```
 
 The provider is plain config — the seed package never imports this one, nor `fontkit`/`subset-font`;

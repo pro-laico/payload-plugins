@@ -9,10 +9,10 @@
  *
  *   seedPlugin({ definitions: [fonts, fontSet], assetProviders: [fontAssetProvider()] })
  *
- *   defineCollectionSeed('font', ({ file }) => [
+ *   defineSeed('font', ({ file }) => [
  *     { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
  *   ])
- *   defineGlobalSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
+ *   defineSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
  *
  * The `_file` options (`weight` / `style` / `variable`) are merged into the `source` value the
  * `font` collection's ingest hook consumes.

@@ -71,7 +71,7 @@ referencing one of them with `ref('images', …)`.
 # 2. Start the app and click "Seed your database" in the admin header (or POST /api/seed)
 ```
 
-The engine uploads `seed-assets/image/*.png` into `images` (carrying each record's focal
+The engine uploads `seed-assets/images/*.png` into `images` (carrying each record's focal
 point), then creates the page and resolves `ref('images', 'lighthouse')` to the created id.
 Reseeds clear the collections via `payload.delete`, so variants cascade away too.
 

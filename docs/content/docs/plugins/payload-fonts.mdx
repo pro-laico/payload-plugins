@@ -311,7 +311,7 @@ await ingestFont(payload, { source: '/path/to/Inter.woff2', title: 'Inter', fami
 ## Seeding
 
 The plugin exports `fontAssetProvider()` so a typeface seeds **like any doc** via
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#external-assets-asset-providers) — a `font`
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed#asset-providers) — a `font`
 record carries its source file on `_file` with the `file()` token, run by the normal seed flow, no
 script. The provider is plain config (the seed package never imports this one, nor `fontkit` /
 `subset-font`; the upload + subset run in this plugin's hooks), so the two packages stay decoupled.
@@ -328,17 +328,17 @@ plugins: [
 
 ```ts
 // seed/fonts.ts — files live in <assetsDir>/fonts/
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('font', ({ file }) => [
+export default defineSeed('font', ({ file }) => [
   { _key: 'inter', _file: file('inter.woff2', { weight: '400' }), title: 'Inter', family: 'sans' },
 ])
 
 // seed/fontSet.ts — pick the active typeface per role with ordinary ref() tokens
-import { defineGlobalSeed } from '@pro-laico/payload-seed'
-export const fontSet = defineGlobalSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
+import { defineSeed } from '@pro-laico/payload-seed'
+export const fontSet = defineSeed('fontSet', ({ ref }) => ({ sans: ref('font', 'inter') }))
 ```
 
 A reseed clears the `font` collection via `payload.delete`, so its cascade removes the old originals
 + optimized too (idempotent). See the
-[seed plugin docs](/docs/plugins/payload-seed#external-assets-asset-providers) for the full reference.
+[seed plugin docs](/docs/plugins/payload-seed#asset-providers) for the full reference.

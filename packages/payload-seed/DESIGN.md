@@ -52,9 +52,9 @@ export const plugins = [
 
 ```ts
 // src/collections/Media/seed.ts — an upload doc carries its source file on `_file`
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('media', ({ file }) => [
+export default defineSeed('media', ({ file }) => [
   {
     _key: 'serviceImg',                 // local ref handle (free string; codegen reads these)
     _file: file('service-a.jpg'),       // source file → uploaded as this doc's file
@@ -65,9 +65,9 @@ export default defineCollectionSeed('media', ({ file }) => [
 
 ```ts
 // src/collections/Posts/seed.ts  (a different file, referencing the docs above)
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('posts', ({ ref }) => [
+export default defineSeed('posts', ({ ref }) => [
   {
     _key: 'launch',
     title: 'We launched',
@@ -77,19 +77,24 @@ export default defineCollectionSeed('posts', ({ ref }) => [
 ])
 ```
 
-Globals use a sibling helper:
+Globals use the same helper — pass a global slug and the builder returns a single object (no `_key`):
 
 ```ts
-export default defineGlobalSeed('header', ({ ref }) => ({ /* HeaderGlobal data */ }))
+export default defineSeed('header', ({ ref }) => ({ /* HeaderGlobal data */ }))
 ```
 
 ## Type model
 
-- `defineCollectionSeed<TSlug extends CollectionSlug>(slug, builder)` returns
-  `RequiredDataFromCollectionSlug<TSlug>[]` (Payload's own generic, keyed to the app's
-  generated types) — **except** relationship and upload fields are widened to also
-  accept `Ref` tokens, plus an optional `_key` handle and an optional `_file` meta-key.
-  This is the "change the schema → TS error" guarantee.
+- `defineSeed<TSlug extends CollectionSlug | GlobalSlug>(slug, builder)` is a single call
+  signature (not an overload set) whose builder shape is a conditional keyed on the slug: a
+  collection slug returns `RequiredDataFromCollectionSlug<TSlug>[]`, a global slug returns
+  `DataFromGlobalSlug<TSlug>` (Payload's own generics, keyed to the app's generated types) —
+  **except** relationship and upload fields are widened to also accept `Ref` tokens, plus (for
+  collection records) an optional `_key` handle and an optional `_file` meta-key. Because the
+  slug is pinned before the builder is checked, the conditional collapses to one concrete branch,
+  so a bad field reports against the resolved record type. This is the "change the schema → TS
+  error" guarantee. Collection vs global is classified at runtime from the builder's shape (array
+  vs object) to set the definition's `kind`.
 - `ref<C extends keyof SeedRegistry['collections']>(collection, key)` where
   `key: SeedRegistry['collections'][C]`. `SeedRegistry` is an augmentable interface
   (empty in the package; filled by codegen). When augmented, the key is checked against
@@ -157,7 +162,8 @@ revalidates after seeding (redeploy / manual), or it's a local/dev DB.
 
 ## What stays the app's responsibility
 
-- The source files in `assets/image|svg|font/` (referenced by each doc's `_file`); their
+- The source files under the assets dir, in a per-collection folder named after the slug
+  (`assets/<collection>/`, overridable via `assetSubDirs`), referenced by each doc's `_file`; their
   metadata (alt, focal point) lives on the seed record as ordinary fields.
 - The actual seed content (the `seed.ts` files), and wiring their definitions into
   `seedPlugin({ definitions })` (e.g. via a `plugins/` barrel).
@@ -175,8 +181,8 @@ normal engine run (no script):
 ```ts
 seedPlugin({ definitions: [videos, pages], assetProviders: [muxAssetProvider()] })
 
-defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
-defineCollectionSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
+defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
+defineSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
 ```
 
 Responsibilities split by ownership — the **ingest** (the SDK work) lives in the owning plugin;

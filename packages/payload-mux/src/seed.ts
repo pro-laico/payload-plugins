@@ -30,8 +30,8 @@ export interface MuxAssetProviderOptions {
  *
  * Then a video is seeded like any doc, with its file on the `_file` meta-key:
  *
- *   defineCollectionSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
- *   defineCollectionSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
+ *   defineSeed('mux-video', ({ file }) => [{ _key: 'intro', _file: file('intro.mp4'), title: 'Intro' }])
+ *   defineSeed('pages', ({ ref }) => [{ _key: 'home', heroVideo: ref('mux-video', 'intro') }])
  */
 export const muxAssetProvider = (options: MuxAssetProviderOptions = {}): MuxAssetProvider => ({
   collection: options.collection ?? 'mux-video',

@@ -11,21 +11,21 @@ pnpm add @pro-laico/payload-seed
 
 ## Use
 
-**1. Write seed files.** One default export per collection/global; give each record a
-`_key`. An upload doc carries its source file on `_file` via `file()`; point at other docs
-with `ref()`:
+**1. Write seed files.** One `defineSeed` default export per collection or global (it infers
+which from the slug); give each collection record a `_key`. An upload doc carries its source file
+on `_file` via `file()`; point at other docs with `ref()`:
 
 ```ts
 // collections/Media/seed.ts — each upload doc carries its file on `_file`
-import { defineCollectionSeed } from '@pro-laico/payload-seed'
+import { defineSeed } from '@pro-laico/payload-seed'
 
-export default defineCollectionSeed('media', ({ file }) => [
+export default defineSeed('media', ({ file }) => [
   { _key: 'serviceImg', _file: file('service-a.jpg'), alt: 'Consulting' },
   { _key: 'postCover', _file: file('post-cover.jpg'), alt: 'Cover' },
 ])
 
 // collections/Posts/seed.ts — point at other seeded docs with ref()
-export default defineCollectionSeed('posts', ({ ref }) => [
+export default defineSeed('posts', ({ ref }) => [
   { _key: 'launch', title: 'We launched', heroImage: ref('media', 'postCover'), relatedService: ref('services', 'consulting') },
 ])
 ```
@@ -94,12 +94,12 @@ plugins: [
 ```ts
 // seed/videos.ts — a mux-video doc; its file rides on `_file`, uploaded to Mux, then the doc
 // is created with its metadata. Playback policy comes from muxVideoPlugin's uploadSettings.
-export default defineCollectionSeed('mux-video', ({ file }) => [
+export default defineSeed('mux-video', ({ file }) => [
   { _key: 'intro', _file: file('intro.mp4'), title: 'Intro', posterTimestamp: 3 },
 ])
 
 // seed/pages.ts — reference it like any other doc; the engine seeds the video first
-export default defineCollectionSeed('pages', ({ ref }) => [
+export default defineSeed('pages', ({ ref }) => [
   { _key: 'home', title: 'Home', heroVideo: ref('mux-video', 'intro') },
 ])
 ```
