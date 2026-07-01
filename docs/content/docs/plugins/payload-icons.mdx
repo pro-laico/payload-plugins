@@ -1,6 +1,6 @@
 ---
 title: "payload-icons"
-description: "A fully custom icon set in Payload CMS that's as easy to use as Lucide — and anyone in the admin can add to it."
+description: "A fully custom icon set in Payload CMS that's as easy to use as Lucide, and anyone in the admin can add to it."
 ---
 
 `@pro-laico/payload-icons` makes it as easy to create a completely custom icon set as using an off-the-shelf
@@ -11,7 +11,7 @@ breaking anything and maintaining optimizations.
 
 You upload an `.svg` in the admin; the plugin optimizes, sanitizes, and themes it on save, then a single
 `<Icon name="…" />` server component drops it into any page as a real, inline `<svg>` that recolors
-from CSS — no sprite sheet, no wrapper file, no untrusted markup reaching the browser.
+from CSS. No sprite sheet, no wrapper file, no untrusted markup reaching the browser.
 
 ```bash
 pnpm add @pro-laico/payload-icons
@@ -19,13 +19,21 @@ pnpm add @pro-laico/payload-icons
 
 ## How it works
 
+<Callout type="info">
+  **Mental model.** Icons are a shared pool of SVGs. An **icon set** maps a lookup `name`
+  (`arrow-right`) to an icon in that pool. One set is **active**, and `<Icon name>` resolves against
+  it, so the *set entry's* name is the lookup key, **not the uploaded filename**. Swap which set is
+  active and every icon re-skins at once. Uploading an icon isn't enough on its own; it renders once
+  an **active, published** set points a name at it.
+</Callout>
+
 The pieces:
 
-- **An [`icon` collection](#icon)** — SVG-only uploads, optimized + sanitized + themed on save.
-- **An [`iconSet` collection](#iconset)** — named `name → icon` mappings with a single-active toggle. The frontend renders the **active** set, so activating a different one re-skins every icon at once.
-- **An [`<Icon>` component](#icon-1)** — resolves a name through the active set and inlines a real, recolorable `<svg>`.
-- **[Icon usage detection](#icon-usage-detection)** — the admin panel scans your code (live in dev) plus tracks runtime misses, surfacing which icons you need and which a set is still missing.
-- **Declarative [seeding](#seeding)** — icons seed natively via the seed plugin's `defineAssets`; no helper, no provider.
+- **An [`<Icon>` component](#icon):** resolves a name through the active set and inlines a real, recolorable `<svg>`.
+- **An [`icon` collection](#icon-1):** SVG-only uploads, optimized + sanitized + themed on save.
+- **An [`iconSet` collection](#iconset):** named `name → icon` mappings with a single-active toggle. The frontend renders the **active** set, so activating a different one re-skins every icon at once.
+- **[Icon usage detection](#icon-usage-detection):** the **Requested icons** panel scans your code (live in dev) plus tracks runtime misses, surfacing which icons you need and which a set is still missing.
+- **Declarative [seeding](#seeding):** icons seed natively via the seed plugin's `defineAssets`; no helper, no provider.
 
 ## Setup
 
@@ -43,7 +51,8 @@ export default buildConfig({
 })
 ```
 
-That registers the `icon` and `iconSet` collections — zero-config, no other wiring.
+That registers the `icon` and `iconSet` collections plus a hidden `iconRequest` diagnostics
+collection. Zero-config, no other wiring.
 </Step>
 
 <Step>
@@ -51,162 +60,49 @@ That registers the `icon` and `iconSet` collections — zero-config, no other wi
 
 Add `.svg` files to the `icon` collection in the admin. Each is optimized and sanitized on save and
 stored as `svgString` (the cleaned `<svg>…</svg>`) plus `optimized` (a short report, e.g. `SVG
-optimized: 1234 to 567 bytes (54.1% reduction)`).
+optimized: 1234 to 567 bytes (54.1% reduction)`). Uploading alone doesn't render anything yet; a set
+has to point a name at it (next step).
 </Step>
 
 <Step>
-**Create a set and activate it**
+**Create a set, name each icon, then activate and publish**
 
-Add an `iconSet`, give each entry a `name` and point it at an uploaded icon, then toggle it
-**active**. The frontend resolves `<Icon name>` through the active set, so this is what makes icons
-render — and activating a different set swaps them all at once (activating one deactivates the rest).
+Add an `iconSet`. In the **Icons** tab, add one row per icon: type a **name** and select an uploaded
+icon. The name is the lookup key `<Icon name>` uses and is **independent of the uploaded filename**,
+so type whatever you'll reference in code (it's auto kebab-cased). In **Settings**, toggle the set
+**active**, then **publish** it: sets are drafts-enabled by default, and the published frontend only
+reads a *published* active set, so a draft-only set won't show. Activating another set later swaps
+every icon at once (activating one deactivates the rest).
+</Step>
+
+<Step>
+**Render it**
+
+The active set is now resolvable. Drop the component into any server component or page:
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+// resolves `arrow-right` through the active set and inlines a real <svg>
+<Icon name="arrow-right" className="size-6 text-primary" />
+```
+
+That's the whole loop: upload → set → render. See [`<Icon>`](#icon) for props, fallbacks, and
+styling.
 </Step>
 
 </Steps>
 
-## Plugin
-
-`iconsPlugin(options?)` is the single entry point — one call registers the `icon` collection (upload
-pipeline, on-save optimizer), the `iconSet` grouping collection, and — opt-in — the `iconRequest`
-diagnostics collection. It's zero-config; options nest per collection.
-
-### Options
-
-export const options = [
-  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op — no collections are registered.` },
-  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins — never replacing them — so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
-  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
-  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
-  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel — shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
-  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget) — including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
-  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection — additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
-]
-
-Pass options to customize — the **Reference** tab is the interactive view; **TypeScript** is the
-same shape in code, every defaulted option written out.
-
-<Tabs items={['Reference', 'TypeScript']}>
-
-<Tab value="Reference" className="p-0!">
-
-<ConfigOptions items={options} />
-
-</Tab>
-
-<Tab value="TypeScript">
-
-```ts
-import { iconsPlugin } from '@pro-laico/payload-icons'
-
-// Defaulted options written out — this is what `iconsPlugin()` does with no args.
-iconsPlugin({
-  enabled: true,
-  includeIconSet: true,
-  usagePanel: true,     // the "Requested icons" panel — set false to omit
-  trackRequests: true,  // runtime miss tracking — set false to omit
-  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
-  iconOverrides: {
-    // slug: 'icon',
-    // access: { read: () => true },
-    // fields: [ /* … */ ],
-    // hooks: { /* … */ },
-  },
-  // overrides for the iconSet collection:
-  iconSetOverrides: {
-    // fields: [{ name: 'description', type: 'textarea' }],
-    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
-  },
-})
-```
-
-</Tab>
-
-</Tabs>
-
-## Collections
-
-The plugin registers the `icon` upload collection (an **Assets** group) and the `iconSet` grouping
-collection (a **Sets** group); opt into `trackRequests` and a hidden `iconRequest` diagnostics
-collection joins them. Icons accept SVG only — every upload is sanitized before storage, so a `.svg`
-is safe to inline straight onto a page.
-
-### `icon`
-
-The upload collection you add icons to. Each file is optimized and sanitized on save by the
-`formatSVGHook` `beforeChange` hook and stored inline as `svgString`. Read is **public** (icons are
-frontend assets); writes are logged-in-admin only. The admin titles each doc by `filename`.
-
-**Fields**
-
-<TypeTable
-  type={{
-    filename: { description: "The uploaded SVG (the upload). The admin useAsTitle.", type: "upload" },
-    svgString: { description: "The cleaned, sanitized <svg>…</svg>, ready to inline. Read-only output.", type: "code" },
-    optimized: { description: "Human-readable optimization report. Read-only output, shown once present.", type: "text" },
-    filesize: { description: "Updated to the optimized byte size.", type: "number" },
-  }}
-/>
-
-**Hooks**
-
-<TypeTable
-  type={{
-    formatSVGHook: { description: "Optimizes + sanitizes each uploaded SVG, folding svgString / optimized / filesize into the doc. A no-op for changes that carry no new file.", type: "beforeChange" },
-  }}
-/>
-
-On save, `formatSVGHook` runs svgo (loaded dynamically, so it never lands in a frontend or edge
-bundle) and:
-
-- **Sanitizes** untrusted SVGs — strips `<script>` elements, `on*` handlers, and `javascript:`
-  URLs. The stored string is later inlined via `dangerouslySetInnerHTML`, so this runs even when
-  geometry optimization is skipped.
-- **Optimizes** with svgo (`preset-default` + path/number cleanup, dimensions removed).
-- **Themes** by rewriting hard-coded `fill`/`stroke` to `currentColor`, so an icon takes its color
-  from CSS.
-- **Normalizes** the `viewBox` — tightened to the real path bounds and squared around the glyph's
-  center, so mismatched source artboards render consistently.
-
 <Callout type="warn">
-  Payload blocks SVG uploads by default (they're on its restricted-file-types list). This collection
-  is SVG-only and sanitizes every file before storage, so it opts in automatically via
-  `upload.allowRestrictedFileTypes` — nothing to configure.
+  **Seeing the fallback glyph instead of your icon?** Check, in order: (1) a set is **active**,
+  (2) it's **published** (not just saved as a draft), (3) the row **name** exactly matches the `name`
+  you pass to `<Icon>` (both are kebab-cased). A name with no match in the active set always renders
+  the fallback, never nothing.
 </Callout>
-
-<Callout type="info">
-  SVGs using `transform` / `clip-path` skip the geometry rewrite (it can't be applied safely) but
-  are still sanitized before storage.
-</Callout>
-
-### `iconSet`
-
-A named, ordered `name → icon` mapping into the shared `icon` pool, with a single-active toggle. Build
-a second set — a different `arrow-right`, a heavier weight, a seasonal pack — and flip it active to
-re-skin every icon at once, without touching the frontend. Writes and reads are logged-in-admin only;
-drafts / versions are on by default (toggle with `drafts`). Lives under a **Sets** admin group.
-
-- **Settings tab** — the `active` toggle and `title` (plus any `fields` you add, and the opt-in [usage panel](#icon-usage-detection)).
-- **Icons tab** — the `iconsArray`: one row per icon, each a `name` (auto kebab-cased — what the
-  frontend looks up) and an `icon` upload relationship into the `icon` collection.
-
-<Callout type="info">
-  Only one set is active at a time. Activating a set runs a `beforeChange` hook that deactivates the
-  others **within the same status lane** — so staging a new active set as a *draft* (with live
-  preview) doesn't disturb the live published set; the swap goes live only on publish. The hook runs
-  in the same transaction and rolls back on failure, so you never end up with two active sets.
-  Self-contained — a plain checkbox, no external dependency.
-</Callout>
-
-### `iconRequest`
-
-Opt-in via `trackRequests`. A hidden diagnostics collection: every icon name that fails to resolve at
-runtime is recorded (throttled, fire-and-forget) with a hit `count` and `first`/`lastRequestedAt`
-timestamps — the runtime counterpart to the static scan, capturing dynamic names a static pass can't
-see. Surfaced in the IconSet [usage panel](#icon-usage-detection), not browsed directly.
 
 ## `<Icon>`
 
-The frontend surface — one import, no wrapper file. The `<Icon>` server component resolves `name`
+The frontend surface: one import, no wrapper file. The `<Icon>` server component resolves `name`
 through the **active set** and inlines the matched icon as a real `<svg>`: your `className`/props win
 over the SVG's intrinsic attributes, and it inherits CSS `color` via `currentColor`. Import from the
 `components/Icon` subpath:
@@ -219,17 +115,23 @@ import { Icon } from '@pro-laico/payload-icons/components/Icon'
 
 <Callout type="info">
   It's an async **server component** (it queries Payload), so render it in a server component / page.
-  It resolves your config via the `@payload-config` alias that `withPayload` sets up — the standard
-  Next + Payload setup — so there's nothing to wire. When `name` isn't in the active set it renders
+  It resolves your config via the `@payload-config` alias that `withPayload` sets up (the standard
+  Next + Payload setup), so there's nothing to wire. When `name` isn't in the active set it renders
   the `fallback` you pass (or a small built-in warning glyph), never nothing.
+</Callout>
+
+<Callout type="info">
+  **Accessibility.** `<Icon>` renders `aria-hidden` by default, which is right for decorative icons. When the
+  icon carries meaning (e.g. it's the only content of a button), pass `aria-hidden={false}` plus an
+  `aria-label` or a `<title>`; your props always win over the defaults.
 </Callout>
 
 ### Props
 
 export const iconProps = [
-  { name: 'name', type: 'string', required: true, description: `The name to render — matched against each entry's name in the active iconSet's iconsArray. Resolved server-side through the active set.` },
+  { name: 'name', type: 'string', required: true, description: `The name to render, matched against each entry's name in the active iconSet's iconsArray. Resolved server-side through the active set.` },
   { name: 'fallback', type: 'string', default: 'built-in warning glyph', description: `Optional SVG string rendered when name doesn't match any icon in the active set. Omit it to use the built-in warning glyph.` },
-  { name: '...svgProps', type: 'SVGAttributes', description: `Any SVG attribute (className, style, width, …) spread onto the rendered svg — winning over the source's intrinsic attributes.` },
+  { name: '...svgProps', type: 'SVGAttributes', description: `Any SVG attribute (className, style, width, …) spread onto the rendered svg, winning over the source's intrinsic attributes.` },
 ]
 
 <Tabs items={['Reference', 'TypeScript']}>
@@ -259,7 +161,7 @@ import { Icon } from '@pro-laico/payload-icons/components/Icon'
 
 ### Rendering it yourself
 
-`<Icon>` is just `getIconSvg` (from the `cache` subpath — server-only, memoized per request) composed
+`<Icon>` is just `getIconSvg` (from the `cache` subpath, server-only and memoized per request) composed
 with the pure `extractSvg*` helpers. Call `getIconSvg(name, draft)` yourself to render an icon in your
 own markup (memoized, so a page calling it many times is still one query):
 
@@ -285,7 +187,7 @@ in draft mode), so you never render an unpublished set.
 ### Styling with CVA + Tailwind
 
 Because the optimizer rewrites fills to `currentColor` and `<Icon>` forwards `className` straight
-onto the `<svg>`, one source SVG recolors and resizes from class names alone — no custom wrapper
+onto the `<svg>`, one source SVG recolors and resizes from class names alone, with no custom wrapper
 needed. Pair `<Icon>` with [`class-variance-authority`](https://cva.style) to turn `size` / `tone`
 props into classes, one variant per line so the axes stay legible:
 
@@ -323,7 +225,7 @@ const iconClass = cva('inline-block shrink-0', {
 ```tsx
 import { Icon } from '@pro-laico/payload-icons/components/Icon'
 
-// One source SVG, every variant — the cva className recolors and resizes it.
+// One source SVG, every variant; the cva className recolors and resizes it.
 <Icon name="star" className={iconClass({ size: 'sm' })} />
 <Icon name="star" className={iconClass({ size: 'lg', tone: 'primary' })} />
 <Icon name="star" className={iconClass({ size: 'xl', tone: 'destructive' })} />
@@ -334,9 +236,9 @@ import { Icon } from '@pro-laico/payload-icons/components/Icon'
 </Tabs>
 
 The [`icons-sandbox` example](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
-ships the full version — a presentational `Icon` (CVA over the inline `<svg>`) plus a name-based
-`CmsIcon` server wrapper — and a showcase page that renders one source SVG across the variant, size,
-and tone axes.
+ships the full version: a presentational `Icon` (CVA over the inline `<svg>`) plus a name-based
+`CmsIcon` server wrapper, along with a showcase page that renders one source SVG across the variant,
+size, and tone axes.
 
 ## Icon Usage Detection
 
@@ -346,13 +248,13 @@ which icons a project actually needs.
 **Fix:** the admin **Requested icons** panel (on by default) lists missing vs present names, from two
 sources:
 
-- **Static scan** — greps your source for literal `<Icon name="…">`, flagging missing names with
-  `file:line`. **In dev the panel scans live** — nothing to set up or run. For **production** (source
+- **Static scan:** greps your source for literal `<Icon name="…">`, flagging missing names with
+  `file:line`. **In dev the panel scans live**, so there's nothing to set up or run. For **production** (source
   isn't on disk at runtime) run `payload-icons-scan` in your build to write an
   `icon-usage-manifest.json` the panel reads there.
-- **Runtime** — on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
-  `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection — hit
-  counts, last-seen, a clear button.
+- **Runtime:** on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
+  `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
+  counts, last-seen, and a clear button.
 
 Both are on with `iconsPlugin()`; pass `usagePanel: false` / `trackRequests: false` to omit either.
 
@@ -361,14 +263,14 @@ payload-icons-scan            # production/CI: scans ./src and ./app; -o sets th
 ```
 
 <Callout type="info">
-  Scan sees **literal** names only — `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
+  Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
   `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
   (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
 </Callout>
 
 ## Revalidation
 
-The plugin does none — `<Icon>` reads via `payload.find` (memoized per request), so a **statically
+The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
 rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
 the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
 `revalidatePath`) through the collections' [`hooks`](#options) option.
@@ -376,21 +278,21 @@ the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hoo
 ## Seeding
 
 Because `icon` is a plain Payload upload collection, it seeds **natively** through
-[`@pro-laico/payload-seed`](/docs/plugins/payload-seed)'s normal `asset()` flow — no plugin-specific
-helper, and (unlike `payload-mux`) no provider. Declare the source `.svg` files as assets, point the
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed)'s normal `asset()` flow, with no plugin-specific
+helper and (unlike `payload-mux`) no provider. Declare the source `.svg` files as assets, point the
 seed plugin's uploads at the `icon` collection, and seed an **active** set that references them by token:
 
 ```ts
 import { defineAssets, defineSeed, seedPlugin } from '@pro-laico/payload-seed'
 import { iconsPlugin } from '@pro-laico/payload-icons'
 
-// seed/icons.ts — uploaded FIRST; each runs the optimize/sanitize hook on the way in
+// seed/icons.ts: uploaded FIRST; each runs the optimize/sanitize hook on the way in
 const icons = defineAssets({
   'arrow-right': { file: 'arrow-right.svg' },
   check: { file: 'check.svg' },
 })
 
-// seed/iconSets.ts — an active set wiring names to the uploaded icons by token
+// seed/iconSets.ts: an active set wiring names to the uploaded icons by token
 const iconSets = defineSeed('iconSet', ({ asset }) => [
   {
     _key: 'default',
@@ -411,16 +313,158 @@ plugins: [
 ]
 ```
 
-Uploaded icons don't render until that active set points at them — `active: true` makes it live,
+Uploaded icons don't render until that active set points at them: `active: true` makes it live,
 `_status: 'published'` makes it visible to the published frontend. See the
 [`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
 app for a full working setup.
+
+## Plugin
+
+`iconsPlugin(options?)` is the single entry point. One call registers the `icon` collection (upload
+pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
+collection. It's zero-config: the usage panel and request tracking are on by default; set them
+`false` to omit.
+
+### Options
+
+export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
+  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
+  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
+  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
+  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
+  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
+  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection: additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
+]
+
+Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
+same shape in code, every defaulted option written out.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={options} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+
+// Defaulted options written out. This is what `iconsPlugin()` does with no args.
+iconsPlugin({
+  enabled: true,
+  includeIconSet: true,
+  usagePanel: true,     // the "Requested icons" panel; set false to omit
+  trackRequests: true,  // runtime miss tracking; set false to omit
+  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
+  iconOverrides: {
+    // slug: 'icon',
+    // access: { read: () => true },
+    // fields: [ /* … */ ],
+    // hooks: { /* … */ },
+  },
+  // overrides for the iconSet collection:
+  iconSetOverrides: {
+    // fields: [{ name: 'description', type: 'textarea' }],
+    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+  },
+})
+```
+
+</Tab>
+
+</Tabs>
+
+## Collections
+
+The plugin registers the `icon` upload collection (an **Assets** group), the `iconSet` grouping
+collection (a **Sets** group), and a hidden `iconRequest` diagnostics collection (on by default;
+disable with `trackRequests: false`). Icons accept SVG only, and every upload is sanitized before
+storage, so a `.svg` is safe to inline straight onto a page.
+
+### `icon`
+
+The upload collection you add icons to. Each file is optimized and sanitized on save by the
+`formatSVGHook` `beforeChange` hook and stored inline as `svgString`. Read is **public** (icons are
+frontend assets); writes are logged-in-admin only. The admin titles each doc by `filename`.
+
+**Fields**
+
+<TypeTable
+  type={{
+    filename: { description: "The uploaded SVG (the upload). The admin useAsTitle.", type: "upload" },
+    svgString: { description: "The cleaned, sanitized <svg>…</svg>, ready to inline. Read-only output.", type: "code" },
+    optimized: { description: "Human-readable optimization report. Read-only output, shown once present.", type: "text" },
+    filesize: { description: "Updated to the optimized byte size.", type: "number" },
+  }}
+/>
+
+**Hooks**
+
+<TypeTable
+  type={{
+    formatSVGHook: { description: "Optimizes + sanitizes each uploaded SVG, folding svgString / optimized / filesize into the doc. A no-op for changes that carry no new file.", type: "beforeChange" },
+  }}
+/>
+
+On save, `formatSVGHook` runs svgo (loaded dynamically, so it never lands in a frontend or edge
+bundle) and:
+
+- **Sanitizes** untrusted SVGs: strips `<script>` elements, `on*` handlers, and `javascript:`
+  URLs. The stored string is later inlined via `dangerouslySetInnerHTML`, so this runs even when
+  geometry optimization is skipped.
+- **Optimizes** with svgo (`preset-default` + path/number cleanup, dimensions removed).
+- **Themes** by rewriting hard-coded `fill`/`stroke` to `currentColor`, so an icon takes its color
+  from CSS.
+- **Normalizes** the `viewBox`: tightened to the real path bounds and squared around the glyph's
+  center, so mismatched source artboards render consistently.
+
+<Callout type="warn">
+  Payload blocks SVG uploads by default (they're on its restricted-file-types list). This collection
+  is SVG-only and sanitizes every file before storage, so it opts in automatically via
+  `upload.allowRestrictedFileTypes`, with nothing to configure.
+</Callout>
+
+<Callout type="info">
+  SVGs using `transform` / `clip-path` skip the geometry rewrite (it can't be applied safely) but
+  are still sanitized before storage.
+</Callout>
+
+### `iconSet`
+
+A named, ordered `name → icon` mapping into the shared `icon` pool, with a single-active toggle. Build
+a second set (a different `arrow-right`, a heavier weight, a seasonal pack) and flip it active to
+re-skin every icon at once, without touching the frontend. Writes and reads are logged-in-admin only;
+drafts / versions are on by default (toggle with `drafts`). Lives under a **Sets** admin group.
+
+- **Settings tab:** the `active` toggle and `title` (plus any `fields` you add, and the [usage panel](#icon-usage-detection) unless `usagePanel: false`).
+- **Icons tab:** the `iconsArray`, one row per icon, each a `name` (auto kebab-cased, what the
+  frontend looks up, independent of the uploaded filename) and an `icon` upload relationship into
+  the `icon` collection.
+
+<Callout type="info">
+  Only one set is active at a time. Activating a set runs a `beforeChange` hook that deactivates the
+  others **within the same status lane**, so staging a new active set as a *draft* (with live
+  preview) doesn't disturb the live published set; the swap goes live only on publish. The hook runs
+  in the same transaction and rolls back on failure, so you never end up with two active sets.
+  It's self-contained: a plain checkbox, no external dependency.
+</Callout>
+
+### `iconRequest`
+
+On by default (disable with `trackRequests: false`). A hidden diagnostics collection: every icon name
+that fails to resolve at runtime is recorded (throttled, fire-and-forget) with a hit `count` and `first`/`lastRequestedAt`
+timestamps. It's the runtime counterpart to the static scan, capturing dynamic names a static pass can't
+see. Surfaced in the IconSet [usage panel](#icon-usage-detection), not browsed directly.
 
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
-| `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory — the single entry point. |
+| `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point. |
 | `extractSvgContent` | `@pro-laico/payload-icons` | Pull the inner markup out of an `svgString` to inline it in your own `<svg>`. |
 | `extractSvgProps` | `@pro-laico/payload-icons` | Parse an `svgString`'s root attributes (viewBox, etc.) onto your own `<svg>`. |
 | `Icon` | `@pro-laico/payload-icons/components/Icon` | The drop-in `<Icon name="…" />` server component (resolves through the active set). |
