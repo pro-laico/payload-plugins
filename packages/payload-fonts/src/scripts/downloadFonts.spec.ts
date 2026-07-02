@@ -72,6 +72,59 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
     expect(hasFontDeclarations(definitionFile)).toBe(false)
   })
 
+  it('treats connection-refused as the calm predev state — empties the definition without the loud failure', async () => {
+    process.env.PAYLOAD_SECRET = 'secret'
+    // Node's fetch shape for a down server: TypeError('fetch failed') with the code on `cause`.
+    const refused = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' }),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(refused)),
+    )
+
+    await runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' })
+
+    expect(hasFontDeclarations(definitionFile)).toBe(false)
+    expect(vi.mocked(console.warn)).not.toHaveBeenCalled()
+    expect(vi.mocked(console.log).mock.calls.some((c) => String(c[0]).includes('no running Payload'))).toBe(true)
+  })
+
+  it('fails clearly when FONT_DOWNLOAD_URL is not an http(s) URL', async () => {
+    process.env.PAYLOAD_SECRET = 'secret'
+
+    await runDownloadFonts({ ...baseOpts(), siteUrl: 'localhost:3000' })
+
+    expect(hasFontDeclarations(definitionFile)).toBe(false)
+    expect(vi.mocked(console.warn).mock.calls.some((c) => String(c[0]).includes('not a valid http(s) URL'))).toBe(true)
+  })
+
+  it('names the per-family cause from the export diagnostics when nothing comes back', async () => {
+    process.env.PAYLOAD_SECRET = 'secret'
+    const manifest = {
+      fonts: {},
+      diagnostics: {
+        sans: { selected: true, typeface: 'Inter', optimizedFiles: 0, readFailures: 0 },
+        serif: { selected: false, optimizedFiles: 0, readFailures: 0 },
+        mono: { selected: true, typeface: 'JetBrains Mono', optimizedFiles: 2, readFailures: 2 },
+      },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(manifest) } as Response)),
+    )
+
+    await runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' })
+
+    const logged = vi
+      .mocked(console.log)
+      .mock.calls.map((c) => String(c[0]))
+      .join('\n')
+    expect(logged).toContain("sans: 'Inter' selected but has 0 optimized files")
+    expect(logged).toContain('serif: no typeface selected')
+    expect(logged).toContain("mono: 'JetBrains Mono' selected but 2/2 optimized files could not be read")
+  })
+
   it('empties the definition when the export endpoint returns a non-OK status', async () => {
     process.env.PAYLOAD_SECRET = 'secret'
     vi.stubGlobal(

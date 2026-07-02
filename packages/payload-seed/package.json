@@ -24,13 +24,13 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
       "./components/SeedButton": {
-        "import": "./dist/components/SeedButton.js",
         "types": "./dist/components/SeedButton.d.ts",
+        "import": "./dist/components/SeedButton.js",
         "default": "./dist/components/SeedButton.js"
       }
     }

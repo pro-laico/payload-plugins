@@ -1,12 +1,21 @@
 import 'server-only'
 
 import { cache } from 'react'
-import type { CollectionSlug, Where } from 'payload'
+import type { CollectionSlug, Payload, Where } from 'payload'
 
-import { getPayloadClient } from '../lib/getPayloadClient'
+import { getIconSetSlug, getPayloadClient } from '../lib/getPayloadClient'
 
 /** A `name → svgString` map for the active set's icons. */
 type IconSetMap = Record<string, string>
+
+/** The lane-correct active-set filter: published-lane reads also require `_status: 'published'`,
+ *  but only when the collection actually has drafts (safe if `drafts: false`). */
+const activeWhere = (payload: Payload, slug: string, draft: boolean): Where => {
+  const hasDrafts = Boolean(
+    (payload.collections as Record<string, { config?: { versions?: { drafts?: unknown } } }>)?.[slug]?.config?.versions?.drafts,
+  )
+  return !draft && hasDrafts ? { and: [{ active: { equals: true } }, { _status: { equals: 'published' } }] } : { active: { equals: true } }
+}
 
 /**
  * The active icon set's `name → svgString` map, resolved in a SINGLE query and
@@ -22,16 +31,13 @@ type IconSetMap = Record<string, string>
  */
 const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
   const payload = await getPayloadClient()
-  const hasDrafts = Boolean(
-    (payload.collections as Record<string, { config?: { versions?: { drafts?: unknown } } }>)?.iconSet?.config?.versions?.drafts,
-  )
-  const where: Where =
-    !draft && hasDrafts ? { and: [{ active: { equals: true } }, { _status: { equals: 'published' } }] } : { active: { equals: true } }
+  // Read the slug AFTER getPayloadClient(): resolving the config applies the plugin, which stashes it.
+  const slug = getIconSetSlug()
 
   const set = (await payload
     .find({
-      collection: 'iconSet' as CollectionSlug,
-      where,
+      collection: slug as CollectionSlug,
+      where: activeWhere(payload, slug, draft),
       limit: 1,
       depth: 1,
       draft,
@@ -58,3 +64,36 @@ const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
  *  `undefined` when the name isn't in the active set. The single seam for
  *  rendering an icon yourself (the `<Icon>` component is this plus `extractSvg*`). */
 export const getIconSvg = async (name: string, draft = false): Promise<string | undefined> => (await getActiveIconSet(draft))[name]
+
+/** Names already warned about, so each miss logs once per process. */
+const warnedMisses = new Set<string>()
+
+/** Dev-only diagnosis for an unresolved icon name: one `console.warn` per name per process, naming
+ *  the cause — no active set / active set only a draft / name not in the set — with the fix. */
+export const warnIconMissDev = async (name: string, draft = false): Promise<void> => {
+  if (process.env.NODE_ENV === 'production' || warnedMisses.has(name)) return
+  warnedMisses.add(name)
+  try {
+    const payload = await getPayloadClient()
+    const slug = getIconSetSlug()
+    const activeSetExists = async (d: boolean): Promise<boolean> => {
+      const find = {
+        collection: slug as CollectionSlug,
+        where: activeWhere(payload, slug, d),
+        limit: 1,
+        depth: 0,
+        draft: d,
+        overrideAccess: true,
+      }
+      return (await payload.find(find)).docs.length > 0
+    }
+    const cause = (await activeSetExists(draft))
+      ? `name '${name}' not in the active set — add it to the set's Icons array`
+      : (await activeSetExists(true))
+        ? 'active set exists only as a draft — publish it'
+        : 'no active icon set — activate one'
+    console.warn(`[payload-icons] <Icon name="${name}"> did not resolve: ${cause}`)
+  } catch {
+    // Diagnostics only — never surface failures into render.
+  }
+}

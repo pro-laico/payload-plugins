@@ -2,7 +2,7 @@
 
 import MuxPlayer from '@mux/mux-player-react'
 import MuxUploader from '@mux/mux-uploader-react'
-import { useConfig, useForm, useFormFields } from '@payloadcms/ui'
+import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './mux-uploader.css'
 
@@ -10,22 +10,25 @@ import './mux-uploader.css'
 const stripExtension = (name: string): string => name.replace(/\.[^./\\]+$/, '')
 
 /**
- * The admin Field for the `muxUploader` UI field. Three states: an uploader before a video
- * exists, a "processing" notice while Mux encodes, and the Mux player once a playback URL is
- * available. Uploads go directly to Mux via a direct-upload URL the plugin's endpoint mints.
+ * The admin Field for the `muxUploader` UI field. Four states: an uploader before a video
+ * exists, a "processing" notice while Mux encodes, an error notice when Mux rejected the
+ * upload (`status: 'errored'`), and the Mux player once a playback URL is available. Uploads
+ * go directly to Mux via a direct-upload URL the plugin's endpoint mints.
  */
 export const MuxUploaderField = () => {
   const { config } = useConfig()
   const apiUrl = config.routes.api
 
   const [uploadId, setUploadId] = useState('')
-  const { assetId, setAssetId, title, setTitle, setFile, playbackUrl } = useFormFields(([fields, dispatch]) => ({
+  const { assetId, setAssetId, title, setTitle, setFile, playbackUrl, status, error } = useFormFields(([fields, dispatch]) => ({
     assetId: fields.assetId,
     setAssetId: (value: string) => dispatch({ type: 'UPDATE', path: 'assetId', value }),
     title: fields.title,
     setTitle: (value: string) => dispatch({ type: 'UPDATE', path: 'title', value }),
     setFile: (value: File) => dispatch({ type: 'UPDATE', path: 'file', value }),
     playbackUrl: fields['playbackOptions.0.playbackUrl']?.value as string | undefined,
+    status: fields.status?.value as string | undefined,
+    error: fields.error?.value as string | undefined,
   }))
 
   const { submit, setProcessing } = useForm()
@@ -33,6 +36,11 @@ export const MuxUploaderField = () => {
 
   const getUploadUrl = useCallback(async () => {
     const response = await fetch(`${apiUrl}/mux/upload`, { method: 'POST' })
+    if (!response.ok) {
+      const body = (await response.text()).slice(0, 200)
+      toast.error(`Could not create a Mux upload (${response.status}): ${body}`)
+      throw new Error(`[payload-mux] upload URL request failed (${response.status}): ${body}`)
+    }
     const { id, url } = (await response.json()) as { id: string; url: string }
     setUploadId(id)
     return url
@@ -62,7 +70,7 @@ export const MuxUploaderField = () => {
 
     if (!upload.asset_id) {
       setProcessing(false)
-      console.error('[payload-mux] Upload did not produce a Mux asset id in time — please try again.')
+      toast.error('The upload did not produce a Mux asset id within 60 seconds — please try again.')
       return
     }
 
@@ -82,9 +90,15 @@ export const MuxUploaderField = () => {
   return (
     <div className="mux-uploader" ref={containerRef}>
       {!assetId?.value && <MuxUploader endpoint={getUploadUrl} onUploadStart={onUploadStart} onSuccess={onSuccess} />}
-      {Boolean(assetId?.value) && !playbackUrl && (
+      {Boolean(assetId?.value) && status === 'errored' && (
+        <div className="mux-uploader__error">
+          Mux could not process this video{error ? `: ${error}` : ''}. Delete this video and upload it again.
+        </div>
+      )}
+      {Boolean(assetId?.value) && !playbackUrl && status !== 'errored' && (
         <div className="mux-uploader__processing">
-          Video is being encoded. This typically takes less than 90 seconds, please refresh the page in a moment
+          Video is being encoded. This typically takes less than 90 seconds, please refresh the page in a moment. If this persists, ensure your
+          Mux webhook points at {`${apiUrl}/mux/webhook`} (see docs)
         </div>
       )}
       {playbackUrl && <MuxPlayer src={playbackUrl} streamType="on-demand" style={{ height: '60vh' }} />}

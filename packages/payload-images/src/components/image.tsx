@@ -126,6 +126,10 @@ const CSS_OBJECT_FIT: Record<Fit, NonNullable<CSSProperties['objectFit']>> = {
 
 const idOf = (image: ResponsiveImageInput): string => (typeof image === 'object' ? String(image.id ?? '') : String(image ?? ''))
 
+// Once-per-process dev warnings — these failures repeat on every render, so warning each time would flood the console.
+let warnedNoConfig = false
+let warnedLqipFailed = false
+
 export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<ReactElement | null> => {
   const {
     image,
@@ -166,6 +170,12 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   } catch {
     cfg = undefined
   }
+  if (!cfg && process.env.NODE_ENV !== 'production' && !warnedNoConfig) {
+    warnedNoConfig = true
+    console.warn(
+      "[payload-images] <ResponsiveImage> could not resolve the Payload config — project pixelStep/placeholder settings are skipped and the inline LQIP is disabled. Pass the `config` prop, or add `transpilePackages: ['@pro-laico/payload-images']` to next.config so the `@payload-config` alias resolves.",
+    )
+  }
   const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep
 
   const doc = typeof image === 'object' ? image : undefined
@@ -205,8 +215,12 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
       const { generateInlineLqip } = await import('./inlineLqip')
       // Trusted (component) call: the requested width is honored (no `untrusted` clamp).
       lqip = await generateInlineLqip({ config: cfg, source: doc as VariantSourceDoc, ar, fit, width: ph.width, quality: ph.quality })
-    } catch {
+    } catch (err) {
       lqip = undefined
+      if (process.env.NODE_ENV !== 'production' && !warnedLqipFailed) {
+        warnedLqipFailed = true
+        console.warn(`[payload-images] <ResponsiveImage> inline LQIP generation failed — rendering without a placeholder. ${String(err)}`)
+      }
     }
   }
 

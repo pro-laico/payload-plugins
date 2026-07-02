@@ -33,7 +33,21 @@ export const muxVideoPlugin =
         (pluginOptions.initSettings?.tokenSecret ?? process.env.MUX_TOKEN_SECRET),
     )
     const collection = MuxVideo(mux, pluginOptions)
-    if (!hasCreds) collection.custom = { ...collection.custom, seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' }
+    if (!hasCreds) {
+      collection.custom = { ...collection.custom, seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' }
+      console.warn('[payload-mux] MUX_TOKEN_ID / MUX_TOKEN_SECRET not set — uploads, server-side ingest, and webhook handling will fail')
+    }
+
+    // Signed playback needs the JWT key pair — without it every read of a signed video throws
+    // in the virtual URL fields, so warn at boot instead of failing per-request.
+    const signed =
+      pluginOptions.playbackPolicy === 'signed' || pluginOptions.uploadSettings?.new_asset_settings?.playback_policy?.includes('signed')
+    const hasSigningKeys = Boolean(
+      (pluginOptions.initSettings?.jwtSigningKey ?? process.env.MUX_SIGNING_KEY) &&
+        (pluginOptions.initSettings?.jwtPrivateKey ?? process.env.MUX_PRIVATE_KEY),
+    )
+    if (signed && !hasSigningKeys)
+      console.warn('[payload-mux] signed playback is configured but MUX_SIGNING_KEY / MUX_PRIVATE_KEY not set — signed video reads will fail')
 
     if (pluginOptions.extendCollection) {
       const target = config.collections?.find((c) => c.slug === pluginOptions.extendCollection)

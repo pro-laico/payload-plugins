@@ -25,6 +25,10 @@ const TOLERANT_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif'
 
 const stripExt = (name: string) => name.slice(0, name.length - extname(name).length)
 
+/** The directories `resolveFilePath` searches for a name, so a missing-file warning can list them. */
+export const searchedDirs = (name: string, assetsRoot: string, subdirs: string[]): string[] =>
+  subdirs.map((sub) => join(assetsRoot, sub, dirname(name)))
+
 /**
  * Resolve a `_file` name to an absolute path on disk. `subdirs` is the ordered list of directories
  * under the assets root to search — typically a collection's subdir then the root (`['media', '']`).

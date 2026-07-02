@@ -202,6 +202,8 @@ the webhook. Read is gated by the `access` option (**logged-in admin** by defaul
     source: { description: "Transient server-side ingest input: a local path / URL, or { file|url, playbackPolicy, posterTimestamp }. Uploaded by beforeValidate then stripped; never persisted.", type: "json" },
     title: { description: "Unique, required. The admin title; auto-deduped to stay unique (and mirrored onto the filename when extending an upload collection).", type: "text" },
     assetId: { description: "Mux asset id. Read-only, filled by the hooks.", type: "text" },
+    status: { description: "Encoding state: preparing / ready / errored. Read-only (sidebar), written by the hooks and the webhook.", type: "select" },
+    error: { description: "Mux's error messages when an asset fails to process. Hidden; surfaced by the uploader field.", type: "text" },
     duration: { description: "Length in seconds. Read-only, from Mux.", type: "number" },
     posterTimestamp: { description: "Seconds into the video for the poster image. Defaults to the middle; validated against duration.", type: "number" },
     aspectRatio: { description: "Read-only, from Mux.", type: "text" },
@@ -413,10 +415,10 @@ seed-file changes. See [Disabled seeds](/docs/plugins/payload-seed#disabled-seed
 A few things to keep in mind:
 
 - **No webhook → longer videos never become playable.** An admin upload polls the new asset for ~6
-  seconds; anything that encodes slower saves with just its `assetId` and waits for the webhook to fill
-  in the playback metadata — and re-saving won't re-fetch. The endpoint must be **publicly reachable**
-  (Mux pushes to it), so tunnel localhost in dev. Server-side ingest and seeding are exempt: they wait
-  for `ready` regardless of length.
+  seconds; anything that encodes slower saves with just its `assetId` (the doc's `status` shows
+  **preparing**) and waits for the webhook to fill in the playback metadata — and re-saving won't
+  re-fetch. The endpoint must be **publicly reachable** (Mux pushes to it), so tunnel localhost in
+  dev. Server-side ingest and seeding are exempt: they wait for `ready` regardless of length.
 - **Deletes are real, both ways.** Deleting the Payload doc deletes the Mux asset (`afterDelete`), and
   replacing a video's asset deletes the previous one. The reverse direction — a Mux-dashboard delete
   removing the Payload doc — only works through the webhook.

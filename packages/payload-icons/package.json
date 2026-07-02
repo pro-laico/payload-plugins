@@ -25,28 +25,28 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
       "./components/Icon": {
-        "import": "./dist/components/Icon.js",
         "types": "./dist/components/Icon.d.ts",
+        "import": "./dist/components/Icon.js",
         "default": "./dist/components/Icon.js"
       },
       "./cache": {
-        "import": "./dist/cache/index.js",
         "types": "./dist/cache/index.d.ts",
+        "import": "./dist/cache/index.js",
         "default": "./dist/cache/index.js"
       },
       "./admin/iconRowLabel": {
-        "import": "./dist/components/admin/iconRowLabel.js",
         "types": "./dist/components/admin/iconRowLabel.d.ts",
+        "import": "./dist/components/admin/iconRowLabel.js",
         "default": "./dist/components/admin/iconRowLabel.js"
       },
       "./admin/iconUsagePanel": {
-        "import": "./dist/components/admin/iconUsagePanel.js",
         "types": "./dist/components/admin/iconUsagePanel.d.ts",
+        "import": "./dist/components/admin/iconUsagePanel.js",
         "default": "./dist/components/admin/iconUsagePanel.js"
       }
     },

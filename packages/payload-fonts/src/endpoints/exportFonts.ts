@@ -22,7 +22,7 @@ export interface ExportFontsEndpointOptions {
 }
 
 /** The selected typeface for a family: a populated `font` doc or its id. */
-type TypefaceRef = { id?: string | number } | string | number | null
+type TypefaceRef = { id?: string | number; title?: string | null } | string | number | null
 type FontSelection = Partial<Record<Family, TypefaceRef | TypefaceRef[]>>
 
 /** A single exported weight file: filename, extension, mime, base64 bytes, and (optional) weight/style. */
@@ -34,8 +34,15 @@ export type ExportedFont = {
   weight?: string | null
   style?: string | null
 }
-/** JSON returned by the fonts export endpoint — an array of weight files per family. */
-export type ExportFontsResponse = { fonts: Partial<Record<Family, ExportedFont[]>> }
+/** Per-family debug info: is a typeface selected, how many optimized files it has, and how many of
+ *  those couldn't be read from storage — so an empty export can name its cause per family. */
+export type ExportFamilyDiagnostics = { selected: boolean; typeface?: string; optimizedFiles: number; readFailures: number }
+/** JSON returned by the fonts export endpoint — an array of weight files per family.
+ *  `diagnostics` is additive; older servers omit it. */
+export type ExportFontsResponse = {
+  fonts: Partial<Record<Family, ExportedFont[]>>
+  diagnostics?: Partial<Record<Family, ExportFamilyDiagnostics>>
+}
 
 /**
  * Constant-time secret compare. Both sides are sha256-hashed to a fixed 32 bytes first, so the
@@ -80,7 +87,9 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
       try {
         const fontSetGlobal = (await payload.findGlobal({
           slug: fontSetGlobalSlug as GlobalSlug,
-          depth: 0,
+          // depth 1 populates each slot's typeface (defaultPopulate: title/family), so the
+          // diagnostics can name the selected typeface.
+          depth: 1,
           overrideAccess: true,
           // `as unknown as` — in a project with generated types this resolves to the concrete
           // fontSet interface, which doesn't structurally overlap a string-keyed record.
@@ -91,15 +100,19 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
       }
 
       const fonts: Partial<Record<Family, ExportedFont[]>> = {}
+      const diagnostics: Partial<Record<Family, ExportFamilyDiagnostics>> = Object.fromEntries(
+        families.map((family) => [family, { selected: false, optimizedFiles: 0, readFailures: 0 }]),
+      )
       if (selection) {
         // One typeface per family (tolerate a stray array — take the first); fetch every family's
         // served files in a single query grouped by typeface, rather than one round-trip per family.
         const familyIds = families
-          .map((family) => ({
-            family,
-            id: refId((Array.isArray(selection[family]) ? (selection[family] as TypefaceRef[])[0] : selection[family]) ?? null),
-          }))
-          .filter((r): r is { family: Family; id: string | number } => r.id != null)
+          .map((family) => {
+            const ref = (Array.isArray(selection[family]) ? (selection[family] as TypefaceRef[])[0] : selection[family]) ?? null
+            const title = ref && typeof ref === 'object' && typeof ref.title === 'string' ? ref.title : undefined
+            return { family, id: refId(ref), title }
+          })
+          .filter((r): r is { family: Family; id: string | number; title: string | undefined } => r.id != null)
 
         const docsByFont = new Map<string | number, Array<Record<string, unknown>>>()
         if (familyIds.length) {
@@ -119,18 +132,26 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
               if (bucket) bucket.push(doc)
               else docsByFont.set(fontId, [doc])
             }
-          } catch {
+          } catch (err) {
             // leave docsByFont empty — the response just carries no fonts
+            payload.logger.warn({ msg: `[payload-fonts] export: could not query ${fontOptimizedSlug}`, err })
           }
         }
 
-        for (const { family, id } of familyIds) {
+        for (const { family, id, title } of familyIds) {
+          const docs = docsByFont.get(id) ?? []
+          const diag = { selected: true, typeface: title, optimizedFiles: docs.length, readFailures: 0 }
+          diagnostics[family] = diag
           const exported: ExportedFont[] = []
-          for (const doc of docsByFont.get(id) ?? []) {
+          for (const doc of docs) {
             const filename = typeof doc.filename === 'string' ? doc.filename : null
-            if (!filename) continue
-            const bytes = await readUploadBytes(payload, fontOptimizedSlug, doc as { filename?: string | null; url?: string | null })
-            if (!bytes) continue
+            const bytes = filename
+              ? await readUploadBytes(payload, fontOptimizedSlug, doc as { filename?: string | null; url?: string | null })
+              : null
+            if (!filename || !bytes) {
+              diag.readFailures++
+              continue
+            }
             exported.push({
               filename,
               extension: filename.split('.').pop()?.toLowerCase() || 'woff2',
@@ -145,7 +166,7 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
       }
 
       // no-store: the response carries font bytes behind auth.
-      return Response.json({ fonts } satisfies ExportFontsResponse, { headers: { 'Cache-Control': 'no-store' } })
+      return Response.json({ fonts, diagnostics } satisfies ExportFontsResponse, { headers: { 'Cache-Control': 'no-store' } })
     },
   }
 }

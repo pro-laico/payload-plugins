@@ -19,9 +19,14 @@ export interface CreateImagesOptions {
   variantSlug?: string
   /** Purge route (under the API base) the purge button POSTs to. Default `/img/purge`. */
   purgePath?: string
-  /** Admin list/preview thumbnail width (px), served on-demand via `/api/img` so the admin
-   *  never loads full-res originals. Default 160; pass `false` to use Payload's default. */
+  /** Admin list/preview thumbnail width (px), served on-demand via the transform endpoint so the
+   *  admin never loads full-res originals. Default 160; pass `false` to use Payload's default. */
   adminThumbnail?: number | false
+  /** The app's API route base (`config.routes.api`), used to build the admin thumbnail URL. Default `/api`. */
+  apiRoute?: string
+  /** Whether the transform + purge endpoints are registered (`transform !== false`). When false, the
+   *  purge button and the `variants` join — UI that targets those endpoints — are skipped. Default true. */
+  endpointsEnabled?: boolean
   /** Add virtual `src`/`srcset`/`placeholderURL`/`thumbnailURL` fields (computed on read), so
    *  optimized URLs ride along in every REST/GraphQL/Local-API response. Default true. */
   virtualFields?: boolean
@@ -41,14 +46,13 @@ export interface CreateImagesOptions {
 /**
  * A focal-cropped admin thumbnail served by the transform endpoint, so the Images list view
  * loads tiny WebP thumbnails instead of full-resolution originals. Returns `undefined` when
- * disabled (`adminThumbnail: false`, or the transform endpoint isn't registered). Assumes the
- * default `/api/img` route — override via `imagesOverrides.upload.adminThumbnail` for a custom
- * `routes.api`.
+ * disabled (`adminThumbnail: false`, or the transform endpoint isn't registered). The API base
+ * comes from the app's `routes.api` (threaded through as `apiRoute`).
  */
-const resolveAdminThumbnail = (adminThumbnail: number | false | undefined): GetAdminThumbnail | undefined => {
+const resolveAdminThumbnail = (adminThumbnail: number | false | undefined, apiRoute = '/api'): GetAdminThumbnail | undefined => {
   if (adminThumbnail === false) return undefined
   const w = typeof adminThumbnail === 'number' ? adminThumbnail : 160
-  return ({ doc }) => (doc?.id ? `/api/img/${String(doc.id)}?w=${w}&h=${w}&fit=cover&fmt=auto` : null)
+  return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?w=${w}&h=${w}&fit=cover&fmt=auto` : null)
 }
 
 /**
@@ -57,7 +61,13 @@ const resolveAdminThumbnail = (adminThumbnail: number | false | undefined): GetA
  * variants (it pairs with the purge button). With `focalUI: false` the collection is a clean
  * upload — just `alt` + the file — and the import map isn't needed.
  */
-const adminUIFields = (focalUI: boolean, variantSlug: CollectionSlug, previewRatios?: string[], purgePath?: string): Field[] =>
+const adminUIFields = (
+  focalUI: boolean,
+  variantSlug: CollectionSlug,
+  previewRatios?: string[],
+  purgePath?: string,
+  endpoints = true,
+): Field[] =>
   focalUI
     ? [
         {
@@ -65,41 +75,63 @@ const adminUIFields = (focalUI: boolean, variantSlug: CollectionSlug, previewRat
           type: 'ui',
           admin: { components: { Field: { path: FocalPreviewFieldPath, ...(previewRatios ? { clientProps: { previewRatios } } : {}) } } },
         },
-        {
-          name: 'purgeVariants',
-          type: 'ui',
-          admin: { components: { Field: { path: PurgeVariantsFieldPath, ...(purgePath ? { clientProps: { purgePath } } : {}) } } },
-        },
-        {
-          name: 'variants',
-          type: 'join',
-          collection: variantSlug,
-          on: 'source',
-          admin: { defaultColumns: ['filename', 'width', 'height', 'format'], allowCreate: false },
-        },
+        // The purge button POSTs to the purge endpoint and the join lists endpoint-generated
+        // variants — with the endpoints unregistered, both would be dead UI.
+        ...(endpoints
+          ? ([
+              {
+                name: 'purgeVariants',
+                type: 'ui',
+                admin: { components: { Field: { path: PurgeVariantsFieldPath, ...(purgePath ? { clientProps: { purgePath } } : {}) } } },
+              },
+              {
+                name: 'variants',
+                type: 'join',
+                collection: variantSlug,
+                on: 'source',
+                admin: { defaultColumns: ['filename', 'width', 'height', 'format'], allowCreate: false },
+              },
+            ] as Field[])
+          : []),
       ]
     : []
 
 /**
  * The image-pipeline additions, as a partial config to deep-merge onto a collection: the admin
- * image-management UI (gated by `focalUI`), the purge hooks, and `upload.focalPoint`. The factory
- * below folds these into the default `images` collection; the plugin folds them onto an existing
- * collection when `extendCollection` is set (so a project's own `media` collection gains the
- * pipeline without a second collection). Deliberately omits `alt`/`access`/`admin`/`slug` and the
- * mime whitelist so it never clobbers a collection it's merged onto.
+ * image-management UI (gated by `focalUI`), the purge hooks, `upload.focalPoint`, the on-demand
+ * admin thumbnail, and the lean `defaultPopulate` / `forceSelect` that keep the virtual URLs
+ * riding through select/populated reads. The factory below folds these into the default `images`
+ * collection; the plugin folds them onto an existing collection when `extendCollection` is set
+ * (so a project's own `media` collection gains the pipeline without a second collection).
+ * Deliberately omits `alt`/`access`/`admin`/`slug` and the mime whitelist so it never clobbers a
+ * collection it's merged onto (the plugin also re-merges the target's own
+ * `defaultPopulate`/`forceSelect`/thumbnail on top).
  */
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true } = opts
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
+  const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
+
+  // Lean relationship population: when an image is referenced (e.g. `page.heroImage`), populate the
+  // renderable fields + the virtual URLs, and skip the `variants` join (which would run an extra
+  // query per populated image). `forceSelect` keeps the virtual fields' inputs present under `select`.
+  const renderableFields = { alt: true, url: true, filename: true, width: true, height: true, focalX: true, focalY: true }
+  const defaultPopulate = virtualFields
+    ? { ...renderableFields, ...Object.fromEntries(VIRTUAL_URL_FIELDS.map((f) => [f, true])) }
+    : renderableFields
+  const forceSelect = virtualFields ? Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])) : undefined
+
   return {
     // Admin UI is gated by focalUI; the virtual URL fields are for API consumers, so they're
     // added independently (hidden in the admin).
-    fields: [...adminUIFields(focalUI, variantSlug, previewRatios, purgePath), ...(virtualFields ? virtualUrlFields() : [])],
+    fields: [...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled), ...(virtualFields ? virtualUrlFields() : [])],
     hooks: {
       afterChange: [purgeStaleVariantsAfterChange({ variantSlug })],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
-    upload: { focalPoint: true },
+    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
+    ...(forceSelect ? { forceSelect: forceSelect as CollectionConfig['forceSelect'] } : {}),
+    upload: { focalPoint: true, ...(adminThumbnail ? { adminThumbnail } : {}) },
     ...(folders ? { folders: true } : {}),
   }
 }
@@ -113,18 +145,9 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
  * inline base64 via the shared variant cache) — there's no stored placeholder field.
  */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
-  const { virtualFields = true, localizeAlt = false, folders, maxOriginalSize } = opts
-  const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail)
+  const { localizeAlt = false, folders, maxOriginalSize } = opts
   const enh = imageEnhancements(opts)
-
-  // Lean relationship population: when an image is referenced (e.g. `page.heroImage`), populate the
-  // renderable fields + the virtual URLs, and skip the `variants` join (which would run an extra
-  // query per populated image). `forceSelect` keeps the virtual fields' inputs present under `select`.
-  const renderableFields = { alt: true, url: true, filename: true, width: true, height: true, focalX: true, focalY: true }
-  const defaultPopulate = virtualFields
-    ? { ...renderableFields, ...Object.fromEntries(VIRTUAL_URL_FIELDS.map((f) => [f, true])) }
-    : renderableFields
-  const forceSelect = virtualFields ? Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])) : undefined
+  const adminThumbnail = (enh.upload as { adminThumbnail?: GetAdminThumbnail }).adminThumbnail
 
   return {
     slug: 'images',
@@ -137,8 +160,8 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       defaultColumns: ['alt', 'updatedAt'],
       listSearchableFields: ['alt'],
     },
-    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
-    ...(forceSelect ? { forceSelect: forceSelect as CollectionConfig['forceSelect'] } : {}),
+    defaultPopulate: enh.defaultPopulate,
+    ...(enh.forceSelect ? { forceSelect: enh.forceSelect } : {}),
     ...(folders ? { folders: true } : {}),
     fields: [
       {

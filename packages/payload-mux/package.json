@@ -27,23 +27,23 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
       "./components/MuxUploaderField": {
-        "import": "./dist/components/MuxUploaderField.js",
         "types": "./dist/components/MuxUploaderField.d.ts",
+        "import": "./dist/components/MuxUploaderField.js",
         "default": "./dist/components/MuxUploaderField.js"
       },
       "./components/MuxVideoGifCell": {
-        "import": "./dist/components/MuxVideoGifCell.js",
         "types": "./dist/components/MuxVideoGifCell.d.ts",
+        "import": "./dist/components/MuxVideoGifCell.js",
         "default": "./dist/components/MuxVideoGifCell.js"
       },
       "./components/MuxVideoImageCell": {
-        "import": "./dist/components/MuxVideoImageCell.js",
         "types": "./dist/components/MuxVideoImageCell.d.ts",
+        "import": "./dist/components/MuxVideoImageCell.js",
         "default": "./dist/components/MuxVideoImageCell.js"
       }
     }

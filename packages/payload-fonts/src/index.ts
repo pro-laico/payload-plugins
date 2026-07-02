@@ -9,9 +9,11 @@ export type { FontFamilyConfig } from './lib/families'
 // Frontend serving. The dev-only runtime component lives at the `@pro-laico/payload-fonts/DevFonts`
 // subpath; `extractFonts` collects the generated next/font/local classes for `<html>`;
 // `getActiveFontFaces` resolves the active `fontSet` selection to its served files (the read behind
-// DevFonts, for custom UIs that list or serve the active fonts).
+// DevFonts, for custom UIs that list or serve the active fonts) and `buildFontFaceCss` turns them
+// into `@font-face` rules + family variables. `ActiveTypeface`/`ActiveFace` are their shared shape.
 export { extractFonts } from './extractFonts'
-export { getActiveFontFaces } from './lib/activeFonts'
+export { buildFontFaceCss, getActiveFontFaces } from './lib/activeFonts'
+export type { ActiveFace, ActiveTypeface } from './lib/activeFonts'
 
 // Response shape of `GET /api/fonts/export` — for custom consumers of the endpoint.
-export type { ExportFontsResponse } from './endpoints/exportFonts'
+export type { ExportFamilyDiagnostics, ExportFontsResponse } from './endpoints/exportFonts'

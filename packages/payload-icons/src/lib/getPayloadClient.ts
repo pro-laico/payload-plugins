@@ -12,6 +12,18 @@ export const stashConfig = (config: SanitizedConfig): void => {
   ;(globalThis as Record<symbol, unknown>)[CONFIG_SLOT] = config
 }
 
+/** globalThis slot for the resolved `iconSet` slug, filled when the plugin is APPLIED (config build
+ *  time), so it's set in any process that loaded the config — which `getConfig` always does. */
+const ICON_SET_SLUG_SLOT = Symbol.for('pro-laico.payload-icons.iconSetSlug')
+
+/** Called from the plugin factory: remember the resolved `iconSet` slug for the cache resolver. */
+export const stashIconSetSlug = (slug: string): void => {
+  ;(globalThis as Record<symbol, unknown>)[ICON_SET_SLUG_SLOT] = slug
+}
+
+/** The app's icon-set collection slug (honors `iconSetOverrides.slug`); the default when unset. */
+export const getIconSetSlug = (): string => ((globalThis as Record<symbol, unknown>)[ICON_SET_SLUG_SLOT] as string | undefined) ?? 'iconSet'
+
 /**
  * Resolve the host app's Payload config, in order:
  *  1. the globalThis stash the plugin's `onInit` fills the moment Payload boots — covers every

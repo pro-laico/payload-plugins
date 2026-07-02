@@ -2,8 +2,8 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { Icon } from './collections/Icon'
 import { createIconRequestCollection, type IconRequestCollectionOverrides } from './collections/IconRequest'
-import { createIconSetCollection, type IconSetCollectionOverrides } from './collections/IconSet'
-import { stashConfig } from './lib/getPayloadClient'
+import { createIconSetCollection, ICON_SET_SLUG, type IconSetCollectionOverrides } from './collections/IconSet'
+import { stashConfig, stashIconSetSlug } from './lib/getPayloadClient'
 import type { IconCollectionOverrides } from './types'
 
 /**
@@ -104,6 +104,10 @@ export const iconsPlugin =
       iconRequestOverrides,
     } = opts
     if (!enabled) return config
+
+    // Stash the resolved iconSet slug at config-build time so the cache resolver (`./cache`)
+    // honors `iconSetOverrides.slug` — any process that loads the config runs this.
+    stashIconSetSlug(iconSetOverrides?.slug ?? ICON_SET_SLUG)
 
     const additions: CollectionConfig[] = [Icon(iconOverrides)]
     if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', usagePanel, ...iconSetOverrides }))

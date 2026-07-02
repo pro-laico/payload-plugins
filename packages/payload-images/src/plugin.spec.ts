@@ -66,6 +66,25 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(slugs(out2)).toEqual(expect.arrayContaining(['images', 'generated-images']))
     expect(out2.endpoints ?? []).toHaveLength(0)
   })
+
+  it('transform: false also drops the endpoint-dependent surface (virtual URLs, purge button, variants join)', () => {
+    const images = (run({ transform: false }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect(byName(images.fields, 'src')).toBeUndefined() // virtualFields defaults off — the URLs would 404
+    expect(byName(images.fields, 'purgeVariants')).toBeUndefined()
+    expect(byName(images.fields, 'variants')).toBeUndefined()
+    expect(byName(images.fields, 'focalPreview')).toBeTruthy() // focal UI stays — it doesn't need the endpoints
+    // …but an EXPLICIT virtualFields: true is honored (warned at boot).
+    const forced = (run({ transform: false, virtualFields: true }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect(byName(forced.fields, 'src')).toBeTruthy()
+  })
+
+  it('validates transform.sourceSlug like extendCollection (existence + upload)', () => {
+    const pages: CollectionConfig = { slug: 'pages', fields: [] }
+    expect(() => run({ transform: { sourceSlug: 'nope' } })).toThrow(/not found/)
+    expect(() => run({ transform: { sourceSlug: 'pages' } }, [pages])).toThrow(/not an upload/)
+    const media: CollectionConfig = { slug: 'media', upload: true, fields: [] }
+    expect(slugs(run({ transform: { sourceSlug: 'media' } }, [media]))).toContain('images') // registration unchanged
+  })
 })
 
 describe('resolvePlaceholder', () => {
@@ -110,6 +129,26 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
     const withFolders = run({ extendCollection: 'media', folders: true }, [media])
     const m = (withFolders.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig & { folders?: unknown }
     expect(m.folders).toBe(true)
+  })
+
+  it('wires defaultPopulate + forceSelect parity so virtual URLs survive select/populated reads (target keys win)', () => {
+    const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
+    expect((m.defaultPopulate as Record<string, boolean>).src).toBe(true)
+    expect((m.defaultPopulate as Record<string, boolean>).variants).toBeUndefined()
+    expect((m.forceSelect as Record<string, boolean>).width).toBe(true)
+    const opinionated: CollectionConfig = { ...media, defaultPopulate: { caption: true } as CollectionConfig['defaultPopulate'] }
+    const kept = (run({ extendCollection: 'media' }, [opinionated]).collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
+    expect((kept.defaultPopulate as Record<string, boolean>).caption).toBe(true) // merged, never overwritten
+    expect((kept.defaultPopulate as Record<string, boolean>).src).toBe(true)
+  })
+
+  it('adds the on-demand admin thumbnail only when the target has not set its own', () => {
+    const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
+    const thumb = (m.upload as { adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null }).adminThumbnail
+    expect(thumb?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?w=160&h=160&fit=cover&fmt=auto')
+    const own: CollectionConfig = { ...media, upload: { adminThumbnail: 'card' } }
+    const kept = (run({ extendCollection: 'media' }, [own]).collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
+    expect((kept.upload as { adminThumbnail?: unknown }).adminThumbnail).toBe('card')
   })
 
   it('throws a clear error for a missing or non-upload target', () => {

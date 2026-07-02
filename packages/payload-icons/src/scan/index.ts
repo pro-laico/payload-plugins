@@ -22,6 +22,9 @@ export type { IconUsage, IconUsageManifest } from './types.js'
 // in this CLI/parser module. Re-exported here to keep the `./scan` API in one place.
 export { DEFAULT_MANIFEST_FILENAME, loadIconUsageManifest, MANIFEST_PATH_ENV, resolveManifestPath } from './load.js'
 
+/** Root directories scanned by default. */
+export const DEFAULT_ROOTS = ['src', 'app']
+
 /** File extensions scanned by default — the JSX-bearing source formats. */
 export const DEFAULT_EXTENSIONS = ['tsx', 'jsx', 'ts', 'js', 'mdx']
 
@@ -90,6 +93,8 @@ export interface ScanResult {
   manifest: IconUsageManifest
   /** Number of files read during the scan. */
   filesScanned: number
+  /** Number of scan roots that actually existed — `0` means every root was missing (wrong cwd?). */
+  rootsScanned: number
 }
 
 /**
@@ -105,19 +110,21 @@ export interface ScanResult {
  */
 export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
   const cwd = options.cwd ?? process.cwd()
-  const roots = options.roots?.length ? options.roots : ['src', 'app']
+  const roots = options.roots?.length ? options.roots : DEFAULT_ROOTS
   const exts = new Set((options.extensions?.length ? options.extensions : DEFAULT_EXTENSIONS).map((e) => e.replace(/^\./, '')))
   const ignore = new Set(options.ignore?.length ? options.ignore : DEFAULT_IGNORE)
 
   const files: string[] = []
+  let rootsScanned = 0
   for (const root of roots) {
     const abs = isAbsolute(root) ? root : resolve(cwd, root)
     let stat: ReturnType<typeof statSync> | null = null
     try {
       stat = statSync(abs)
     } catch {
-      continue // missing root — skip
+      continue // missing root — skip; the caller checks `rootsScanned`
     }
+    rootsScanned++
     if (stat.isDirectory()) walk(abs, exts, ignore, files)
     else if (stat.isFile()) files.push(abs)
   }
@@ -145,6 +152,7 @@ export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
   return {
     manifest: { version: 1, generatedAt: new Date().toISOString(), names, usages },
     filesScanned,
+    rootsScanned,
   }
 }
 

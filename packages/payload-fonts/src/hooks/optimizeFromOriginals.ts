@@ -180,7 +180,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
           if (isSubsetterLoadError(err) && !warnedSubsetterLoad) {
             warnedSubsetterLoad = true
             req.payload.logger.error(
-              "[payload-fonts] The font subsetter failed to LOAD (subset-font / harfbuzz wasm / fontkit) — uploaded fonts are NOT being subsetted, so no web fonts will be served. In Next.js the wasm/native deps were bundled: add `serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']` to your next.config. See the @pro-laico/payload-fonts README.",
+              "[payload-fonts] The font subsetter failed to LOAD (subset-font / harfbuzz wasm / fontkit) — uploaded fonts are NOT being subsetted, so no web fonts will be served. In Next.js the wasm/native deps were bundled: add `serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']` to your next.config. Docs: https://payload-plugins.prolaico.com/docs/plugins/payload-fonts",
             )
           }
           req.payload.logger.warn({ msg: `Font optimization failed for original ${d.originalId}`, err })

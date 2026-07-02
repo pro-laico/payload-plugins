@@ -58,12 +58,30 @@ describe('formatSvg', () => {
     expect(out.svgString).toContain('transform')
   })
 
-  it('returns the doc unchanged when the SVG cannot be parsed (no svgString stored)', async () => {
-    // Undeclared `xlink:` namespace → svgo throws → the hook swallows it and stores nothing.
+  it('reports the failure in `optimized` when the SVG cannot be parsed (no svgString stored)', async () => {
+    // Undeclared `xlink:` namespace → svgo throws → no svgString, but the doc reports the failure.
     const broken = '<svg viewBox="0 0 24 24"><a xlink:href="#x"><path d="M0 0"/></a></svg>'
     const out = await run(broken)
     expect(out.svgString).toBeUndefined()
-    expect(out.optimized).toBeUndefined()
+    expect(out.optimized).toMatch(/^Optimization failed: .+ — icon will not render\.$/)
     expect(logger.error).toHaveBeenCalled()
+  })
+
+  it('warns on a stroke-based icon (fill="none" + stroke) but still processes it', async () => {
+    const lucide = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2">
+      <path d="M5 12 h14"/>
+    </svg>`
+    const out = await run(lucide)
+    expect(out.optimized).toMatch(/^Warning: stroke-based icon detected/)
+    expect(out.optimized).toMatch(/SVG optimized:/) // the normal report still follows the warning
+    expect(out.svgString).toContain('<svg')
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('stroke-based icon detected'))
+  })
+
+  it('does not flag a fill-based icon as stroke-based', async () => {
+    const filled = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 2 h20 v20 h-20 z"/></svg>'
+    const out = await run(filled)
+    expect(out.optimized).not.toMatch(/stroke-based/)
+    expect(out.optimized).toMatch(/^SVG optimized:/)
   })
 })

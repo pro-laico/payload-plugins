@@ -384,8 +384,8 @@ see. Surfaced in the IconSet [usage panel](#icon-usage-detection), not browsed d
 
 ## Icon Use Detection
 
-**Problem:** code asks for a name the active set lacks → blank fallback glyph, and it's easy to miss
-which icons a project actually needs.
+**Problem:** code asks for a name the active set lacks → the fallback warning glyph, and it's easy to
+miss which icons a project actually needs.
 
 **Fix:** the admin **Requested icons** panel (on by default) lists missing vs present names, from two
 sources:
@@ -407,7 +407,9 @@ payload-icons-scan            # production/CI: scans ./src and ./app; -o sets th
 <Callout type="info">
   Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
   `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
-  (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
+  (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`. On
+  standalone / Vercel builds, a JSON file that's never `import`ed isn't traced into the function
+  bundle — add it to `outputFileTracingIncludes` in next.config so the panel can read it there.
 </Callout>
 
 
@@ -422,7 +424,7 @@ The active set, the read path, and revalidation fit together like this.
 through `currentColor` and sized by your own classes. The lookup reads through `payload.find`,
 memoized per request, so repeating the same icon on a page costs one query. The name is the *set
 entry's* name, not the uploaded filename, which is why swapping the active set re-skins every icon at
-once. A name the active set doesn't cover renders a blank fallback and is recorded for the
+once. A name the active set doesn't cover renders the fallback warning glyph and is recorded for the
 [Requested icons](#icon-usage-detection) panel.
 
 ### Revalidation
@@ -523,7 +525,8 @@ A few things to keep in mind:
 - **Use fill-based SVGs, not stroke-based.** The optimizer themes filled glyphs by rewriting their
   colors to `currentColor`. A stroke-drawn icon (Lucide/Feather-style `fill="none" stroke="…"`) comes
   out with its enclosed shapes filled solid — a circle outline becomes a disk. Source solid-fill
-  glyphs (Noun Project-style filled paths work; stroke sets don't).
+  glyphs (Noun Project-style filled paths work; stroke sets don't). The upload detects the stroke
+  signature and flags it in the doc's `optimized` report.
 - **`<Icon>` is an async server component.** It queries Payload, so it can't render inside a client
   component — render it in a server component and pass the output down, or resolve the SVG yourself
   with `getIconSvg`.

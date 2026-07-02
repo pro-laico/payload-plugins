@@ -7,6 +7,8 @@ import { recordIconMiss } from './recordMiss'
 
 /** Don't write the same name more than once per this window per process. */
 const THROTTLE_MS = 60_000
+/** Evict stale throttle entries once the map exceeds this — dynamic names would otherwise grow it forever. */
+const MAX_TRACKED = 500
 const lastRecorded = new Map<string, number>()
 
 /**
@@ -28,6 +30,9 @@ export const trackIconMiss = (name: string): void => {
   const now = Date.now()
   const last = lastRecorded.get(name)
   if (last !== undefined && now - last < THROTTLE_MS) return
+  if (lastRecorded.size >= MAX_TRACKED) {
+    for (const [key, at] of lastRecorded) if (now - at >= THROTTLE_MS) lastRecorded.delete(key)
+  }
   lastRecorded.set(name, now)
 
   try {

@@ -20,14 +20,18 @@ async function pollUntil<T>(fetch: () => Promise<T>, done: (value: T) => boolean
 }
 
 /** Build the PUT body for the Mux upload. A local path streams from disk with a Content-Length
- *  (so a large video never sits fully in memory); an `http(s)` URL is fetched and forwarded. */
+ *  (so a large video never sits fully in memory); an `http(s)` URL is fetched and forwarded.
+ *  Note: a URL source is buffered fully in memory before the PUT (Mux's upload endpoint needs a
+ *  known length) — for very large remote files, download to disk and ingest the local path. */
 async function buildUploadBody(source: MuxSource): Promise<{ body: BodyInit; headers?: Record<string, string> }> {
   if (/^https?:\/\//i.test(source)) {
     const res = await fetch(source)
     if (!res.ok) throw new Error(`[payload-mux] failed to fetch source '${source}': ${res.status} ${res.statusText}`)
     return { body: new Blob([await res.arrayBuffer()]) }
   }
-  const { size } = await stat(source)
+  const { size } = await stat(source).catch(() => {
+    throw new Error(`[payload-mux] source file not found: ${source}`)
+  })
   return { body: createReadStream(source) as unknown as BodyInit, headers: { 'Content-Length': String(size) } }
 }
 
@@ -92,7 +96,12 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
     (a) => a.status !== 'preparing',
     2000,
   )
-  if (asset.status !== 'ready') throw new Error(`[payload-mux] asset '${asset.id}' did not become ready (status: ${asset.status})`)
+  // Still `preparing` means the 120s pollUntil deadline passed, not a Mux verdict.
+  if (asset.status === 'preparing') throw new Error(`[payload-mux] timed out after 120s waiting for asset '${asset.id}' (status: preparing)`)
+  if (asset.status !== 'ready') {
+    const detail = asset.errors?.messages?.length ? `: ${asset.errors.messages.join('; ')}` : ''
+    throw new Error(`[payload-mux] asset '${asset.id}' did not become ready (status: ${asset.status})${detail}`)
+  }
 
   return asset
 }

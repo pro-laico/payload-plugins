@@ -3,7 +3,7 @@ import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from
 import { file, isFileToken, isRef, ref } from '../refs'
 import type { SeedAssetMarker, SeedDefinition, SeedDisabledMarker } from '../types'
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph, type DeferredField } from './graph'
-import { resolveFilePath, readFileAsUpload } from './files'
+import { resolveFilePath, readFileAsUpload, searchedDirs } from './files'
 import { collectTokens, docNodeId, resolveTokens } from './tokens'
 import { SeedValidationError, validateModel } from './validate'
 
@@ -118,7 +118,9 @@ function stripRefsToSkipped(payload: Payload, model: BuiltModel, skipped: Skippe
         continue
       }
       delete data[field]
-      payload.logger.warn(`[payload-seed] dropping '${where}.${field}': ref('${hit.collection}', '${hit.key}') targets a skipped definition.`)
+      payload.logger.warn(
+        `[payload-seed] dropping entire field '${field}' on ${where} (contains ref('${hit.collection}', '${hit.key}') to skipped '${hit.collection}': ${reasonBySlug.get(hit.collection)}).`,
+      )
     }
   }
 
@@ -199,7 +201,8 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   // required (the doc can't be created without it).
   stripRefsToSkipped(payload, model, skipped, requiredFields)
 
-  validateModel({ model, collectionSlugs, fileCollections, fieldNames })
+  const globalSlugs = new Set(payload.config.globals.map((g) => g.slug))
+  validateModel({ model, collectionSlugs, globalSlugs, fileCollections, fieldNames })
   const isRequired = (collection: string, field: string): boolean => requiredFields.get(collection)?.has(field) ?? false
   const { order, deferred } = buildGraph(model, { isRequired })
 
@@ -244,9 +247,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
       // `custom.seedAsset` `subdir`, else `assetSubDirs`, else the slug), then the assets root.
       const asset = assetBySlug.get(slug)
       const subdir = asset?.subdir ?? options.assetSubDirs[slug] ?? slug
-      const path = await resolveFilePath(record.file.name, options.assetsDir, [subdir, ''])
+      const subdirs = [subdir, '']
+      const path = await resolveFilePath(record.file.name, options.assetsDir, subdirs)
       if (!path) {
-        payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found under ${options.assetsDir} - skipped` })
+        const searched = searchedDirs(record.file.name, options.assetsDir, subdirs).join(', ')
+        payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found - skipped. Searched: ${searched}` })
       } else if (asset) {
         // Hand the resolved path + options to the collection's ingest hook via its source field
         // instead of uploading bytes.

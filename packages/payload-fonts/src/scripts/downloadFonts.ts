@@ -13,6 +13,16 @@ const colors = {
   orange: (t: string) => `\x1b[33m${t}\x1b[0m`,
 }
 
+/** Connection-refused / unreachable host — the DESIGNED `predev` state (server not up yet), never
+ *  an error. Node buries the code under `cause` (often an AggregateError), so walk the chain. */
+const DOWN_CODES = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH/
+const isServerDown = (err: unknown): boolean => {
+  if (!err || typeof err !== 'object') return false
+  const { code, message, cause, errors } = err as { code?: string; message?: string; cause?: unknown; errors?: unknown[] }
+  if (DOWN_CODES.test(code ?? '') || DOWN_CODES.test(message ?? '')) return true
+  return isServerDown(cause) || (Array.isArray(errors) && errors.some(isServerDown))
+}
+
 // A family key. `sans`/`serif`/`mono`/`display` by default, but the plugin's `families` option can
 // replace or extend them — so this CLI never hardcodes the list; it discovers the active families
 // from the keys of the export response and derives each family's `next/font` export name + CSS
@@ -27,7 +37,8 @@ export type RunDownloadFontsOptions = {
   fontsOutputDir?: string
   /** Generated `next/font/local` module path. Default `./src/app/definition.ts` or `PAYLOAD_FONTS_DEFINITION_FILE`. */
   definitionFile?: string
-  /** Dotenv file to load before reading env. Default `./.env` or `PAYLOAD_FONTS_ENV_FILE`. */
+  /** Dotenv file to load before reading env. Default `./.env.local` then `./.env` (Next
+   *  convention, `.env.local` wins), or `PAYLOAD_FONTS_ENV_FILE` to load exactly one file. */
   envFile?: string
   /**
    * `src` path passed to `localFont()` in the generated file (relative to the definition file's
@@ -58,10 +69,13 @@ export type RunDownloadFontsOptions = {
 }
 
 function resolveOptions(overrides?: RunDownloadFontsOptions) {
+  // An explicit env file (option or PAYLOAD_FONTS_ENV_FILE) is loaded alone; otherwise follow the
+  // Next convention — `.env.local` first so its values win over `.env` (dotenv keeps the first).
+  const explicitEnvFile = overrides?.envFile ?? process.env.PAYLOAD_FONTS_ENV_FILE
   return {
     fontsOutputDir: overrides?.fontsOutputDir ?? process.env.PAYLOAD_FONTS_OUTPUT_DIR ?? './public/fonts',
     definitionFile: overrides?.definitionFile ?? process.env.PAYLOAD_FONTS_DEFINITION_FILE ?? './src/app/definition.ts',
-    envFile: overrides?.envFile ?? process.env.PAYLOAD_FONTS_ENV_FILE ?? './.env',
+    envFiles: explicitEnvFile ? [explicitEnvFile] : ['./.env.local', './.env'],
     localFontSrcPrefix: overrides?.localFontSrcPrefix ?? process.env.PAYLOAD_FONTS_SRC_PREFIX ?? '../../public/fonts',
     cssVariablePrefix: overrides?.cssVariablePrefix ?? process.env.PAYLOAD_FONTS_CSS_VAR_PREFIX ?? '--font-set',
     endpointPath: overrides?.endpointPath ?? process.env.PAYLOAD_FONTS_ENDPOINT ?? '/api/fonts/export',
@@ -71,7 +85,7 @@ function resolveOptions(overrides?: RunDownloadFontsOptions) {
 
 export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Promise<void> {
   const opts = resolveOptions(overrides)
-  dotenv.config({ path: opts.envFile })
+  dotenv.config({ path: opts.envFiles, quiet: true })
 
   const FONT_FILES_DIR = opts.fontsOutputDir
   const FONT_DEFINITION_FILE = opts.definitionFile
@@ -150,10 +164,15 @@ export default fonts
     const siteUrl = overrides?.siteUrl ?? process.env.FONT_DOWNLOAD_URL
     const secret = process.env.PAYLOAD_SECRET
     if (!siteUrl || !secret) {
-      if (!siteUrl) console.warn(colors.red('Missing required environment variable: FONT_DOWNLOAD_URL'))
-      if (!secret) console.warn(colors.red('Missing required environment variable: PAYLOAD_SECRET'))
+      const searched = ` (searched ${opts.envFiles.join(', ')})`
+      if (!siteUrl) console.warn(colors.red(`Missing required environment variable: FONT_DOWNLOAD_URL${searched}`))
+      if (!secret) console.warn(colors.red(`Missing required environment variable: PAYLOAD_SECRET${searched}`))
       console.warn(colors.orange('Font download skipped — wrote an empty definition so the build can proceed.'))
       writeEmptyDefinitions()
+      return
+    }
+    if (!/^https?:\/\//i.test(siteUrl) || !URL.canParse(siteUrl)) {
+      warnAndEmpty(`FONT_DOWNLOAD_URL is not a valid http(s) URL: "${siteUrl}" — expected e.g. http://localhost:3000`)
       return
     }
 
@@ -164,11 +183,23 @@ export default fonts
     try {
       const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${secret}` } })
       if (!res.ok) {
-        warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}`)
+        const hint =
+          res.status === 401 || res.status === 403
+            ? " — your local PAYLOAD_SECRET doesn't match the server's"
+            : res.status === 404
+              ? ' — is the fonts plugin registered on that app? (or set PAYLOAD_FONTS_ENDPOINT)'
+              : ''
+        warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}${hint}`)
         return
       }
       manifest = (await res.json()) as ExportFontsResponse
     } catch (err) {
+      if (isServerDown(err)) {
+        // The DESIGNED predev state: `predev` runs before the dev server exists. Not an error.
+        console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)
+        writeEmptyDefinitions()
+        return
+      }
       warnAndEmpty(`Could not reach the font export endpoint at ${endpoint}`, err)
       return
     }
@@ -213,8 +244,28 @@ export default fonts
 
     generateFontDefinitions(familyFiles)
 
-    if (count === 0) console.log(colors.orange('\nNo active fonts returned — generated an empty definition.\n'))
-    else console.log(colors.green(`\n✓ Font definitions generated (${count} font file${count === 1 ? '' : 's'})\n`))
+    if (count === 0) {
+      console.log(colors.orange('\nNo active fonts returned — generated an empty definition.'))
+      // Newer servers say WHY each family came back empty (older ones omit `diagnostics`).
+      for (const [family, d] of Object.entries(manifest?.diagnostics ?? {})) {
+        if (!d) continue
+        const name = d.typeface ? `'${d.typeface}'` : 'a typeface'
+        if (!d.selected) console.log(colors.orange(`  ${family}: no typeface selected in the fontSet global`))
+        else if (d.optimizedFiles === 0)
+          console.log(
+            colors.orange(
+              `  ${family}: ${name} selected but has 0 optimized files — did the subsetter run on the server? (Next.js: serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit'])`,
+            ),
+          )
+        else if (d.readFailures > 0)
+          console.log(
+            colors.orange(
+              `  ${family}: ${name} selected but ${d.readFailures}/${d.optimizedFiles} optimized files could not be read from storage`,
+            ),
+          )
+      }
+      console.log('')
+    } else console.log(colors.green(`\n✓ Font definitions generated (${count} font file${count === 1 ? '' : 's'})\n`))
   } catch (err) {
     // Any unexpected failure → empty definition, so a broken run never leaves a stale one that
     // imports font files that aren't on disk (the bug this guards against).

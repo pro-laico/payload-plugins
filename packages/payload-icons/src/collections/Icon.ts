@@ -40,6 +40,9 @@ export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig =>
         type: 'code',
         admin: {
           language: 'xml',
+          // Read-only: a direct edit would bypass formatSVGHook's sanitization (only runs on file
+          // uploads) and the string is later inlined via dangerouslySetInnerHTML — re-upload to change.
+          readOnly: true,
           condition: (data) => Boolean(data?.svgString),
           editorOptions: { wordWrap: 'off', scrollBeyondLastLine: false },
         },

@@ -28,28 +28,28 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
       "./components/image": {
-        "import": "./dist/components/image.js",
         "types": "./dist/components/image.d.ts",
+        "import": "./dist/components/image.js",
         "default": "./dist/components/image.js"
       },
       "./utils/urls": {
-        "import": "./dist/utils/urls.js",
         "types": "./dist/utils/urls.d.ts",
+        "import": "./dist/utils/urls.js",
         "default": "./dist/utils/urls.js"
       },
       "./admin/focalPreview": {
-        "import": "./dist/components/admin/focalPreview.js",
         "types": "./dist/components/admin/focalPreview.d.ts",
+        "import": "./dist/components/admin/focalPreview.js",
         "default": "./dist/components/admin/focalPreview.js"
       },
       "./admin/purgeVariants": {
-        "import": "./dist/components/admin/purgeVariants.js",
         "types": "./dist/components/admin/purgeVariants.d.ts",
+        "import": "./dist/components/admin/purgeVariants.js",
         "default": "./dist/components/admin/purgeVariants.js"
       }
     }

@@ -1,6 +1,12 @@
 // The plugin — the single entry point.
 export { iconsPlugin, default } from './plugin'
 
+// Public types, re-exported so consumers can type options/helpers without deep imports.
+export type { IconsPluginOptions } from './plugin'
+export type { IconCollectionOverrides, IconDoc } from './types'
+export type { IconSetCollectionOverrides } from './collections/IconSet'
+export type { IconRequestCollectionOverrides } from './collections/IconRequest'
+
 // SVG string helpers — inline an icon's `svgString` as a real `<svg>` when rendering it yourself
 // (e.g. with `getIconSvg` from the `./cache` subpath):
 //   <svg {...extractSvgProps(svg)} className="size-6" dangerouslySetInnerHTML={{ __html: extractSvgContent(svg) }} />

@@ -66,6 +66,8 @@ export const getBeforeValidateHook =
       ...rest,
       assetId: asset.id,
       ...getAssetMetadata(asset),
+      // Ingest waits until the asset is ready, so the status can be stamped directly.
+      status: 'ready',
       ...(norm.posterTimestamp !== undefined ? { posterTimestamp: norm.posterTimestamp } : {}),
     }
   }

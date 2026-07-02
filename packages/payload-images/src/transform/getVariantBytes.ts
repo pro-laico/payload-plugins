@@ -63,6 +63,16 @@ const isDuplicateKeyError = (err: unknown): boolean => {
   return Array.isArray(fieldErrors) && fieldErrors.some((f) => f.path === 'cacheKey' || /unique/i.test(f.message ?? ''))
 }
 
+/** True when Sharp itself failed to load (module missing or native binding broken) — the fix is
+ *  the install, not this image, so the generic "transform failed" line alone would mislead. */
+const isSharpLoadError = (err: unknown): boolean => {
+  const s = `${String(err)} ${String((err as { code?: unknown })?.code ?? '')}`
+  return /sharp|libvips/i.test(s) && /cannot find module|module_not_found|could not load|native|binding/i.test(s)
+}
+
+/** The actionable fix for a Sharp load failure — shared by the boot probe and the request-time catch. */
+export const SHARP_INSTALL_HINT = "install it (`pnpm add sharp`) and externalize it in next.config (`serverExternalPackages: ['sharp']`)"
+
 /**
  * Return the bytes for one variant: cache hit → stored copy; miss → Sharp once, persist after
  * the response (via Next's `after()`, falling back to fire-and-forget), then return the bytes.
@@ -112,7 +122,8 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
         maxInputPixels,
       })
     } catch (err) {
-      payload.logger.error(`[payload-images] transform failed for ${src.id}: ${String(err)}`)
+      const hint = isSharpLoadError(err) ? ` — sharp failed to load; ${SHARP_INSTALL_HINT}` : ''
+      payload.logger.error(`[payload-images] transform failed for ${src.id}: ${String(err)}${hint}`)
       return { ok: false, status: 500, msg: 'Transform failed' }
     }
 

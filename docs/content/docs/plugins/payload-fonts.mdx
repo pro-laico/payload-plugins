@@ -344,6 +344,8 @@ giving precise preloading, size-adjusted fallbacks, content-hashed static assets
 
 `definition.ts` and `public/fonts/` are generated, so gitignore them. A `predev: payload-fonts-download`
 writes an empty stub so the import resolves before your dev server is up (no file to hand-create).
+Alternative: **commit an empty `definition.ts` as a baseline** and skip `predev` entirely — the download
+still overwrites it on `prebuild` (the fonts-sandbox example takes this route).
 
 The CLI reads these env vars. Only the first two are required:
 
@@ -527,6 +529,14 @@ A few things to keep in mind:
 - **One original per typeface, and variable XOR weights.** A save that references a `fontOriginal`
   already used by another typeface is rejected (it keeps cascade cleanup safe), as is mixing a
   variable file with per-weight files on the same typeface.
+- **Changing `families` strands existing data.** Dropping a family removes its `fontSet` slot (the
+  stored selection silently vanishes) and leaves `font` docs whose `family` value is no longer an
+  option — they fail validation on their next save. Migrate those docs (or keep the old key) when you
+  reshape the list.
+- **The download CLI fails soft, and carries your secret.** Every handled failure writes the empty
+  definition and exits 0 so the build proceeds — CI can't gate on "shipped without fonts", so watch
+  the build log. And it sends `PAYLOAD_SECRET` as a bearer token to whatever `FONT_DOWNLOAD_URL`
+  points at — keep that URL https and correct.
 
 ## Exports
 

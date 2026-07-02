@@ -72,8 +72,11 @@ export async function DevFonts({
     const payload = await getPayload({ config })
     const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, families: resolved?.map((r) => r.key) })
     css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug, fallbacks })
-  } catch {
-    return null // no DB / not seeded yet — render nothing rather than throw in the layout
+  } catch (err) {
+    // No DB / not seeded yet — render nothing rather than throw in the layout, but say why
+    // (dev-only component, so the warning never reaches production logs).
+    console.warn('[payload-fonts] DevFonts failed to load the active fonts:', err)
+    return null
   }
   if (!css) return null
 

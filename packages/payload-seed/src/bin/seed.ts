@@ -17,6 +17,12 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   }
   const options = (config.custom?.payloadSeed?.options ?? {}) as SeedPluginOptions
   const payload = await getPayload({ config })
-  const result = await seed({ payload, options })
-  payload.logger.info({ msg: 'seed complete', ...result })
+  try {
+    const result = await seed({ payload, options })
+    payload.logger.info({ msg: 'seed complete', ...result })
+  } finally {
+    // Close adapter connections so the process doesn't hang on open handles.
+    await payload.db.destroy?.()
+  }
+  process.exit(0)
 }

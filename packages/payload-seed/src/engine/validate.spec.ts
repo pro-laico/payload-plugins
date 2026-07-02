@@ -4,9 +4,10 @@ import type { BuiltModel } from './graph'
 import { SeedValidationError, validateModel } from './validate'
 
 const slugs = new Set(['services', 'posts', 'media'])
+const globalSlugs = new Set(['site-settings'])
 const fileCollections = new Set(['media'])
 
-const run = (model: BuiltModel) => validateModel({ model, collectionSlugs: slugs, fileCollections })
+const run = (model: BuiltModel) => validateModel({ model, collectionSlugs: slugs, globalSlugs, fileCollections })
 
 describe('validateModel', () => {
   it('passes when every ref resolves', () => {
@@ -57,6 +58,30 @@ describe('validateModel', () => {
     ).toThrow(/not an upload collection or a custom\.seedAsset collection/)
   })
 
+  it('flags a definition whose own collection slug is not in the config', () => {
+    expect(() => run({ collections: [{ slug: 'widgets', records: [{ key: 'a', data: {} }] }], globals: [] })).toThrow(
+      /defineSeed\('widgets'\): no collection 'widgets' in the Payload config/,
+    )
+  })
+
+  it('flags a definition whose own global slug is not in the config', () => {
+    expect(() => run({ collections: [], globals: [{ slug: 'footer', data: {} }] })).toThrow(
+      /defineSeed\('footer'\): no global 'footer' in the Payload config/,
+    )
+  })
+
+  it('flags duplicate _keys across two definitions of the same slug', () => {
+    expect(() =>
+      run({
+        collections: [
+          { slug: 'media', records: [{ key: 'dup', data: {} }] },
+          { slug: 'media', records: [{ key: 'dup', data: {} }] },
+        ],
+        globals: [],
+      }),
+    ).toThrow(/media: duplicate _key 'dup'/)
+  })
+
   it('flags duplicate _keys within a collection', () => {
     expect(() =>
       run({
@@ -80,6 +105,7 @@ describe('validateModel', () => {
       validateModel({
         model: { collections: [{ slug: 'services', records: [{ key: 'a', data: { title: 'X', bogus: 'Y' } }] }], globals: [] },
         collectionSlugs: slugs,
+        globalSlugs,
         fileCollections,
         fieldNames,
       }),
@@ -92,7 +118,7 @@ describe('validateModel', () => {
       globals: [],
     }
     expect(() =>
-      validateModel({ model, collectionSlugs: slugs, fileCollections, fieldNames: new Map([['services', new Set(['title'])]]) }),
+      validateModel({ model, collectionSlugs: slugs, globalSlugs, fileCollections, fieldNames: new Map([['services', new Set(['title'])]]) }),
     ).not.toThrow()
     expect(() => run(model)).not.toThrow() // no fieldNames → field check skipped
   })

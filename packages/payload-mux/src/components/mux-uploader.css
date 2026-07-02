@@ -2,6 +2,10 @@
   margin-bottom: var(--base);
 }
 
+.mux-uploader__error {
+  color: var(--theme-error-500);
+}
+
 .mux-uploader__processing::after {
   display: inline-block;
   overflow: hidden;

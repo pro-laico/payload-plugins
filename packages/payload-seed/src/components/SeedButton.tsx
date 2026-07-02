@@ -1,6 +1,6 @@
 'use client'
 
-import { toast } from '@payloadcms/ui'
+import { toast, useConfig } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useState } from 'react'
 
@@ -13,33 +13,56 @@ const SuccessMessage: React.FC = () => (
   </div>
 )
 
+const MAX_SHOWN_ISSUES = 5
+
+const summarizeIssues = (issues: string[]): string => {
+  const shown = issues.slice(0, MAX_SHOWN_ISSUES)
+  const more = issues.length - shown.length
+  return shown.join('\n') + (more > 0 ? `\n…and ${more} more` : '')
+}
+
+interface SeedResponseBody {
+  error?: string
+  issues?: string[]
+  message?: string
+}
+
 export interface SeedButtonProps {
-  /** Endpoint URL the button POSTs to. Defaults to `/api/seed`. */
+  /** Endpoint URL the button POSTs to. Defaults to `<routes.api>/seed` from the admin config. */
   endpoint?: string
 }
 
 /** Admin dashboard button that triggers `POST /api/seed`. Injected via the plugin's
- *  `adminButton` option, or registered manually in `admin.components.beforeDashboard`. */
-export const SeedButton: React.FC<SeedButtonProps> = ({ endpoint = '/api/seed' }) => {
+ *  `adminButton` option, or registered manually in `admin.components.beforeDashboard`.
+ *  The seed wipes seeded collections, so the first click arms a confirm and the second runs. */
+export const SeedButton: React.FC<SeedButtonProps> = ({ endpoint }) => {
+  const { config } = useConfig()
+  const url = endpoint ?? `${config.serverURL ?? ''}${config.routes.api}/seed`
   const [seeded, setSeeded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<null | string>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault()
 
-      if (seeded) return toast.info('Database already seeded.')
       if (loading) return toast.info('Seeding already in progress.')
-      if (error) return toast.error('An error occurred, please refresh and try again.')
+      if (!confirming) return setConfirming(true)
 
+      setConfirming(false)
+      setError(null)
       setLoading(true)
 
-      const run = fetch(endpoint, { method: 'POST', credentials: 'include' })
-        .then((res) => {
-          if (!res.ok) throw new Error('An error occurred while seeding.')
+      const run = fetch(url, { method: 'POST', credentials: 'include' })
+        .then(async (res) => {
+          const body = (await res.json().catch(() => ({}))) as SeedResponseBody
+          if (!res.ok) {
+            const base = body.error ?? 'An error occurred while seeding.'
+            throw new Error(body.issues?.length ? `${base}\n${summarizeIssues(body.issues)}` : base)
+          }
           setSeeded(true)
-          return true
+          return body
         })
         .catch((err) => {
           const wrapped = err instanceof Error ? err : new Error(String(err))
@@ -48,18 +71,23 @@ export const SeedButton: React.FC<SeedButtonProps> = ({ endpoint = '/api/seed' }
         })
         .finally(() => setLoading(false))
 
-      toast.promise(run, { loading: 'Seeding with data....', success: <SuccessMessage />, error: 'An error occurred while seeding.' })
+      toast.promise(run, {
+        loading: 'Seeding with data....',
+        success: (body) => body.message ?? <SuccessMessage />,
+        error: (err) => (err instanceof Error ? err.message : 'An error occurred while seeding.'),
+      })
     },
-    [loading, seeded, error, endpoint],
+    [loading, confirming, url],
   )
 
   let message = ''
+  if (seeded) message = ' (done — click to reseed)'
+  if (error) message = ` (error: ${error} — click to retry)`
+  if (confirming) message = ' — click again to confirm: this wipes seeded collections'
   if (loading) message = ' (seeding...)'
-  if (seeded) message = ' (done!)'
-  if (error) message = ` (error: ${error})`
 
   return (
-    <button type="button" onClick={handleClick} disabled={loading || seeded}>
+    <button type="button" onClick={handleClick} disabled={loading}>
       Seed your database{message}
     </button>
   )

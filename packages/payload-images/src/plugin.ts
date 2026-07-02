@@ -5,7 +5,9 @@ import { createImagesCollection, imageEnhancements } from './collections/images'
 import { createPurgeEndpoint, createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
 import { stashConfig } from './lib/configStash'
 import { mergeCollection } from './lib/mergeCollection'
+import { SHARP_INSTALL_HINT } from './transform/getVariantBytes'
 import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './transform/params'
+import { loadSharp } from './transform/sharpInstance'
 
 export interface ImagesPluginOptions {
   /**
@@ -55,7 +57,9 @@ export interface ImagesPluginOptions {
   /**
    * Add virtual `src` / `srcset` / `placeholderURL` / `thumbnailURL` fields, computed on read,
    * so optimized URLs ride along in every REST / GraphQL / Local-API response (and through
-   * relationship population). Absolute when `serverURL` is set, relative otherwise. Default true.
+   * relationship population). Absolute when `serverURL` is set, relative otherwise. Default true;
+   * defaults to false with `transform: false` (the URLs would 404 — an explicit true is honored,
+   * with a boot warning).
    */
   virtualFields?: boolean
   /** Mark the `alt` field `localized: true` (requires Payload localization). Ignored with
@@ -145,7 +149,6 @@ export const imagesPlugin =
       transform = {},
       focalUI = true,
       previewRatios,
-      virtualFields = true,
       localizeAlt = false,
       mimeTypes,
       folders,
@@ -160,6 +163,11 @@ export const imagesPlugin =
     const sourceSlug = extendCollection || transformCfg.sourceSlug || 'images'
     const basePath = '/img'
     const purgePath = `${basePath}/purge`
+    const apiRoute = config.routes?.api ?? '/api'
+    const endpointsEnabled = transform !== false
+    // With transforms off the virtual URL fields would point at an unregistered endpoint, so they
+    // default off; an explicit `virtualFields: true` is honored (warned at boot — the URLs 404).
+    const virtualFields = opts.virtualFields ?? endpointsEnabled
 
     const generated = mergeCollection(createGeneratedImagesCollection({ slug: variantSlug, sourceSlug }), generatedImagesOverrides)
 
@@ -168,10 +176,39 @@ export const imagesPlugin =
       const target = (config.collections ?? []).find((c) => c.slug === extendCollection)
       if (!target) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' not found`)
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
-      const enhanced = mergeCollection(
-        mergeCollection(target, imageEnhancements({ focalUI, previewRatios, variantSlug, purgePath, virtualFields, folders })),
-        imagesOverrides,
-      )
+      // On-demand admin thumbnail only when the endpoint exists AND the target hasn't set its own.
+      const ownThumbnail =
+        (typeof target.upload === 'object' && !!target.upload.adminThumbnail) ||
+        !!(target.admin as { thumbnail?: unknown } | undefined)?.thumbnail
+      const enh = imageEnhancements({
+        focalUI,
+        previewRatios,
+        variantSlug,
+        purgePath,
+        virtualFields,
+        folders,
+        apiRoute,
+        endpointsEnabled,
+        adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
+      })
+      // Merge, never overwrite: the target's own defaultPopulate / forceSelect entries win over
+      // (and add to) the parity defaults, so its populated reads keep behaving as it declared.
+      const parity: Partial<CollectionConfig> = {
+        ...enh,
+        defaultPopulate: {
+          ...(enh.defaultPopulate as Record<string, unknown>),
+          ...(target.defaultPopulate as Record<string, unknown> | undefined),
+        } as CollectionConfig['defaultPopulate'],
+        ...(enh.forceSelect || target.forceSelect
+          ? {
+              forceSelect: {
+                ...(enh.forceSelect as Record<string, unknown> | undefined),
+                ...(target.forceSelect as Record<string, unknown> | undefined),
+              } as CollectionConfig['forceSelect'],
+            }
+          : {}),
+      }
+      const enhanced = mergeCollection(mergeCollection(target, parity), imagesOverrides)
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
     } else {
       const images = mergeCollection(
@@ -186,11 +223,23 @@ export const imagesPlugin =
           mimeTypes,
           folders,
           maxOriginalSize,
-          adminThumbnail: transform === false ? false : undefined,
+          apiRoute,
+          endpointsEnabled,
+          adminThumbnail: endpointsEnabled ? undefined : false,
         }),
         imagesOverrides,
       )
       collections = [...(config.collections ?? []), images, generated]
+    }
+
+    // A custom transform.sourceSlug gets the same guard extendCollection does — a typo here would
+    // otherwise just 404/500 every image request at runtime. Checked against the FINAL collections
+    // array (registration is unchanged; the default `images` collection is still created).
+    if (!extendCollection && transformCfg.sourceSlug) {
+      const src = collections.find((c) => c.slug === transformCfg.sourceSlug)
+      if (!src) throw new Error(`[payload-images] transform.sourceSlug: collection '${transformCfg.sourceSlug}' not found`)
+      if (!src.upload)
+        throw new Error(`[payload-images] transform.sourceSlug: collection '${transformCfg.sourceSlug}' is not an upload collection`)
     }
 
     const endpoints =
@@ -211,6 +260,11 @@ export const imagesPlugin =
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]
     const shadowed = transform !== false && collections.some((c) => c.slug === baseSegment)
+    // These options only shape the CREATED `images` collection; with extendCollection the target's
+    // own upload config governs, so a set value would be silently ignored — surface it at boot.
+    const ignoredWithExtend = extendCollection
+      ? (['mimeTypes', 'localizeAlt', 'maxOriginalSize'] as const).filter((k) => opts[k] !== undefined)
+      : []
 
     return {
       ...config,
@@ -239,6 +293,25 @@ export const imagesPlugin =
         if (shadowed) {
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
+          )
+        }
+        if (ignoredWithExtend.length) {
+          payload.logger.warn(
+            `[payload-images] extendCollection: option(s) ${ignoredWithExtend.join(', ')} are ignored — you own '${extendCollection}'s upload config; set the equivalent on the collection itself.`,
+          )
+        }
+        if (!endpointsEnabled && opts.virtualFields === true) {
+          payload.logger.warn(
+            '[payload-images] virtualFields: true with transform: false — the virtual src/srcset/placeholderURL/thumbnailURL fields point at the unregistered transform endpoint and will 404.',
+          )
+        }
+        // Probe Sharp once at boot so a missing install / broken native binding surfaces as one
+        // actionable error here instead of a 500 on the first image request.
+        try {
+          await loadSharp()
+        } catch (err) {
+          payload.logger.error(
+            `[payload-images] sharp failed to load — transforms and LQIPs will fail; ${SHARP_INSTALL_HINT}. (${String(err)})`,
           )
         }
       },

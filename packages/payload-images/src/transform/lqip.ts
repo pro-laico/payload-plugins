@@ -26,7 +26,11 @@ export const resolveLqipWidth = (requested: number | undefined, defaultW: number
     const cap = Math.max(LQIP_MIN_WIDTH, Math.round(maxWidth))
     return Math.max(LQIP_MIN_WIDTH, Math.round(clamp(w, LQIP_MIN_WIDTH, cap) / 8) * 8)
   }
-  return clamp(w, LQIP_MIN_WIDTH, LQIP_HARD_MAX_WIDTH)
+  const applied = clamp(w, LQIP_MIN_WIDTH, LQIP_HARD_MAX_WIDTH)
+  // The trusted path's promised feedback: honored up to the guard, but the guard is never silent.
+  if (applied !== w && process.env.NODE_ENV !== 'production')
+    console.warn(`[payload-images] LQIP width ${w} is outside the ${LQIP_MIN_WIDTH}–${LQIP_HARD_MAX_WIDTH} guard — using ${applied}.`)
+  return applied
 }
 
 /** Clamp a requested LQIP quality to {@link LQIP_QUALITY_RANGE}, falling back to `defaultQ`. */

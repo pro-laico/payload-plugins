@@ -1,5 +1,5 @@
 import type { Config } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { fontsPlugin } from './plugin'
 
@@ -38,6 +38,13 @@ describe('fontsPlugin (unit)', () => {
 
   it('leaves upload config untouched (uploads go to the fontOriginal collection)', () => {
     expect(apply(fontsPlugin()).upload).toBeUndefined()
+  })
+
+  it("wraps onInit (dev subsetter probe) without dropping the app's own onInit", async () => {
+    const appOnInit = vi.fn()
+    const config = apply(fontsPlugin(), { onInit: appOnInit })
+    await config.onInit?.({ logger: { error: vi.fn() } } as never)
+    expect(appOnInit).toHaveBeenCalledOnce()
   })
 
   it('is a no-op when disabled', () => {

@@ -120,7 +120,7 @@ export const options = [
   },
   { name: 'focalUI', type: 'boolean', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button.` },
   { name: 'previewRatios', type: 'string[]', default: "['16:9','9:16','1:1','4:3','3:2','21:9']", description: `Aspect ratios shown as preview tiles in the focal-point field.` },
-  { name: 'virtualFields', type: 'boolean', default: 'true', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population.` },
+  { name: 'virtualFields', type: 'boolean', default: 'true (false when transform: false)', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population. Defaults off when the transform endpoint is disabled (the URLs would 404); pass true explicitly to force them anyway.` },
   { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
   { name: 'folders', type: 'boolean', default: 'false', description: `Enable Payload's native folder organization on the managed collection (the created images, or the extendCollection target) so editors can organize a large library.` },
@@ -284,6 +284,9 @@ The URLs are absolute when `serverURL` is set (relative otherwise), hidden in th
 images return these renderable fields and **not** the `variants` cache join (which would cost an
 extra query per image). Disable with `virtualFields: false`. (A `blurDataURL`, an on-demand inline
 LQIP, sits on the doc too, but stays `null` until a read opts in; see [Placeholder](#placeholder).)
+One cost to know: a wide original at the default `pixelStep: 50` emits dozens of `srcset` URLs
+(several KB of string) on every read and population — raise `pixelStep` or pass an explicit ladder
+if response size matters.
 
 <Callout type="info">
   The resolved config (slugs + options) is stashed on `config.custom.payloadImages`, so decoupled
@@ -562,13 +565,10 @@ import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 export async function generateMetadata({ params }): Promise<Metadata> {
   const page = await getPage(params.slug) // your data fetch
   const image = page.heroImage            // a populated `images` doc
+  const url = getImageUrl(image, { width: 1200, aspectRatio: '1200/630' }) // string | null (null without an id)
   return {
     openGraph: {
-      images: [{
-        url: getImageUrl(image, { width: 1200, aspectRatio: '1200/630' }),
-        width: 1200,
-        height: 630,
-      }],
+      images: url ? [{ url, width: 1200, height: 630 }] : [],
     },
   }
 }

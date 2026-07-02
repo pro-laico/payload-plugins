@@ -13,14 +13,19 @@ const sanitizePlugins: PluginConfig[] = ['removeScripts', { name: 'removeAttrs',
 // output as a final pass.
 const stripDangerousUrls = (svg: string): string => svg.replace(/\s(?:xlink:)?href\s*=\s*(["'])\s*javascript:[^"']*\1/gi, '')
 
+// The optimizer targets FILL glyphs: presentation attrs are stripped and fill="currentColor" is
+// re-added, so a stroke-outline source (Lucide-style) renders its enclosed shapes as solid blobs.
+const STROKE_WARNING = 'Warning: stroke-based icon detected — enclosed shapes will render filled. Use a fill-based glyph.'
+const isStrokeBased = (svg: string): boolean => /fill\s*=\s*(["'])\s*none\s*\1/i.test(svg) && /\bstroke(?:-width)?\s*=/i.test(svg)
+
 /**
  * Optimize and sanitize an uploaded SVG: run svgo (sanitize → preset-default → strip presentation
  * attrs → re-add `currentColor` fill/stroke so the icon themes with CSS color), tighten the
  * `viewBox` to the real path bounds, and store the result as `svgString` for inline rendering.
  *
  * svgo + svg-path-bbox are imported dynamically so they never land in a frontend/edge bundle —
- * this only runs server-side when an SVG is actually uploaded. Returns `icon` unchanged on any
- * failure (the raw upload is still stored, just not optimized).
+ * this only runs server-side when an SVG is actually uploaded. On failure the raw upload is still
+ * stored (never optimized/inlined) and the `optimized` field carries the error so the doc shows it.
  */
 export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload['logger']): Promise<IconData> => {
   try {
@@ -28,6 +33,11 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
 
     const svg = svgData.toString('utf-8')
     const originalSize = svgData.length
+
+    const strokeBased = isStrokeBased(svg)
+    if (strokeBased) logger.warn(`[payload-icons] ${STROKE_WARNING}`)
+    // Prefix the report field so the editor sees the warning on the doc, not just in the server log.
+    const report = (msg: string): string => (strokeBased ? `${STROKE_WARNING} ${msg}` : msg)
 
     const hasTransforms = svg.includes('transform=')
     const hasClipPaths = svg.includes('clip-path=') || svg.includes('<clipPath')
@@ -40,7 +50,7 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
       // Even when we skip optimization we MUST strip scripts/event handlers, because svgString is
       // later inlined via dangerouslySetInnerHTML for every visitor.
       const sanitized = stripDangerousUrls(optimize(svg, { multipass: false, plugins: sanitizePlugins }).data)
-      return { ...icon, optimized: 'Skipped optimization (transform/clip-path present); scripts stripped', svgString: sanitized }
+      return { ...icon, optimized: report('Skipped optimization (transform/clip-path present); scripts stripped'), svgString: sanitized }
     }
 
     const optimized = optimize(svg, {
@@ -170,10 +180,12 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
     const optimizedString = `SVG optimized: ${originalSize} to ${finalSize} bytes (${reductionPercentage}% reduction)`
     logger.info(`[payload-icons] ${optimizedString}`)
 
-    return { ...icon, filesize: finalSize, optimized: optimizedString, svgString: svgStr }
+    return { ...icon, filesize: finalSize, optimized: report(optimizedString), svgString: svgStr }
   } catch (error) {
     logger.error({ msg: '[payload-icons] Error processing SVG', err: error })
-    return icon
+    // Surface the failure on the doc itself — both output fields are condition-hidden when empty,
+    // so a silent return would look like a normal save while the icon never renders.
+    return { ...icon, optimized: `Optimization failed: ${error instanceof Error ? error.message : String(error)} — icon will not render.` }
   }
 }
 

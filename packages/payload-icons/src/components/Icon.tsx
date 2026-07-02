@@ -3,7 +3,7 @@ import 'server-only'
 import type React from 'react'
 import { draftMode } from 'next/headers'
 
-import { getIconSvg } from '../cache'
+import { getIconSvg, warnIconMissDev } from '../cache'
 import { extractSvgContent, extractSvgProps } from '../lib/extractSVG'
 import { trackIconMiss } from '../usage/trackIconMiss'
 
@@ -51,12 +51,24 @@ export const Icon = async ({ name, fallback, ...svgProps }: IconProps): Promise<
   // Name didn't resolve against the active set — record it (throttled,
   // fire-and-forget) so the admin "Requested icons" panel can surface real
   // runtime misses, including dynamic names a static scan can't see.
-  if (!svg) trackIconMiss(name)
+  if (!svg) {
+    trackIconMiss(name)
+    void warnIconMissDev(name, draft) // dev-only, once per name — diagnoses WHY the name missed
+  }
   const source = svg || fallback || FALLBACK_WARNING_SVG
 
   // Default to decorative (aria-hidden); callers announcing the icon override
   // with `aria-hidden={false}` + a title since svgProps wins over this default.
-  return <svg aria-hidden="true" {...extractSvgProps(source)} {...svgProps} dangerouslySetInnerHTML={{ __html: extractSvgContent(source) }} />
+  // `data-icon-missing` marks fallback renders so multiple misses on a page are distinguishable.
+  return (
+    <svg
+      aria-hidden="true"
+      {...(svg ? {} : { 'data-icon-missing': name })}
+      {...extractSvgProps(source)}
+      {...svgProps}
+      dangerouslySetInnerHTML={{ __html: extractSvgContent(source) }}
+    />
+  )
 }
 
 export default Icon

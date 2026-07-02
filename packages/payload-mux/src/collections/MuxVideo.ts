@@ -103,6 +103,21 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
     // create that supplies a `source` instead of an already-resolved `assetId`.
     // Indexed: the webhook looks a doc up by assetId on every Mux event.
     { name: 'assetId', type: 'text', index: true, admin: { readOnly: true, condition: (data) => data.assetId } },
+    // Encoding lifecycle, hook-written: 'preparing' until Mux reports the asset ready (short
+    // poll or webhook), 'ready' once playable, 'errored' when Mux rejects it (see `error`).
+    // Not required — docs created before this field existed have no status.
+    {
+      name: 'status',
+      type: 'select',
+      options: [
+        { label: 'Preparing', value: 'preparing' },
+        { label: 'Ready', value: 'ready' },
+        { label: 'Errored', value: 'errored' },
+      ],
+      admin: { position: 'sidebar', readOnly: true, condition: (data) => data.status },
+    },
+    // Mux's error messages when `status` is 'errored'; surfaced by the uploader field.
+    { name: 'error', type: 'text', admin: { hidden: true, readOnly: true } },
     { name: 'duration', label: 'Duration', type: 'number', admin: { readOnly: true, condition: (data) => data.duration } },
     {
       name: 'posterTimestamp',
@@ -127,11 +142,13 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       type: 'array',
       admin: { readOnly: true, condition: (data) => !!data.playbackOptions },
       fields: [
-        { name: 'playbackId', label: 'Playback ID', type: 'text', admin: { readOnly: true } },
+        // Both required: the pair is always written together, and it tightens the generated types.
+        { name: 'playbackId', label: 'Playback ID', type: 'text', required: true, admin: { readOnly: true } },
         {
           name: 'playbackPolicy',
           label: 'Playback Policy',
           type: 'select',
+          required: true,
           options: [
             { label: 'signed', value: 'signed' },
             { label: 'public', value: 'public' },

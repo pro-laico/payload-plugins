@@ -28,18 +28,18 @@
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
-        "import": "./dist/index.js",
         "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
         "default": "./dist/index.js"
       },
       "./admin/FontOriginalUpload": {
-        "import": "./dist/components/admin/FontOriginalUpload.js",
         "types": "./dist/components/admin/FontOriginalUpload.d.ts",
+        "import": "./dist/components/admin/FontOriginalUpload.js",
         "default": "./dist/components/admin/FontOriginalUpload.js"
       },
       "./DevFonts": {
-        "import": "./dist/components/DevFonts.js",
         "types": "./dist/components/DevFonts.d.ts",
+        "import": "./dist/components/DevFonts.js",
         "default": "./dist/components/DevFonts.js"
       }
     }

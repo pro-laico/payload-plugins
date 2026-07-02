@@ -74,7 +74,12 @@ export function defineSeed<TSlug extends CollectionSlug | GlobalSlug, const T ex
   // Classify collection vs global from the builder's shape (collection → array, global → object).
   // The ref/file tokens are pure constructors, so this eager call has no side effects and resolves
   // no refs; it only decides `kind`. The engine calls `build` again at seed time.
-  const built = (build as (t: SeedTokens) => unknown)(tokens)
+  let built: unknown
+  try {
+    built = (build as (t: SeedTokens) => unknown)(tokens)
+  } catch (e) {
+    throw new Error(`[payload-seed] defineSeed('${slug}'): builder threw during classification: ${e instanceof Error ? e.message : String(e)}`)
+  }
   const kind = Array.isArray(built) ? 'collection' : 'global'
   return { kind, slug, build, ...(opts?.disabled !== undefined ? { disabled: opts.disabled } : {}) } as unknown as DefinitionFor<TSlug>
 }

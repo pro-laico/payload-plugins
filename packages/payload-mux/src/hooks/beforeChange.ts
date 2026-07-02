@@ -9,8 +9,8 @@ const POLL_LIMIT_MS = 6000
 
 /**
  * When a doc's `assetId` is set or changed: delete the previous asset (on update), fetch the
- * new asset, briefly poll while it's `preparing`, and fold its metadata into the doc. A
- * still-`preparing` asset is left for the webhook to finish; an `errored` asset is deleted
+ * new asset, briefly poll while it's `preparing`, and fold its metadata + `status` into the
+ * doc. A still-`preparing` asset is left for the webhook to finish; an `errored` asset is deleted
  * and the save rejected. The doc's `filename`/`title` are made unique (the upload collection
  * requires a unique filename).
  */
@@ -44,7 +44,10 @@ export const getBeforeChangeHook =
       }
 
       if (asset.status === 'ready') {
-        data = { ...data, ...getAssetMetadata(asset) }
+        data = { ...data, ...getAssetMetadata(asset), status: 'ready', error: null }
+      } else {
+        // Still preparing after the short poll — the webhook flips the status to 'ready'.
+        data = { ...data, status: 'preparing', error: null }
       }
 
       // `title` is unique: probe `base`, then `base (1)`, `base (2)` … until one is free.

@@ -142,10 +142,10 @@ The seed is gated by the `ENABLE_SEED` kill switch (off by default). Set it, the
 of three ways: the bundled command, the admin button (`adminButton: true`), or the endpoint:
 
 ```bash
-ENABLE_SEED=true 
-# pnpm payload seed   # CLI (Local API)
-# or click "Seed your database" in the admin header
-# or POST /api/seed  (any authenticated user)
+ENABLE_SEED=true pnpm payload seed   # CLI (Local API)
+# or set ENABLE_SEED=true in your env, then:
+#   click "Seed your database" in the admin header
+#   or POST /api/seed  (any authenticated user)
 ```
 
 <Callout type="warn">
@@ -520,9 +520,11 @@ curl -X POST https://your-app.com/api/seed \
 # 200 → { "success": true, "created": { "media": 3, "services": 2, "posts": 1 }, "order": [ … ] }
 ```
 
-On success it returns `200` with `{ success, created, order }`. On failure it logs the error server-side
-and returns a generic `500` (`{ error: 'Error seeding data.' }`), so internals never reach the client.
-**Best for:** CI/CD, or seeding a deployed environment over HTTP.
+On success it returns `200` with `{ success, created, order }`. A validation failure (bad ref, duplicate
+`_key`, unknown field/slug) returns `400` with `{ error, issues }` — the same named, collected issues the
+engine produces, so you can fix them without digging through server logs. Any other failure logs
+server-side and returns a generic `500` (`{ error: 'Error seeding data.' }`), so internals never reach the
+client. **Best for:** CI/CD, or seeding a deployed environment over HTTP.
 
 </Tab>
 
@@ -563,13 +565,15 @@ import config from '@payload-config'
 const payload = await getPayload({ config })
 const result = await seed({ payload, options: { definitions: [media, services, posts] } })
 
-result.created // → { media: 3, services: 2, posts: 1 }              (created docs per collection)
-result.order   // → ['media:hero', 'services:consulting', 'posts:launch']  (topo-sorted create order)
+result.created  // → { media: 3, services: 2, posts: 1 }              (created docs per collection)
+result.order    // → ['media:hero', 'services:consulting', 'posts:launch']  (topo-sorted create order)
+result.deferred // → fields created null to break a ref cycle, set in the second pass
+result.skipped  // → [{ slug, reason }] definitions skipped this run (disabled / custom.seedDisabled)
 ```
 
-`seed()` returns `{ created, order }` — the same shape the endpoint response carries (alongside
-`success: true`) and the CLI logs on completion. Still destructive; call it deliberately. **Best for:**
-integration tests and migrations.
+`seed()` returns `{ created, order, deferred, skipped }` — `created` and `order` are the same shape
+the endpoint response carries (alongside `success: true`) and the CLI logs on completion. Still
+destructive; call it deliberately. **Best for:** integration tests and migrations.
 
 </Tab>
 
@@ -696,5 +700,8 @@ A few things to keep in mind:
 | `seedPlugin` | `@pro-laico/payload-seed` | The plugin factory. |
 | `defineSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records or a global's seed data (inferred from the slug; one default export per `seed.ts`). |
 | `seed` | `@pro-laico/payload-seed` | Run the seed from a script / test / migration (see [Running the seed](#running-the-seed)). |
+| `ref` / `file` / `isRef` / `isFileToken` | `@pro-laico/payload-seed` | The token constructors + type guards, for code that builds seed data *outside* a builder callback (unit tests, composed fragments). Inside a builder, use the supplied tokens. |
+| `SeedTokens` / `WithRefs` / `CollectionSeedData` / `GlobalSeedData` | `@pro-laico/payload-seed` | Types for seed helpers composed across files: type a fragment's `{ ref, file }` parameter, widen generated data types to accept `Ref` tokens. |
+| `Ref` / `FileToken` | `@pro-laico/payload-seed` | The token value types themselves. |
 | `SeedRegistry` | `@pro-laico/payload-seed` | Augmentable interface `generate:types` fills in, so `ref()` keys are checked. Not imported by name. |
 | `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (wired via the import map when `adminButton` is on). |

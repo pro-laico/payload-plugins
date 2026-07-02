@@ -96,7 +96,27 @@ export const fontsPlugin =
       exportFontsEndpoint({ fontSetGlobalSlug: FONT_SET_SLUG, fontOptimizedSlug: FONT_OPTIMIZED_SLUG, families: familyKeys }),
     ]
 
-    return { ...config, collections, globals, endpoints }
+    return {
+      ...config,
+      collections,
+      globals,
+      endpoints,
+      onInit: async (payload) => {
+        await config.onInit?.(payload)
+        // Dev-only probe for the most common deployment mistake: a bundler inlined the subsetter's
+        // wasm/native assets, so `subset-font` throws at import — which otherwise only surfaces on
+        // the first font save. Importing is the same load path the optimize hook takes, and the
+        // wasm is read at module init, so the import alone trips the failure. Not awaited (never
+        // slows boot) and never runs in production.
+        if (process.env.NODE_ENV !== 'production') {
+          import('subset-font').catch((err) => {
+            payload.logger.error(
+              `[payload-fonts] The font subsetter failed to load — uploaded fonts will NOT be subsetted or served. In Next.js add \`serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']\` to your next.config. (${err instanceof Error ? err.message : err})`,
+            )
+          })
+        }
+      },
+    }
   }
 
 export default fontsPlugin

@@ -8,4 +8,12 @@ pnpm add @pro-laico/payload-fonts
 
 **[Documentation →](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts)**
 
+## Troubleshooting
+
+**Fonts upload but nothing is served ("the font subsetter failed to load")** — a bundler (Next/Turbopack) inlined the subsetter's wasm/native assets, so `subset-font` can't load at runtime. Keep them external in `next.config`:
+
+```ts
+serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']
+```
+
 Ported from [`@pro-laico/fonts`](https://github.com/pro-laico/atomic-payload/tree/main/packages/fonts) (Atomic Payload, MIT).
