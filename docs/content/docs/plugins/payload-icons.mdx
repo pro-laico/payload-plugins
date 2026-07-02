@@ -52,7 +52,12 @@ export default buildConfig({
 ```
 
 That registers the `icon` and `iconSet` collections plus a hidden `iconRequest` diagnostics
-collection. Zero-config, no other wiring.
+collection. Zero-config — then regenerate the admin import map (the icon-preview components are
+registered by string path):
+
+```bash
+pnpm payload generate:importmap
+```
 </Step>
 
 <Step>
@@ -318,7 +323,8 @@ frontend assets); writes are logged-in-admin only. The admin titles each doc by 
 <TypeTable
   type={{
     filename: { description: "The uploaded SVG (the upload). The admin useAsTitle.", type: "upload" },
-    svgString: { description: "The cleaned, sanitized <svg>…</svg>, ready to inline. Read-only output.", type: "code" },
+    iconPreview: { description: "Theme-aware inline preview of the sanitized SVG (edit view + list cell), inheriting the admin theme's text color so icons stay visible in dark mode.", type: "ui" },
+    svgString: { description: "The cleaned, sanitized <svg>…</svg>, ready to inline. Read-only output; its list cell renders the themed preview.", type: "code" },
     optimized: { description: "Human-readable optimization report. Read-only output, shown once present.", type: "text" },
     filesize: { description: "Updated to the optimized byte size.", type: "number" },
   }}

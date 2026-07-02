@@ -157,8 +157,9 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       description: 'Upload images here. Display sizes are generated on demand and cached — store the original once, render any size.',
       enableListViewSelectAPI: true,
       useAsTitle: 'alt',
-      defaultColumns: ['alt', 'updatedAt'],
-      listSearchableFields: ['alt'],
+      // `filename` first: the list view renders the (on-demand, adminThumbnail) preview on that cell.
+      defaultColumns: ['filename', 'alt', 'updatedAt'],
+      listSearchableFields: ['alt', 'filename'],
     },
     defaultPopulate: enh.defaultPopulate,
     ...(enh.forceSelect ? { forceSelect: enh.forceSelect } : {}),

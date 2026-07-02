@@ -48,6 +48,11 @@
         "types": "./dist/components/admin/iconUsagePanel.d.ts",
         "import": "./dist/components/admin/iconUsagePanel.js",
         "default": "./dist/components/admin/iconUsagePanel.js"
+      },
+      "./admin/iconPreview": {
+        "types": "./dist/components/admin/iconPreview.d.ts",
+        "import": "./dist/components/admin/iconPreview.js",
+        "default": "./dist/components/admin/iconPreview.js"
       }
     },
     "bin": {
@@ -81,6 +86,11 @@
       "import": "./src/components/admin/iconUsagePanel.tsx",
       "types": "./src/components/admin/iconUsagePanel.tsx",
       "default": "./src/components/admin/iconUsagePanel.tsx"
+    },
+    "./admin/iconPreview": {
+      "import": "./src/components/admin/iconPreview.tsx",
+      "types": "./src/components/admin/iconPreview.tsx",
+      "default": "./src/components/admin/iconPreview.tsx"
     }
   },
   "files": [

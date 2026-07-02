@@ -73,7 +73,13 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
   // uploads it to Mux. Plain config — payload-mux doesn't import the seed package.
   custom: { seedAsset: { sourceField: 'source' } },
   access: { read: ({ req }) => isAllowed(options, req) },
-  admin: { useAsTitle: 'title', defaultColumns: ['title', 'muxUploader', 'duration'] },
+  // Grouped with the other asset collections (images/icons/fonts) — but never re-grouping a
+  // collection the plugin merely extends.
+  admin: {
+    ...(options.extendCollection ? {} : { group: 'Assets' }),
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'muxUploader', 'duration'],
+  },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
     beforeValidate: [getBeforeValidateHook(mux, options)],

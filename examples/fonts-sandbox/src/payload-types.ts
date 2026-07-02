@@ -165,15 +165,6 @@ export interface Font {
   id: number;
   title: string;
   family: GenericFontFamily;
-  source?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
   /**
    * Web-ready files generated from your uploads. 0 means nothing was served yet — re-save; if it stays 0, the upload may have failed to optimize (check server logs).
    */
@@ -351,7 +342,6 @@ export interface UsersSelect<T extends boolean = true> {
 export interface FontSelect<T extends boolean = true> {
   title?: T;
   family?: T;
-  source?: T;
   servedFiles?: T;
   variable?:
     | T
@@ -500,7 +490,7 @@ declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
       'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
-      'fontOriginal': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
+      'fontOriginal': 'abril-fatface' | 'inter-variable' | 'jetbrains-mono' | 'lora' | 'lora-700'
     }
     globals: 'fontSet'
   }

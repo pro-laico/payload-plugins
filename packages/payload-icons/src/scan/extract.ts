@@ -40,6 +40,9 @@ export interface ExtractOptions {
 
 const DEFAULT_COMPONENTS = ['Icon']
 
+/** Plausible icon names only — set-row names are kebab-cased, so prose placeholders (`…`) never qualify. */
+const PLAUSIBLE_NAME = /^[\w-]+$/
+
 const isWhitespace = (c: string): boolean => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f' || c === '\v'
 const isIdentStart = (c: string): boolean => /[A-Za-z_$]/.test(c)
 const isTagNameBoundary = (c: string | undefined): boolean => c === undefined || isWhitespace(c) || c === '/' || c === '>'
@@ -256,9 +259,14 @@ const parseNameAttr = (source: string, start: number): { name: string; index: nu
  * found correctly). It deliberately does NOT try to mask surrounding strings or
  * comments: JSX text routinely contains apostrophes (`it's`) and `//` (`http://`)
  * that a whole-file lexer would mis-read as a string/comment and skip a real
- * usage past. The cost is that an `<Icon name="…">` written literally inside a
- * JS string or comment may be picked up — a harmless over-count for an
- * inventory, where missing a real usage would be the worse failure.
+ * usage past. Instead, two surgical guards keep commentary out without a lexer:
+ * a candidate whose line leads with `//` or `*` (line comments, JSDoc
+ * continuations — real JSX never starts a line that way) is skipped, and
+ * extracted names must look like icon names ({@link PLAUSIBLE_NAME}), so prose
+ * placeholders like `…` are dropped. An `<Icon name="…">` written literally in
+ * a JS string (or a mid-line comment) can still be picked up — a harmless
+ * over-count for an inventory, where missing a real usage would be the worse
+ * failure.
  */
 export const extractIconUsages = (source: string, options: ExtractOptions = {}): ExtractedUsage[] => {
   const components = options.components?.length ? options.components : DEFAULT_COMPONENTS
@@ -286,10 +294,17 @@ export const extractIconUsages = (source: string, options: ExtractOptions = {}):
       i = k
       continue
     }
+    // Comment guard: only the text between the line start and this `<` counts,
+    // so a URL's `//` earlier on the line never triggers a false skip.
+    const linePrefix = source.slice(source.lastIndexOf('\n', i - 1) + 1, i).trimStart()
+    if (linePrefix.startsWith('//') || linePrefix.startsWith('*')) {
+      i = k
+      continue
+    }
     const found = parseNameAttr(source, k)
-    if (found) {
+    if (found && PLAUSIBLE_NAME.test(found.name.trim())) {
       const { line, column } = lineColAt(lineStarts, found.index)
-      usages.push({ name: found.name, line, column })
+      usages.push({ name: found.name.trim(), line, column })
     }
     i = k
   }

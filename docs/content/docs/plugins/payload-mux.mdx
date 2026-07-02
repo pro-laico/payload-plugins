@@ -189,7 +189,8 @@ and uploader into a collection you already have.
 
 ### `mux-video`
 
-The Videos collection, and the only one you touch. You set `title` and an optional `posterTimestamp`;
+The Videos collection (under the **Assets** admin group, alongside the other Pro Laico asset
+collections), and the only one you touch. You set `title` and an optional `posterTimestamp`;
 Mux fills in everything else (asset id, duration, dimensions, playback ids) through the upload poll and
 the webhook. Read is gated by the `access` option (**logged-in admin** by default). Pass a transient
 `source` to create one server-side; see [Server-side ingest](#server-side-ingest).

@@ -341,6 +341,8 @@ export interface MuxVideo {
    */
   title: string;
   assetId?: string | null;
+  status?: ('preparing' | 'ready' | 'errored') | null;
+  error?: string | null;
   duration?: number | null;
   /**
    * A timestamp (in seconds) from the video to be used as the poster image. When unset, defaults to the middle of the video.
@@ -351,8 +353,8 @@ export interface MuxVideo {
   maxHeight?: number | null;
   playbackOptions?:
     | {
-        playbackId?: string | null;
-        playbackPolicy?: ('signed' | 'public') | null;
+        playbackId: string;
+        playbackPolicy: 'signed' | 'public';
         playbackUrl?: string | null;
         posterUrl?: string | null;
         gifUrl?: string | null;
@@ -910,6 +912,8 @@ export interface MuxVideoSelect<T extends boolean = true> {
   source?: T;
   title?: T;
   assetId?: T;
+  status?: T;
+  error?: T;
   duration?: T;
   posterTimestamp?: T;
   aspectRatio?: T;
@@ -1173,7 +1177,7 @@ declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
       'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
-      'fontOriginal': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
+      'fontOriginal': 'abril-fatface' | 'inter-variable' | 'jetbrains-mono' | 'lora' | 'lora-700'
       'icon': 'architecture' | 'arrow-right' | 'check' | 'interiors' | 'landscape' | 'mail' | 'map-pin' | 'phone' | 'renovation' | 'sparkles'
       'iconSet': 'default'
       'images': 'cedar-hill' | 'cedar-hill-interior' | 'foundry-detail' | 'foundry-loft' | 'hero' | 'riverside-interior' | 'riverside-pavilion' | 'svc-architecture' | 'svc-interiors' | 'svc-landscape' | 'svc-renovation' | 'team-1' | 'team-2' | 'team-3'

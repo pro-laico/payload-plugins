@@ -1,5 +1,7 @@
 import { default as default_15c508277a49aa6e34e1b12c9ef99470 } from '@pro-laico/payload-images/admin/focalPreview'
 import { default as default_8552d304bd6a24c034b539029c30e0ed } from '@pro-laico/payload-images/admin/purgeVariants'
+import { IconPreviewField as IconPreviewField_5305caa8a0c17b5d21856e785a2e23a4 } from '@pro-laico/payload-icons/admin/iconPreview'
+import { IconPreviewCell as IconPreviewCell_5305caa8a0c17b5d21856e785a2e23a4 } from '@pro-laico/payload-icons/admin/iconPreview'
 import { default as default_1f8a7993835993c0d3a042de3e887130 } from '@pro-laico/payload-icons/admin/iconUsagePanel'
 import { default as default_1533e6442a3525480dced7e80ce51cae } from '@pro-laico/payload-icons/admin/iconRowLabel'
 import { MuxUploaderField as MuxUploaderField_31eb7dfdccb52c66cbf3688508dd808a } from '@pro-laico/payload-mux/components/MuxUploaderField'
@@ -12,6 +14,8 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 export const importMap = {
   "@pro-laico/payload-images/admin/focalPreview#default": default_15c508277a49aa6e34e1b12c9ef99470,
   "@pro-laico/payload-images/admin/purgeVariants#default": default_8552d304bd6a24c034b539029c30e0ed,
+  "@pro-laico/payload-icons/admin/iconPreview#IconPreviewField": IconPreviewField_5305caa8a0c17b5d21856e785a2e23a4,
+  "@pro-laico/payload-icons/admin/iconPreview#IconPreviewCell": IconPreviewCell_5305caa8a0c17b5d21856e785a2e23a4,
   "@pro-laico/payload-icons/admin/iconUsagePanel#default": default_1f8a7993835993c0d3a042de3e887130,
   "@pro-laico/payload-icons/admin/iconRowLabel#default": default_1533e6442a3525480dced7e80ce51cae,
   "@pro-laico/payload-mux/components/MuxUploaderField#MuxUploaderField": MuxUploaderField_31eb7dfdccb52c66cbf3688508dd808a,

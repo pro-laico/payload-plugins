@@ -25,7 +25,7 @@ describe('extractIconUsages — literal forms', () => {
   })
 
   it('decodes simple escapes in the literal', () => {
-    expect(names('<Icon name="a\\nb" />')).toEqual(['a\nb'])
+    expect(names('<Icon name="a\\-b" />')).toEqual(['a-b'])
   })
 })
 
@@ -103,6 +103,29 @@ describe('extractIconUsages — multiple usages and locations', () => {
     // `  <Icon name="first"` — the opening quote sits at column 14.
     expect(usages[0]?.column).toBe(14)
     expect(usages[1]?.line).toBe(3)
+  })
+})
+
+describe('extractIconUsages — comment and prose guards', () => {
+  it('skips a usage written inside a // line comment', () => {
+    expect(names('// `<Icon name="check" />` resolves against the active set')).toEqual([])
+  })
+
+  it('skips a usage on a JSDoc continuation line', () => {
+    expect(names(['/**', ' * Renders `<Icon name="check" />` for each row.', ' */'].join('\n'))).toEqual([])
+  })
+
+  it('still matches a usage after a string containing a URL on the same line', () => {
+    expect(names('const href = "https://example.test/docs"; const el = <Icon name="x" />')).toEqual(['x'])
+  })
+
+  it('filters implausible names like a prose ellipsis placeholder', () => {
+    expect(names('<Icon name="…" />')).toEqual([])
+    expect(names('// `<Icon name="…" />` and each row resolve')).toEqual([])
+  })
+
+  it('filters names decoded to whitespace-bearing values', () => {
+    expect(names('<Icon name="a\\nb" />')).toEqual([])
   })
 })
 

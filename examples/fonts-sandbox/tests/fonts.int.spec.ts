@@ -43,31 +43,51 @@ describe('payload-fonts seeding (integration)', () => {
   it('seeds typefaces from local files: native original upload → ref → subset → fontSet wiring', async () => {
     const result = await seed({ payload, options: seedOptions })
 
-    // Four originals uploaded, then four typefaces created after them (the ref() edges order the graph).
-    expect(result.created.fontOriginal).toBe(4)
+    // Five originals uploaded, then four typefaces created after them (the ref() edges order the graph).
+    expect(result.created.fontOriginal).toBe(5)
     expect(result.created.font).toBe(4)
-    expect(result.order.indexOf('fontOriginal:inter')).toBeLessThan(result.order.indexOf('font:inter'))
+    expect(result.order.indexOf('fontOriginal:inter-variable')).toBeLessThan(result.order.indexOf('font:inter'))
 
-    // Each typeface refs an uploaded original and produced a served fontOptimized.
+    // Each referenced original produced a served fontOptimized: Inter variable → 1, Lora 400+700 → 2, mono + display → 1 each.
     expect(await payload.find({ collection: 'font', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(4)
-    expect(await payload.find({ collection: 'fontOriginal', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(4)
+    expect(await payload.find({ collection: 'fontOriginal', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(5)
     const optimized = await payload.find({ collection: 'fontOptimized', limit: 0, depth: 0 })
-    expect(optimized.totalDocs).toBe(4)
+    expect(optimized.totalDocs).toBe(5)
 
-    // The ref() wired a real weights row pointing at the uploaded original.
+    // The ref() wired the variable upright slot pointing at the uploaded original.
     const inter = (await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0 })).docs[0] as {
       family?: string
-      weights?: Array<{ file?: unknown; weight?: string }>
+      variable?: { upright?: unknown }
     }
     expect(inter.family).toBe('sans')
-    expect(inter.weights?.[0]?.file).toBeTruthy()
-    expect(inter.weights?.[0]?.weight).toBe('400')
+    expect(inter.variable?.upright).toBeTruthy()
 
     // The fontSet global was wired to the typefaces via ref() — sans → the Inter doc.
     const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as {
       sans?: { title?: string }
     }
     expect(fontSet.sans?.title).toBe('Inter')
+  })
+
+  it('optimizes the seeded shapes: the variable font keeps its wght range, the multi-weight face gets a file per row', async () => {
+    const fontId = async (title: string) =>
+      (await payload.find({ collection: 'font', where: { title: { equals: title } }, depth: 0 })).docs[0].id
+    const optimizedFor = async (title: string) =>
+      (await payload.find({ collection: 'fontOptimized', where: { font: { equals: await fontId(title) } }, depth: 0 })).docs as Array<{
+        weight?: string
+        isVariable?: boolean
+      }>
+
+    // Inter variable: one optimized file carrying the full axis range, flagged variable.
+    const inter = await optimizedFor('Inter')
+    expect(inter).toHaveLength(1)
+    expect(inter[0].isVariable).toBe(true)
+    expect(inter[0].weight).toBe('100 900')
+
+    // Lora 400 + 700: one static optimized file per weight row.
+    const lora = await optimizedFor('Lora')
+    expect(lora.map((d) => d.weight).sort()).toEqual(['400', '700'])
+    expect(lora.every((d) => d.isVariable === false)).toBe(true)
   })
 
   it('serves the active fonts as base64 WOFF2 bytes per family from the export endpoint', async () => {
@@ -91,7 +111,7 @@ describe('payload-fonts seeding (integration)', () => {
   it('is idempotent — re-seeding clears (cascading the hidden uploads) and recreates', async () => {
     await seed({ payload, options: seedOptions })
     expect(await payload.find({ collection: 'font', limit: 0 }).then((r) => r.totalDocs)).toBe(4)
-    expect(await payload.find({ collection: 'fontOriginal', limit: 0 }).then((r) => r.totalDocs)).toBe(4)
-    expect(await payload.find({ collection: 'fontOptimized', limit: 0 }).then((r) => r.totalDocs)).toBe(4)
+    expect(await payload.find({ collection: 'fontOriginal', limit: 0 }).then((r) => r.totalDocs)).toBe(5)
+    expect(await payload.find({ collection: 'fontOptimized', limit: 0 }).then((r) => r.totalDocs)).toBe(5)
   })
 })
