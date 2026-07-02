@@ -1177,6 +1177,7 @@ declare module '@pro-laico/payload-seed' {
       'icon': 'architecture' | 'arrow-right' | 'check' | 'interiors' | 'landscape' | 'mail' | 'map-pin' | 'phone' | 'renovation' | 'sparkles'
       'iconSet': 'default'
       'images': 'cedar-hill' | 'cedar-hill-interior' | 'foundry-detail' | 'foundry-loft' | 'hero' | 'riverside-interior' | 'riverside-pavilion' | 'svc-architecture' | 'svc-interiors' | 'svc-landscape' | 'svc-renovation' | 'team-1' | 'team-2' | 'team-3'
+      'mux-video': 'showreel'
       'projects': 'cedar-hill-residence' | 'foundry-loft' | 'riverside-pavilion'
       'services': 'architecture' | 'interiors' | 'landscape' | 'renovation'
       'team': 'elena' | 'sam' | 'theo'

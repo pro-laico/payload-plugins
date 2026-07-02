@@ -3,6 +3,7 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 import { Icon } from './collections/Icon'
 import { createIconRequestCollection, type IconRequestCollectionOverrides } from './collections/IconRequest'
 import { createIconSetCollection, type IconSetCollectionOverrides } from './collections/IconSet'
+import { stashConfig } from './lib/getPayloadClient'
 import type { IconCollectionOverrides } from './types'
 
 /**
@@ -108,7 +109,17 @@ export const iconsPlugin =
     if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', usagePanel, ...iconSetOverrides }))
     if (trackRequests) additions.push(createIconRequestCollection(iconRequestOverrides))
 
-    return { ...config, collections: [...(config.collections ?? []), ...additions] }
+    return {
+      ...config,
+      collections: [...(config.collections ?? []), ...additions],
+      onInit: async (payload) => {
+        await config.onInit?.(payload)
+        // Remember the app's config so the server components (<Icon> et al) resolve it from
+        // globalThis — no `@payload-config` alias (and thus no transpilePackages) required
+        // once Payload has booted.
+        stashConfig(payload.config)
+      },
+    }
   }
 
 export default iconsPlugin

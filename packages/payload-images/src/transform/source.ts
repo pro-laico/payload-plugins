@@ -6,12 +6,19 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Payload } from 'payload'
+import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 
 export interface UploadDocLike {
   filename?: string | null
   url?: string | null
+  /** Cloud-storage adapters store their key prefix on the doc. */
+  prefix?: string | null
 }
+
+type UploadHandler = (
+  req: PayloadRequest,
+  args: { doc: unknown; headers?: Headers; params: { collection: string; filename: string; prefix?: string } },
+) => Promise<Response | void> | Response | void
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024
 
@@ -53,21 +60,54 @@ export const resolveStaticDir = (payload: Payload, slug: string): string => {
 }
 
 /**
+ * Read the bytes through the collection's storage-adapter `upload.handlers` (Vercel Blob, S3, …).
+ * This is the same server-side path Payload's own file route takes after its access check —
+ * invoked directly, not over HTTP, so it needs no origin, cookie, or open read access. (The
+ * self-fetch fallback below can't serve an access-controlled collection like `generated-images`:
+ * its unauthenticated request 403s and every variant read becomes a cache miss.)
+ */
+const readViaStorageHandlers = async (payload: Payload, slug: string, doc: UploadDocLike): Promise<Buffer | null> => {
+  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }>
+  const handlers = collections?.[slug]?.config?.upload?.handlers
+  if (!handlers?.length || !doc.filename) return null
+  try {
+    const req = await createLocalReq({}, payload)
+    for (const handler of handlers) {
+      const res = await handler(req, { doc, params: { collection: slug, filename: doc.filename, prefix: doc.prefix ?? undefined } })
+      if (res instanceof Response) return res.ok ? Buffer.from(await res.arrayBuffer()) : null
+    }
+  } catch {
+    // fall through to the URL fetch
+  }
+  return null
+}
+
+/**
  * Read an upload's bytes. In order:
  *  1. the local file under `staticDir` (verifying the resolved path stays inside it),
- *  2. the absolute URL the doc reports (cloud storage), or
- *  3. its relative URL resolved against `baseUrl` — i.e. self-fetch Payload's own
+ *  2. the collection's storage-adapter `upload.handlers`, invoked directly (cloud storage — no
+ *     HTTP, no access control; pass `via` to enable),
+ *  3. the absolute URL the doc reports (cloud storage), or
+ *  4. its relative URL resolved against `baseUrl` — i.e. self-fetch Payload's own
  *     static file route, which serves the file whatever the adapter/storage is.
  *
- * Step 3 is why a configured storage adapter (whose `url` is relative, or served by
- * Payload) no longer yields an unreadable source. Returns null when nothing yields
- * bytes.
+ * Returns null when nothing yields bytes.
  */
-export const readBytes = async (doc: UploadDocLike, staticDir: string, baseUrl?: string): Promise<Buffer | null> => {
+export const readBytes = async (
+  doc: UploadDocLike,
+  staticDir: string,
+  baseUrl?: string,
+  via?: { payload: Payload; slug: string },
+): Promise<Buffer | null> => {
   if (doc.filename) {
     const base = path.resolve(staticDir)
     const filePath = path.resolve(base, doc.filename)
     if ((filePath === base || filePath.startsWith(base + path.sep)) && fs.existsSync(filePath)) return fs.readFileSync(filePath)
+  }
+
+  if (via) {
+    const bytes = await readViaStorageHandlers(via.payload, via.slug, doc)
+    if (bytes) return bytes
   }
 
   if (typeof doc.url === 'string' && doc.url) {

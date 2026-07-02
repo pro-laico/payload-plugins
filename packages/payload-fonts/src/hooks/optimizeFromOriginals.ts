@@ -6,6 +6,11 @@ import { type Charset, detectMetadata, resolveCharsetText, subsetToWoff2 } from 
 
 type Ref = string | number | { id?: string | number } | null | undefined
 
+/** True when a delete failed because the doc is already gone — the goal state, not a problem.
+ *  Happens routinely when another path deleted it first (e.g. a seed run clears `fontOriginal`
+ *  directly, then clearing `font` fires this cascade at the same ids). */
+const isNotFound = (err: unknown): boolean => (err as { status?: number })?.status === 404 || (err instanceof Error && err.name === 'NotFound')
+
 // The most common deployment mistake: a bundler (Next/Turbopack) bundles the harfbuzz / fontkit
 // wasm + native assets, so `subset-font` can't load its `hb-subset.wasm` at runtime. The subset
 // then throws, fonts upload but never get subsetted, and nothing is served — with only a generic
@@ -188,7 +193,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         try {
           await req.payload.delete({ collection: optimizedSlug, id: d.id as string | number, overrideAccess: true, req })
         } catch (err) {
-          req.payload.logger.warn({ msg: 'Could not delete stale optimized font', err })
+          if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete stale optimized font', err })
         }
       }
 
@@ -201,7 +206,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
           try {
             await req.payload.delete({ collection: originalSlug, id: oid, overrideAccess: true, req })
           } catch (err) {
-            req.payload.logger.warn({ msg: `Could not delete de-referenced font original ${oid}`, err })
+            if (!isNotFound(err)) req.payload.logger.warn({ msg: `Could not delete de-referenced font original ${oid}`, err })
           }
         }
       }
@@ -263,7 +268,7 @@ export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSl
         try {
           await req.payload.delete({ collection: originalSlug, id: oid, overrideAccess: true, req })
         } catch (err) {
-          req.payload.logger.warn({ msg: 'Could not delete font original', err })
+          if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete font original', err })
         }
       }
     }

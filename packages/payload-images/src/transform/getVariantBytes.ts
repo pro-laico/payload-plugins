@@ -45,7 +45,23 @@ export interface GetVariantBytesArgs {
   genFlight?: GenFlight
 }
 
-const isDuplicateKeyError = (err: unknown): boolean => /duplicate|unique/i.test(err instanceof Error ? err.message : String(err))
+/** True for a unique-constraint violation on the variant create. Two requests racing the same
+ *  cache miss both persist; the loser is expected, not noise. The violation arrives in several
+ *  shapes — a raw driver error mentioning duplicate/unique, a wrapper (drizzle's "Failed query:
+ *  insert …") whose `cause` carries the code (e.g. SQLITE_CONSTRAINT_UNIQUE), or Payload's
+ *  ValidationError ("The following field is invalid: cacheKey") — so walk the cause chain and
+ *  the field errors. */
+const isDuplicateKeyError = (err: unknown): boolean => {
+  let e: unknown = err
+  for (let depth = 0; depth < 4 && e; depth++) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const code = (e as { code?: unknown })?.code
+    if (/duplicate|unique/i.test(`${msg} ${typeof code === 'string' ? code : ''}`)) return true
+    e = (e as { cause?: unknown })?.cause
+  }
+  const fieldErrors = (err as { data?: { errors?: Array<{ message?: string; path?: string }> } })?.data?.errors
+  return Array.isArray(fieldErrors) && fieldErrors.some((f) => f.path === 'cacheKey' || /unique/i.test(f.message ?? ''))
+}
 
 /**
  * Return the bytes for one variant: cache hit → stored copy; miss → Sharp once, persist after
@@ -67,13 +83,13 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
     })
     const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined
     if (variant) {
-      const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base)
+      const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
       if (bytes) return { ok: true, data: bytes, mimeType: mimeForFormat(format), key }
     }
   } catch {}
 
   const generate = async (): Promise<GenBytes> => {
-    const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base)
+    const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug })
     if (!original) {
       // Only the relative-URL path needs an origin to resolve; surface the serverURL hint
       // just here, when a read has actually failed — not preemptively at boot.

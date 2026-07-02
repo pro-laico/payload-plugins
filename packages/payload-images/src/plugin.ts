@@ -3,6 +3,7 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 import { createImagesCollection, imageEnhancements } from './collections/images'
 import { createPurgeEndpoint, createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
+import { stashConfig } from './lib/configStash'
 import { mergeCollection } from './lib/mergeCollection'
 import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './transform/params'
 
@@ -232,6 +233,9 @@ export const imagesPlugin =
       },
       onInit: async (payload) => {
         await config.onInit?.(payload)
+        // Remember the app's config so <ResponsiveImage> resolves it from globalThis — no
+        // `@payload-config` alias (and thus no transpilePackages) required once Payload has booted.
+        stashConfig(payload.config)
         if (shadowed) {
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,

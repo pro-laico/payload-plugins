@@ -1,6 +1,13 @@
 import type { CollectionSlug, GlobalSlug } from 'payload'
 import { file, ref } from './refs'
-import type { CollectionSeedData, CollectionSeedDefinition, GlobalSeedData, GlobalSeedDefinition, SeedTokens } from './types'
+import type {
+  CollectionSeedData,
+  CollectionSeedDefinition,
+  GlobalSeedData,
+  GlobalSeedDefinition,
+  SeedDisabledMarker,
+  SeedTokens,
+} from './types'
 
 const tokens = { ref, file }
 
@@ -53,17 +60,23 @@ type DefinitionFor<TSlug> = TSlug extends CollectionSlug
  *   export default defineSeed('site-settings', ({ ref }) => ({
  *     featured: ref('services', 'consulting'),
  *   }))
+ *
+ * `opts.disabled` skips the definition at seed time without removing it (so the generated seed-ref
+ * types stay stable) — the engine warns, and optional refs pointing at it are dropped. Collections
+ * that declare `custom.seedDisabled` (e.g. a plugin detecting missing credentials) are skipped the
+ * same way automatically, so you usually don't need to set this yourself.
  */
 export function defineSeed<TSlug extends CollectionSlug | GlobalSlug, const T extends ShapeFor<TSlug>>(
   slug: TSlug,
   build: (tokens: SeedTokens) => ExactFor<T, ShapeFor<TSlug>>,
+  opts?: { disabled?: SeedDisabledMarker },
 ): DefinitionFor<TSlug> {
   // Classify collection vs global from the builder's shape (collection → array, global → object).
   // The ref/file tokens are pure constructors, so this eager call has no side effects and resolves
   // no refs; it only decides `kind`. The engine calls `build` again at seed time.
   const built = (build as (t: SeedTokens) => unknown)(tokens)
   const kind = Array.isArray(built) ? 'collection' : 'global'
-  return { kind, slug, build } as unknown as DefinitionFor<TSlug>
+  return { kind, slug, build, ...(opts?.disabled !== undefined ? { disabled: opts.disabled } : {}) } as unknown as DefinitionFor<TSlug>
 }
 
 export { tokens }

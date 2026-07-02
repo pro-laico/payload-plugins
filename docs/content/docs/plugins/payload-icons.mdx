@@ -173,9 +173,11 @@ import { Icon } from '@pro-laico/payload-icons/components/Icon'
 
 <Callout type="info">
   It's an async **server component** (it queries Payload), so render it in a server component / page.
-  It resolves your config via the `@payload-config` alias that `withPayload` sets up (the standard
-  Next + Payload setup), so there's nothing to wire. When `name` isn't in the active set it renders
-  the `fallback` you pass (or a small built-in warning glyph), never nothing.
+  It resolves your config from the plugin itself (stashed when Payload boots), so there's nothing to
+  wire. Only if it can render before *anything* has initialized Payload does it fall back to the
+  `@payload-config` alias — which, from a published package, needs
+  `transpilePackages: ['@pro-laico/payload-icons']` in next.config. When `name` isn't in the active
+  set it renders the `fallback` you pass (or a small built-in warning glyph), never nothing.
 </Callout>
 
 <Callout type="info">

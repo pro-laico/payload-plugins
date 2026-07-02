@@ -8,11 +8,13 @@ import config from '../src/payload.config'
 import { seedOptions } from '../src/plugins'
 
 // One end-to-end pass: run the same offline seed the admin button / POST /api/seed does, then assert
-// every plugin ended up wired. Mux is credential-gated, so it's excluded here (no MUX_TOKEN_ID) and
-// the site's mux-video refs simply don't seed — everything else must still resolve.
+// every plugin ended up wired. There are no MUX_* creds here, so the run also exercises the
+// seed-disabled path: the plugin marks `mux-video`, the engine skips the videos definition, and the
+// site-settings showreel ref is dropped — everything else must still resolve.
 describe('service-co — all plugins seed together', () => {
   let payload: Payload
   let dbDir: string
+  let result: Awaited<ReturnType<typeof seed>>
 
   beforeAll(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'service-co-'))
@@ -32,7 +34,7 @@ describe('service-co — all plugins seed together', () => {
       await payload.db.deleteMany({ collection: slug, req, where: {} })
     }
 
-    await seed({ payload, options: seedOptions })
+    result = await seed({ payload, options: seedOptions })
   })
 
   afterAll(async () => {
@@ -119,5 +121,16 @@ describe('service-co — all plugins seed together', () => {
     expect(settings.companyName).toBe('Meridian')
     expect(settings.heroImage).toBeTypeOf('object')
     expect(settings.featuredProject).toBeTypeOf('object')
+  })
+
+  it('payload-seed: skips the credential-gated mux-video definition and drops the showreel ref', async () => {
+    // No MUX_* creds in the test env → the plugin marks the collection seed-disabled, the engine
+    // skips the videos definition (reporting why), and the optional showreel ref is dropped rather
+    // than failing the run. With creds, the same seed ingests the clip and wires the ref.
+    expect(result.skipped).toEqual([{ slug: 'mux-video', reason: expect.stringContaining('MUX_TOKEN_ID') }])
+    const { totalDocs } = await payload.find({ collection: 'mux-video', limit: 0, overrideAccess: true })
+    expect(totalDocs).toBe(0)
+    const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })) as { showreel?: unknown }
+    expect(settings.showreel ?? null).toBeNull()
   })
 })

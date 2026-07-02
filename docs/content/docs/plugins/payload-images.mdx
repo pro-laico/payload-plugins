@@ -470,7 +470,7 @@ export const imageProps = [
   { name: 'style', type: 'CSSProperties', description: `Merged onto the <img>'s style.` },
   { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
   { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
-  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep + placeholder settings and generate the inline LQIP. Defaults to the @payload-config alias withPayload sets up; pass it for a non-aliased setup.` },
+  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep + placeholder settings and generate the inline LQIP. Rarely needed: without it the component uses the config the plugin stashed at init, falling back to the @payload-config alias (which, from a published package, needs transpilePackages: ['@pro-laico/payload-images']).` },
   { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the one derived from the doc.` },
   { name: 'placeholder', type: "boolean | number | { width?, quality? }", default: 'true (project config)', description: `Inline LQIP placeholder. false disables it; a number sets the LQIP width in px; an object tunes { width, quality }. Keep widths small (24–64 is the sweet spot); it's base64-inlined in every response. Supersedes blur.` },
   { name: 'blur', type: 'boolean', default: 'true', description: `Deprecated alias for placeholder (blur={false} to disable).` },

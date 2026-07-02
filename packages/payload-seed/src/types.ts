@@ -61,6 +61,20 @@ export type SeedAssetMarker =
       subdir?: string
     }
 
+/**
+ * A collection's `custom.seedDisabled` marker: declares that the collection cannot be seeded right
+ * now (typically missing credentials), set by the owning plugin from its own config/env:
+ *
+ *   { slug: 'mux-video', custom: { seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' } }
+ *
+ * The engine skips the collection's definition at runtime with a warning (a string is used as the
+ * reason) and drops any optional field whose `ref()` points at it — a required ref is a hard error.
+ * Because the definition stays registered, the generated seed-ref types don't change with the
+ * environment; set the env vars and the next run seeds it, nothing else to touch. Plain config —
+ * no import of the seed package needed, so the owning plugin stays decoupled from it.
+ */
+export type SeedDisabledMarker = boolean | string
+
 /** A seed builder receives the ref/file tokens and returns the seed data. Deferred
  *  (not eager data) so refs resolve against the full definition set. */
 export type SeedBuilder<T> = (tokens: SeedTokens) => T
@@ -69,12 +83,18 @@ export interface CollectionSeedDefinition<TSlug extends CollectionSlug = Collect
   readonly kind: 'collection'
   readonly slug: TSlug
   readonly build: SeedBuilder<Array<CollectionSeedData<TSlug>>>
+  /** Skip this definition at seed time (a string is used as the warning's reason). The definition
+   *  still contributes to the generated seed-ref types, so gating it doesn't shift types. Also set
+   *  automatically when the target collection declares `custom.seedDisabled`. */
+  readonly disabled?: SeedDisabledMarker
 }
 
 export interface GlobalSeedDefinition<TSlug extends GlobalSlug = GlobalSlug> {
   readonly kind: 'global'
   readonly slug: TSlug
   readonly build: SeedBuilder<GlobalSeedData<TSlug>>
+  /** Skip this definition at seed time (a string is used as the warning's reason). */
+  readonly disabled?: SeedDisabledMarker
 }
 
 export type SeedDefinition = CollectionSeedDefinition | GlobalSeedDefinition

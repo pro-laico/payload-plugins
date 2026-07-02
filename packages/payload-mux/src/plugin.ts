@@ -25,15 +25,25 @@ export const muxVideoPlugin =
     // key, no import, so other packages stay decoupled from this one.
     const config: Config = { ...incomingConfig, custom: { ...incomingConfig.custom, payloadMux: { options: pluginOptions } } }
 
+    // Without credentials the collection still registers (so generated types stay stable), but
+    // ingest can't reach Mux — mark it seed-disabled so a seeder skips its definition with this
+    // reason instead of failing mid-run. Set the env vars and the next seed picks it up.
+    const hasCreds = Boolean(
+      (pluginOptions.initSettings?.tokenId ?? process.env.MUX_TOKEN_ID) &&
+        (pluginOptions.initSettings?.tokenSecret ?? process.env.MUX_TOKEN_SECRET),
+    )
+    const collection = MuxVideo(mux, pluginOptions)
+    if (!hasCreds) collection.custom = { ...collection.custom, seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' }
+
     if (pluginOptions.extendCollection) {
       const target = config.collections?.find((c) => c.slug === pluginOptions.extendCollection)
       if (!target) throw new Error(`[payload-mux] extendCollection: collection '${pluginOptions.extendCollection}' not found`)
       config.collections = [
         ...(config.collections ?? []).filter((c) => c.slug !== pluginOptions.extendCollection),
-        deepMerge(MuxVideo(mux, pluginOptions), target),
+        deepMerge(collection, target),
       ]
     } else {
-      config.collections = [...(config.collections ?? []), MuxVideo(mux, pluginOptions)]
+      config.collections = [...(config.collections ?? []), collection]
     }
 
     config.endpoints = [

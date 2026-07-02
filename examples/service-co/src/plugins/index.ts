@@ -16,15 +16,13 @@ import team from '../seed/team'
 import testimonials from '../seed/testimonials'
 import videos from '../seed/videos'
 
-// Mux needs real credentials to ingest a clip, so the video seed only runs when they're present.
-// Everything else seeds offline. Nothing else in the seed references `mux-video` (attach the clip
-// to a project's Video / Site Settings → Showreel in the admin), which keeps the seed-ref types the
-// dev server regenerates on boot stable whether or not creds are set.
-const withMux = Boolean(process.env.MUX_TOKEN_ID)
-
 // Every seed definition, handed to the seed plugin (which powers the admin "Seed your database"
 // button, POST /api/seed, and `pnpm seed`) and re-exported for the integration test. The engine
-// orders these by their `ref()` edges — array order here is just for reading.
+// orders these by their `ref()` edges — array order here is just for reading. `videos` is always
+// registered (so the seed-ref types are stable), but Mux needs real credentials to ingest a clip:
+// without MUX_TOKEN_ID / MUX_TOKEN_SECRET the plugin marks the collection seed-disabled, the engine
+// skips the definition with a warning and drops the refs that point at it (Site Settings →
+// Showreel). Set the env vars and the next seed fills everything in — nothing else to touch.
 export const seedDefinitions = [
   fontOriginals,
   fonts,
@@ -37,7 +35,7 @@ export const seedDefinitions = [
   team,
   testimonials,
   siteSettings,
-  ...(withMux ? [videos] : []),
+  videos,
 ]
 
 // The seed options, shared by the seed plugin below and the integration test — so the test drives

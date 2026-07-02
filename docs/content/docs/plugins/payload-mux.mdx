@@ -362,6 +362,12 @@ one, nor the Mux SDK; when it sees a `_file` on `mux-video` it writes the file t
 policy, so seeded and admin-uploaded videos share one policy. See the
 [seed plugin docs](/docs/plugins/payload-seed#custom-ingestion) for the full reference.
 
+**Without credentials, seeding skips — it doesn't fail.** When `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET`
+aren't set, the plugin also marks the collection `custom: { seedDisabled: '…' }`, so the seed engine
+skips its definition with a warning and drops any optional `ref('mux-video', …)` — the rest of the
+seed runs offline. Set the env vars and the next run ingests the clips and wires the refs, with no
+seed-file changes. See [Disabled seeds](/docs/plugins/payload-seed#disabled-seeds).
+
 ## How it works
 
 The upload flow, virtual URLs, and webhook fit together like this.

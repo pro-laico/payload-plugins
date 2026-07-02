@@ -14,6 +14,7 @@
 import type { SanitizedConfig } from 'payload'
 import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
 
+import { stashedConfig } from '../lib/configStash'
 import type { VariantSourceDoc } from '../transform/getVariantBytes'
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
 import {
@@ -96,8 +97,9 @@ export interface ResponsiveImageProps {
   baseUrl?: string
   /** Transform endpoint base. Default `/api/img`; set it only if your Payload API route or Next.js basePath differs. */
   path?: string
-  /** Payload config, used to resolve the project `pixelStep`. Defaults to the `@payload-config` alias
-   *  that `withPayload` sets up; pass it explicitly for a non-aliased setup. */
+  /** Payload config, used to resolve the project `pixelStep`. Rarely needed: without it the
+   *  component uses the config the plugin stashed at init, falling back to the `@payload-config`
+   *  alias `withPayload` sets up. Pass it explicitly only for a non-standard setup. */
   config?: Awaitable<SanitizedConfig>
   /** Explicit cache-busting version token (`v=`); overrides the one derived from the doc's filename + focal. */
   version?: string
@@ -153,11 +155,14 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   if (!id) return null
 
   // Resolve the Payload config once (the srcset's `pixelStep` and the placeholder settings both
-  // come off it). `@payload-config` is the host bundler's alias (set up by `withPayload`);
-  // `as string` keeps TS from resolving it at this package's build. Stays undefined if unreadable.
+  // come off it): the explicit prop, else the globalThis stash the plugin's `onInit` filled (set
+  // the moment Payload boots — no bundler involvement), else the `@payload-config` alias — which
+  // only resolves from a published package when the consumer transpiles it (`transpilePackages`).
+  // `as string` keeps TS from resolving the alias at this package's build. Stays undefined if
+  // unreadable (defaults apply).
   let cfg: SanitizedConfig | undefined
   try {
-    cfg = await (config ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
+    cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
   } catch {
     cfg = undefined
   }

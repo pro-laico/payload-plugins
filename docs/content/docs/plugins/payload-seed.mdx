@@ -208,9 +208,10 @@ add to `seedPlugin({ definitions })`.
 export const defineSeedParams = [
   { name: 'slug', type: 'CollectionSlug | GlobalSlug', required: true, description: `The collection or global to seed into. Typed against your Payload types, so an unknown slug is a TypeScript error. The slug also picks the builder's return shape: an array of records for a collection, a single object for a global.` },
   { name: 'build', type: '(tokens) => Record[] | GlobalData', required: true, description: `Returns the data to create: an array of records for a collection, or one data object for a global. Receives the { ref, file } tokens as its argument, so you point at other docs and attach files inline, with nothing to import.` },
+  { name: 'opts.disabled', type: 'boolean | string', description: `Skip this definition at seed time without unregistering it, so the generated seed-ref types don't change (a string becomes the warning's reason). Rarely set by hand — a collection that declares custom.seedDisabled (e.g. payload-mux without credentials) is skipped automatically. See Disabled seeds.` },
 ]
 
-The **Reference** tab lists the two parameters; **TypeScript** is a minimal example.
+The **Reference** tab lists the parameters; **TypeScript** is a minimal example.
 
 <Tabs items={['Reference', 'TypeScript']}>
 
@@ -448,6 +449,26 @@ never imports payload-seed. The doc then seeds like any other (`_file` + `ref()`
 is a plain upload (payload-fonts' `fontOriginal`, payload-images' `image`) need **no** marker. See
 [payload-mux → Seeding](/docs/plugins/payload-mux) for a worked example.
 
+## Disabled seeds
+
+Some collections can't always seed — [`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`
+needs API credentials to ingest a clip. Don't gate the definition on the environment (that shifts the
+generated seed-ref types with it); the **collection declares it** instead:
+
+```ts
+// set by the owning plugin when it can't ingest — e.g. payload-mux without MUX_* env vars
+{
+  slug: 'mux-video',
+  custom: { seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' },
+}
+```
+
+The engine **skips** that definition (warning with the reason) and **drops** any optional field whose
+`ref()` points at it — a *required* ref is a hard error. The definition stays registered, so types
+don't change with the environment; set the env vars and the next run seeds it and fills the dropped
+refs back in. To gate a definition yourself, `defineSeed` takes the same flag directly:
+`defineSeed('reports', build, { disabled: !process.env.REPORTS_API_KEY })`.
+
 ## Running the seed
 
 Four entry points run the **same engine** over the same definitions — pick by where you are. Three of
@@ -569,7 +590,10 @@ in-memory `defineSeed` output and ending with a fully-populated database:
 <Step>
 **Build the model**
 
-Run each definition's builder to produce the collection records (with their `_file`) and the globals.
+Skip any [disabled definition](#disabled-seeds) (its own `disabled`, or the collection's
+`custom.seedDisabled` — warning per skip), then run each remaining builder to produce the collection
+records (with their `_file`) and the globals. Optional fields whose `ref()` points at a skipped
+definition are dropped (required ones error).
 </Step>
 
 <Step>
@@ -653,6 +677,11 @@ A few things to keep in mind:
   logs `_file '…' not found` and keeps going — the doc is still created (and an upload collection that
   requires a file may then error downstream). Watch the logs for typos. The subdir defaults to the
   collection slug; override it with `assetSubDirs`.
+- **Don't env-gate a definition out of the array.** Conditionally registering a definition
+  (`...(withMux ? [videos] : [])`) makes the generated seed-ref types depend on the environment — the dev
+  server regenerates them on boot and every `ref()` at it flips between valid and error. Register it
+  unconditionally and let it be [skipped at runtime](#disabled-seeds) instead (`custom.seedDisabled`, or
+  `defineSeed`'s `disabled`).
 - **Typed refs need `generate:types`.** `ref()` keys are only checked once the `SeedRegistry` is generated;
   before that they fall back to runtime validation. Rename a `_key` and you must regenerate types for the
   compile-time check to catch stale references.

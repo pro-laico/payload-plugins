@@ -1,11 +1,11 @@
 import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
-import { file, isFileToken, ref } from '../refs'
-import type { SeedAssetMarker, SeedDefinition } from '../types'
+import { file, isFileToken, isRef, ref } from '../refs'
+import type { SeedAssetMarker, SeedDefinition, SeedDisabledMarker } from '../types'
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph, type DeferredField } from './graph'
 import { resolveFilePath, readFileAsUpload } from './files'
-import { docNodeId, resolveTokens } from './tokens'
-import { validateModel } from './validate'
+import { collectTokens, docNodeId, resolveTokens } from './tokens'
+import { SeedValidationError, validateModel } from './validate'
 
 export interface SeedResult {
   /** Created doc counts keyed by collection slug. */
@@ -14,6 +14,13 @@ export interface SeedResult {
   order: string[]
   /** Fields deferred to break a `ref` cycle: created null, then set in a second pass. */
   deferred: DeferredField[]
+  /** Definitions skipped this run (their own `disabled`, or the collection's `custom.seedDisabled`). */
+  skipped: SkippedDefinition[]
+}
+
+export interface SkippedDefinition {
+  slug: string
+  reason: string
 }
 
 export interface RunSeedArgs {
@@ -68,6 +75,59 @@ function buildModel(definitions: SeedDefinition[]): BuiltModel {
   return { collections, globals }
 }
 
+/** Split definitions into runnable and skipped. A definition is skipped when its own `disabled` is
+ *  set, or when its target collection declares `custom.seedDisabled` (e.g. a plugin detecting
+ *  missing credentials at config time). Skipped definitions still shaped the generated seed-ref
+ *  types — only the run drops them, so types stay stable across environments. */
+function partitionDefinitions(payload: Payload, defs: SeedDefinition[]): { active: SeedDefinition[]; skipped: SkippedDefinition[] } {
+  const active: SeedDefinition[] = []
+  const skipped: SkippedDefinition[] = []
+  for (const def of defs) {
+    const fromCollection =
+      def.kind === 'collection'
+        ? (payload.collections[def.slug as CollectionSlug]?.config.custom?.seedDisabled as SeedDisabledMarker | undefined)
+        : undefined
+    const flag = def.disabled || fromCollection
+    if (!flag) {
+      active.push(def)
+      continue
+    }
+    const reason = typeof flag === 'string' ? flag : 'disabled'
+    skipped.push({ slug: def.slug, reason })
+    payload.logger.warn(`[payload-seed] skipping '${def.slug}': ${reason}`)
+  }
+  return { active, skipped }
+}
+
+/** Drop every optional field whose value contains a `ref()` into a skipped collection (warning per
+ *  drop — the doc won't exist this run), and hard-error when such a ref sits on a required field.
+ *  Runs before validation, so the remaining model checks clean. */
+function stripRefsToSkipped(payload: Payload, model: BuiltModel, skipped: SkippedDefinition[], requiredFields: Map<string, Set<string>>): void {
+  if (!skipped.length) return
+  const reasonBySlug = new Map(skipped.map((s) => [s.slug, s.reason]))
+  const issues: string[] = []
+
+  const strip = (where: string, slug: string | undefined, data: Record<string, unknown>) => {
+    for (const [field, value] of Object.entries(data)) {
+      const hit = collectTokens(value).find((t) => isRef(t) && reasonBySlug.has(t.collection))
+      if (!hit || !isRef(hit)) continue
+      if (slug && requiredFields.get(slug)?.has(field)) {
+        issues.push(
+          `${where}.${field}: required, but ref('${hit.collection}', '${hit.key}') targets a skipped definition (${reasonBySlug.get(hit.collection)}).`,
+        )
+        continue
+      }
+      delete data[field]
+      payload.logger.warn(`[payload-seed] dropping '${where}.${field}': ref('${hit.collection}', '${hit.key}') targets a skipped definition.`)
+    }
+  }
+
+  for (const coll of model.collections) for (const rec of coll.records) strip(docNodeId(coll.slug, rec.key), coll.slug, rec.data)
+  for (const g of model.globals) strip(`global:${g.slug}`, undefined, g.data)
+
+  if (issues.length) throw new SeedValidationError(issues)
+}
+
 async function clearCollection(payload: Payload, req: PayloadRequest, collection: string): Promise<void> {
   const config = payload.collections[collection as CollectionSlug]?.config
   if (!config) return
@@ -92,18 +152,24 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
 }
 
 /**
- * The seed engine. Takes the seed definitions, builds the model, validates references against
- * the live config, topologically sorts the dependency graph, clears the seeded collections, then
- * creates docs in order — resolving `ref` tokens to ids and delivering each doc's `_file` as a
- * native upload (upload collections) or a source-field value (`custom.seedAsset` collections). A
- * `ref` cycle is broken by deferring an optional field, which a second pass sets once every doc
- * exists (a cycle with only required fields is a hard error). Globals are updated last.
+ * The seed engine. Takes the seed definitions, skips the disabled ones (their own `disabled`, or
+ * the collection's `custom.seedDisabled` — dropping optional refs that point at them), builds the
+ * model, validates references against the live config, topologically sorts the dependency graph,
+ * clears the seeded collections, then creates docs in order — resolving `ref` tokens to ids and
+ * delivering each doc's `_file` as a native upload (upload collections) or a source-field value
+ * (`custom.seedAsset` collections). A `ref` cycle is broken by deferring an optional field, which a
+ * second pass sets once every doc exists (a cycle with only required fields is a hard error).
+ * Globals are updated last.
  */
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
   const defs = definitions ?? options.definitions ?? []
   if (defs.length === 0) payload.logger.warn('[payload-seed] no seed definitions: pass `definitions` to seedPlugin() or seed().')
 
-  const model = buildModel(defs)
+  // Drop disabled definitions (their own `disabled`, or the collection's `custom.seedDisabled` —
+  // e.g. payload-mux without credentials). They still shaped the generated seed-ref types.
+  const { active, skipped } = partitionDefinitions(payload, defs)
+
+  const model = buildModel(active)
   const collectionSlugs = new Set(Object.keys(payload.collections))
 
   const isUpload = (slug: string): boolean => Boolean(payload.collections[slug as CollectionSlug]?.config.upload)
@@ -127,6 +193,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     const cfg = payload.config.globals.find((gc) => gc.slug === g.slug)
     if (cfg) fieldNames.set(`global:${g.slug}`, new Set(cfg.flattenedFields.map((f) => f.name)))
   }
+
+  // Refs into a skipped definition come out of the data before validation: dropped when the field
+  // is optional (the run warns; re-seed once the skip is lifted and they fill in), fatal when it's
+  // required (the doc can't be created without it).
+  stripRefsToSkipped(payload, model, skipped, requiredFields)
 
   validateModel({ model, collectionSlugs, fileCollections, fieldNames })
   const isRequired = (collection: string, field: string): boolean => requiredFields.get(collection)?.has(field) ?? false
@@ -216,7 +287,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   }
 
   payload.logger.info('[payload-seed] seed complete.')
-  return { created, order, deferred }
+  return { created, order, deferred, skipped }
 }
 
 /**
