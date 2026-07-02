@@ -374,11 +374,11 @@ it with `ref()`:
 import { muxVideoPlugin } from '@pro-laico/payload-mux'
 import { defineSeed, seedPlugin } from '@pro-laico/payload-seed'
 
-// src/seed/videos.ts — each doc carries its clip on `_file` (assets/mux-video/intro.mp4)
+// src/seed/videos.ts — each doc carries its clip on `_file`
 const videos = defineSeed('mux-video', ({ file }) => [
   {
     _key: 'intro',
-    _file: file('intro.mp4'),
+    _file: file('intro.mp4'), // assets/mux-video/intro.mp4
     title: 'Intro',
   },
 ])

@@ -444,15 +444,14 @@ each record carries its source SVG on the `_file` meta-key via the `file()` toke
 // src/seed/icons.ts — each icon doc carries its SVG on `_file`
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// assets/icon/star.svg, assets/icon/check.svg
 export default defineSeed('icon', ({ file }) => [
   {
     _key: 'star',
-    _file: file('star.svg'),
+    _file: file('star.svg'), // assets/icon/star.svg
   },
   {
     _key: 'check',
-    _file: file('check.svg'),
+    _file: file('check.svg'), // assets/icon/check.svg
   },
 ])
 ```
