@@ -1,7 +1,7 @@
 {
   "name": "@pro-laico/payload-dev-tools",
   "version": "0.0.0",
-  "description": "Dev-only tooling for Payload CMS + Next.js: a floating <DevToolbar> (seed status + reseed, plugin diagnostics, a component test harness) and a GET /api/dev snapshot endpoint (JSON for AI agents, an HTML dashboard for humans). One plugin in the list, one component in the layout.",
+  "description": "A utility to help you build Payload CMS projects faster.",
   "license": "MIT",
   "repository": {
     "type": "git",
