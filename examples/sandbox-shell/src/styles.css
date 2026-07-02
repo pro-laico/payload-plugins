@@ -1,0 +1,86 @@
+/* The one sandbox theme. All tokens live on .sandbox-shell so the admin ((payload) group) is untouched.
+   Apps set the accent via style={{ '--accent': … }} or [data-accent] — SandboxShell wires both. */
+
+.sandbox-shell {
+  color-scheme: dark;
+  --accent: oklch(0.72 0.16 250);
+  --bg: oklch(0.145 0 0);
+  --card: oklch(0.205 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --text: oklch(0.985 0 0);
+  --muted: oklch(0.708 0 0);
+  --danger: oklch(0.65 0.18 25);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+}
+
+.sandbox-shell *,
+.sandbox-shell *::before,
+.sandbox-shell *::after { box-sizing: border-box; }
+
+.sandbox-shell a { color: var(--accent); text-decoration: none; }
+.sandbox-shell a:hover { text-decoration: underline; }
+
+.sandbox-shell h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.sandbox-shell h2 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; margin: 40px 0 12px; }
+.sandbox-shell h3 { font-size: 0.95rem; font-weight: 600; margin: 24px 0 8px; }
+.sandbox-shell p.shell-lead { color: var(--muted); margin: 0 0 24px; }
+
+/* layout: header / centered main column / footer */
+.shell-header {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  max-width: 920px; width: 100%; margin: 0 auto; padding: 40px 24px 0;
+}
+.shell-header .shell-pkg { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); display: block; margin-top: 4px; }
+.shell-header nav { display: flex; gap: 16px; font-size: 0.9rem; white-space: nowrap; }
+.shell-main { max-width: 920px; width: 100%; margin: 0 auto; padding: 32px 24px 64px; flex: 1; }
+.shell-footer {
+  max-width: 920px; width: 100%; margin: 0 auto; padding: 20px 24px 40px;
+  border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
+}
+
+.shell-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.shell-empty { color: var(--muted); font-style: italic; background: var(--card); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin: 0 0 16px; }
+.shell-muted { color: var(--muted); }
+.shell-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.shell-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 10px 16px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--bg);
+  font-family: var(--font-sans); font-weight: 600; font-size: 0.95rem; line-height: 1; cursor: pointer;
+  text-decoration: none; transition: filter 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.shell-btn:hover { filter: brightness(1.1); text-decoration: none; }
+.shell-btn:disabled { opacity: 0.6; cursor: default; filter: none; }
+.shell-btn--ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+.shell-btn--ghost:hover { background: var(--card); filter: none; border-color: var(--accent); }
+.shell-btn--danger:not(:disabled):hover { filter: none; background: var(--danger); color: var(--text); }
+
+.sandbox-shell code, .sandbox-shell kbd {
+  background: var(--card); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.9em;
+}
+.sandbox-shell pre.shell-code {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px;
+  overflow-x: auto; font-size: 0.82rem; line-height: 1.55; font-family: var(--font-mono);
+}
+.sandbox-shell pre.shell-code code { background: none; border: none; padding: 0; }
+
+/* seed panel */
+.shell-seed-error { color: var(--danger); font-size: 0.9rem; margin: 12px 0 0; }
+.shell-seed-error ul { margin: 6px 0 0; padding-left: 20px; }
+.shell-seed-steps { color: var(--muted); margin: 0 0 16px; padding-left: 20px; }
+.shell-seed-steps li { margin: 6px 0; }
+.shell-seed-steps strong { color: var(--text); }

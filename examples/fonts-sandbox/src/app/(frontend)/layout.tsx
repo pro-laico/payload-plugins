@@ -3,10 +3,14 @@ import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import type React from 'react'
 import definitionFonts from '@/app/definition'
+import '@pro-laico/sandbox-shell/styles.css'
+
+// Dynamic: the page reads live Payload data (seed status + the active font set) on every request.
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Fonts Sandbox',
-  description: 'A minimal Payload app for testing the @pro-laico/payload-fonts plugin.',
+  description: 'An example app for @pro-laico/payload-fonts.',
 }
 
 // The active fonts are applied as the `--font-set{Sans,Serif,Mono,Display}` CSS variables, two
@@ -21,21 +25,17 @@ export const metadata = {
 //     definition is populated, so `generate:fonts` lets you preview the real prod path locally).
 //
 // A page then just uses `font-family: var(--font-setSans)` — identical in both environments.
-const demoChrome = `
-  *, *::before, *::after { box-sizing: border-box; }
-  body { margin: 0; font-family: var(--font-setSans, ui-sans-serif), system-ui, sans-serif; background: #0a0a0a; color: #ededed; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-  a { color: #4ade80; }
-`
+// Redirecting the shell's --font-sans token at the seeded sans makes the whole page part of the demo.
+const shellUsesSeededSans = `.sandbox-shell { --font-sans: var(--font-setSans, ui-sans-serif, system-ui, sans-serif); }`
 
 export default function FrontendLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
       <head>
         <DevFonts config={config} definition={definitionFonts} />
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static demo chrome, no user input. */}
-        <style dangerouslySetInnerHTML={{ __html: demoChrome }} />
+        <style dangerouslySetInnerHTML={{ __html: shellUsesSeededSans }} />
       </head>
-      <body>{children}</body>
+      <body style={{ margin: 0 }}>{children}</body>
     </html>
   )
 }

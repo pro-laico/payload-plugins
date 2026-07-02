@@ -20,6 +20,7 @@
     "@payloadcms/richtext-lexical": "^3.85.1",
     "@payloadcms/ui": "^3.85.1",
     "@pro-laico/payload-seed": "workspace:*",
+    "@pro-laico/sandbox-shell": "workspace:*",
     "cross-env": "^10.1.0",
     "graphql": "^16.14.2",
     "next": "^16.2.9",

@@ -20,6 +20,7 @@
     "@payloadcms/ui": "^3.85.1",
     "@pro-laico/payload-icons": "workspace:*",
     "@pro-laico/payload-seed": "workspace:*",
+    "@pro-laico/sandbox-shell": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cross-env": "^10.1.0",

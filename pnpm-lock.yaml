@@ -129,6 +129,9 @@ importers:
       '@pro-laico/payload-seed':
         specifier: workspace:*
         version: link:../../packages/payload-seed
+      '@pro-laico/sandbox-shell':
+        specifier: workspace:*
+        version: link:../sandbox-shell
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -165,7 +168,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.9
-        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
+        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
 
   examples/icons-sandbox:
     dependencies:
@@ -187,6 +190,9 @@ importers:
       '@pro-laico/payload-seed':
         specifier: workspace:*
         version: link:../../packages/payload-seed
+      '@pro-laico/sandbox-shell':
+        specifier: workspace:*
+        version: link:../sandbox-shell
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -260,6 +266,9 @@ importers:
       '@pro-laico/payload-seed':
         specifier: workspace:*
         version: link:../../packages/payload-seed
+      '@pro-laico/sandbox-shell':
+        specifier: workspace:*
+        version: link:../sandbox-shell
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -318,6 +327,9 @@ importers:
       '@pro-laico/payload-seed':
         specifier: workspace:*
         version: link:../../packages/payload-seed
+      '@pro-laico/sandbox-shell':
+        specifier: workspace:*
+        version: link:../sandbox-shell
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -356,6 +368,24 @@ importers:
         specifier: ^4.1.9
         version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
 
+  examples/sandbox-shell:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      payload:
+        specifier: ^3.85.1
+        version: 3.85.1(graphql@16.14.2)(typescript@6.0.3)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   examples/seed-sandbox:
     dependencies:
       '@payloadcms/db-sqlite':
@@ -373,6 +403,9 @@ importers:
       '@pro-laico/payload-seed':
         specifier: workspace:*
         version: link:../../packages/payload-seed
+      '@pro-laico/sandbox-shell':
+        specifier: workspace:*
+        version: link:../sandbox-shell
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -494,7 +527,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4.1.9
-        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
+        version: 4.1.9(@types/node@26.0.1)(happy-dom@20.10.6)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.77.4)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/payload-fonts:
     dependencies:

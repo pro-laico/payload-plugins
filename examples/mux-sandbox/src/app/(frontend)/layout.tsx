@@ -1,12 +1,12 @@
 import type React from 'react'
 import '@pro-laico/sandbox-shell/styles.css'
 
-// Dynamic: the demo reads live Payload data (seed status + seeded images) on every request.
+// Dynamic: the page reads live Payload data (seed status + seeded videos) on every request.
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Images Sandbox',
-  description: 'An example app for @pro-laico/payload-images.',
+  title: 'Mux Sandbox',
+  description: 'An example app for @pro-laico/payload-mux.',
 }
 
 // A second root layout (alongside the Payload admin's own at (payload)/layout.tsx) — route

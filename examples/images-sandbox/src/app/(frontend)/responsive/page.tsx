@@ -1,6 +1,8 @@
 import config from '@payload-config'
-import { getPayload } from 'payload'
 import { buildSrcset, deriveVersion, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
+import { getPayload } from 'payload'
+import { shellProps } from '../shell'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,12 +24,14 @@ export default async function ResponsivePage() {
 
   if (!img) {
     return (
-      <main>
-        <h1>Responsive srcset demo</h1>
-        <p className="empty">
-          No images yet — <a href="/">seed the samples</a> first, then come back.
+      <SandboxShell {...shellProps}>
+        <p style={{ margin: '0 0 16px' }}>
+          <a href="/">← Back to the gallery</a>
         </p>
-      </main>
+        <EmptyState>
+          No images yet — <a href="/">seed the samples</a> first, then come back.
+        </EmptyState>
+      </SandboxShell>
     )
   }
 
@@ -37,17 +41,17 @@ export default async function ResponsivePage() {
   const { srcset } = buildSrcset(String(img.id), { sourceWidth: img.width ?? undefined, aspectRatio: ar, version: deriveVersion(img) })
 
   return (
-    <main>
+    <SandboxShell {...shellProps}>
       <p style={{ margin: 0 }}>
         <a href="/">← Back to the gallery</a>
       </p>
-      <h1>One image, every screen size</h1>
-      <p className="lead">
+      <h2>One image, every screen size</h2>
+      <p className="shell-lead">
         A single <code>&lt;ResponsiveImage&gt;</code> with <code>sizes=&quot;100vw&quot;</code>, full-bleed. No JavaScript and no resize handler
         — the browser reads the <code>srcset</code> and downloads the one variant that fits your screen.
       </p>
 
-      <ol className="steps">
+      <ol className="shell-seed-steps">
         <li>
           Open DevTools → <strong>Network</strong>, filter to <strong>Img</strong>, and tick <strong>Disable cache</strong>.
         </li>
@@ -71,7 +75,7 @@ export default async function ResponsivePage() {
       </div>
 
       <h2>The srcset it emitted</h2>
-      <pre className="code">{srcset.split(', ').join('\n')}</pre>
-    </main>
+      <pre className="shell-code">{srcset.split(', ').join('\n')}</pre>
+    </SandboxShell>
   )
 }

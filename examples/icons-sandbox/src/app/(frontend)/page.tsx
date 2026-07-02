@@ -2,13 +2,14 @@ import config from '@payload-config'
 // The plugin's drop-in component — one import, fetches by name and inlines the SVG (resolves
 // config via the @payload-config alias on its own; no wiring).
 import { Icon as PayloadIcon } from '@pro-laico/payload-icons/components/Icon'
+import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
 import { CmsIcon } from '@/components/ui/CmsIcon'
 import type { IconSize, IconTone, IconVariant } from '@/components/ui/Icon'
 
-// Always read fresh so newly-seeded/uploaded icons show up on reload.
-export const dynamic = 'force-dynamic'
+// The slugs the seed definitions in src/seed/*.ts fill.
+const SEEDED_SLUGS = ['icon', 'iconSet', 'pages']
 
 const VARIANTS: IconVariant[] = ['standalone', 'outline', 'solid', 'ghost']
 const SIZES: IconSize[] = ['xs', 'sm', 'base', 'lg', 'xl']
@@ -16,11 +17,11 @@ const TONES: IconTone[] = ['current', 'muted', 'primary', 'accent', 'destructive
 
 const iconName = (filename?: string | null): string => filename?.replace(/\.svg$/i, '') ?? 'icon'
 
-/** A labeled showcase cell. */
+/** A labeled showcase cell. `span` not `code` — the shell's chip styling would swallow the tiny label. */
 const Cell = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="flex flex-col items-center gap-2">
     <div className="flex h-12 items-center justify-center">{children}</div>
-    <code className="font-mono text-[11px] text-muted-foreground">{label}</code>
+    <span className="font-mono text-[11px] text-muted-foreground">{label}</span>
   </div>
 )
 
@@ -34,36 +35,31 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 
 export default async function Home() {
   const payload = await getPayload({ config })
+  const status = await getSeedStatus(payload, SEEDED_SLUGS)
   const { docs } = await payload.find({ collection: 'icon', limit: 24, overrideAccess: true })
   const names = docs.map((d) => iconName(d.filename))
   const name = names[0]
 
   return (
-    <main className="mx-auto max-w-3xl space-y-12 px-6 py-16">
-      <header className="space-y-3">
-        <h1 className="text-2xl font-semibold">Icons Sandbox</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          A common-usage showcase for <code className="font-mono text-foreground">@pro-laico/payload-icons</code>: a{' '}
-          <code className="font-mono text-foreground">cva</code> + Tailwind <code className="font-mono text-foreground">Icon</code> wrapper over
-          the plugin's primitive. CMS-managed SVGs are optimized to <code className="font-mono text-foreground">currentColor</code> on upload,
-          so a single source recolors and resizes from class names alone.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Manage icons in the{' '}
-          <a href="/admin" className="underline underline-offset-2 hover:text-foreground">
-            admin panel
-          </a>
-          .
-        </p>
-      </header>
+    <SandboxShell
+      title="Icons Sandbox"
+      packageName="@pro-laico/payload-icons"
+      docsHref="https://payload-plugins.prolaico.com/docs/plugins/payload-icons"
+      accent="oklch(0.75 0.15 165)"
+      lead={
+        <>
+          A common-usage showcase for <code>@pro-laico/payload-icons</code>: a <code>cva</code> + Tailwind <code>Icon</code> wrapper over the
+          plugin's primitive. CMS-managed SVGs are optimized to <code>currentColor</code> on upload, so a single source recolors and resizes
+          from class names alone.
+        </>
+      }
+    >
+      <SeedPanel seeded={status.seeded} counts={status.counts} />
 
       {!name ? (
-        <p className="text-sm text-muted-foreground">
-          No icons yet — open <code className="rounded bg-muted px-1.5 py-0.5 font-mono">/admin</code>, click{' '}
-          <strong className="text-foreground">Seed your database</strong> (or upload an SVG), then reload.
-        </p>
+        <EmptyState>No icons yet — seed the database above, or upload an SVG in the admin, then reload.</EmptyState>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-10 pt-6">
           <Section title="the drop-in component — <Icon name> from the plugin, one import">
             {names.map((n) => (
               <Cell key={n} label={n}>
@@ -143,6 +139,6 @@ export default async function Home() {
           </section>
         </div>
       )}
-    </main>
+    </SandboxShell>
   )
 }

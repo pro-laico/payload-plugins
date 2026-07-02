@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import '@pro-laico/sandbox-shell/styles.css'
 import './globals.css'
+
+// Dynamic: the page reads live Payload data (seed status + icons) on every request.
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Icons Sandbox',
@@ -10,7 +14,7 @@ export const metadata: Metadata = {
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground antialiased">{children}</body>
+      <body>{children}</body>
     </html>
   )
 }

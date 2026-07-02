@@ -1,21 +1,21 @@
 import config from '@payload-config'
-import { getActiveFontFaces } from '@pro-laico/payload-fonts'
-import { getPayload } from 'payload'
-import { SeedControls } from '@/components/SeedControls'
+import { type ActiveFace, getActiveFontFaces } from '@pro-laico/payload-fonts'
+import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { getPayload, type Payload } from 'payload'
 
-// Read the active selection fresh each render so a seed/edit shows up on reload.
-export const dynamic = 'force-dynamic'
+// The slugs src/seed/ fills (the seed also sets the `fontSet` global, but getSeedStatus counts
+// collections — the global's effect shows up as the specimens themselves).
+const SEEDED_SLUGS = ['fontOriginal', 'font']
 
 const FAMILY_LABEL: Record<string, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const familyVar = (family: string) => `var(--font-set${cap(family)})`
 
-type ActiveEntry = { family: string; title: string; files: string[] }
+type ActiveEntry = { family: string; title: string; faces: ActiveFace[] }
 
-/** The active typefaces (family, title, served filenames) — the fonts the layout makes available as
+/** The active typefaces (family, title, served faces) — the fonts the layout makes available as
  *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */
-async function getActive(): Promise<ActiveEntry[]> {
-  const payload = await getPayload({ config })
+async function getActive(payload: Payload): Promise<ActiveEntry[]> {
   const faces = await getActiveFontFaces(payload)
 
   const titleByFamily = new Map<string, string>()
@@ -31,82 +31,92 @@ async function getActive(): Promise<ActiveEntry[]> {
     // no fontSet global
   }
 
-  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, files: f.faces.map((x) => x.filename) }))
+  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, faces: f.faces }))
+}
+
+// A variable face carries a 'min max' range in one file — sample a spread across it. Static faces
+// get one sample per served upright weight.
+const sampleWeights = (faces: ActiveFace[]): number[] => {
+  const upright = faces.filter((f) => f.style === 'normal')
+  const variable = upright.find((f) => f.weight.includes(' '))
+  if (variable) {
+    const [min, max] = variable.weight.split(' ').map(Number)
+    return [...new Set([min, 400, 700, max])].filter((w) => w >= min && w <= max).sort((a, b) => a - b)
+  }
+  return [...new Set(upright.map((f) => Number(f.weight)))].sort((a, b) => a - b)
+}
+
+const rangeLabel = (faces: ActiveFace[]) => {
+  const variable = faces.find((f) => f.weight.includes(' '))
+  return variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
 }
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
 export default async function Home() {
-  const active = await getActive()
+  const payload = await getPayload({ config })
+  const status = await getSeedStatus(payload, SEEDED_SLUGS)
+  const active = await getActive(payload)
 
   return (
-    <main className="shell">
-      <style dangerouslySetInnerHTML={{ __html: CHROME }} />
+    <SandboxShell
+      title="Fonts Sandbox"
+      packageName="@pro-laico/payload-fonts"
+      docsHref="https://payload-plugins.prolaico.com/docs/plugins/payload-fonts"
+      accent="oklch(0.78 0.14 75)"
+      lead={
+        <>
+          Each specimen below is rendered with <code>font-family: var(--font-set…)</code> — the family variables the layout exposes via{' '}
+          <code>&lt;DevFonts /&gt;</code> in dev and <code>next/font</code> in production. Same CSS, both environments. If the specimens render
+          in distinct fonts at distinct weights, the whole pipeline works: upload → subset → serve → render.
+        </>
+      }
+    >
+      <style dangerouslySetInnerHTML={{ __html: SPECIMEN_CSS }} />
 
-      <header>
-        <h1 className="h1" style={{ fontFamily: familyVar('display') }}>
-          Fonts Sandbox
-        </h1>
-        <p className="lead">
-          Each sample below is rendered with <code>font-family: var(--font-set…)</code> — the family variables the layout exposes via{' '}
-          <code>&lt;DevFonts /&gt;</code> in dev and <code>next/font</code> in production. Same CSS, both environments. If the headings render
-          in distinct fonts, the whole pipeline works: upload → subset → serve → render.
-        </p>
-        <SeedControls />
-      </header>
+      <SeedPanel seeded={status.seeded} counts={status.counts} />
 
       {active.length === 0 ? (
-        <section className="card">
-          <h2 className="h2" style={{ fontFamily: familyVar('display') }}>
-            No fonts seeded yet
-          </h2>
-          <p className="muted">
-            Click <strong>Seed the database</strong> above (needs <code>ENABLE_SEED=true</code> + an admin session), use the “Seed your
-            database” button in the <a href="/admin">admin dashboard</a>, or <code>POST /api/seed</code>. The seed ingests four sample typefaces
-            from <code>seed-assets/fonts/</code>, subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
-          </p>
-        </section>
+        <EmptyState>
+          No fonts seeded yet — seed above. The seed ingests four sample typefaces from <code>seed-assets/font/</code> (including a variable
+          Inter and a two-weight Lora), subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
+        </EmptyState>
       ) : (
         active.map((entry) => (
-          <section key={entry.family} className="specimen">
+          <section key={entry.family} className="shell-card">
             <div className="specimen__head">
               <span className="specimen__name" style={{ fontFamily: familyVar(entry.family) }}>
                 {entry.title}
               </span>
-              <span className="badge">
-                {FAMILY_LABEL[entry.family]} · var(--font-set{cap(entry.family)})
+              <span className="specimen__badge">
+                {FAMILY_LABEL[entry.family] ?? entry.family} · var(--font-set{cap(entry.family)}) · {rangeLabel(entry.faces)}
               </span>
             </div>
-            <p className="specimen__sample" style={{ fontFamily: familyVar(entry.family) }}>
-              {SAMPLE}
-            </p>
-            <p className="specimen__files">{entry.files.join(' · ')}</p>
+            {sampleWeights(entry.faces).map((weight) => (
+              <p key={weight} className="specimen__sample" style={{ fontFamily: familyVar(entry.family), fontWeight: weight }}>
+                <span className="specimen__weight">{weight}</span> {SAMPLE}
+              </p>
+            ))}
+            <p className="specimen__files shell-muted">{entry.faces.map((f) => f.filename).join(' · ')}</p>
           </section>
         ))
       )}
 
-      <footer className="muted foot">
-        In production, run <code>pnpm prebuild</code> (or <code>generate:fonts</code>) to self-host these with <code>next/font/local</code>— it
+      <p className="shell-muted" style={{ fontSize: '0.85rem', maxWidth: '72ch' }}>
+        In production, run <code>pnpm prebuild</code> (or <code>generate:fonts</code>) to self-host these with <code>next/font/local</code> — it
         fetches the active fonts from <code>/api/fonts/export</code> and writes <code>public/fonts/</code> + <code>definition.ts</code>. Running
         it against this dev server makes <code>&lt;DevFonts /&gt;</code> stand down so you can preview the exact production path.
-      </footer>
-    </main>
+      </p>
+    </SandboxShell>
   )
 }
 
-const CHROME = `
-  .shell { max-width: 820px; margin: 0 auto; padding: 48px 24px 96px; }
-  .h1 { font-size: 2.2rem; letter-spacing: -0.02em; margin: 0 0 10px; }
-  .h2 { font-size: 1.3rem; margin: 0 0 8px; }
-  .lead { color: #b4b4b4; margin: 0 0 20px; max-width: 64ch; }
-  .muted { color: #9a9a9a; }
-  code { background: #171717; border: 1px solid #2a2a2a; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
-  .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; padding: 20px; margin-top: 8px; }
-  .specimen { background: #141414; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+// Specimen-specific type styles only — cards, buttons, and colors come from the shell.
+const SPECIMEN_CSS = `
   .specimen__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
   .specimen__name { font-size: 1.5rem; font-weight: 600; }
-  .badge { font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: #b4b4b4; border: 1px solid #2a2a2a; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
-  .specimen__sample { font-size: 1.9rem; line-height: 1.25; margin: 0 0 10px; word-break: break-word; }
-  .specimen__files { color: #7c7c7c; font-size: 0.8rem; margin: 0; }
-  .foot { margin-top: 28px; font-size: 0.85rem; max-width: 64ch; }
+  .specimen__badge { font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .specimen__sample { display: flex; align-items: baseline; gap: 14px; font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; word-break: break-word; }
+  .specimen__weight { flex: none; min-width: 3ch; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
+  .specimen__files { font-size: 0.8rem; margin: 8px 0 0; }
 `
