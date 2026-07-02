@@ -2,7 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeDeleteHook, CollectionS
 
 import { refId } from '../lib/refs'
 import { readUploadBytes } from '../lib/uploadBytes'
-import { type Charset, detectMetadata, resolveCharsetText, subsetToWoff2 } from './optimizeFont'
+import { type Charset, detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from './optimizeFont'
 
 type Ref = string | number | { id?: string | number } | null | undefined
 
@@ -11,18 +11,9 @@ type Ref = string | number | { id?: string | number } | null | undefined
  *  directly, then clearing `font` fires this cascade at the same ids). */
 const isNotFound = (err: unknown): boolean => (err as { status?: number })?.status === 404 || (err instanceof Error && err.name === 'NotFound')
 
-// The most common deployment mistake: a bundler (Next/Turbopack) bundles the harfbuzz / fontkit
-// wasm + native assets, so `subset-font` can't load its `hb-subset.wasm` at runtime. The subset
-// then throws, fonts upload but never get subsetted, and nothing is served — with only a generic
-// per-font warning to go on. Detect that specific failure and surface ONE loud, actionable log.
+// Surface the bundled-subsetter load failure (see isSubsetterLoadError) as ONE loud, actionable
+// log instead of only the generic per-font warning.
 let warnedSubsetterLoad = false
-const isSubsetterLoadError = (err: unknown): boolean => {
-  const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
-  return (
-    /(hb-subset\.wasm|harfbuzzjs|subset-font|fontkit)/i.test(msg) &&
-    /(ENOENT|no such file|cannot find module|failed to load|MODULE_NOT_FOUND)/i.test(msg)
-  )
-}
 
 /**
  * Every `fontOriginal` id a typeface doc references across all of its slots. Each original

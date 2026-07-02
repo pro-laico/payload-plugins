@@ -21,6 +21,8 @@ Custom, self-hosted fonts with none of the usual setup:
 - **Zero-config in dev, optimized in prod:** a runtime component serves the live selection while you work; a build step bakes `next/font` for production. The two paths never both fire.
 - **Declarative seeding:** seed typefaces like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — upload the raw files to `fontOriginal` and reference them from the typeface.
 
+![Fonts rendered from CMS in the /dev/fonts route](/screenshots/fonts.png)
+
 ## Quickstart
 
 <Steps>
@@ -563,9 +565,12 @@ the old originals + optimized too (idempotent). See the
 
 A few things to keep in mind:
 
-- **A bundled subsetter fails silently.** Without `serverExternalPackages: ['subset-font',
+- **A bundled subsetter breaks font serving.** Without `serverExternalPackages: ['subset-font',
   'harfbuzzjs', 'fontkit']` in next.config, Next bundles the subsetter, the wasm breaks, and
-  optimization silently skips — fonts save but never shrink. It's a Quickstart step for a reason.
+  optimization skips — fonts save but never shrink. It's a Quickstart step for a reason. You'll
+  hear about it: a dev-boot probe runs a real subset and logs a loud `[payload-fonts]` error with
+  the fix when the wasm can't load (in production, the same error logs on the first font save),
+  and a typeface whose **Served Files** count stays 0 in the admin is the same signal.
 - **`families` replaces the defaults wholesale.** The list you pass is the *complete* list:
   `families: [{ key: 'brand' }]` drops sans/serif/mono/display entirely. Spread
   `DEFAULT_FONT_FAMILIES` to keep them and add yours.

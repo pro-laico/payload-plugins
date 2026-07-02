@@ -5,7 +5,7 @@ import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collection
 import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
 import { exportFontsEndpoint } from './endpoints/exportFonts'
 import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
-import type { Charset } from './hooks/optimizeFont'
+import { type Charset, probeSubsetter } from './hooks/optimizeFont'
 import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
 import { type FontFamilyConfig, resolveFontFamilies } from './lib/families'
 
@@ -118,15 +118,18 @@ export const fontsPlugin =
       onInit: async (payload) => {
         await config.onInit?.(payload)
         // Dev-only probe for the most common deployment mistake: a bundler inlined the subsetter's
-        // wasm/native assets, so `subset-font` throws at import — which otherwise only surfaces on
-        // the first font save. Importing is the same load path the optimize hook takes, and the
-        // wasm is read at module init, so the import alone trips the failure. Not awaited (never
-        // slows boot) and never runs in production.
+        // wasm/native assets, which otherwise only surfaces on the first font save. Importing
+        // `subset-font` is not enough — harfbuzz reads its wasm lazily on the first subset call —
+        // so probeSubsetter runs a real (garbage-buffer) subset and reports only load failures.
+        // Not awaited (never slows boot) and never runs in production, where the same failure is
+        // still caught loudly on the first font save.
         if (process.env.NODE_ENV !== 'production') {
-          import('subset-font').catch((err) => {
-            payload.logger.error(
-              `[payload-fonts] The font subsetter failed to load — uploaded fonts will NOT be subsetted or served. In Next.js add \`serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']\` to your next.config. (${err instanceof Error ? err.message : err})`,
-            )
+          void probeSubsetter().then((err) => {
+            if (err) {
+              payload.logger.error(
+                `[payload-fonts] The font subsetter failed to load — uploaded fonts will NOT be subsetted or served. In Next.js add \`serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']\` to your next.config. (${err instanceof Error ? err.message : err})`,
+              )
+            }
           })
         }
       },

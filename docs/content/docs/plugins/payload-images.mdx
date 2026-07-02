@@ -28,6 +28,8 @@ A Sanity-style image pipeline, driven from your CMS:
 - **Resize, recrop, reformat from anywhere:** point a `<ResponsiveImage>` or a virtual `srcset` at any ratio in code, or drag the focal point / replace the file in the admin.
 - **Self-busting cache + declarative seeding:** content-addressed URLs refresh themselves when a file or focal point changes, and seeded media (focal point and all) is declared in code through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
+![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)
+
 ## Quickstart
 
 <Callout type="info">
@@ -597,6 +599,8 @@ that must stay in frame) once per image, and the endpoint crops around it at eve
   endpoint calls all honor it with nothing extra to pass.
 - **Move it and stale crops refresh.** Changing the focal point purges that image's cached variants
   and bumps its `v` token, so anything already served refetches the new crop.
+
+![Custom focal point setter component](/screenshots/images-back-end.png)
 
 ## How it works
 

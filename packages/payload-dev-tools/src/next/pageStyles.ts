@@ -15,7 +15,7 @@ export const PDTP_CSS = `
 :where(.pdtp) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 .pdtp-container { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
-.pdtp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.pdtp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
 .pdtp-head h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; color: var(--pdtp-fg); }
 .pdtp-badge { font-family: ui-monospace, Consolas, monospace; font-size: 10px; text-transform: uppercase;
   letter-spacing: 0.08em; color: var(--pdtp-muted); border: 1px solid var(--pdtp-border); border-radius: 4px; padding: 2px 7px; }

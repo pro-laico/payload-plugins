@@ -146,3 +146,33 @@ export async function subsetToWoff2(buffer: Buffer, charsetText: string): Promis
   const subsetFont = (await import('subset-font')).default as unknown as SubsetFontFn
   return subsetFont(buffer, charsetText, { targetFormat: 'woff2' })
 }
+
+/**
+ * The most common deployment mistake: a bundler (Next/Turbopack) bundles the harfbuzz / fontkit
+ * wasm + native assets, rewriting their load paths to virtual ones that don't exist on disk. The
+ * subset then throws at runtime, fonts upload but never get subsetted, and nothing is served.
+ * True when an error is that load failure (vs. an ordinary bad-font error).
+ */
+export const isSubsetterLoadError = (err: unknown): boolean => {
+  const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err)
+  return (
+    /(hb-subset\.wasm|harfbuzzjs|subset-font|fontkit)/i.test(msg) &&
+    /(ENOENT|no such file|cannot find module|failed to load|MODULE_NOT_FOUND)/i.test(msg)
+  )
+}
+
+/**
+ * Boot-time probe for that mistake. Importing `subset-font` is NOT enough to detect it — harfbuzz
+ * reads its wasm lazily (`_.once`) on the FIRST SUBSET CALL — so this runs a real subset on a
+ * garbage buffer: the wasm loads (and fails loudly if bundled) before the buffer is ever parsed.
+ * Resolves `null` when the subsetter is healthy — a bad-font error from the garbage buffer proves
+ * the wasm loaded — or the load error for the caller to report.
+ */
+export async function probeSubsetter(): Promise<unknown | null> {
+  try {
+    await subsetToWoff2(Buffer.from('not a font'), 'a')
+  } catch (err) {
+    if (isSubsetterLoadError(err)) return err
+  }
+  return null
+}

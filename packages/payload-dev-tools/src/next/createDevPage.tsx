@@ -121,7 +121,7 @@ const Shell = ({ snapshot, title, children }: { snapshot: DevSnapshot; title: st
 
 const DevIndex = ({ snapshot }: { snapshot: DevSnapshot }) => (
   <>
-    <div className="pdtp-chips" style={{ marginTop: 16 }}>
+    <div className="pdtp-chips">
       {Object.entries(snapshot.plugins).map(([name, on]) => (
         <span key={name}>
           <span className={`pdtp-dot ${on ? 'pdtp-dot-on' : 'pdtp-dot-off'}`} />
