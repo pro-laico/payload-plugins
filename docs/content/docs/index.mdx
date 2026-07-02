@@ -1,40 +1,65 @@
 ---
-title: "Introduction"
+title: "Overview"
 description: "A suite of composable @pro-laico/* plugins for Payload CMS. Each works standalone in any Payload + Next.js project."
 ---
 
 **Payload Plugins** is a collection of composable [Payload CMS](https://payloadcms.com/)
 plugins published under the `@pro-laico/*` scope. Each is an independent package you can
-drop into any Payload + Next.js project — add only the ones you need.
+drop into any Payload + Next.js (App Router) project — add only the ones you need. They
+peer on Payload `^3` and React 19, and ship in lockstep under one version.
 
 <Callout type="info">
   Payload Plugins is not affiliated with Payload CMS in any capacity.
 </Callout>
 
-## Getting started
-
-Install a plugin and add it to your Payload config:
-
-```bash
-pnpm add @pro-laico/payload-seed
-```
-
-```ts
-import { buildConfig } from 'payload'
-import { seedPlugin } from '@pro-laico/payload-seed'
-
-export default buildConfig({
-  plugins: [seedPlugin({ definitions: [/* your seed.ts exports */] })],
-  // ...
-})
-```
-
-## How it's organized
-
-Every plugin follows the same shape: a `(opts) => (config) => config` factory exported
-both as the default and a named export, with the raw collections, hooks, fields, and
-components also exported for advanced consumers.
+## The plugins
 
 <Cards>
-  <Card title="Plugins" href="/docs/plugins" description="Reference for every @pro-laico/* package." />
+  <Card
+    title="payload-seed"
+    href="/docs/plugins/payload-seed"
+    description="Type-safe database seeding — typed cross-file references, dependency ordering, media uploads, behind an ENABLE_SEED kill switch."
+  />
+  <Card
+    title="payload-images"
+    href="/docs/plugins/payload-images"
+    description="On-demand image optimization — an Images collection that stores only the original, a Sharp transform endpoint with focal-aware cropping, a variant cache, and a responsive image component."
+  />
+  <Card
+    title="payload-icons"
+    href="/docs/plugins/payload-icons"
+    description="SVG icons — an Icon collection that optimizes and sanitizes SVGs on save (svgo + currentColor theming) and a drop-in <Icon name> component that inlines the SVG."
+  />
+  <Card
+    title="payload-fonts"
+    href="/docs/plugins/payload-fonts"
+    description="Custom self-hosted fonts — a Font typeface collection that subsets uploads to served WOFF2s, a fontSet global, and an export endpoint + CLI for next/font/local."
+  />
+  <Card
+    title="payload-mux"
+    href="/docs/plugins/payload-mux"
+    description="Mux Video — a Videos collection that uploads straight to Mux, public or signed playback, virtual URLs, two-way delete, and an admin uploader."
+  />
 </Cards>
+
+## How they compose
+
+Each plugin stands alone, but they're built to snap together — and
+[`payload-seed`](/docs/plugins/payload-seed) is the connective tissue. Images, icons, and
+font files seed natively as uploads; Mux clips seed through the same flow via a
+`custom.seedAsset` marker the engine auto-discovers, so one set of `seed.ts` files
+bootstraps a whole site's content — assets, cross-references, and all. The asset
+collections share an **Assets** admin group, and no plugin imports another: composition
+happens through plain Payload config.
+
+See it wired end-to-end in the
+[example apps](https://github.com/pro-laico/payload-plugins/tree/main/examples):
+[`service-co`](https://github.com/pro-laico/payload-plugins/tree/main/examples/service-co)
+runs all five plugins on one fictional studio site, and each plugin has a focused sandbox
+(`seed-sandbox`, `images-sandbox`, `icons-sandbox`, `fonts-sandbox`, `mux-sandbox`).
+
+## Conventions
+
+Every plugin follows the same shape: a `(opts) => (config) => config` factory exported
+both as the default and a named export, zero-config by default, with the raw collections,
+hooks, fields, and components also exported for advanced consumers.
