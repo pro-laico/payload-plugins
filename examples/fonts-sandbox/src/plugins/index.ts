@@ -6,7 +6,7 @@ import fontSet from '../seed/fontSet'
 
 // The seed definitions, shared by the seed plugin (the admin button / POST /api/seed) and the
 // integration test. `fontOriginals` uploads the raw font files into the `fontOriginal` archive;
-// `fonts` declares four typefaces that ref those originals; `fontSet` wires the active selection
+// `fonts` declares five typefaces that ref those originals; `fontSet` wires the active selection
 // with ordinary `ref('font', …)` tokens.
 export const seedDefinitions = [fontOriginals, fonts, fontSet]
 

@@ -48,8 +48,14 @@ const sampleWeights = (faces: ActiveFace[]): number[] => {
 
 const rangeLabel = (faces: ActiveFace[]) => {
   const variable = faces.find((f) => f.weight.includes(' '))
-  return variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
+  const italic = faces.find((f) => f.style === 'italic')
+  const base = variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
+  return italic ? `${base} + italic${italic.obliqueAngle ? ` (oblique ${italic.obliqueAngle}°)` : ''}` : base
 }
+
+// An italic face rides `font-style: italic` (a true italic / `ital` axis) or, when it carries an
+// oblique angle, the `oblique <angle>` that maps onto the file's `slnt` axis — same as the served CSS.
+const italicFontStyle = (face: ActiveFace) => (face.obliqueAngle ? `oblique ${face.obliqueAngle}deg` : 'italic')
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
@@ -78,8 +84,8 @@ export default async function Home() {
 
       {active.length === 0 ? (
         <EmptyState>
-          No fonts seeded yet — seed above. The seed ingests four sample typefaces from <code>seed-assets/font/</code> (including a variable
-          Inter and a two-weight Lora), subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
+          No fonts seeded yet — seed above. The seed ingests five sample typefaces from <code>seed-assets/font/</code> (including a variable
+          Inter, a two-weight Lora, and an ital-capable Recursive), subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
         </EmptyState>
       ) : (
         active.map((entry) => (
@@ -97,7 +103,15 @@ export default async function Home() {
                 <span className="specimen__weight">{weight}</span> {SAMPLE}
               </p>
             ))}
-            <p className="specimen__files shell-muted">{entry.faces.map((f) => f.filename).join(' · ')}</p>
+            {entry.faces
+              .filter((f) => f.style === 'italic')
+              .slice(0, 1)
+              .map((face) => (
+                <p key="italic" className="specimen__sample" style={{ fontFamily: familyVar(entry.family), fontStyle: italicFontStyle(face) }}>
+                  <span className="specimen__weight">italic</span> {SAMPLE}
+                </p>
+              ))}
+            <p className="specimen__files shell-muted">{[...new Set(entry.faces.map((f) => f.filename))].join(' · ')}</p>
           </section>
         ))
       )}

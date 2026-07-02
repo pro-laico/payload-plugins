@@ -45,7 +45,9 @@ const encode = (pipeline: Sharp, format: OutputFormat, quality: number): Sharp =
     case 'png':
       return pipeline.png()
     default:
-      return pipeline.jpeg({ quality, mozjpeg: true })
+      // JPEG has no alpha channel — composite transparent sources (logos, contain letterboxing)
+      // onto white instead of Sharp's default black.
+      return pipeline.flatten({ background: '#ffffff' }).jpeg({ quality, mozjpeg: true })
   }
 }
 
@@ -68,7 +70,15 @@ export const transformImage = (src: Buffer, input: TransformInput): Promise<Tran
       const g = coverCropGeometry(sw, sh, tw, th, input.focalX ?? 50, input.focalY ?? 50)
       pipeline = pipeline.resize(g.resizeWidth, g.resizeHeight).extract({ left: g.left, top: g.top, width: g.width, height: g.height })
     } else {
-      pipeline = pipeline.resize({ width: input.w, height: input.h, fit: input.fit, withoutEnlargement: true })
+      // Transparent padding: 'contain' letterboxes when the box aspect differs from the source,
+      // and Sharp's default pad color is opaque black.
+      pipeline = pipeline.resize({
+        width: input.w,
+        height: input.h,
+        fit: input.fit,
+        withoutEnlargement: true,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
     }
 
     const { data, info } = await encode(pipeline, input.format, input.quality).toBuffer({ resolveWithObject: true })

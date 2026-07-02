@@ -58,11 +58,34 @@ describe('service-co — all plugins seed together', () => {
       ['team', 3],
       ['testimonials', 3],
       ['images', 14],
-      ['icon', 10],
+      // 10 names × 2 glyph families (Default + Alternate sets)
+      ['icon', 20],
+      ['iconSet', 2],
+      ['payload-folders', 4],
     ] as const) {
       const { totalDocs } = await payload.find({ collection: slug, limit: 0, overrideAccess: true })
       expect(totalDocs, slug).toBe(count)
     }
+  })
+
+  it('payload folders: every image files into a seeded folder', async () => {
+    const { docs } = await payload.find({ collection: 'payload-folders', depth: 0, overrideAccess: true })
+    expect(docs.map((f) => (f as { name?: string }).name).sort()).toEqual(['Projects', 'Services', 'Site', 'Team'])
+    const projects = docs.find((f) => (f as { name?: string }).name === 'Projects') as { id: string | number }
+    const { totalDocs } = await payload.find({
+      collection: 'images',
+      where: { folder: { equals: projects.id } },
+      limit: 0,
+      overrideAccess: true,
+    })
+    expect(totalDocs).toBe(6)
+    const unfiled = await payload.find({
+      collection: 'images',
+      where: { or: [{ folder: { exists: false } }, { folder: { equals: null } }] },
+      limit: 0,
+      overrideAccess: true,
+    })
+    expect(unfiled.totalDocs).toBe(0)
   })
 
   it('payload-images: stores dimensions on upload (originals ready to transform on demand)', async () => {
@@ -112,6 +135,38 @@ describe('service-co — all plugins seed together', () => {
     expect(fontSet.sans ?? fontSet.serif ?? fontSet.display).toBeTruthy()
   })
 
+  it('payload-fonts: a single variable file carrying both styles is flagged ital-capable', async () => {
+    // Recursive's one upload has wght 300–1000 AND slnt 0…-15 — the optimize hook detects the
+    // slant range and marks the served file so an italic face is emitted from the same WOFF2.
+    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Recursive' } }, depth: 0, overrideAccess: true })
+    const recursive = docs[0] as { id: string | number }
+    const optimized = await payload.find({
+      collection: 'fontOptimized',
+      where: { font: { equals: recursive.id } },
+      depth: 0,
+      overrideAccess: true,
+    })
+    expect(optimized.docs).toHaveLength(1)
+    const face = optimized.docs[0] as { weight?: string; style?: string; isVariable?: boolean; italCapable?: boolean; obliqueAngle?: number }
+    expect(face.isVariable).toBe(true)
+    expect(face.weight).toBe('300 1000')
+    expect(face.style).toBe('normal')
+    expect(face.italCapable).toBe(true)
+    expect(face.obliqueAngle).toBe(15)
+  })
+
+  it('payload-fonts: explicit italics upload alongside their uprights (Inter variable, Lora/JBM statics)', async () => {
+    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0, overrideAccess: true })
+    const inter = docs[0] as { id: string | number }
+    const optimized = await payload.find({ collection: 'fontOptimized', where: { font: { equals: inter.id } }, depth: 0, overrideAccess: true })
+    const styles = (optimized.docs as { style?: string; weight?: string }[]).map((d) => `${d.weight}/${d.style}`).sort()
+    expect(styles).toEqual(['100 900/italic', '100 900/normal'])
+
+    const { totalDocs: optimizedTotal } = await payload.find({ collection: 'fontOptimized', limit: 0, overrideAccess: true })
+    // Inter 2 (variable pair) + Lora 4 + JetBrains Mono 4 (400/700 × normal/italic) + Recursive 1
+    expect(optimizedTotal).toBe(11)
+  })
+
   it('SiteSettings global resolves its refs (hero image + featured project)', async () => {
     const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 1, overrideAccess: true })) as {
       companyName?: string
@@ -132,5 +187,35 @@ describe('service-co — all plugins seed together', () => {
     expect(totalDocs).toBe(0)
     const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })) as { showreel?: unknown }
     expect(settings.showreel ?? null).toBeNull()
+  })
+
+  // Keep this LAST — it reruns the whole seed, so every doc id above changes.
+  it('reseeds cleanly over a populated database (dependents cleared before their dependencies)', async () => {
+    // The case a fresh-DB run can't catch: the previous run's projects still reference images
+    // (a required in-array upload is NOT NULL with an ON DELETE SET NULL FK on sqlite), so
+    // clearing images FIRST used to fail those deletes and strand stale docs. The engine now
+    // clears in reverse creation order — dependents go first.
+    const second = await seed({ payload, options: seedOptions })
+    expect(Object.keys(second.created).length).toBeGreaterThan(0)
+
+    for (const [slug, count] of [
+      ['images', 14],
+      ['icon', 20],
+      ['iconSet', 2],
+      ['payload-folders', 4],
+      ['projects', 3],
+      ['services', 4],
+    ] as const) {
+      const { totalDocs } = await payload.find({ collection: slug, limit: 0, overrideAccess: true })
+      expect(totalDocs, `${slug} after reseed`).toBe(count)
+    }
+    // No strays: every image belongs to a folder, exactly as a single seed produces.
+    const unfiled = await payload.find({
+      collection: 'images',
+      where: { or: [{ folder: { exists: false } }, { folder: { equals: null } }] },
+      limit: 0,
+      overrideAccess: true,
+    })
+    expect(unfiled.totalDocs).toBe(0)
   })
 })

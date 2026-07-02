@@ -23,6 +23,23 @@ describe('formatSvg', () => {
     expect(out.filesize).toBe(Buffer.from(out.svgString as string).length)
   })
 
+  it('strips legacy editor attrs (xml:space, enable-background, version) — they break React inlining', async () => {
+    const legacy = `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" x="0px" y="0px" viewBox="0 0 100 100" enable-background="new 0 0 100 100" xml:space="preserve">
+      <path d="M10 14 L30 14 L20 34 Z" fill="#111111"/>
+    </svg>`
+    const out = await run(legacy)
+    expect(out.svgString).not.toContain('xml:space')
+    expect(out.svgString).not.toContain('enable-background')
+    expect(out.svgString).not.toContain('version=')
+
+    // The skip path (transform present) must strip them too — that string is also inlined.
+    const legacyWithTransform = `<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 10 10">
+      <path transform="translate(1 1)" d="M0 0h8v8H0z"/>
+    </svg>`
+    const skipped = await run(legacyWithTransform)
+    expect(skipped.svgString).not.toContain('xml:space')
+  })
+
   it('sanitizes scripts, on* handlers, and javascript: URLs (the stored string is inlined)', async () => {
     const malicious = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" onclick="alert(1)">
       <script>alert('xss')</script>

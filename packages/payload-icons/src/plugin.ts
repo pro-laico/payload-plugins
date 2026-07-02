@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { Icon } from './collections/Icon'
-import { createIconRequestCollection, type IconRequestCollectionOverrides } from './collections/IconRequest'
+import { createIconRequestCollection, ICON_REQUEST_SLUG, type IconRequestCollectionOverrides } from './collections/IconRequest'
 import { createIconSetCollection, ICON_SET_SLUG, type IconSetCollectionOverrides } from './collections/IconSet'
 import { stashConfig, stashIconSetSlug } from './lib/getPayloadClient'
 import type { IconCollectionOverrides } from './types'
@@ -116,6 +116,17 @@ export const iconsPlugin =
     return {
       ...config,
       collections: [...(config.collections ?? []), ...additions],
+      // Stash the resolved slugs so decoupled tooling (e.g. @pro-laico/payload-dev-tools) can
+      // discover the plugin and read them from just `payload.config` — no import.
+      custom: {
+        ...config.custom,
+        payloadIcons: {
+          options: opts,
+          iconSlug: iconOverrides?.slug ?? 'icon',
+          iconSetSlug: includeIconSet ? (iconSetOverrides?.slug ?? ICON_SET_SLUG) : null,
+          iconRequestSlug: trackRequests ? ICON_REQUEST_SLUG : null,
+        },
+      },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         // Remember the app's config so the server components (<Icon> et al) resolve it from

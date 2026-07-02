@@ -1,0 +1,294 @@
+---
+title: "payload-dev-tools"
+description: "Dev-only tooling for Payload + Next.js: /dev pages inside your app (seed controls, icon/font/image labs, a component test harness), a floating dev toolbar, and a machine-readable app snapshot."
+---
+
+Dev-only tooling built for the human/AI iterative loop: the AI proposes, you visually confirm.
+One plugin in the list, one component in your layout, one drop-in file — and your app has a
+`/dev` area rendered by your own frontend (your fonts, your styles): an overview with one-click
+seeding, an icon lab with an active-set switcher, font specimens, an image grid that exercises
+the transform endpoint, and URL-addressable stages for component variants. Alongside it,
+`GET /api/dev` serves the same picture as JSON for scripts and agents. Everything is hard-gated
+to development: endpoints 404, pages 404, and the toolbar renders `null` everywhere else.
+
+```bash
+pnpm add @pro-laico/payload-dev-tools
+```
+
+## What's included
+
+- **The `/dev` pages** — real routes inside your app from one catch-all file: `/dev` (overview,
+  seed controls, collection counts), `/dev/icons` (glyph grid + switch the active set with one
+  click), `/dev/fonts` (specimens in the actual served fonts), `/dev/images`, `/dev/mux`, and
+  `/dev/tests/<test>` (one page per test — the toolbar toggles which version it shows).
+- **`<DevToolbar />`** — the one controller: a floating corner button on every page (admin
+  included) that navigates the dev pages, toggles test versions, seeds, and reads diagnostics —
+  and **stays open while you browse**, so flipping through icons → fonts → tests is frictionless.
+  Self-styled — no Tailwind, no CSS import, no `isDev` conditional.
+- **`GET /api/dev`** — the machine-readable snapshot: environment, installed plugins, seed status
+  + counts, icon misses, font slots, mux readiness, per-collection doc counts. The endpoint to
+  point an AI agent at first; browsers get redirected to `/dev`.
+- **Plugin-aware, import-free.** Sibling `@pro-laico/*` plugins are discovered through their
+  `config.custom` markers — none are dependencies; panels and pages appear for whatever is
+  installed.
+
+## Quickstart
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { devToolsPlugin } from '@pro-laico/payload-dev-tools'
+
+export default buildConfig({
+  // …
+  plugins: [devToolsPlugin()],
+})
+```
+
+Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), and
+`POST /api/dev/icons/activate` (the set switcher) — all 404 outside development.
+</Step>
+
+<Step>
+**Drop in the dev pages**
+
+```tsx title="app/(frontend)/dev/[[...view]]/page.tsx"
+import { createDevPage } from '@pro-laico/payload-dev-tools/next'
+
+export const dynamic = 'force-dynamic'
+export default createDevPage()
+```
+
+One file, all views. Because it lives in your `(frontend)` group, the pages inherit your layout —
+header, brand fonts, globals — so visual confirmation happens in the app, not a facsimile of it.
+`createDevPage` resolves Payload itself; no props required.
+</Step>
+
+<Step>
+**Mount the toolbar**
+
+```tsx title="app/(frontend)/layout.tsx"
+import { DevToolbar } from '@pro-laico/payload-dev-tools/toolbar'
+
+export default function Layout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <DevToolbar />
+      </body>
+    </html>
+  )
+}
+```
+
+No `isDev` check needed — it renders `null` in production. It works in the admin too: drop the
+same line inside `<RootLayout>` in `app/(payload)/layout.tsx`. Because it lives in the layout,
+the panel survives client-side navigation — it's the controller you browse the dev pages with,
+not a menu you keep reopening.
+</Step>
+
+<Step>
+**Optionally, register tests**
+
+```tsx title="src/dev/tests.tsx"
+import { defineTest } from '@pro-laico/payload-dev-tools/next'
+
+export const heroTest = defineTest({
+  key: 'hero',
+  label: 'Homepage hero',
+  kind: 'page',
+  versions: [
+    { id: 'bold', label: 'Bold', render: () => <BoldHero /> },
+    { id: 'split', label: 'Split', render: async () => <SplitHero data={await load()} /> },
+  ],
+})
+```
+
+Pass the same array to both frontend pieces:
+
+```tsx
+export default createDevPage({ tests: [heroTest] })   // → the page: /dev/tests/hero
+<DevToolbar tests={[heroTest]} />                      // → the controls: open it, toggle versions
+```
+
+Each test is **one page**; which version it shows is a cookie the toolbar's chips set — click
+Bold, look; click Split, compare. The page is the canvas, the toolbar is the controller.
+
+**Header/footer tests** go one further: with one more line in your layout, picking a
+`header`/`footer`-kind version swaps it into the **real layout, site-wide**, until you hit Real:
+
+```tsx title="app/(frontend)/layout.tsx"
+const { header, footer } = await resolveDevChrome({ tests: devTests, header: <SiteHeader />, footer: <SiteFooter /> })
+// …render {header} / {footer} where the real ones went
+```
+
+In production `resolveDevChrome` returns exactly what you passed in (before ever touching
+cookies, so static optimization is unaffected). A variant that throws falls back to the real
+chrome.
+</Step>
+
+</Steps>
+
+## Plugin options
+
+export const options = [
+  {
+    name: 'enabled',
+    type: 'boolean',
+    default: "NODE_ENV === 'development'",
+    description: `Forces the endpoints on or off regardless of environment. The default gates everything to development. Only force true on a deployment you'd hand a teammate anyway (a preview env) — the snapshot exposes collection counts and config details, unauthenticated.`,
+  },
+  {
+    name: 'devRoute',
+    type: 'string',
+    default: `'/dev'`,
+    description: `Where the host app mounts the createDevPage catch-all. Drives the toolbar's built-in link and the browser redirect from GET /api/dev.`,
+  },
+]
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+<ConfigOptions items={options} />
+</Tab>
+
+<Tab value="TypeScript">
+```ts
+interface DevToolsPluginOptions {
+  enabled?: boolean
+  devRoute?: string // default '/dev'
+}
+```
+</Tab>
+
+</Tabs>
+
+`createDevPage({ tests, enabled })` and `<DevToolbar tests links enabled />` take the same
+`enabled` override and the same `tests` array (from `defineTest`); the toolbar's `links` adds
+extra rows to its Pages view — point them at your own labs.
+
+## The `/dev` pages
+
+The pages render **content only** — navigation between them is the toolbar's Pages view, which
+stays open as you browse. Views light up based on which plugins the config carries:
+
+| Route | What you see |
+| --- | --- |
+| `/dev` | Env + plugin chips, seed card (seed / destructive reseed with the endpoint's errors inline), doc counts. |
+| `/dev/icons` | Every icon set as a button — **click one to activate it** (published via the single-active hook, the whole site re-skins) — plus the active set's glyph grid and runtime misses. |
+| `/dev/fonts` | An interactive specimen per family slot in its `--font-set*` variable — click through only the weights and styles the typeface actually serves (variable ranges expand to stops; a one-file-both-styles font gets an italic toggle). |
+| `/dev/images` | Originals rendered through `/api/img/:id?w=320`, so the grid exercises the transform + cache end-to-end. With Payload folders enabled, the folders render as filter chips you can click through. |
+| `/dev/mux` | Videos with their persisted ingest `status`. |
+| `/dev/tests/<key>` | One page per test, showing the toolbar-selected version — no added chrome, so you see the component exactly as it would ship. |
+
+Your own labs coexist: a static route like `app/(frontend)/dev/blocks/page.tsx` always beats the
+catch-all, and the toolbar's `links` puts it in the Pages view.
+
+## The snapshot: `GET /api/dev`
+
+JSON for everything non-human (`?format=json` also forces it); browsers are redirected to `/dev`.
+
+```bash
+curl -s localhost:3000/api/dev | jq '.seed.seeded, .icons.misses'
+```
+
+```jsonc
+{
+  "env": { "nodeEnv": "development", "nodeVersion": "v22.x" },
+  "plugins": { "seed": true, "images": true, "icons": true, "fonts": true, "mux": true },
+  "seed": { "enabled": true, "seeded": true, "totalDocs": 42, "counts": { "services": 4 }, "definitions": [/* … */] },
+  "images": { "sourceSlug": "images", "basePath": "/api/img", "sourceCount": 12, "variantCount": 96 },
+  "icons": { "iconCount": 9, "activeSet": "Brand icons", "misses": [{ "name": "sparkles", "count": 7 }] },
+  "fonts": { "familyKeys": ["sans", "serif"], "slots": { "sans": "Inter", "serif": null } },
+  "mux": { "slug": "mux-video", "credentialed": false, "total": 0, "ready": 0 },
+  "collections": [{ "slug": "services", "count": 4 }/* … */],
+  "globals": ["site-settings"],
+  "devRoute": "/dev"
+}
+```
+
+Each plugin panel is `null` when that plugin isn't installed. One request answers "what is this
+app, is it seeded, and what's broken."
+
+## The test harness
+
+`defineTest` registers a named test with versions; each version's `render` is a prop-less
+(optionally async) **server component** — fetch your own data inside it. The model is
+one-page-per-test:
+
+- **The page** — `/dev/tests/<key>` renders inside your real layout with no added chrome: what
+  you see is exactly what would ship. Which version it shows comes from a session cookie
+  (defaulting to the first version), so the URL is stable while you compare.
+- **The controller** — the toolbar's Tests view names what you're viewing and its chips flip the
+  cookie; already on the page, a chip click just re-renders it with the other version.
+- **Chrome overrides** — `header`/`footer`-kind tests get Real/variant chips instead of a page:
+  selecting one sets a slot cookie that `resolveDevChrome` (one line in your layout) reads to
+  swap the variant into the real chrome on every route — browse the whole site wearing the
+  candidate header, with real content between it and the real (or overridden) footer.
+- **The script hook** — `GET /api/dev/stage?test=hero&version=bold` sets the cookie and redirects
+  to the test's page, so an agent or screenshot script puts any version on screen with one URL
+  (`?clear=1` resets; add `?slot=header|footer` to target a chrome override instead). A
+  layout-invisible wrapper (`display: contents`) carries `data-pdt-test` / `data-pdt-version` to
+  assert against.
+
+## How it works
+
+- **Plugin discovery is marker-based.** Each `@pro-laico/*` plugin stashes its resolved slugs and
+  options on `config.custom` (`payloadSeed`, `payloadImages`, `payloadIcons`, `payloadFonts`,
+  `payloadMux`). The snapshot builder reads those markers off `payload.config` — no plugin
+  imports, so nothing else is a dependency and third-party setups simply show fewer panels.
+- **The dev pages resolve Payload themselves.** `createDevPage` reads the config from a
+  `globalThis` stash the plugin's `onInit` fills (falling back to the `@payload-config` alias),
+  so the drop-in file passes no config.
+- **Seeding goes through the seed plugin's own endpoint.** The seed card and toolbar POST to
+  `/api/seed` — same gate (`ENABLE_SEED=true` + a logged-in user), same `{ error, issues }`
+  responses, surfaced inline.
+- **The toolbar persists because it lives in the layout.** Its rows are client-side `<Link>`s, so
+  navigating between dev pages never remounts it — the panel stays open, state intact. It injects
+  one `<style>` tag (all `.pdt-`/`.pdtp-` prefixed — no host theme dependency; `--pdt-accent` is
+  the override seam), and it only ever receives test *labels*, never render functions.
+- **Gating is layered.** Endpoints check per request, pages and toolbar per render. A production
+  build ships neither markup nor data.
+- **It sits beside Next's own dev indicator, on purpose.** The launcher borrows its idiom (solid
+  black, thin border breathing toward grey) and defaults to the opposite corner (Next's is
+  bottom-left). Next has no public API for third-party panels in its indicator yet — when one
+  ships, this is a natural candidate to register there.
+
+## Gotchas
+
+A few things to keep in mind:
+
+- **Three entry points, three contexts.** `.` (the plugin) is for `payload.config`; `/toolbar` is
+  a React component for your layouts; `/next` boots Payload. Import each only where it belongs —
+  mixing them up fails at build time.
+- **Add `export const dynamic = 'force-dynamic'` to the drop-in file.** The dev pages read live
+  data on every request; without it a statically-optimized build can freeze them.
+- **The panel persists per layout tree.** Client-side navigation within your `(frontend)` group
+  keeps it open; jumping to the admin (a different root layout) remounts it closed. That's a Next
+  boundary, not a setting.
+- **Chrome swaps need the `resolveDevChrome` line.** Without it, `header`/`footer`-kind chips set
+  their cookie but nothing reads it — the swap happens exactly where your layout lets it. And the
+  override is site-wide in dev by design: the toolbar's Real chip (or `?slot=…&clear=1`) is the
+  way back.
+- **`enabled: true` outside dev publishes your counts.** The snapshot and pages are deliberately
+  unauthenticated for local convenience; flipping them on in a deployed env exposes collection
+  counts, slugs, and seed state to anyone with the URL.
+- **The Seed view needs the seed plugin's preconditions.** `ENABLE_SEED=true` in `.env.local` and
+  a logged-in Payload user — the card tells you which one is missing, but it can't remove them.
+
+## Exports
+
+| Export | From | What |
+| --- | --- | --- |
+| `devToolsPlugin` | `@pro-laico/payload-dev-tools` | The plugin factory — registers the `/api/dev*` endpoints. |
+| `defineTest` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | Identity helper defining a test's versions with full typing. |
+| `DevSnapshot` (+ per-plugin types) | `@pro-laico/payload-dev-tools` | The `GET /api/dev` response shape, for typed consumers. |
+| `STAGE_COOKIE` | `@pro-laico/payload-dev-tools` | The stage cookie name, for custom staging tooling. |
+| `createDevPage` | `@pro-laico/payload-dev-tools/next` | The `/dev` pages — one catch-all drop-in file. |
+| `DevToolbar` | `@pro-laico/payload-dev-tools/toolbar` | The floating toolbar server component — one line in your layout. |
+| `resolveDevChrome` | `@pro-laico/payload-dev-tools/toolbar` | The chrome-swap seam: returns the real header/footer, or the toolbar-selected variant, site-wide in dev. |

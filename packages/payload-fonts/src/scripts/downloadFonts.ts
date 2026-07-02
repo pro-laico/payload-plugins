@@ -223,12 +223,15 @@ export default fonts
         try {
           const ext = font.extension || font.filename.split('.').pop()?.toLowerCase() || 'woff2'
           const weight = font.weight || '400'
-          const style = font.style || 'normal'
+          const isItalic = font.style === 'italic'
+          // A slnt-axis italic declares `oblique <angle>` so the browser drives the axis; a true
+          // italic (explicit file or ital axis) declares plain `italic`.
+          const style = isItalic && font.obliqueAngle ? `oblique ${font.obliqueAngle}deg` : font.style || 'normal'
           // A variable font's weight is a "min max" range; collapse the space for a filename-safe
           // slug (sans-100-900). The emitted `weight` below keeps the range.
           const weightSlug = weight.replace(/\s+/g, '-')
           // Distinct filename per weight/style; append the index if two files share one.
-          const base = `${family}-${weightSlug}${style === 'italic' ? '-italic' : ''}`
+          const base = `${family}-${weightSlug}${isItalic ? '-italic' : ''}`
           const fileName = bucket.some((f) => f.path.endsWith(`/${base}.${ext}`)) ? `${base}-${i}` : base
           fs.writeFileSync(path.join(FONT_FILES_DIR, `${fileName}.${ext}`), Buffer.from(font.data, 'base64'))
           bucket.push({ path: `${localPrefix}/${fileName}.${ext}`, weight, style })

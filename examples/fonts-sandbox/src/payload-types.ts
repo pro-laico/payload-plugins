@@ -219,6 +219,8 @@ export interface FontOptimized {
   weight?: string | null;
   style?: ('normal' | 'italic') | null;
   isVariable?: boolean | null;
+  italCapable?: boolean | null;
+  obliqueAngle?: number | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -387,6 +389,8 @@ export interface FontOptimizedSelect<T extends boolean = true> {
   weight?: T;
   style?: T;
   isVariable?: T;
+  italCapable?: T;
+  obliqueAngle?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -489,8 +493,8 @@ export interface Auth {
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
-      'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
-      'fontOriginal': 'abril-fatface' | 'inter-variable' | 'jetbrains-mono' | 'lora' | 'lora-700'
+      'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora' | 'recursive'
+      'fontOriginal': 'abril-fatface' | 'inter-variable' | 'jetbrains-mono' | 'lora' | 'lora-700' | 'recursive-variable'
     }
     globals: 'fontSet'
   }

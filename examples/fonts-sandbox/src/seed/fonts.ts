@@ -9,9 +9,10 @@ export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
   { _key: 'lora-700', _file: file('lora-700.woff2') },
   { _key: 'jetbrains-mono', _file: file('jetbrains-mono.woff2') },
   { _key: 'abril-fatface', _file: file('abril-fatface.woff2') },
+  { _key: 'recursive-variable', _file: file('recursive-variable.woff2') },
 ])
 
-// Four typefaces spanning the two supported shapes — no asset-provider glue: the `font`
+// Five typefaces spanning the two supported shapes — no asset-provider glue: the `font`
 // collection's afterChange hook subsets each referenced original into a served `fontOptimized`
 // WOFF2. Reference a typeface — e.g. from the fontSet global — via ref('font', <_key>). The
 // ref('fontOriginal', …) edges also order originals before typefaces.
@@ -35,11 +36,15 @@ export default defineSeed('font', ({ ref }) => [
     family: 'mono',
     weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'jetbrains-mono') }],
   },
-  // Genuinely a single-style display face — Abril Fatface ships in one weight only.
+  // Genuinely a single-style display face — Abril Fatface ships in one weight only. Seeded but
+  // left INACTIVE (the fontSet display slot picks Recursive), showing an uploaded-but-unselected typeface.
   {
     _key: 'abril-fatface',
     title: 'Abril Fatface',
     family: 'display',
     weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'abril-fatface') }],
   },
+  // Ital-capable variable: ONE upright file whose slnt axis leans to -15° — the optimize hook flags
+  // it (italCapable + obliqueAngle 15) and the serving layers synthesize an italic face from it.
+  { _key: 'recursive', title: 'Recursive', family: 'display', variable: { upright: ref('fontOriginal', 'recursive-variable') } },
 ])

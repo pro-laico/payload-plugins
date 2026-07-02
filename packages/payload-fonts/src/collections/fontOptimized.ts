@@ -43,6 +43,12 @@ export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectio
       { name: 'weight', type: 'text', admin: { readOnly: true } },
       { name: 'style', type: 'radio', options: ['normal', 'italic'], admin: { readOnly: true } },
       { name: 'isVariable', type: 'checkbox', admin: { readOnly: true } },
+      // This upright variable file ALSO carries italics via its axes (`ital`, or a negative
+      // `slnt`) — the serving layers emit a second, italic @font-face from the same file, unless
+      // the typeface has an explicit italic file.
+      { name: 'italCapable', type: 'checkbox', admin: { readOnly: true } },
+      // For slnt-based italics: the positive CSS `oblique` angle (deg) matching the axis extreme.
+      { name: 'obliqueAngle', type: 'number', admin: { readOnly: true, condition: (data) => Boolean(data?.italCapable) } },
     ],
   }
 }

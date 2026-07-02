@@ -139,14 +139,44 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
   // cleanup, `font`'s cascade to its originals + optimized). Otherwise wipe rows directly.
   const withHooks = Boolean(config.upload || config.hooks?.beforeDelete?.length || config.hooks?.afterDelete?.length)
   if (withHooks) {
-    await payload.delete({
+    const result = (await payload.delete({
       collection: collection as CollectionSlug,
       where: { id: { exists: true } },
       req,
       overrideAccess: true,
       context: { disableRevalidate: true },
       disableTransaction: true,
-    })
+    })) as { errors?: Array<{ id?: string | number; message?: string }> }
+    // Payload's bulk delete does NOT throw on per-doc failures — it returns them in `errors`.
+    // Retry each once, then warn LOUDLY with the underlying reasons — a silent partial wipe
+    // would leave stale docs sitting beside the fresh seed.
+    const failed: Array<{ id: string | number; reason: string }> = []
+    for (const e of result?.errors ?? []) {
+      if (e.id == null) continue
+      try {
+        await payload.delete({
+          collection: collection as CollectionSlug,
+          id: e.id,
+          req,
+          overrideAccess: true,
+          context: { disableRevalidate: true },
+          disableTransaction: true,
+        })
+      } catch (err) {
+        // Surface the DEEPEST cause: the ORM wraps the driver error ("Failed query: …"), which
+        // hides the actionable part (e.g. "NOT NULL constraint failed: projects_gallery.image_id").
+        let deepest = err instanceof Error ? err : undefined
+        while (deepest?.cause instanceof Error) deepest = deepest.cause
+        const reason = (deepest?.message ?? e.message ?? String(err)).replace(/\s+/g, ' ').slice(0, 300)
+        failed.push({ id: e.id, reason })
+      }
+    }
+    if (failed.length) {
+      const detail = failed.map((f) => `${f.id}: ${f.reason}`).join(' | ')
+      payload.logger.warn(
+        `[payload-seed] could not clear ${failed.length} doc(s) in '${collection}' — these STALE docs now sit beside the fresh seed; re-run the seed or delete them in the admin. Reasons: ${detail}`,
+      )
+    }
   } else {
     await payload.db.deleteMany({ collection: collection as CollectionSlug, req, where: {} })
   }
@@ -216,18 +246,34 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
   const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
 
-  // Clear every seeded collection. `clearCollection` fires delete hooks when the collection needs
-  // a cascade (uploads / external-asset cleanup); plain collections are wiped directly.
-  const seededCollections = [...new Set(model.collections.map((c) => c.slug))]
-  payload.logger.info('[payload-seed] clearing collections...')
-  for (const slug of seededCollections) await clearCollection(payload, req, slug)
-
-  // Create docs in dependency order, resolving ref tokens to ids and delivering each `_file`.
   const docIds = new Map<string, string | number>()
   const recordIndex = new Map<string, { slug: string; record: BuiltRecord }>()
   for (const coll of model.collections)
     for (const rec of coll.records) recordIndex.set(docNodeId(coll.slug, rec.key), { slug: coll.slug, record: rec })
 
+  // Clear every seeded collection — dependents BEFORE their dependencies (the REVERSE of creation
+  // order). Clearing in creation order deletes referenced docs while the previous run's
+  // referencing rows still exist, and on SQL adapters a relationship column can make that delete
+  // FAIL outright (e.g. sqlite generates a required in-array upload as NOT NULL with an
+  // ON DELETE SET NULL foreign key — nulling it violates the constraint), stranding stale docs
+  // beside the fresh seed. `clearCollection` fires delete hooks when the collection needs a
+  // cascade (uploads / external-asset cleanup); plain collections are wiped directly.
+  const seededCollections = [...new Set(model.collections.map((c) => c.slug))]
+  const creationOrder: string[] = []
+  const seen = new Set<string>()
+  for (const nodeId of order) {
+    const slug = recordIndex.get(nodeId)?.slug
+    if (slug && !seen.has(slug)) {
+      seen.add(slug)
+      creationOrder.push(slug)
+    }
+  }
+  // Definitions whose records were all skipped/empty still get cleared (after the ordered ones).
+  for (const slug of seededCollections) if (!seen.has(slug)) creationOrder.push(slug)
+  payload.logger.info('[payload-seed] clearing collections...')
+  for (const slug of [...creationOrder].reverse()) await clearCollection(payload, req, slug)
+
+  // Create docs in dependency order, resolving ref tokens to ids and delivering each `_file`.
   const created: Record<string, number> = {}
 
   payload.logger.info('[payload-seed] seeding documents...')

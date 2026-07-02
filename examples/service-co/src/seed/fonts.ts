@@ -5,41 +5,56 @@ import { defineSeed } from '@pro-laico/payload-seed'
 // collection slug is `fontOriginal`, but `font/` reads better for a folder of font files).
 export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
   { _key: 'inter-variable', _file: file('inter-variable.woff2') },
+  { _key: 'inter-variable-italic', _file: file('inter-variable-italic.woff2') },
   { _key: 'lora', _file: file('lora.woff2') },
+  { _key: 'lora-italic', _file: file('lora-italic.woff2') },
   { _key: 'lora-700', _file: file('lora-700.woff2') },
+  { _key: 'lora-700-italic', _file: file('lora-700-italic.woff2') },
   { _key: 'jetbrains-mono', _file: file('jetbrains-mono.woff2') },
-  { _key: 'abril-fatface', _file: file('abril-fatface.woff2') },
+  { _key: 'jetbrains-mono-italic', _file: file('jetbrains-mono-italic.woff2') },
+  { _key: 'jetbrains-mono-700', _file: file('jetbrains-mono-700.woff2') },
+  { _key: 'jetbrains-mono-700-italic', _file: file('jetbrains-mono-700-italic.woff2') },
+  { _key: 'recursive-variable', _file: file('recursive-variable.woff2') },
 ])
 
-// Four typefaces spanning the two supported shapes — no asset-provider glue: the `font`
-// collection's afterChange hook subsets each referenced original into a served `fontOptimized`
-// WOFF2. Reference a typeface — e.g. from the fontSet global — via ref('font', <_key>). The
+// Four typefaces covering every supported shape — no asset-provider glue: the `font` collection's
+// afterChange hook subsets each referenced original into a served `fontOptimized` WOFF2.
+// Reference a typeface — e.g. from the fontSet global — via ref('font', <_key>). The
 // ref('fontOriginal', …) edges also order originals before typefaces.
 export default defineSeed('font', ({ ref }) => [
-  // Variable: one file carries wght 100–900 — the realistic modern default for a workhorse sans.
-  { _key: 'inter', title: 'Inter', family: 'sans', variable: { upright: ref('fontOriginal', 'inter-variable') } },
-  // Static weights: one file per weight row — the classic body (400) + bold (700) pairing.
+  // Variable, upright + italic as SEPARATE files: each slot carries wght 100–900.
+  {
+    _key: 'inter',
+    title: 'Inter',
+    family: 'sans',
+    variable: { upright: ref('fontOriginal', 'inter-variable'), italic: ref('fontOriginal', 'inter-variable-italic') },
+  },
+  // Static weights WITH italics: one file per weight/style row — the classic 400/700 pairing.
   {
     _key: 'lora',
     title: 'Lora',
     family: 'serif',
     weights: [
       { weight: '400', style: 'normal', file: ref('fontOriginal', 'lora') },
+      { weight: '400', style: 'italic', file: ref('fontOriginal', 'lora-italic') },
       { weight: '700', style: 'normal', file: ref('fontOriginal', 'lora-700') },
+      { weight: '700', style: 'italic', file: ref('fontOriginal', 'lora-700-italic') },
     ],
   },
-  // A code font used at one weight — a single 400 row is the whole typeface.
+  // The same static shape for the code font.
   {
     _key: 'jetbrains-mono',
     title: 'JetBrains Mono',
     family: 'mono',
-    weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'jetbrains-mono') }],
+    weights: [
+      { weight: '400', style: 'normal', file: ref('fontOriginal', 'jetbrains-mono') },
+      { weight: '400', style: 'italic', file: ref('fontOriginal', 'jetbrains-mono-italic') },
+      { weight: '700', style: 'normal', file: ref('fontOriginal', 'jetbrains-mono-700') },
+      { weight: '700', style: 'italic', file: ref('fontOriginal', 'jetbrains-mono-700-italic') },
+    ],
   },
-  // Genuinely a single-style display face — Abril Fatface ships in one weight only.
-  {
-    _key: 'abril-fatface',
-    title: 'Abril Fatface',
-    family: 'display',
-    weights: [{ weight: '400', style: 'normal', file: ref('fontOriginal', 'abril-fatface') }],
-  },
+  // Variable, ONE file carrying BOTH styles: Recursive's axes include wght 300–1000 and
+  // slnt 0…-15, so the optimize hook flags the file ital-capable and the site serves an italic
+  // face from the same upload — nothing extra to reference here.
+  { _key: 'recursive', title: 'Recursive', family: 'display', variable: { upright: ref('fontOriginal', 'recursive-variable') } },
 ])

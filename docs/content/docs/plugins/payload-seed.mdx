@@ -691,6 +691,11 @@ A few things to keep in mind:
   compile-time check to catch stale references.
 - **Globals can't be referenced, and update last.** `ref()` points at collection docs only — a global can
   reference docs, but a doc can't reference a global. Globals are applied after every doc exists.
+- **CLI dies with `ENOENT … node:crypto?tsx-namespace=…` on Node 24? That's tsx, not the seed.** Payload's
+  CLI loads bin scripts through tsx's `tsImport()`, and tsx ≥ 4.21.1 mis-resolves a dependency's bare
+  `require('crypto')` under Node 24's module hooks — killing any custom `payload <script>` at boot. Pin tsx
+  below the regression until it's fixed upstream (pnpm: `overrides: { tsx: '4.19.4' }`). The admin button
+  and `POST /api/seed` are unaffected.
 
 
 ## Exports

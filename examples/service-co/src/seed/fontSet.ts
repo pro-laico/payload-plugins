@@ -7,5 +7,5 @@ export default defineSeed('fontSet', ({ ref }) => ({
   sans: ref('font', 'inter'),
   serif: ref('font', 'lora'),
   mono: ref('font', 'jetbrains-mono'),
-  display: ref('font', 'abril-fatface'),
+  display: ref('font', 'recursive'),
 }))

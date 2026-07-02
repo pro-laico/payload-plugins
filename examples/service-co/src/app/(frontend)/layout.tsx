@@ -1,4 +1,5 @@
 import config from '@payload-config'
+import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolbar'
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import type { Metadata } from 'next'
@@ -6,6 +7,8 @@ import type { ReactNode } from 'react'
 import definitionFonts from '@/app/definition'
 import { SiteFooter } from '@/components/SiteFooter'
 import { SiteHeader } from '@/components/SiteHeader'
+import { devLinks } from '@/dev/links'
+import { devTests } from '@/dev/tests'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -19,16 +22,22 @@ export const metadata: Metadata = {
 //     `extractFonts` puts their classes on <html>.
 //   • Development — <DevFonts /> reads the active selection from Payload and inlines the matching
 //     @font-face + `--font-set*` vars at runtime, so a seed/edit shows on refresh with no build.
-export default function FrontendLayout({ children }: { children: ReactNode }) {
+export default async function FrontendLayout({ children }: { children: ReactNode }) {
+  // Dev-only chrome swap: a header/footer-kind test selected in the dev toolbar replaces the real
+  // chrome site-wide until reset. In production this returns the real components untouched.
+  const { header, footer } = await resolveDevChrome({ tests: devTests, header: <SiteHeader />, footer: <SiteFooter /> })
+
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
       <head>
         <DevFonts config={config} definition={definitionFonts} />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <SiteHeader />
+        {header}
         <main>{children}</main>
-        <SiteFooter />
+        {footer}
+        {/* Dev-only (renders null in production): the floating dev toolbar + test harness. */}
+        <DevToolbar tests={devTests} links={devLinks} />
       </body>
     </html>
   )

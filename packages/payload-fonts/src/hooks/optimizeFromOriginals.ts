@@ -166,6 +166,9 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
           const woff2 = await subsetToWoff2(bytes, charsetText)
           // Variable: the intrinsic axis range wins. Static: the row's weight wins, detection fills a blank.
           const weight = d.isVariable ? (meta?.weight ?? d.weight) : (d.weight ?? meta?.weight)
+          // An upright variable file whose axes also cover italics (ital / negative slnt) is
+          // flagged so the serving layers can emit an italic face from the same file.
+          const italCapable = Boolean(d.style === 'normal' && meta?.italCapable)
           const baseName = (original.filename || `font-${d.originalId}`).replace(/\.[^.]+$/, '')
           // Shallow-cloned req: createLocalReq mutates `.file` on the req it's given; the clone
           // keeps that off the parent while sharing the transaction.
@@ -173,7 +176,15 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
             collection: optimizedSlug,
             req: { ...req },
             overrideAccess: true,
-            data: { font: fontId, original: d.originalId, weight, style: d.style, isVariable: meta?.isVariable ?? d.isVariable } as never,
+            data: {
+              font: fontId,
+              original: d.originalId,
+              weight,
+              style: d.style,
+              isVariable: meta?.isVariable ?? d.isVariable,
+              italCapable,
+              ...(italCapable && meta?.obliqueAngle ? { obliqueAngle: meta.obliqueAngle } : {}),
+            } as never,
             file: { data: woff2, name: `${baseName}.woff2`, mimetype: 'font/woff2', size: woff2.length },
           })
         } catch (err) {

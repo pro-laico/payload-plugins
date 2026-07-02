@@ -22,6 +22,7 @@
     "@payloadcms/next": "^3.85.1",
     "@payloadcms/richtext-lexical": "^3.85.1",
     "@payloadcms/ui": "^3.85.1",
+    "@pro-laico/payload-dev-tools": "workspace:*",
     "@pro-laico/payload-fonts": "workspace:*",
     "@pro-laico/payload-icons": "workspace:*",
     "@pro-laico/payload-images": "workspace:*",

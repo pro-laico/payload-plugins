@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { type ActiveTypeface, buildFontFaceCss, getActiveFontFaces } from './activeFonts'
+import { type ActiveTypeface, buildFontFaceCss, expandItalCapableFaces, getActiveFontFaces } from './activeFonts'
 
 const typefaces: ActiveTypeface[] = [
   { family: 'sans', id: 1, faces: [{ filename: 'inter.woff2', weight: '400', style: 'normal' }] },
@@ -56,6 +56,22 @@ describe('buildFontFaceCss', () => {
     expect(css.match(/'pl-font-9'/g)).toHaveLength(3)
   })
 
+  it('emits `oblique <angle>deg` for a slnt-synthesized italic face', () => {
+    const css = buildFontFaceCss([
+      {
+        family: 'display',
+        id: 9,
+        faces: [
+          { filename: 'recursive.woff2', weight: '300 1000', style: 'normal' },
+          { filename: 'recursive.woff2', weight: '300 1000', style: 'italic', obliqueAngle: 15 },
+        ],
+      },
+    ])
+    expect(css).toContain('font-style:normal')
+    expect(css).toContain('font-style:oblique 15deg')
+    expect(css).not.toContain('font-style:italic')
+  })
+
   it('encodes filenames with spaces in the served URL', () => {
     const css = buildFontFaceCss([{ family: 'mono', id: 3, faces: [{ filename: 'My Mono.woff2', weight: '400', style: 'normal' }] }])
     expect(css).toContain('/api/fontOptimized/file/My%20Mono.woff2')
@@ -71,6 +87,42 @@ describe('buildFontFaceCss', () => {
   it('falls back to a generic sans stack for a custom family with no declared fallback', () => {
     const css = buildFontFaceCss([{ family: 'brand', id: 5, faces: [{ filename: 'b.woff2', weight: '400', style: 'normal' }] }])
     expect(css).toContain("--font-setBrand:'pl-font-5',ui-sans-serif, system-ui, sans-serif")
+  })
+})
+
+describe('expandItalCapableFaces', () => {
+  it('expands an upright ital-capable face into upright + italic over the same file', () => {
+    const faces = expandItalCapableFaces([
+      { filename: 'recursive.woff2', weight: '300 1000', style: 'normal', italCapable: true, obliqueAngle: 15 },
+    ])
+    expect(faces).toEqual([
+      { filename: 'recursive.woff2', weight: '300 1000', style: 'normal' },
+      { filename: 'recursive.woff2', weight: '300 1000', style: 'italic', obliqueAngle: 15 },
+    ])
+  })
+
+  it('an explicit italic file wins — no synthesis, and no stray obliqueAngle on the upright', () => {
+    const faces = expandItalCapableFaces([
+      { filename: 'up.woff2', weight: '100 900', style: 'normal', italCapable: true, obliqueAngle: 10 },
+      { filename: 'it.woff2', weight: '100 900', style: 'italic' },
+    ])
+    expect(faces).toEqual([
+      { filename: 'up.woff2', weight: '100 900', style: 'normal' },
+      { filename: 'it.woff2', weight: '100 900', style: 'italic' },
+    ])
+  })
+
+  it('leaves plain static faces untouched', () => {
+    const faces = [
+      { filename: 'a.woff2', weight: '400', style: 'normal' as const },
+      { filename: 'b.woff2', weight: '700', style: 'italic' as const },
+    ]
+    expect(expandItalCapableFaces(faces)).toEqual(faces)
+  })
+
+  it('an ital-axis italic (no oblique angle) synthesizes a plain italic face', () => {
+    const faces = expandItalCapableFaces([{ filename: 'v.woff2', weight: '100 900', style: 'normal', italCapable: true }])
+    expect(faces[1]).toEqual({ filename: 'v.woff2', weight: '100 900', style: 'italic' })
   })
 })
 

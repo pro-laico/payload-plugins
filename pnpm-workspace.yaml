@@ -15,5 +15,10 @@ allowBuilds:
   unrs-resolver: true
 # payload@3.85.1 pins undici exactly at 7.24.4, which is vulnerable (GHSA fixed in >=7.28.0).
 # No newer payload exists, so override undici to a patched 7.x for payload's subtree only.
+# payload also pins tsx exactly at 4.22.4, whose namespaced tsImport() (payload's bin.js wraps the
+# whole CLI in it) taints CJS `node:` builtin requires with `?tsx-namespace=…` under Node 24's sync
+# module hooks — breaking every custom `payload <bin-script>` (e.g. `payload seed`) with
+# ENOENT node:crypto. Still broken in tsx 4.22.5; 4.19.4 predates the namespace rework and works.
 overrides:
   payload>undici: '^7.28.0'
+  tsx: '4.19.4'

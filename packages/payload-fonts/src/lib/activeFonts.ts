@@ -6,12 +6,37 @@ import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
 /** A family key. `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
 export type FontFamily = string
 
-/** One served, subsetted WOFF2 file (a `fontOptimized` doc). */
+/** One served face. Usually one per `fontOptimized` doc — but an upright variable file whose
+ *  axes also cover italics (`italCapable`) expands into a second, italic face over the SAME file. */
 export interface ActiveFace {
   filename: string
   /** A single CSS weight ('400') or a variable range ('100 900'). */
   weight: string
   style: 'normal' | 'italic'
+  /** For slnt-based italics: the positive CSS `oblique` angle (deg). Absent = a true italic
+   *  (explicit file, or an `ital` axis that `font-style: italic` activates). */
+  obliqueAngle?: number
+}
+
+/** A raw `fontOptimized` doc's face fields, before ital-capability expansion. */
+type RawFace = ActiveFace & { italCapable?: boolean }
+
+/**
+ * Expand one typeface's raw faces into the served set: an upright, ital-capable variable face
+ * contributes an extra italic face over the same file — unless the typeface already has an
+ * explicit italic file, which always wins. Exported for reuse (the export endpoint applies the
+ * same rule) and for tests.
+ */
+export function expandItalCapableFaces(faces: RawFace[]): ActiveFace[] {
+  const hasExplicitItalic = faces.some((f) => f.style === 'italic')
+  return faces.flatMap(({ italCapable, ...face }) => {
+    // obliqueAngle is only meaningful on the synthesized italic face — never on an upright.
+    const { obliqueAngle: _drop, ...upright } = face
+    if (face.style === 'normal' && italCapable && !hasExplicitItalic) {
+      return [upright, { ...face, style: 'italic' as const }]
+    }
+    return [face.style === 'normal' ? upright : face]
+  })
 }
 
 /** The typeface active for a family, plus its served faces. */
@@ -70,12 +95,18 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   const uniqueIds = [...new Set(familyIds.map((r) => r.id))]
   const res = await payload.find({ collection: optimizedSlug, where: { font: { in: uniqueIds } }, depth: 0, limit: 1000, overrideAccess: true })
 
-  const facesByFont = new Map<string | number, ActiveFace[]>()
+  const facesByFont = new Map<string | number, RawFace[]>()
   for (const d of res.docs as unknown as Array<Record<string, unknown>>) {
     if (typeof d.filename !== 'string') continue
     const fontId = refId(d.font)
     if (fontId == null) continue
-    const face: ActiveFace = { filename: d.filename, weight: (d.weight as string) || '400', style: d.style === 'italic' ? 'italic' : 'normal' }
+    const face: RawFace = {
+      filename: d.filename,
+      weight: (d.weight as string) || '400',
+      style: d.style === 'italic' ? 'italic' : 'normal',
+      ...(d.italCapable ? { italCapable: true } : {}),
+      ...(typeof d.obliqueAngle === 'number' ? { obliqueAngle: d.obliqueAngle } : {}),
+    }
     const bucket = facesByFont.get(fontId)
     if (bucket) bucket.push(face)
     else facesByFont.set(fontId, [face])
@@ -84,7 +115,7 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   const out: ActiveTypeface[] = []
   for (const { family, id } of familyIds) {
     const faces = facesByFont.get(id)
-    if (faces?.length) out.push({ family, id, faces })
+    if (faces?.length) out.push({ family, id, faces: expandItalCapableFaces(faces) })
   }
   return out
 }
@@ -123,10 +154,13 @@ export function buildFontFaceCss(typefaces: ActiveTypeface[], opts: BuildFontFac
 
   const faces = typefaces
     .flatMap((tf) =>
-      tf.faces.map(
-        (f) =>
-          `@font-face{font-family:'pl-font-${tf.id}';src:url('${faceUrl(f.filename, optimizedSlug)}') format('woff2');font-weight:${f.weight};font-style:${f.style};font-display:swap;}`,
-      ),
+      tf.faces.map((f) => {
+        // An italic with an oblique angle rides a `slnt` axis: `font-style: oblique <angle>`
+        // maps onto it per CSS Fonts 4 (as `font-style: italic` maps onto an `ital` axis), and
+        // italic requests fall back to oblique faces in font matching.
+        const fontStyle = f.style === 'italic' && f.obliqueAngle ? `oblique ${f.obliqueAngle}deg` : f.style
+        return `@font-face{font-family:'pl-font-${tf.id}';src:url('${faceUrl(f.filename, optimizedSlug)}') format('woff2');font-weight:${f.weight};font-style:${fontStyle};font-display:swap;}`
+      }),
     )
     .join('')
   const vars = typefaces.map((tf) => `${cssVarPrefix}${familyVarSuffix(tf.family)}:'pl-font-${tf.id}',${fallbackFor(tf.family)};`).join('')

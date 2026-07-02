@@ -1,0 +1,97 @@
+{
+  "name": "@pro-laico/payload-dev-tools",
+  "version": "0.0.0",
+  "description": "Dev-only tooling for Payload CMS + Next.js: a floating <DevToolbar> (seed status + reseed, plugin diagnostics, a component test harness) and a GET /api/dev snapshot endpoint (JSON for AI agents, an HTML dashboard for humans). One plugin in the list, one component in the layout.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pro-laico/payload-plugins.git",
+    "directory": "packages/payload-dev-tools"
+  },
+  "keywords": [
+    "payload",
+    "payloadcms",
+    "plugin",
+    "devtools",
+    "toolbar",
+    "testing"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "default": "./dist/index.js"
+      },
+      "./toolbar": {
+        "types": "./dist/toolbar.d.ts",
+        "import": "./dist/toolbar.js",
+        "default": "./dist/toolbar.js"
+      },
+      "./next": {
+        "types": "./dist/next.d.ts",
+        "import": "./dist/next.js",
+        "default": "./dist/next.js"
+      }
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./toolbar": {
+      "import": "./src/toolbar.ts",
+      "types": "./src/toolbar.ts",
+      "default": "./src/toolbar.ts"
+    },
+    "./next": {
+      "import": "./src/next.ts",
+      "types": "./src/next.ts",
+      "default": "./src/next.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm clean && pnpm build:types && pnpm build:swc",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "prepack": "pnpm build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:swc": "swc ./src -d ./dist --config-file ../../.swcrc --strip-leading-paths",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --noCheck"
+  },
+  "peerDependencies": {
+    "next": ">=15.0.0",
+    "payload": "^3.0.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

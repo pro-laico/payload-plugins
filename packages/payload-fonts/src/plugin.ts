@@ -101,6 +101,20 @@ export const fontsPlugin =
       collections,
       globals,
       endpoints,
+      // Stash the resolved slugs + families so decoupled tooling (e.g. @pro-laico/payload-dev-tools)
+      // can discover the plugin and read them from just `payload.config` — no import.
+      custom: {
+        ...config.custom,
+        payloadFonts: {
+          options: opts,
+          fontSlug: fontOverrides?.slug ?? 'font',
+          fontOriginalSlug: FONT_ORIGINAL_SLUG,
+          fontOptimizedSlug: FONT_OPTIMIZED_SLUG,
+          fontSetSlug: includeFontSet ? FONT_SET_SLUG : null,
+          familyKeys,
+          exportPath: '/fonts/export',
+        },
+      },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         // Dev-only probe for the most common deployment mistake: a bundler inlined the subsetter's

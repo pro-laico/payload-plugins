@@ -69,6 +69,19 @@ const normalizeWeight = (weight?: number): string | undefined => {
   return String(Math.min(900, Math.max(100, Math.round(weight / 100) * 100)))
 }
 
+/** What {@link detectMetadata} reads out of a font binary. */
+export interface FontFileMetadata {
+  familyName?: string
+  weight?: string
+  style?: 'normal' | 'italic'
+  isVariable: boolean
+  /** The file ALSO carries italics through a variation axis (an `ital` axis reaching 1, or a
+   *  negative `slnt` range) while its default instance is upright — one file, both styles. */
+  italCapable?: boolean
+  /** For `slnt`-based italics: the positive CSS oblique angle (deg) matching the axis extreme. */
+  obliqueAngle?: number
+}
+
 /**
  * Best-effort read of weight / style / family from a font's metadata via the bundled
  * `fontkit` dependency. Returns `null` when the font can't be parsed.
@@ -76,10 +89,13 @@ const normalizeWeight = (weight?: number): string | undefined => {
  * A `wght` variation axis marks a variable font: we keep its full `min max` range (e.g.
  * `'100 900'`) — exactly what `next/font/local` expects — instead of clamping to the
  * single default-instance weight class as we do for static fonts.
+ *
+ * An upright variable file whose axes ALSO cover italics — a true `ital` axis reaching 1, or a
+ * `slnt` axis leaning forward (negative min) — is flagged `italCapable`, so the serving layers
+ * can emit an italic `@font-face` from the same file (CSS maps `font-style: italic` onto `ital`
+ * and `font-style: oblique <angle>` onto `slnt`).
  */
-export async function detectMetadata(
-  buffer: Buffer,
-): Promise<{ familyName?: string; weight?: string; style?: 'normal' | 'italic'; isVariable: boolean } | null> {
+export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata | null> {
   try {
     // fontkit v2 ships `create` as a NAMED export under node's ESM interop (no usable
     // `default`), but bundlers may synthesize a default — accept either, or detection
@@ -95,7 +111,27 @@ export async function detectMetadata(
     )
     const wght = font.variationAxes?.wght
     const weight = wght ? `${Math.round(wght.min)} ${Math.round(wght.max)}` : normalizeWeight(font['OS/2']?.usWeightClass)
-    return { familyName: font.familyName ?? undefined, weight, style: italic ? 'italic' : 'normal', isVariable: Boolean(wght) }
+
+    let italCapable: boolean | undefined
+    let obliqueAngle: number | undefined
+    if (!italic) {
+      const ital = font.variationAxes?.ital
+      const slnt = font.variationAxes?.slnt
+      if (ital && ital.max >= 1) italCapable = true
+      else if (slnt && slnt.min < 0) {
+        italCapable = true
+        obliqueAngle = Math.round(Math.abs(slnt.min))
+      }
+    }
+
+    return {
+      familyName: font.familyName ?? undefined,
+      weight,
+      style: italic ? 'italic' : 'normal',
+      isVariable: Boolean(wght),
+      ...(italCapable ? { italCapable } : {}),
+      ...(obliqueAngle ? { obliqueAngle } : {}),
+    }
   } catch {
     return null
   }

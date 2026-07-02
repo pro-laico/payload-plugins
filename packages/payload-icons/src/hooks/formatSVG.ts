@@ -6,8 +6,15 @@ type IconData = Record<string, unknown> & { filesize?: number; optimized?: strin
 
 // Strip executable content from untrusted SVG uploads before they're stored and later inlined
 // via dangerouslySetInnerHTML: <script> elements (svgo 4's `removeScripts`, renamed from 3.x's
-// `removeScriptElement`) + on* event handlers.
-const sanitizePlugins: PluginConfig[] = ['removeScripts', { name: 'removeAttrs', params: { attrs: ['on.*'] } }]
+// `removeScriptElement`) + on* event handlers. Also drop legacy editor attributes that survive
+// preset-default and break React rendering when the root attrs are spread onto a JSX <svg>
+// (`xml:space` → "Invalid DOM property") or mean nothing inline (`version`, `enable-background`).
+const sanitizePlugins: PluginConfig[] = [
+  'removeScripts',
+  // elemSeparator '|': removeAttrs treats ':' as its element:attr:value separator, which would
+  // split the literal attribute name `xml:space` — swap the separator so it matches verbatim.
+  { name: 'removeAttrs', params: { attrs: ['on.*', 'xml:space', 'enable-background', 'version'], elemSeparator: '|' } },
+]
 
 // svgo has no builtin for javascript: URLs, so scrub (xlink:)href values from the serialized
 // output as a final pass.

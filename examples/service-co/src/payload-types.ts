@@ -88,6 +88,7 @@ export interface Config {
     fontOptimized: FontOptimized;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
+    'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -95,6 +96,9 @@ export interface Config {
   collectionsJoins: {
     images: {
       variants: 'generated-images';
+    };
+    'payload-folders': {
+      documentsAndFolders: 'payload-folders' | 'images';
     };
   };
   collectionsSelect: {
@@ -114,6 +118,7 @@ export interface Config {
     fontOptimized: FontOptimizedSelect<false> | FontOptimizedSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
+    'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -257,6 +262,7 @@ export interface Image {
    * Inline LQIP data-URI; generated only when a read sets req.context.lqip ({ ar, fit }) or sends an X-LQIP header. Null otherwise.
    */
   blurDataURL?: string | null;
+  folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -294,6 +300,32 @@ export interface GeneratedImage {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders".
+ */
+export interface FolderInterface {
+  id: number;
+  name: string;
+  folder?: (number | null) | FolderInterface;
+  documentsAndFolders?: {
+    docs?: (
+      | {
+          relationTo?: 'payload-folders';
+          value: number | FolderInterface;
+        }
+      | {
+          relationTo?: 'images';
+          value: number | Image;
+        }
+    )[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  folderType?: 'images'[] | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -498,6 +530,8 @@ export interface FontOptimized {
   weight?: string | null;
   style?: ('normal' | 'italic') | null;
   isVariable?: boolean | null;
+  italCapable?: boolean | null;
+  obliqueAngle?: number | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -681,6 +715,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'fontOptimized';
         value: number | FontOptimized;
+      } | null)
+    | ({
+        relationTo: 'payload-folders';
+        value: number | FolderInterface;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -821,6 +859,7 @@ export interface ImagesSelect<T extends boolean = true> {
   srcset?: T;
   placeholderURL?: T;
   blurDataURL?: T;
+  folder?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -984,6 +1023,8 @@ export interface FontOptimizedSelect<T extends boolean = true> {
   weight?: T;
   style?: T;
   isVariable?: T;
+  italCapable?: T;
+  obliqueAngle?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -1032,6 +1073,18 @@ export interface PayloadJobsSelect<T extends boolean = true> {
   queue?: T;
   waitUntil?: T;
   processing?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders_select".
+ */
+export interface PayloadFoldersSelect<T extends boolean = true> {
+  name?: T;
+  folder?: T;
+  documentsAndFolders?: T;
+  folderType?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1176,12 +1229,13 @@ export interface Auth {
 declare module '@pro-laico/payload-seed' {
   interface SeedRegistry {
     collections: {
-      'font': 'abril-fatface' | 'inter' | 'jetbrains-mono' | 'lora'
-      'fontOriginal': 'abril-fatface' | 'inter-variable' | 'jetbrains-mono' | 'lora' | 'lora-700'
-      'icon': 'architecture' | 'arrow-right' | 'check' | 'interiors' | 'landscape' | 'mail' | 'map-pin' | 'phone' | 'renovation' | 'sparkles'
-      'iconSet': 'default'
+      'font': 'inter' | 'jetbrains-mono' | 'lora' | 'recursive'
+      'fontOriginal': 'inter-variable' | 'inter-variable-italic' | 'jetbrains-mono' | 'jetbrains-mono-700' | 'jetbrains-mono-700-italic' | 'jetbrains-mono-italic' | 'lora' | 'lora-700' | 'lora-700-italic' | 'lora-italic' | 'recursive-variable'
+      'icon': 'architecture' | 'architecture-alt' | 'arrow-right' | 'arrow-right-alt' | 'check' | 'check-alt' | 'interiors' | 'interiors-alt' | 'landscape' | 'landscape-alt' | 'mail' | 'mail-alt' | 'map-pin' | 'map-pin-alt' | 'phone' | 'phone-alt' | 'renovation' | 'renovation-alt' | 'sparkles' | 'sparkles-alt'
+      'iconSet': 'alternate' | 'default'
       'images': 'cedar-hill' | 'cedar-hill-interior' | 'foundry-detail' | 'foundry-loft' | 'hero' | 'riverside-interior' | 'riverside-pavilion' | 'svc-architecture' | 'svc-interiors' | 'svc-landscape' | 'svc-renovation' | 'team-1' | 'team-2' | 'team-3'
       'mux-video': 'showreel'
+      'payload-folders': 'projects' | 'services' | 'site' | 'team'
       'projects': 'cedar-hill-residence' | 'foundry-loft' | 'riverside-pavilion'
       'services': 'architecture' | 'interiors' | 'landscape' | 'renovation'
       'team': 'elena' | 'sam' | 'theo'

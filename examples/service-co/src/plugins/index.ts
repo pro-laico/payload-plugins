@@ -1,9 +1,11 @@
+import { devToolsPlugin } from '@pro-laico/payload-dev-tools'
 import { fontsPlugin } from '@pro-laico/payload-fonts'
 import { iconsPlugin } from '@pro-laico/payload-icons'
 import { imagesPlugin } from '@pro-laico/payload-images'
 import { muxVideoPlugin } from '@pro-laico/payload-mux'
 import { seedPlugin } from '@pro-laico/payload-seed'
 import type { Plugin } from 'payload'
+import folders from '../seed/folders'
 import fonts, { fontOriginals } from '../seed/fonts'
 import fontSet from '../seed/fontSet'
 import iconSets from '../seed/iconSets'
@@ -29,6 +31,7 @@ export const seedDefinitions = [
   fontSet,
   icons,
   iconSets,
+  folders,
   images,
   services,
   projects,
@@ -59,10 +62,15 @@ export const seedOptions = {
 //                     endpoint. The brand fonts come from here.
 //   • seedPlugin    — fills all of the above from `src/seed/`; `assetsDir` points at `seed-assets/`
 //                     and `assetSubDirs` maps the `fontOriginal` slug to the friendlier `font/`.
+//   • devToolsPlugin— dev-only `GET /api/dev` snapshot + stage endpoints (404 in production),
+//                     feeding the floating <DevToolbar> mounted in the frontend layout.
 export const plugins: Plugin[] = [
-  imagesPlugin(),
+  // `folders: true` opts the images collection into Payload's native folder organization — the
+  // seed files the photos into Site/Services/Projects/Team folders (see seed/folders.ts).
+  imagesPlugin({ folders: true }),
   iconsPlugin(),
   muxVideoPlugin(),
   fontsPlugin(),
   seedPlugin({ adminButton: true, ...seedOptions }),
+  devToolsPlugin(),
 ]

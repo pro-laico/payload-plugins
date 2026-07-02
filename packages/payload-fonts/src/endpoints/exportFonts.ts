@@ -25,7 +25,9 @@ export interface ExportFontsEndpointOptions {
 type TypefaceRef = { id?: string | number; title?: string | null } | string | number | null
 type FontSelection = Partial<Record<Family, TypefaceRef | TypefaceRef[]>>
 
-/** A single exported weight file: filename, extension, mime, base64 bytes, and (optional) weight/style. */
+/** A single exported weight file: filename, extension, mime, base64 bytes, and (optional) weight/style.
+ *  An upright variable file that also carries italics (ital/slnt axes) exports TWICE — once per
+ *  style, same bytes; the italic entry carries `obliqueAngle` when the italics ride a slnt axis. */
 export type ExportedFont = {
   filename: string
   extension: string
@@ -33,6 +35,8 @@ export type ExportedFont = {
   data: string
   weight?: string | null
   style?: string | null
+  /** For slnt-based italics: the positive CSS `oblique` angle (deg). */
+  obliqueAngle?: number | null
 }
 /** Per-family debug info: is a typeface selected, how many optimized files it has, and how many of
  *  those couldn't be read from storage — so an empty export can name its cause per family. */
@@ -142,6 +146,9 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           const docs = docsByFont.get(id) ?? []
           const diag = { selected: true, typeface: title, optimizedFiles: docs.length, readFailures: 0 }
           diagnostics[family] = diag
+          // An explicit italic file always wins over synthesizing italics from an ital-capable
+          // upright — same rule as `expandItalCapableFaces` on the runtime CSS path.
+          const hasExplicitItalic = docs.some((doc) => doc.style === 'italic')
           const exported: ExportedFont[] = []
           for (const doc of docs) {
             const filename = typeof doc.filename === 'string' ? doc.filename : null
@@ -152,14 +159,18 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
               diag.readFailures++
               continue
             }
-            exported.push({
+            const entry: ExportedFont = {
               filename,
               extension: filename.split('.').pop()?.toLowerCase() || 'woff2',
               mimeType: (doc.mimeType as string) ?? null,
               data: bytes.toString('base64'),
               weight: (doc.weight as string) ?? null,
               style: (doc.style as string) ?? null,
-            })
+            }
+            exported.push(entry)
+            if (doc.style !== 'italic' && doc.italCapable && !hasExplicitItalic) {
+              exported.push({ ...entry, style: 'italic', obliqueAngle: typeof doc.obliqueAngle === 'number' ? doc.obliqueAngle : null })
+            }
           }
           if (exported.length) fonts[family] = exported
         }

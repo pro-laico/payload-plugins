@@ -28,6 +28,29 @@
 
 html {
   scroll-behavior: smooth;
+  /* Custom scrollbar in the site palette: a slim clay-toned thumb, no track, no arrows. */
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.78 0.03 60) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.78 0.03 60);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.62 0.08 50);
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 body {

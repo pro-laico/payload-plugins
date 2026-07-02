@@ -1,5 +1,5 @@
 import config from '@payload-config'
-import type { ExportFontsResponse } from '@pro-laico/payload-fonts'
+import { type ExportFontsResponse, getActiveFontFaces } from '@pro-laico/payload-fonts'
 import { seed } from '@pro-laico/payload-seed'
 import { getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -43,16 +43,16 @@ describe('payload-fonts seeding (integration)', () => {
   it('seeds typefaces from local files: native original upload → ref → subset → fontSet wiring', async () => {
     const result = await seed({ payload, options: seedOptions })
 
-    // Five originals uploaded, then four typefaces created after them (the ref() edges order the graph).
-    expect(result.created.fontOriginal).toBe(5)
-    expect(result.created.font).toBe(4)
+    // Six originals uploaded, then five typefaces created after them (the ref() edges order the graph).
+    expect(result.created.fontOriginal).toBe(6)
+    expect(result.created.font).toBe(5)
     expect(result.order.indexOf('fontOriginal:inter-variable')).toBeLessThan(result.order.indexOf('font:inter'))
 
-    // Each referenced original produced a served fontOptimized: Inter variable → 1, Lora 400+700 → 2, mono + display → 1 each.
-    expect(await payload.find({ collection: 'font', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(4)
-    expect(await payload.find({ collection: 'fontOriginal', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(5)
+    // Each referenced original produced a served fontOptimized: Inter + Recursive variable → 1 each, Lora 400+700 → 2, mono + Abril → 1 each.
+    expect(await payload.find({ collection: 'font', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(5)
+    expect(await payload.find({ collection: 'fontOriginal', limit: 0, depth: 0 }).then((r) => r.totalDocs)).toBe(6)
     const optimized = await payload.find({ collection: 'fontOptimized', limit: 0, depth: 0 })
-    expect(optimized.totalDocs).toBe(5)
+    expect(optimized.totalDocs).toBe(6)
 
     // The ref() wired the variable upright slot pointing at the uploaded original.
     const inter = (await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0 })).docs[0] as {
@@ -90,6 +90,40 @@ describe('payload-fonts seeding (integration)', () => {
     expect(lora.every((d) => d.isVariable === false)).toBe(true)
   })
 
+  it('flags the ital-capable variable file and serves an upright + italic face pair from it', async () => {
+    // Recursive's ONE upright file carries a slnt 0…-15 axis: the optimize hook detects it and
+    // flags the served doc, keeping the full wght range and recording the CSS oblique angle.
+    const recursiveId = (await payload.find({ collection: 'font', where: { title: { equals: 'Recursive' } }, depth: 0 })).docs[0].id
+    const optimized = (await payload.find({ collection: 'fontOptimized', where: { font: { equals: recursiveId } }, depth: 0 })).docs as Array<{
+      weight?: string
+      style?: string
+      isVariable?: boolean
+      italCapable?: boolean
+      obliqueAngle?: number
+    }>
+    expect(optimized).toHaveLength(1)
+    expect(optimized[0].isVariable).toBe(true)
+    expect(optimized[0].weight).toBe('300 1000')
+    expect(optimized[0].style).toBe('normal')
+    expect(optimized[0].italCapable).toBe(true)
+    expect(optimized[0].obliqueAngle).toBe(15)
+
+    // getActiveFontFaces expands that single file into TWO served faces for the display family:
+    // the upright, plus a synthesized italic (oblique 15deg) over the SAME filename.
+    const active = await getActiveFontFaces(payload)
+    const display = active.find((a) => a.family === 'display')
+    expect(display).toBeDefined()
+    expect(display?.id).toBe(recursiveId)
+    expect(display?.faces).toHaveLength(2)
+    const normal = display?.faces.find((f) => f.style === 'normal')
+    const italic = display?.faces.find((f) => f.style === 'italic')
+    expect(normal).toBeDefined()
+    expect(italic).toBeDefined()
+    expect(normal?.filename).toBe(italic?.filename)
+    expect(normal?.obliqueAngle).toBeUndefined()
+    expect(italic?.obliqueAngle).toBe(15)
+  })
+
   it('serves the active fonts as base64 WOFF2 bytes per family from the export endpoint', async () => {
     const res = await callExport()
     expect(res.status).toBe(200)
@@ -110,8 +144,8 @@ describe('payload-fonts seeding (integration)', () => {
 
   it('is idempotent — re-seeding clears (cascading the hidden uploads) and recreates', async () => {
     await seed({ payload, options: seedOptions })
-    expect(await payload.find({ collection: 'font', limit: 0 }).then((r) => r.totalDocs)).toBe(4)
-    expect(await payload.find({ collection: 'fontOriginal', limit: 0 }).then((r) => r.totalDocs)).toBe(5)
-    expect(await payload.find({ collection: 'fontOptimized', limit: 0 }).then((r) => r.totalDocs)).toBe(5)
+    expect(await payload.find({ collection: 'font', limit: 0 }).then((r) => r.totalDocs)).toBe(5)
+    expect(await payload.find({ collection: 'fontOriginal', limit: 0 }).then((r) => r.totalDocs)).toBe(6)
+    expect(await payload.find({ collection: 'fontOptimized', limit: 0 }).then((r) => r.totalDocs)).toBe(6)
   })
 })

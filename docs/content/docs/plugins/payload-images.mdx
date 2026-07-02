@@ -669,6 +669,23 @@ subject the moment the transform endpoint serves them. See the
 setup with a visual gallery page that renders every seeded image focal-cropped at multiple
 aspect ratios.
 
+With `imagesPlugin({ folders: true })`, Payload's folders seed the same way — they're ordinary
+docs in the hidden `payload-folders` collection, and each image references its folder like any
+relationship:
+
+```ts
+// Folders first (seeded like any collection), then file each image into one:
+const folders = defineSeed('payload-folders', () => [
+  { _key: 'projects', name: 'Projects', folderType: ['images'] },
+])
+const images = defineSeed('images', ({ file, ref }) => [
+  { _key: 'hero', _file: file('hero.jpg'), alt: 'Hero', folder: ref('payload-folders', 'projects') },
+])
+```
+
+The `examples/service-co` app seeds its whole library into Site / Services / Projects / Team
+folders this way.
+
 ## Gotchas
 
 A few things to keep in mind:

@@ -13,6 +13,7 @@ official [Inter release](https://rsms.me/inter/).
 | `lora-700.woff2` | Lora | static 700 | Cyreal — <https://fonts.google.com/specimen/Lora> | OFL 1.1 |
 | `jetbrains-mono.woff2` | JetBrains Mono | static 400 | JetBrains — <https://fonts.google.com/specimen/JetBrains+Mono> | OFL 1.1 |
 | `abril-fatface.woff2` | Abril Fatface | static 400 (its only style) | TypeTogether — <https://fonts.google.com/specimen/Abril+Fatface> | OFL 1.1 |
+| `recursive-variable.woff2` | Recursive | variable (wght 300–1000, slnt 0…−15, MONO, CASL, CRSV) — one file, upright + italic | Arrowtype — <https://www.recursive.design/> (Fontsource full-axes latin build) | OFL 1.1 |
 
 The full OFL text is available at <https://openfontlicense.org>. Replace these
 with your own licensed fonts before shipping a real project.

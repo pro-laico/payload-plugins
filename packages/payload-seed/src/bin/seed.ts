@@ -19,7 +19,11 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const payload = await getPayload({ config })
   try {
     const result = await seed({ payload, options })
-    payload.logger.info({ msg: 'seed complete', ...result })
+    // One human-sized summary line — the full result (created/order/deferred/skipped) is for
+    // programmatic consumers of `seed()`, not the terminal.
+    const total = Object.values(result.created).reduce((sum, n) => sum + n, 0)
+    const skipped = result.skipped.length ? ` (${result.skipped.length} definition${result.skipped.length === 1 ? '' : 's'} skipped)` : ''
+    payload.logger.info(`[payload-seed] created ${total} docs across ${Object.keys(result.created).length} collections${skipped}`)
   } finally {
     // Close adapter connections so the process doesn't hang on open handles.
     await payload.db.destroy?.()

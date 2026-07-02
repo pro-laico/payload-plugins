@@ -40,6 +40,11 @@ peer on Payload `^3` and React 19, and ship in lockstep under one version.
     href="/docs/plugins/payload-mux"
     description="Mux Video — a Videos collection that uploads straight to Mux, public or signed playback, virtual URLs, two-way delete, and an admin uploader."
   />
+  <Card
+    title="payload-dev-tools"
+    href="/docs/plugins/payload-dev-tools"
+    description="Dev-only tooling — /dev pages inside your app (seed controls, icon/font/image labs, a component test harness), a floating dev toolbar, and a machine-readable app snapshot for AI agents."
+  />
 </Cards>
 
 ## How they compose
@@ -50,13 +55,15 @@ font files seed natively as uploads; Mux clips seed through the same flow via a
 `custom.seedAsset` marker the engine auto-discovers, so one set of `seed.ts` files
 bootstraps a whole site's content — assets, cross-references, and all. The asset
 collections share an **Assets** admin group, and no plugin imports another: composition
-happens through plain Payload config.
+happens through plain Payload config —
+[`payload-dev-tools`](/docs/plugins/payload-dev-tools) even discovers its siblings through
+their config markers to power its diagnostics panels.
 
 See it wired end-to-end in the
 [example apps](https://github.com/pro-laico/payload-plugins/tree/main/examples):
 [`service-co`](https://github.com/pro-laico/payload-plugins/tree/main/examples/service-co)
-runs all five plugins on one fictional studio site, and each plugin has a focused sandbox
-(`seed-sandbox`, `images-sandbox`, `icons-sandbox`, `fonts-sandbox`, `mux-sandbox`).
+runs every plugin on one fictional studio site, and each content plugin has a focused
+sandbox (`seed-sandbox`, `images-sandbox`, `icons-sandbox`, `fonts-sandbox`, `mux-sandbox`).
 
 ## Conventions
 
