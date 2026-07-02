@@ -501,6 +501,32 @@ A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, 
 the old originals + optimized too (idempotent). See the
 [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
 
+## Gotchas
+
+A few things to keep in mind:
+
+- **A bundled subsetter fails silently.** Without `serverExternalPackages: ['subset-font',
+  'harfbuzzjs', 'fontkit']` in next.config, Next bundles the subsetter, the wasm breaks, and
+  optimization silently skips — fonts save but never shrink. It's a Quickstart step for a reason.
+- **`families` replaces the defaults wholesale.** The list you pass is the *complete* list:
+  `families: [{ key: 'brand' }]` drops sans/serif/mono/display entirely. Spread
+  `DEFAULT_FONT_FAMILIES` to keep them and add yours.
+- **`definition.ts` and `public/fonts/` are generated — gitignore them.** There's no file to
+  hand-create or hand-edit; `payload-fonts-download` owns both. Any download failure resets
+  `definition.ts` to an **empty** module so the build still compiles (fonts fall back to your CSS
+  stacks rather than erroring).
+- **The download CLI needs a running Payload.** `payload-fonts-download` fetches over HTTP from
+  `FONT_DOWNLOAD_URL`, so that instance must be up and reachable while `prebuild` runs — a build with
+  no reachable Payload gets the empty-definition fallback above.
+- **Production font changes need a rebuild.** The build bakes the `fontSet` selection via `next/font`;
+  there's no runtime cache to revalidate. Publish a swap by re-running the download + build (or wire a
+  deploy hook via `fontSetOverrides`).
+- **Subsetting is lossy to your `charset`.** Characters outside it aren't in the served WOFF2 and
+  render in the fallback font. The originals are archived, so widen `charset` and re-save each
+  typeface to re-derive — no re-upload.
+- **One original per typeface, and variable XOR weights.** A save that references a `fontOriginal`
+  already used by another typeface is rejected (it keeps cascade cleanup safe), as is mixing a
+  variable file with per-weight files on the same typeface.
 
 ## Exports
 

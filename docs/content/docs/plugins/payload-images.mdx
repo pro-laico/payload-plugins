@@ -612,7 +612,6 @@ forever, while the collection's change / delete hooks drop the variants a new fi
 stale. Nothing is pre-generated: the hidden `generated-images` collection fills in lazily, one
 requested size at a time.
 
-
 ### Revalidation
 
 **The optimized images revalidate themselves, with nothing to configure.** Because every URL is
@@ -670,6 +669,30 @@ subject the moment the transform endpoint serves them. See the
 setup with a visual gallery page that renders every seeded image focal-cropped at multiple
 aspect ratios.
 
+## Gotchas
+
+A few things to keep in mind:
+
+- **Leave `sizes` at its `100vw` default and the browser over-fetches.** The classic `next/image` trap
+  applies here too: an image in a narrow column still downloads at viewport width. Set `sizes` to how
+  big the image actually renders, e.g. `sizes="(max-width: 768px) 100vw, 33vw"`.
+- **`enabled: false` means "not installed", not "paused".** On SQL adapters, turning it off for an
+  existing project produces a migration that drops the image tables — including every cached variant.
+- **Sharp must stay out of the bundle.** The plugin needs `sharp` on the Payload config *and*
+  `serverExternalPackages: ['sharp']` in next.config (Turbopack and webpack both) — it ships a native
+  binary that breaks when bundled.
+- **The transform endpoint is public and unsigned.** It's bounded by design (grid-snapped sizes,
+  quality buckets, `maxDimension` / `maxInputPixels`, a concurrency gate), but for fully untrusted
+  traffic tighten those bounds and put a rate limiter or CDN in front.
+- **Image URLs self-bust; your page cache doesn't.** Replacing a file or moving a focal point changes
+  the `v` token and purges stale variants, but a cached page keeps serving the old URL until you
+  revalidate that route — exactly as for any other Payload content.
+- **A bare id degrades `<ResponsiveImage>`.** Dimensions are guessed from the ratio, `alt` is empty,
+  there's no `v` token, and the srcset climbs to the 4096 ceiling. Pass the populated doc; you
+  usually have one.
+- **`extendCollection` hands you the upload config.** The plugin adds the pipeline to your collection,
+  but `mimeTypes`, `localizeAlt`, and `maxOriginalSize` are ignored there — that collection's
+  `upload` (and its `imageSizes`) stays yours to manage.
 
 ## Exports
 

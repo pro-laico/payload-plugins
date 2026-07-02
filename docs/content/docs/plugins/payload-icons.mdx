@@ -382,27 +382,6 @@ that fails to resolve at runtime is recorded (throttled, fire-and-forget) with a
 timestamps. It's the runtime counterpart to the static scan, capturing dynamic names a static pass can't
 see. Surfaced in the IconSet [usage panel](#icon-usage-detection), not browsed directly.
 
-## How it works
-
-The active set, the read path, and revalidation fit together like this.
-
-### Resolving an icon
-
-`<Icon name="arrow-right" />` looks the name up in the **active, published** `iconSet`, finds the
-`icon` doc it points at, and inlines that doc's stored `svgString` as a real `<svg>` — recolorable
-through `currentColor` and sized by your own classes. The lookup reads through `payload.find`,
-memoized per request, so repeating the same icon on a page costs one query. The name is the *set
-entry's* name, not the uploaded filename, which is why swapping the active set re-skins every icon at
-once. A name the active set doesn't cover renders a blank fallback and is recorded for the
-[Requested icons](#icon-usage-detection) panel.
-
-### Revalidation
-
-The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
-rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
-the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
-`revalidatePath`) through the collections' [`hooks`](#plugin-options) option.
-
 ## Icon Use Detection
 
 **Problem:** code asks for a name the active set lacks → blank fallback glyph, and it's easy to miss
@@ -431,6 +410,27 @@ payload-icons-scan            # production/CI: scans ./src and ./app; -o sets th
   (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`.
 </Callout>
 
+
+## How it works
+
+The active set, the read path, and revalidation fit together like this.
+
+### Resolving an icon
+
+`<Icon name="arrow-right" />` looks the name up in the **active, published** `iconSet`, finds the
+`icon` doc it points at, and inlines that doc's stored `svgString` as a real `<svg>` — recolorable
+through `currentColor` and sized by your own classes. The lookup reads through `payload.find`,
+memoized per request, so repeating the same icon on a page costs one query. The name is the *set
+entry's* name, not the uploaded filename, which is why swapping the active set re-skins every icon at
+once. A name the active set doesn't cover renders a blank fallback and is recorded for the
+[Requested icons](#icon-usage-detection) panel.
+
+### Revalidation
+
+The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
+rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
+the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
+`revalidatePath`) through the collections' [`hooks`](#plugin-options) option.
 
 ## Seeding
 
@@ -512,6 +512,28 @@ makes the set live and `_status: 'published'` makes it visible to the published 
 [`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
 app for a full working setup, or the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
 
+## Gotchas
+
+A few things to keep in mind:
+
+- **Uploading an icon doesn't render it.** `<Icon name>` resolves through the **active, published**
+  set. Seeing the fallback glyph? Check, in order: a set is active, it's published (not just a draft),
+  and the row name matches the `name` you pass (both are kebab-cased).
+- **The lookup name is the set entry's name, not the filename.** Renaming an uploaded file changes
+  nothing; the `iconsArray` row's name is the key your code references.
+- **Use fill-based SVGs, not stroke-based.** The optimizer themes filled glyphs by rewriting their
+  colors to `currentColor`. A stroke-drawn icon (Lucide/Feather-style `fill="none" stroke="…"`) comes
+  out with its enclosed shapes filled solid — a circle outline becomes a disk. Source solid-fill
+  glyphs (Noun Project-style filled paths work; stroke sets don't).
+- **`<Icon>` is an async server component.** It queries Payload, so it can't render inside a client
+  component — render it in a server component and pass the output down, or resolve the SVG yourself
+  with `getIconSvg`.
+- **No revalidation built in.** A statically rendered page bakes the SVG at build time and won't
+  reflect an edit or an active-set swap until the route revalidates — wire
+  `revalidatePath` / `revalidateTag` yourself through the collections' hooks.
+- **The static scan sees literal names only.** A dynamic `name={expr}` is invisible to it (that's
+  `trackRequests`' job at runtime), and in production the usage panel needs the
+  `payload-icons-scan` manifest written during your build.
 
 ## Exports
 
