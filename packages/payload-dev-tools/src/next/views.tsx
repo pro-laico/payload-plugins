@@ -55,7 +55,7 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
           <div className="pdtp-icon-grid">
             {active.rows.map((row) => (
               <figure key={row.name} className="pdtp-icon-cell" style={{ margin: 0 }}>
-                {/* biome-ignore lint/security/noDangerouslySetInnerHtml: svgString is sanitized by payload-icons on save */}
+                {/* dangerouslySetInnerHTML: svgString is sanitized by payload-icons on save */}
                 <span dangerouslySetInnerHTML={{ __html: row.svg }} />
                 <figcaption>{row.name}</figcaption>
               </figure>

@@ -15,7 +15,7 @@ export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
     handler: async (req) => {
       if (!devToolsEnabled(enabled)) return Response.json({ error: 'Not found' }, { status: 404 })
 
-      const marker = (req.payload.config.custom ?? {}).payloadIcons as { iconSetSlug?: string | null } | undefined
+      const marker = req.payload.config.custom?.payloadIcons as { iconSetSlug?: string | null } | undefined
       if (!marker?.iconSetSlug)
         return Response.json({ error: 'payload-icons (with its iconSet collection) is not installed.' }, { status: 400 })
 

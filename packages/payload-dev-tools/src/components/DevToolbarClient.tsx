@@ -109,6 +109,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
    *  page, navigate there if not. The panel stays open either way. */
   const selectVersion = useCallback(
     (testKey: string, versionId: string) => {
+      // biome-ignore lint/suspicious/noDocumentCookie: dev-only synchronous cookie write; Cookie Store API is async and not universal
       document.cookie = `${STAGE_COOKIE}=${encodeURIComponent(`${testKey}:${versionId}`)}; path=/; samesite=lax`
       setSelection({ testKey, versionId })
       const testPath = `${base}/tests/${testKey}`
@@ -122,6 +123,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
    *  `resolveDevChrome` in the host layout swaps the variant in wherever you browse. */
   const selectChrome = useCallback(
     (slot: ChromeSlot, sel: StageSelection | null) => {
+      // biome-ignore lint/suspicious/noDocumentCookie: dev-only synchronous cookie write; Cookie Store API is async and not universal
       document.cookie = sel
         ? `${CHROME_COOKIES[slot]}=${encodeURIComponent(`${sel.testKey}:${sel.versionId}`)}; path=/; samesite=lax`
         : `${CHROME_COOKIES[slot]}=; path=/; max-age=0; samesite=lax`

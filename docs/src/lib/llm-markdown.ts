@@ -45,7 +45,7 @@ interface Opt {
 function evalExpr(src?: string): unknown {
   if (src == null) return undefined
   try {
-    // biome-ignore lint/security/noGlobalEval: build-time eval of our own literal doc data
+    // new Function: build-time eval of our own literal doc data
     return new Function(`return (${src})`)()
   } catch {
     return undefined

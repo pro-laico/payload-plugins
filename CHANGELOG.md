@@ -9,6 +9,26 @@ packages share one lockstep version.
 
 ### Added
 
+- `@pro-laico/payload-dev-tools` — build Payload projects faster: a floating dev toolbar,
+  `/dev` pages inside your app (one catch-all drop-in file via `createDevPage`), cookie-staged
+  A/B test and header/footer variant previews (`defineTest` / `resolveDevChrome`), and a
+  machine-readable app snapshot (`GET /api/dev`) for AI agents. Dev-only — disappears in
+  production. Adds a docs page.
+- `@pro-laico/payload-fonts` — custom fonts for Payload: a Font typeface collection that
+  subsets uploaded files (including italics) to served WOFF2s, an optional active-font
+  global, an export endpoint + `payload-fonts-download` CLI that writes the active fonts to
+  disk for `next/font/local`, and declarative seeding. Adds the `fonts-sandbox` example and
+  a docs page.
+- `@pro-laico/payload-icons` — SVG icons for Payload: an Icon upload collection that
+  optimizes and sanitizes SVGs on save (svgo + viewBox tightening + `currentColor` theming),
+  a drop-in `<Icon name>` server component that inlines the SVG, a `payload-icons-scan` CLI,
+  and one-line declarative seeding via `@pro-laico/payload-seed`. Adds the `icons-sandbox`
+  example and a docs page.
+- `@pro-laico/payload-images` — on-demand image optimization for Payload: an Images upload
+  collection that stores only the original, a Sharp transform endpoint (focal-aware crop,
+  format negotiation, built-in LQIP placeholders), a durable variant cache with two-way
+  purge, an admin focal-point picker, and a responsive `<ResponsiveImage>` component. Adds
+  the `images-sandbox` example and a docs page.
 - `@pro-laico/payload-mux` — Mux Video for Payload: a `mux-video` collection that uploads
   directly to Mux, public or signed playback, virtual playback/poster/gif URLs, two-way
   delete, an admin uploader with list-view previews, and `mux/upload` + `mux/webhook`

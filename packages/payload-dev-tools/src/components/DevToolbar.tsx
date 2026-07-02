@@ -31,7 +31,7 @@ export function DevToolbar({ tests = [], links = [], enabled }: DevToolbarProps)
 
   return (
     <>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own static CSS — React would escape selector characters as a text child */}
+      {/* dangerouslySetInnerHTML: our own static CSS — React would escape selector characters as a text child */}
       <style dangerouslySetInnerHTML={{ __html: PDT_CSS }} />
       <DevToolbarClient tests={toTestMeta(tests)} links={links} />
     </>

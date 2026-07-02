@@ -18,6 +18,7 @@ export interface UploadDocLike {
 type UploadHandler = (
   req: PayloadRequest,
   args: { doc: unknown; headers?: Headers; params: { collection: string; filename: string; prefix?: string } },
+  // biome-ignore lint/suspicious/noConfusingVoidType: mirrors Payload's upload handler signature, which returns void
 ) => Promise<Response | void> | Response | void
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024

@@ -10,6 +10,7 @@ export type UploadDoc = { filename?: string | null; url?: string | null; prefix?
 type UploadHandler = (
   req: PayloadRequest,
   args: { doc: unknown; headers?: Headers; params: { collection: string; filename: string; prefix?: string } },
+  // biome-ignore lint/suspicious/noConfusingVoidType: mirrors Payload's upload handler signature, which returns void
 ) => Promise<Response | void> | Response | void
 
 /** Resolve a collection's on-disk `staticDir` (absolute), defaulting to its slug. */

@@ -80,7 +80,7 @@ export async function DevFonts({
   }
   if (!css) return null
 
-  // biome-ignore lint/security/noDangerouslySetInnerHtml: server-built CSS from our own data, no user input.
+  // dangerouslySetInnerHTML: server-built CSS from our own data, no user input.
   return <style data-payload-fonts-dev dangerouslySetInnerHTML={{ __html: css }} />
 }
 

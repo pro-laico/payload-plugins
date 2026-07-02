@@ -104,7 +104,7 @@ export function createDevPage(options: CreateDevPageOptions = {}) {
 /** Content chrome only — heading + env line. Navigation is the toolbar's job. */
 const Shell = ({ snapshot, title, children }: { snapshot: DevSnapshot; title: string; children: ReactNode }) => (
   <div className="pdtp">
-    {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own static CSS — React would escape selector characters as a text child */}
+    {/* dangerouslySetInnerHTML: our own static CSS — React would escape selector characters as a text child */}
     <style dangerouslySetInnerHTML={{ __html: PDTP_CSS }} />
     <div className="pdtp-container">
       <div className="pdtp-head">
