@@ -6,11 +6,12 @@ node_modules
 *.db-wal
 *.db-shm
 
-# Uploaded files (written at runtime to local-disk storage). media/ is the seed lab's upload
-# collection; images/ + generated-images/ are payload-images' default staticDirs under cwd.
-media/
-images/
-generated-images/
+# Uploaded files (written at runtime to local-disk storage). /media/ is the seed lab's upload
+# collection; /images/ + /generated-images/ are payload-images' default staticDirs under cwd.
+# Root-anchored so the assets/media/ source fixtures stay tracked.
+/media/
+/images/
+/generated-images/
 
 .env
 .env*.local

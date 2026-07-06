@@ -1,0 +1,1 @@
+This file exists so the seed can successfully upload something before a failure is simulated.
