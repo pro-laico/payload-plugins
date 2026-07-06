@@ -491,7 +491,8 @@ purpose. (See [Quickstart](#quickstart) for setting `ENABLE_SEED`.)
 
 The friendliest path: a **"Seed your database"** button in the admin header. Turn it on with
 `adminButton: true`, set `ENABLE_SEED=true`, then click it — it POSTs to `/api/seed` as the logged-in
-user and reports success (or the error) inline.
+user and reports success (or the error) inline. When `ENABLE_SEED` isn't set, the button doesn't
+render at all — environments where the endpoint would refuse anyway never show it.
 
 ```ts
 // payload.config.ts
@@ -670,9 +671,9 @@ A few things to keep in mind:
 
 - **Every run is destructive.** A seed clears each collection it touches before recreating it — a reset,
   not an append. Re-running wipes and rebuilds, so never point it at data you want to keep.
-- **Nothing runs without `ENABLE_SEED`.** The admin button, endpoint, and CLI all no-op (`403`) unless
-  `ENABLE_SEED` is exactly `"true"`. The in-code `seed()` is the exception — it skips the gate, so it will
-  wipe whatever database it's handed. Guard your script / test setup accordingly.
+- **Nothing runs without `ENABLE_SEED`.** The endpoint and CLI no-op (`403`) unless `ENABLE_SEED` is
+  exactly `"true"`, and the admin button isn't even rendered. The in-code `seed()` is the exception — it
+  skips the gate, so it will wipe whatever database it's handed. Guard your script / test setup accordingly.
 - **Circular references need an optional field.** Two docs that reference each other are fine — the engine
   breaks the cycle by deferring one side's `ref` and setting it in a second pass once both docs exist. That
   field just has to be **optional** (it's created null first). A cycle where every ref sits on a *required*
@@ -709,4 +710,4 @@ A few things to keep in mind:
 | `SeedTokens` / `WithRefs` / `CollectionSeedData` / `GlobalSeedData` | `@pro-laico/payload-seed` | Types for seed helpers composed across files: type a fragment's `{ ref, file }` parameter, widen generated data types to accept `Ref` tokens. |
 | `Ref` / `FileToken` | `@pro-laico/payload-seed` | The token value types themselves. |
 | `SeedRegistry` | `@pro-laico/payload-seed` | Augmentable interface `generate:types` fills in, so `ref()` keys are checked. Not imported by name. |
-| `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (wired via the import map when `adminButton` is on). |
+| `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (wired via the import map when `adminButton` is on). Server component — renders nothing unless `ENABLE_SEED` is `"true"`. |
