@@ -9,6 +9,16 @@ export class SeedValidationError extends Error {
   }
 }
 
+/** A write failed mid-run (create / deferred set / global update). `detail` names the seed node
+ *  (`collection:_key`) and the deepest driver cause, so the failure tells a meaningful story rather
+ *  than surfacing an opaque generated id. */
+export class SeedRunError extends Error {
+  constructor(public detail: string) {
+    super(`[payload-seed] seed run failed while ${detail}`)
+    this.name = 'SeedRunError'
+  }
+}
+
 export interface ValidateArgs {
   model: BuiltModel
   /** Slugs of collections that actually exist in the Payload config. */

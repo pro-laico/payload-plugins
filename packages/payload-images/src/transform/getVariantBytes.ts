@@ -73,6 +73,9 @@ const isSharpLoadError = (err: unknown): boolean => {
 /** The actionable fix for a Sharp load failure — shared by the boot probe and the request-time catch. */
 export const SHARP_INSTALL_HINT = "install it (`pnpm add sharp`) and externalize it in next.config (`serverExternalPackages: ['sharp']`)"
 
+/** Once-per-process latch for the cache-lookup warning below. */
+let warnedCacheLookup = false
+
 /**
  * Return the bytes for one variant: cache hit → stored copy; miss → Sharp once, persist after
  * the response (via Next's `after()`, falling back to fire-and-forget), then return the bytes.
@@ -96,7 +99,17 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
       const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
       if (bytes) return { ok: true, data: bytes, mimeType: mimeForFormat(format), key }
     }
-  } catch {}
+  } catch (err) {
+    // Fall through to regeneration, but not SILENTLY: a broken variant collection would otherwise
+    // masquerade as a perpetual cache miss — every request re-transforms, with zero signal.
+    if (!warnedCacheLookup) {
+      warnedCacheLookup = true
+      payload.logger.warn({
+        msg: `[payload-images] variant cache lookup failed for '${variantSlug}' — falling back to regenerating on every request until this is fixed (warns once per process).`,
+        err,
+      })
+    }
+  }
 
   const generate = async (): Promise<GenBytes> => {
     const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug })

@@ -1,6 +1,6 @@
 import type { Endpoint } from 'payload'
 import { runSeed } from './engine/run'
-import { SeedValidationError } from './engine/validate'
+import { SeedRunError, SeedValidationError } from './engine/validate'
 import { SEED_DISABLED_MESSAGE, seedingEnabled } from './guard'
 import type { ResolvedSeedOptions } from './options'
 
@@ -26,6 +26,7 @@ export function createSeedEndpoint(options: ResolvedSeedOptions): Endpoint {
       } catch (e) {
         req.payload.logger.error({ err: e, msg: 'Error seeding data' })
         if (e instanceof SeedValidationError) return Response.json({ error: 'Seed validation failed.', issues: e.issues }, { status: 400 })
+        if (e instanceof SeedRunError) return Response.json({ error: 'Error seeding data.', issues: [e.detail] }, { status: 500 })
         return Response.json({ error: 'Error seeding data.' }, { status: 500 })
       }
     },

@@ -1,0 +1,31 @@
+{
+  "name": "failure-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@payloadcms/db-sqlite": "^3.85.1",
+    "@payloadcms/richtext-lexical": "^3.85.1",
+    "@pro-laico/payload-fonts": "workspace:*",
+    "@pro-laico/payload-icons": "workspace:*",
+    "@pro-laico/payload-images": "workspace:*",
+    "@pro-laico/payload-mux": "workspace:*",
+    "@pro-laico/payload-seed": "workspace:*",
+    "cross-env": "^10.1.0",
+    "graphql": "^16.14.2",
+    "next": "^16.2.9",
+    "payload": "^3.85.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

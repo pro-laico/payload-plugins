@@ -22,3 +22,7 @@ export { file, isFileToken, isRef, ref } from './refs'
 
 // Run the seed from a script or test (the `payload seed` command and endpoint use this)
 export { seed } from './engine/run'
+
+// The error classes a failing run throws, so callers can branch on (and test) failure modes:
+// SeedValidationError collects every model issue; SeedRunError names the write that died.
+export { SeedRunError, SeedValidationError } from './engine/validate'

@@ -11,8 +11,6 @@ out
 # Uploaded media (written at runtime to the local-disk storage)
 media/
 
-# Dependency graph artifact emitted by the seed
-
 .env
 .env*.local
 next-env.d.ts

@@ -71,9 +71,23 @@ export const generateInlineLqip = async ({
     const params: ParsedParams = { w, h, fit, q, fmt: ph.format }
 
     const res = await getOrCreateVariantBytes({ payload, source, params, format: ph.format, sourceSlug, variantSlug, base, maxInputPixels })
-    if (!res.ok) return undefined
+    if (!res.ok) {
+      warnLqipFailureOnce(`generation returned ${res.status} (${res.msg}) for source ${source.id}`)
+      return undefined
+    }
     return `data:image/${ph.format};base64,${res.data.toString('base64')}`
-  } catch {
+  } catch (err) {
+    warnLqipFailureOnce(`threw for source ${source.id}: ${err instanceof Error ? err.message : String(err)}`)
     return undefined
   }
+}
+
+let warnedLqip = false
+
+/** A broken LQIP pipeline degrades to "no placeholder" — visually invisible — so say WHY once per
+ *  process instead of swallowing it entirely. Callers still render fine without a placeholder. */
+const warnLqipFailureOnce = (detail: string): void => {
+  if (warnedLqip) return
+  warnedLqip = true
+  console.warn(`[payload-images] inline LQIP ${detail} — placeholders are being skipped (this warns once per process).`)
 }

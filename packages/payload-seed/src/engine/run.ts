@@ -5,7 +5,49 @@ import type { SeedAssetMarker, SeedDefinition, SeedDisabledMarker } from '../typ
 import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph, type DeferredField } from './graph'
 import { resolveFilePath, readFileAsUpload, searchedDirs } from './files'
 import { collectTokens, docNodeId, resolveTokens } from './tokens'
-import { SeedValidationError, validateModel } from './validate'
+import { SeedRunError, SeedValidationError, validateModel } from './validate'
+
+/** Unwrap a thrown error to its deepest `cause` and return one trimmed line. The ORM wraps the
+ *  driver error ("Failed query: …"), hiding the actionable part (e.g. "NOT NULL constraint failed:
+ *  projects_gallery.image_id") — this surfaces it. Payload's ValidationError likewise buries the
+ *  per-field messages in `data.errors` ("The following field is invalid: status" says nothing) —
+ *  those are appended too. */
+function deepestReason(err: unknown, fallback?: string): string {
+  let deepest = err instanceof Error ? err : undefined
+  while (deepest?.cause instanceof Error) deepest = deepest.cause
+  let msg = deepest?.message ?? fallback ?? String(err)
+  const data = (deepest as undefined | { data?: { errors?: Array<{ path?: string; field?: string; message?: string }> } })?.data
+  if (data?.errors?.length) {
+    const fields = data.errors.map((e) => `${e.path ?? e.field ?? '?'}: ${e.message ?? '?'}`).join('; ')
+    msg = `${msg} — ${fields}`
+  }
+  return msg.replace(/\s+/g, ' ').slice(0, 300)
+}
+
+/** A human label for a doc that couldn't be cleared. The seed only holds the prior run's opaque id,
+ *  so it looks the doc up (it still exists — the delete failed) and reports its `admin.useAsTitle`
+ *  value, else a common identifying field, else the upload filename — falling back to the bare id. */
+async function describeFailedDoc(
+  payload: Payload,
+  req: PayloadRequest,
+  slug: string,
+  useAsTitle: string | undefined,
+  id: string | number,
+): Promise<string> {
+  try {
+    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, overrideAccess: true, depth: 0 })) as Record<
+      string,
+      unknown
+    >
+    const label = [useAsTitle ? doc[useAsTitle] : undefined, doc.title, doc.name, doc.slug, doc.filename].find(
+      (v): v is string => typeof v === 'string' && v.trim().length > 0,
+    )
+    if (label) return `"${label}" [${id}]`
+  } catch {
+    // The doc's gone or unreadable — the bare id is the best we can do.
+  }
+  return `[${id}]`
+}
 
 export interface SeedResult {
   /** Created doc counts keyed by collection slug. */
@@ -150,7 +192,7 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
     // Payload's bulk delete does NOT throw on per-doc failures — it returns them in `errors`.
     // Retry each once, then warn LOUDLY with the underlying reasons — a silent partial wipe
     // would leave stale docs sitting beside the fresh seed.
-    const failed: Array<{ id: string | number; reason: string }> = []
+    const failed: Array<{ label: string; reason: string }> = []
     for (const e of result?.errors ?? []) {
       if (e.id == null) continue
       try {
@@ -163,16 +205,15 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
           disableTransaction: true,
         })
       } catch (err) {
-        // Surface the DEEPEST cause: the ORM wraps the driver error ("Failed query: …"), which
-        // hides the actionable part (e.g. "NOT NULL constraint failed: projects_gallery.image_id").
-        let deepest = err instanceof Error ? err : undefined
-        while (deepest?.cause instanceof Error) deepest = deepest.cause
-        const reason = (deepest?.message ?? e.message ?? String(err)).replace(/\s+/g, ' ').slice(0, 300)
-        failed.push({ id: e.id, reason })
+        // A prior-run generated id tells no story, so resolve it to the doc's admin title (the delete
+        // failed — the doc still exists to look up), alongside the deepest driver cause.
+        const reason = deepestReason(err, e.message)
+        const label = await describeFailedDoc(payload, req, collection, config.admin?.useAsTitle, e.id)
+        failed.push({ label, reason })
       }
     }
     if (failed.length) {
-      const detail = failed.map((f) => `${f.id}: ${f.reason}`).join(' | ')
+      const detail = failed.map((f) => `${f.label}: ${f.reason}`).join(' | ')
       payload.logger.warn(
         `[payload-seed] could not clear ${failed.length} doc(s) in '${collection}' — these STALE docs now sit beside the fresh seed; re-run the seed or delete them in the admin. Reasons: ${detail}`,
       )
@@ -308,12 +349,17 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     }
 
     payload.logger.info(`[payload-seed] seeding '${nodeId}'`)
-    const doc = (await payload.create({
-      collection: slug as CollectionSlug,
-      data: data as never,
-      ...(uploadFile ? { file: uploadFile } : {}),
-      ...baseArgs,
-    })) as { id: string | number }
+    let doc: { id: string | number }
+    try {
+      doc = (await payload.create({
+        collection: slug as CollectionSlug,
+        data: data as never,
+        ...(uploadFile ? { file: uploadFile } : {}),
+        ...baseArgs,
+      })) as { id: string | number }
+    } catch (err) {
+      throw new SeedRunError(`creating '${nodeId}': ${deepestReason(err)}`)
+    }
     docIds.set(nodeId, doc.id)
     created[slug] = (created[slug] ?? 0) + 1
   }
@@ -326,7 +372,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
       const id = docIds.get(node)
       if (!entry || id === undefined) continue
       const value = resolveTokens(entry.record.data[field], { docs: docIds, where: `${node}.${field}` })
-      await payload.update({ collection: entry.slug as CollectionSlug, id, data: { [field]: value } as never, ...baseArgs })
+      try {
+        await payload.update({ collection: entry.slug as CollectionSlug, id, data: { [field]: value } as never, ...baseArgs })
+      } catch (err) {
+        throw new SeedRunError(`setting deferred field '${node}.${field}': ${deepestReason(err)}`)
+      }
     }
   }
 
@@ -334,7 +384,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   for (const g of model.globals) {
     payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
     const data = resolveTokens(g.data, { docs: docIds, where: `global:${g.slug}` }) as Record<string, unknown>
-    await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
+    try {
+      await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs })
+    } catch (err) {
+      throw new SeedRunError(`updating global '${g.slug}': ${deepestReason(err)}`)
+    }
   }
 
   payload.logger.info('[payload-seed] seed complete.')

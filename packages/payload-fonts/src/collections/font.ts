@@ -67,8 +67,10 @@ const servedFilesHook =
         req,
       })
       ;(doc as Record<string, unknown>).servedFiles = totalDocs
-    } catch {
-      // a count failure shouldn't break the read — just leave it unset
+    } catch (err) {
+      // A count failure shouldn't break the read — leave servedFiles unset, but say so: silence
+      // here made a broken optimized collection indistinguishable from "nothing served yet".
+      req.payload.logger.warn({ msg: `[payload-fonts] could not count served files for typeface ${id}`, err })
     }
     return doc
   }

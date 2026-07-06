@@ -10,12 +10,21 @@ export const createMuxUploadHandler =
   async (req) => {
     if (!(await isAllowed(pluginOptions, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
-    const upload = await mux.video.uploads.create({
-      cors_origin: pluginOptions.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
-      new_asset_settings: { playback_policy: [pluginOptions.playbackPolicy ?? 'public'], ...pluginOptions.uploadSettings?.new_asset_settings },
-    })
-
-    return Response.json(upload)
+    try {
+      const upload = await mux.video.uploads.create({
+        cors_origin: pluginOptions.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
+        new_asset_settings: {
+          playback_policy: [pluginOptions.playbackPolicy ?? 'public'],
+          ...pluginOptions.uploadSettings?.new_asset_settings,
+        },
+      })
+      return Response.json(upload)
+    } catch (err) {
+      // Without this, a missing-credentials SDK error propagates as Payload's generic 500 with
+      // no [payload-mux] context anywhere (unlike the GET sibling below).
+      req.payload.logger.error({ err, msg: '[payload-mux] Failed to create upload' })
+      return Response.json({ error: 'Failed to create upload.' }, { status: 500 })
+    }
   }
 
 /** `GET /api/mux/upload?id=…` — retrieve a direct-upload by id so the client can read the

@@ -120,6 +120,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         if (oid != null) byOriginal.set(oid, d)
       }
       const desiredIds = new Set(desired.map((d) => d.originalId))
+      const fontTitle = typeof data.title === 'string' && data.title ? data.title : String(fontId)
 
       // Create new, or sync metadata on a kept one whose row changed.
       for (const d of desired) {
@@ -137,6 +138,9 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
           }
           continue
         }
+        // Upgraded to include the filename once the original doc is fetched — a bare id tells an
+        // operator nothing about WHICH font file broke.
+        let originalLabel = `original ${d.originalId}`
         try {
           const original = (await req.payload.findByID({
             collection: originalSlug,
@@ -148,9 +152,12 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
             filename?: string | null
             url?: string | null
           }
+          if (original.filename) originalLabel = `original ${d.originalId} ('${original.filename}')`
           const bytes = await readUploadBytes(req.payload, originalSlug, original, { headers: fwdHeaders })
           if (!bytes) {
-            req.payload.logger.warn(`Font optimize: could not read original ${d.originalId}`)
+            req.payload.logger.warn(
+              `[payload-fonts] typeface '${fontTitle}': could not read ${originalLabel} — the stored file is missing or unreadable, so that weight will NOT be served.`,
+            )
             continue
           }
           const meta = await detectMetadata(bytes)
@@ -185,7 +192,10 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
               "[payload-fonts] The font subsetter failed to LOAD (subset-font / harfbuzz wasm / fontkit) — uploaded fonts are NOT being subsetted, so no web fonts will be served. In Next.js the wasm/native deps were bundled: add `serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']` to your next.config. Docs: https://payload-plugins.prolaico.com/docs/plugins/payload-fonts",
             )
           }
-          req.payload.logger.warn({ msg: `Font optimization failed for original ${d.originalId}`, err })
+          req.payload.logger.warn({
+            msg: `[payload-fonts] typeface '${fontTitle}': optimization failed for ${originalLabel} — the file may be corrupt or not a real font; that weight will NOT be served.`,
+            err,
+          })
         }
       }
 
