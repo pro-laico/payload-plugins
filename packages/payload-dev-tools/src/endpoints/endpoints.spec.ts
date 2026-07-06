@@ -2,7 +2,25 @@ import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { createActivateIconSetEndpoint } from './activateIconSet'
 import { createDevEndpoint } from './dev'
+import { createDraftEndpoint } from './draft'
 import { createStageEndpoint } from './stage'
+
+// The draft endpoint lazy-imports `next/headers`; outside a real Next request scope
+// `draftMode()` throws, so stand in a minimal in-memory implementation.
+const draftState = { isEnabled: false }
+vi.mock('next/headers', () => ({
+  draftMode: async () => ({
+    get isEnabled() {
+      return draftState.isEnabled
+    },
+    enable: () => {
+      draftState.isEnabled = true
+    },
+    disable: () => {
+      draftState.isEnabled = false
+    },
+  }),
+}))
 
 const barePayload = (): Payload =>
   ({
@@ -84,6 +102,45 @@ describe('GET /api/dev/stage', () => {
 
     const clear = await stage(true).handler(request('http://x/api/dev/stage?slot=footer&clear=1'))
     expect(clear.headers.get('set-cookie')).toContain('pdt-chrome-footer=;')
+  })
+})
+
+describe('GET /api/dev/draft', () => {
+  it('404s outside development by default', async () => {
+    const res = await createDraftEndpoint(undefined).handler(request('http://x/api/dev/draft'))
+    expect(res.status).toBe(404)
+  })
+
+  it('reports the current state without params', async () => {
+    draftState.isEnabled = false
+    const res = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ enabled: false })
+  })
+
+  it('flips draft mode with ?enable and reports the new state', async () => {
+    draftState.isEnabled = false
+    const on = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft?enable=1'))
+    expect(await on.json()).toEqual({ enabled: true })
+    expect(draftState.isEnabled).toBe(true)
+
+    const off = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft?enable=off'))
+    expect(await off.json()).toEqual({ enabled: false })
+    expect(draftState.isEnabled).toBe(false)
+  })
+
+  it('400s on an unrecognized enable value', async () => {
+    const res = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft?enable=maybe'))
+    expect(res.status).toBe(400)
+  })
+
+  it('redirects with `to` (same-site paths only)', async () => {
+    const res = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft?enable=1&to=/pricing'))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/pricing')
+
+    const evil = await createDraftEndpoint(true).handler(request('http://x/api/dev/draft?to=//evil.test'))
+    expect(evil.headers.get('location')).toBe('/')
   })
 })
 

@@ -1,6 +1,7 @@
 import type { Config, Plugin } from 'payload'
 import { createActivateIconSetEndpoint } from './endpoints/activateIconSet'
 import { createDevEndpoint } from './endpoints/dev'
+import { createDraftEndpoint } from './endpoints/draft'
 import { createStageEndpoint } from './endpoints/stage'
 import { stashConfig } from './lib/getPayloadClient'
 import type { DevToolsPluginOptions } from './options'
@@ -12,6 +13,7 @@ import type { DevToolsPluginOptions } from './options'
  *   with per-plugin panels (seed status, icon misses, font slots, mux readiness), and doc counts
  *   for every collection. Browsers are redirected to the dev pages (`devRoute`).
  * - `GET /api/dev/stage` — sets/clears the test-stage cookie via URL, for scripted staging.
+ * - `GET /api/dev/draft` — reports/toggles Next.js draft mode (the toolbar's Draft mode switch).
  * - `POST /api/dev/icons/activate` — switch the active icon set (the `/dev/icons` switcher).
  *
  * Pairs with two frontend pieces from `@pro-laico/payload-dev-tools/toolbar` and `/next`:
@@ -28,6 +30,7 @@ export function devToolsPlugin(options: DevToolsPluginOptions = {}): Plugin {
       ...(config.endpoints ?? []),
       createDevEndpoint({ enabled: options.enabled, devRoute: options.devRoute ?? '/dev' }),
       createStageEndpoint({ enabled: options.enabled, devRoute: options.devRoute ?? '/dev' }),
+      createDraftEndpoint(options.enabled),
       createActivateIconSetEndpoint(options.enabled),
     ],
     onInit: async (payload) => {

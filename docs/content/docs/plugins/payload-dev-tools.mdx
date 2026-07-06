@@ -20,8 +20,8 @@ pnpm add @pro-laico/payload-dev-tools
   `/dev/fonts` (specimens in your actual served fonts), `/dev/images`, `/dev/mux`, and
   `/dev/tests/<test>` (one page per test, toolbar toggles the version).
 - **`<DevToolbar />`.** A floating corner button on every page (admin included) that navigates the
-  dev pages, toggles test versions, seeds, and reads diagnostics. Stays open while you browse.
-  Self-styled: no Tailwind, no CSS import, no `isDev` conditional.
+  dev pages, toggles test versions and Next.js draft mode, seeds, and reads diagnostics. Stays open
+  while you browse. Self-styled: no Tailwind, no CSS import, no `isDev` conditional.
 - **`GET /api/dev`.** A machine-readable snapshot: environment, installed plugins, seed status and
   counts, icon misses, font slots, mux readiness, per-collection doc counts. Point an AI agent here
   first. Browsers get redirected to `/dev`.
@@ -47,8 +47,8 @@ export default buildConfig({
 })
 ```
 
-Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), and
-`POST /api/dev/icons/activate` (set switcher). All 404 outside development.
+Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /api/dev/draft`
+(draft-mode toggle), and `POST /api/dev/icons/activate` (set switcher). All 404 outside development.
 </Step>
 
 <Step>
@@ -240,6 +240,10 @@ app, is it seeded, and what's broken."
 - **Seeding goes through the seed plugin's own endpoint.** The seed card and toolbar POST to
   `/api/seed`: same gate (`ENABLE_SEED=true` + a logged-in user), same `{ error, issues }`
   responses, surfaced inline.
+- **Draft mode flips server-side.** The panel header's draft switch calls `GET /api/dev/draft?enable=1|0`,
+  which drives Next's `draftMode()` — the real `__prerender_bypass` cookie, exactly as a preview route
+  would set it — then refreshes the page you're on so drafts render in or out. It's URL-addressable
+  too (`?to=/path` redirects after flipping), like `/api/dev/stage`.
 - **The toolbar persists because it lives in the layout.** Its rows are client-side `<Link>`s, so
   navigating between dev pages never remounts it. It injects one `<style>` tag (all
   `.pdt-`/`.pdtp-` prefixed, no host theme dependency; `--pdt-accent` is the override seam), and it

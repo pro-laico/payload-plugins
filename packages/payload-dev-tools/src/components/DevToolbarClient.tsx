@@ -74,6 +74,8 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
   const [chrome, setChrome] = useState<Record<ChromeSlot, StageSelection | null>>({ header: null, footer: null })
   const [snapshot, setSnapshot] = useState<DevSnapshot | null>(null)
   const [snapshotError, setSnapshotError] = useState(false)
+  const [draft, setDraft] = useState<boolean | null>(null)
+  const [draftBusy, setDraftBusy] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [seedError, setSeedError] = useState<SeedError | null>(null)
@@ -102,6 +104,30 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
   useEffect(() => {
     if (open && !snapshot && !snapshotError) void fetchSnapshot()
   }, [open, snapshot, snapshotError, fetchSnapshot])
+
+  // Draft mode is server-held state (`__prerender_bypass` is httpOnly), so re-read it on every
+  // open — a preview route or another tab may have flipped it. null = endpoint unavailable, row hidden.
+  useEffect(() => {
+    if (!open) return
+    void fetch('/api/dev/draft', { credentials: 'include' })
+      .then(async (res) => (res.ok ? setDraft(((await res.json()) as { enabled: boolean }).enabled) : setDraft(null)))
+      .catch(() => setDraft(null))
+  }, [open])
+
+  const toggleDraft = useCallback(async () => {
+    if (draft === null || draftBusy) return
+    setDraftBusy(true)
+    try {
+      const res = await fetch(`/api/dev/draft?enable=${draft ? 0 : 1}`, { credentials: 'include' })
+      if (!res.ok) throw new Error(String(res.status))
+      setDraft(((await res.json()) as { enabled: boolean }).enabled)
+      router.refresh()
+    } catch {
+      setDraft(null)
+    } finally {
+      setDraftBusy(false)
+    }
+  }, [draft, draftBusy, router])
 
   const base = snapshot?.devRoute ?? '/dev'
 
@@ -210,7 +236,20 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
               </button>
             ) : null}
             <span className="pdt-head-title">{view === 'main' ? 'Dev tools' : VIEW_TITLE[view]}</span>
-            <span className="pdt-head-badge">dev only</span>
+            {draft !== null ? (
+              <button
+                type="button"
+                title="Toggle Next.js draft mode"
+                className={`pdt-head-draft ${draft ? 'pdt-on' : ''}`}
+                disabled={draftBusy}
+                onClick={() => void toggleDraft()}
+              >
+                <span>draft</span>
+                <span className={`pdt-switch ${draft ? 'pdt-active' : ''}`} aria-hidden />
+              </button>
+            ) : (
+              <span className="pdt-head-badge">dev only</span>
+            )}
           </div>
 
           <div className="pdt-body">

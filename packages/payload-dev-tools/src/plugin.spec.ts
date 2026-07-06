@@ -9,7 +9,7 @@ describe('devToolsPlugin', () => {
   it('registers the dev endpoints without dropping existing ones', () => {
     const existing: Endpoint = { path: '/mine', method: 'get', handler: async () => new Response(null) }
     const endpoints = apply({ endpoints: [existing] }).endpoints ?? []
-    expect(endpoints.map((e) => e.path)).toEqual(['/mine', '/dev', '/dev/stage', '/dev/icons/activate'])
+    expect(endpoints.map((e) => e.path)).toEqual(['/mine', '/dev', '/dev/stage', '/dev/draft', '/dev/icons/activate'])
   })
 
   it('marks config.custom.payloadDevTools (with the resolved devRoute) and preserves existing custom entries', () => {

@@ -42,6 +42,19 @@ export const PDT_CSS = `
 .pdt-back { color: var(--pdt-muted); padding: 0 4px; font-size: 16px; line-height: 1; }
 .pdt-back:hover { color: var(--pdt-fg); }
 
+/* The header's draft-mode toggle — same tiny-mono idiom as the old "dev only" badge it replaced. */
+.pdt-head-draft { display: inline-flex; align-items: center; gap: 6px; font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pdt-muted); }
+.pdt-head-draft:hover { color: var(--pdt-fg); }
+.pdt-head-draft.pdt-on { color: var(--pdt-accent); }
+.pdt-head-draft:disabled { opacity: 0.55; cursor: default; }
+.pdt-switch { display: inline-block; position: relative; width: 22px; height: 13px; border-radius: 999px;
+  background: oklch(0.32 0 0); transition: background 0.15s ease; }
+.pdt-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 9px; height: 9px;
+  border-radius: 50%; background: oklch(0.85 0 0); transition: transform 0.15s ease; }
+.pdt-switch.pdt-active { background: var(--pdt-accent); }
+.pdt-switch.pdt-active::after { transform: translateX(9px); background: oklch(0.13 0 0); }
+
 /* Minimal scrollbar for the tiny panel: a bare 4px thumb, no track, no arrows. */
 .pdt-body { overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: oklch(0.42 0 0) transparent; }
 .pdt-body::-webkit-scrollbar { width: 4px; }
