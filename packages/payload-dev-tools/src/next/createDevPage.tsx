@@ -7,7 +7,7 @@ import { getPayloadClient } from '../lib/getPayloadClient'
 import { buildDevSnapshot, type DevSnapshot } from '../lib/snapshot'
 import { SeedCard } from './client'
 import { PDTP_CSS } from './pageStyles'
-import { FontsView, IconsView, ImagesView, MuxView } from './views'
+import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './views'
 
 export type CreateDevPageOptions = {
   /** Component tests (from `defineTest`) — each gets ONE page at `/dev/tests/<key>`; which
@@ -84,6 +84,13 @@ export function createDevPage(options: CreateDevPageOptions = {}) {
         return (
           <Shell snapshot={snapshot} title="Mux">
             <MuxView payload={payload} snapshot={snapshot} />
+          </Shell>
+        )
+      case 'revalidate':
+        if (!snapshot.revalidate || rest.length) notFound()
+        return (
+          <Shell snapshot={snapshot} title="Revalidate">
+            <RevalidateView snapshot={snapshot} />
           </Shell>
         )
       case 'tests': {

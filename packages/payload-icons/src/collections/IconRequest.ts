@@ -37,6 +37,9 @@ export const createIconRequestCollection = (opts: IconRequestCollectionOverrides
   return {
     slug: ICON_REQUEST_SLUG,
     access: { create: authd, delete: authd, read: authd, update: authd },
+    // Internal diagnostic feed, written at runtime by the miss recorder — opt it out of
+    // @pro-laico/payload-revalidate's auto-attached hooks (no frontend read ever caches it).
+    custom: { revalidate: false },
     admin: {
       group,
       useAsTitle: 'name',

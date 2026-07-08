@@ -35,7 +35,7 @@ describe('buildDevSnapshot', () => {
     const snapshot = await buildDevSnapshot(
       fakePayload({ collections: [{ slug: 'users' }, { slug: 'broken' }], globals: [{ slug: 'settings' }], docs: { users: 3 } }),
     )
-    expect(snapshot.plugins).toEqual({ seed: false, images: false, icons: false, fonts: false, mux: false })
+    expect(snapshot.plugins).toEqual({ seed: false, images: false, icons: false, fonts: false, mux: false, revalidate: false })
     expect(snapshot.seed).toBeNull()
     expect(snapshot.collections).toEqual([
       { slug: 'users', count: 3 },
@@ -147,5 +147,27 @@ describe('buildDevSnapshot', () => {
     })
     const { images } = await buildDevSnapshot(payload)
     expect(images).toEqual({ sourceSlug: 'images', variantSlug: 'generated-images', basePath: '/api/img', sourceCount: 5, variantCount: 40 })
+  })
+})
+
+describe('buildDevSnapshot — revalidate panel', () => {
+  it('builds from the payloadRevalidate marker plus the shared inspection slot', async () => {
+    const slot = Symbol.for('pro-laico.payload-revalidate.inspect')
+    ;(globalThis as Record<symbol, unknown>)[slot] = () => ({
+      graph: { edges: [{}, {}] },
+      prefix: 'shop',
+      observing: true,
+      reads: [{}],
+      events: [],
+    })
+    const snapshot = await buildDevSnapshot(fakePayload({ custom: { payloadRevalidate: { endpointPath: '/api/revalidate-map' } } }))
+    expect(snapshot.plugins.revalidate).toBe(true)
+    expect(snapshot.revalidate).toEqual({ endpointPath: '/api/revalidate-map', prefix: 'shop', observing: true, edges: 2, reads: 1, events: 0 })
+    ;(globalThis as Record<symbol, unknown>)[slot] = undefined
+  })
+
+  it('degrades to marker-only data when the inspection slot is empty (different process)', async () => {
+    const snapshot = await buildDevSnapshot(fakePayload({ custom: { payloadRevalidate: { endpointPath: null } } }))
+    expect(snapshot.revalidate).toEqual({ endpointPath: null, prefix: '', observing: false, edges: 0, reads: 0, events: 0 })
   })
 })

@@ -26,7 +26,9 @@ export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
         await req.payload.update({
           collection: marker.iconSetSlug as CollectionSlug,
           id: body.id,
-          data: { active: true, _status: 'published' },
+          // Through `never`: the app's generated update-data union only knows the app's own
+          // collections — hosts without payload-icons' iconSet can't type `active`.
+          data: { active: true, _status: 'published' } as never,
           draft: false,
           overrideAccess: true,
         })

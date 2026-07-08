@@ -75,6 +75,23 @@ export const PDTP_CSS = `
 .pdtp-img-cell figcaption { padding: 7px 10px; font-family: ui-monospace, Consolas, monospace; font-size: 10.5px;
   color: var(--pdtp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* /dev/revalidate — the dependency explorer */
+.pdtp-flow { height: 440px; border: 1px solid var(--pdtp-border); border-radius: 12px; overflow: hidden; background: var(--pdtp-card); }
+.pdtp-flow .react-flow { background: var(--pdtp-card); }
+.pdtp-flow-node { display: flex; align-items: center; gap: 8px; border: 1px solid var(--pdtp-border); background: oklch(0.26 0 0);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; transition: border-color 0.15s ease; }
+.pdtp-flow-node:hover { border-color: oklch(0.5 0 0); }
+.pdtp-flow-node-active { border-color: var(--pdtp-accent); box-shadow: 0 0 0 1px var(--pdtp-accent); }
+.pdtp-flow-badges { display: inline-flex; gap: 6px; }
+.pdtp-flow-badges em { font-style: normal; font-family: ui-monospace, Consolas, monospace; font-size: 10px; color: var(--pdtp-muted);
+  border: 1px solid var(--pdtp-border); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.pdtp-flow-badges em.pdtp-flow-warn { color: var(--pdtp-warn); border-color: color-mix(in oklch, var(--pdtp-warn), transparent 55%); }
+.pdtp-flow-handle { opacity: 0; pointer-events: none; }
+.pdtp-rev-cols { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.pdtp-rev-subhead { margin: 0 0 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pdtp-muted); font-weight: 600; }
+.pdtp-rev-list { margin: 0; padding-left: 18px; font-size: 0.9rem; }
+.pdtp-rev-list li { margin: 3px 0; }
+
 .pdtp-specimen { border: 1px solid var(--pdtp-border); background: var(--pdtp-card); border-radius: 12px; padding: 20px; margin-bottom: 14px; }
 .pdtp-specimen-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; }
 .pdtp-specimen-big { font-size: 2.2rem; line-height: 1.15; margin: 0 0 8px; overflow-wrap: break-word; }

@@ -8,8 +8,9 @@ out
 *.db-wal
 *.db-shm
 
-# Uploaded media (written at runtime to the local-disk storage)
-media/
+# Uploaded media (written at runtime to local-disk storage). Root-anchored so the
+# assets/media/ seed fixtures stay tracked.
+/media/
 
 .env
 .env*.local

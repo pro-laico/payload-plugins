@@ -44,7 +44,7 @@ describe('GET /api/dev', () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as { plugins: Record<string, boolean>; adminRoute: string }
     expect(body.adminRoute).toBe('/admin')
-    expect(body.plugins).toEqual({ seed: false, images: false, icons: false, fonts: false, mux: false })
+    expect(body.plugins).toEqual({ seed: false, images: false, icons: false, fonts: false, mux: false, revalidate: false })
   })
 
   it('redirects browsers to the dev pages, and ?format=json overrides it', async () => {

@@ -32,6 +32,10 @@ export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectio
     // even when they're on cloud storage served through Payload's access-controlled file route.
     // Writes stay gated; the raw originals stay private.
     access: { create: authd, delete: authd, read: () => true, update: authd },
+    // Derived output written by the Font save hook — opt out of @pro-laico/payload-revalidate's
+    // auto-attached hooks. Served fonts are consumed at BUILD time (the next/font export
+    // endpoint), so runtime cache tags can't refresh them; a rebuild is the invalidation path.
+    custom: { revalidate: false },
     admin: { group: 'Assets', hidden: true, useAsTitle: 'filename', defaultColumns: ['filename', 'weight', 'style', 'isVariable'] },
     upload: { mimeTypes: ['font/woff2'] },
     fields: [

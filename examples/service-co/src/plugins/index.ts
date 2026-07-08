@@ -3,6 +3,7 @@ import { fontsPlugin } from '@pro-laico/payload-fonts'
 import { iconsPlugin } from '@pro-laico/payload-icons'
 import { imagesPlugin } from '@pro-laico/payload-images'
 import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { revalidatePlugin } from '@pro-laico/payload-revalidate'
 import { seedPlugin } from '@pro-laico/payload-seed'
 import type { Plugin } from 'payload'
 import folders from '../seed/folders'
@@ -64,6 +65,10 @@ export const seedOptions = {
 //                     and `assetSubDirs` maps the `fontOriginal` slug to the friendlier `font/`.
 //   • devToolsPlugin— dev-only `GET /api/dev` snapshot + stage endpoints (404 in production),
 //                     feeding the floating <DevToolbar> mounted in the frontend layout.
+//   • revalidatePlugin — surgical tag-based cache busting for every collection/global above
+//                     (its own and the sibling plugins', via their `custom.revalidate` markers).
+//                     The read side lives in `src/lib/data.ts` (cacheDoc/cacheIds/cacheGlobal);
+//                     the live dependency map renders at /dev/revalidate.
 export const plugins: Plugin[] = [
   // `folders: true` opts the images collection into Payload's native folder organization — the
   // seed files the photos into Site/Services/Projects/Team folders (see seed/folders.ts).
@@ -73,4 +78,14 @@ export const plugins: Plugin[] = [
   fontsPlugin(),
   seedPlugin({ adminButton: true, ...seedOptions }),
   devToolsPlugin(),
+  // LAST, so collections contributed by the plugins above get revalidation hooks too. Each list
+  // surface the site renders declares its scope + the fields that can reorder/refilter it — so
+  // e.g. flipping a project's `featured` busts the two project lists but no doc-only edit ever does.
+  revalidatePlugin({
+    collections: {
+      services: { lists: { ordered: { fields: ['order'] } } },
+      projects: { lists: { work: { fields: ['featured', 'year'] }, featured: { fields: ['featured'] } } },
+      team: { lists: { ordered: { fields: ['order'] } } },
+    },
+  }),
 ]

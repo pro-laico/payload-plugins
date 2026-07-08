@@ -48,6 +48,20 @@ export type FontsSnapshot = {
 
 export type MuxSnapshot = { slug: string; credentialed: boolean; total: number | null; ready: number | null }
 
+export type RevalidateSnapshot = {
+  /** Where the map endpoint lives (`/api/revalidate-map`), or null when disabled. */
+  endpointPath: string | null
+  /** Tag namespace prefix ('' when unset). */
+  prefix: string
+  /** Whether the plugin is recording reads/events in this process. */
+  observing: boolean
+  /** Static reference-graph edge count ("can embed" relationships). */
+  edges: number
+  /** Materialized cached reads / bust events observed so far. */
+  reads: number
+  events: number
+}
+
 /** Everything `GET /api/dev` reports: environment, per-plugin panels (null = plugin not
  *  installed), and doc counts for every collection. Built fresh on each request — dev only. */
 export type DevSnapshot = {
@@ -56,12 +70,13 @@ export type DevSnapshot = {
   adminRoute: string
   /** Where the host mounts the `createDevPage` catch-all (the plugin's `devRoute` option). */
   devRoute: string
-  plugins: { seed: boolean; images: boolean; icons: boolean; fonts: boolean; mux: boolean }
+  plugins: { seed: boolean; images: boolean; icons: boolean; fonts: boolean; mux: boolean; revalidate: boolean }
   seed: SeedSnapshot | null
   images: ImagesSnapshot | null
   icons: IconsSnapshot | null
   fonts: FontsSnapshot | null
   mux: MuxSnapshot | null
+  revalidate: RevalidateSnapshot | null
   collections: CollectionCount[]
   globals: string[]
 }
@@ -203,6 +218,27 @@ const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnap
   }
 }
 
+type RevalidateMarker = { endpointPath?: string | null }
+
+/** The live-inspection shape payload-revalidate stashes on its shared symbol slot (functions
+ *  can't ride `config.custom` — it feeds the serialized client config). Structural — no import. */
+type RevalidateInspection = { graph: { edges: unknown[] }; prefix: string; observing: boolean; reads: unknown[]; events: unknown[] }
+
+const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
+  const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
+    | (() => RevalidateInspection)
+    | undefined
+  const data = inspect?.()
+  return {
+    endpointPath: marker.endpointPath ?? null,
+    prefix: data?.prefix ?? '',
+    observing: data?.observing ?? false,
+    edges: data?.graph.edges.length ?? 0,
+    reads: data?.reads.length ?? 0,
+    events: data?.events.length ?? 0,
+  }
+}
+
 /** Build the full dev snapshot from a booted Payload instance. Sibling @pro-laico plugins are
  *  discovered through their `config.custom` markers — no imports, so none of them are required. */
 export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
@@ -212,6 +248,7 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
   const iconsMarker = custom.payloadIcons
   const fontsMarker = custom.payloadFonts
   const muxMarker = custom.payloadMux
+  const revalidateMarker = custom.payloadRevalidate
 
   const collections: CollectionCount[] = []
   for (const c of payload.config.collections) collections.push({ slug: c.slug, count: await countDocs(payload, c.slug) })
@@ -221,12 +258,20 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
     env: { nodeEnv: process.env.NODE_ENV ?? 'development', nodeVersion: process.version },
     adminRoute: payload.config.routes?.admin ?? '/admin',
     devRoute: (custom.payloadDevTools?.devRoute as string | undefined) ?? '/dev',
-    plugins: { seed: !!seedMarker, images: !!imagesMarker, icons: !!iconsMarker, fonts: !!fontsMarker, mux: !!muxMarker },
+    plugins: {
+      seed: !!seedMarker,
+      images: !!imagesMarker,
+      icons: !!iconsMarker,
+      fonts: !!fontsMarker,
+      mux: !!muxMarker,
+      revalidate: !!revalidateMarker,
+    },
     seed: seedMarker ? await seedSnapshot(payload, seedMarker) : null,
     images: imagesMarker ? await imagesSnapshot(payload, imagesMarker) : null,
     icons: iconsMarker ? await iconsSnapshot(payload, iconsMarker) : null,
     fonts: fontsMarker ? await fontsSnapshot(payload, fontsMarker) : null,
     mux: muxMarker ? await muxSnapshot(payload, muxMarker) : null,
+    revalidate: revalidateMarker ? revalidateSnapshot(revalidateMarker) : null,
     collections,
     globals: (payload.config.globals ?? []).map((g) => g.slug),
   }

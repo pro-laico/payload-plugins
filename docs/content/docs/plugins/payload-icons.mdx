@@ -439,10 +439,27 @@ once. A name the active set doesn't cover renders the fallback warning glyph and
 
 ### Revalidation
 
-The plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a **statically
-rendered** page bakes the SVG at build time and won't reflect an edit (or an active-set swap) until
-the route revalidates. Wire that yourself with `afterChange` / `afterDelete` hooks (e.g. calling
-`revalidatePath`) through the collections' [`hooks`](#plugin-options) option.
+On its own the plugin does none. `<Icon>` reads via `payload.find` (memoized per request), so a
+**statically rendered** page bakes the SVG at build time and won't reflect an edit (or an
+active-set swap) until the route revalidates.
+
+Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) and the whole surface
+becomes self-healing, zero config. Two decoupled halves meet on one shared tag, `payload-icons`:
+
+- **Write side** — the `icon` and `iconSet` collections ship a data-only `custom.revalidate`
+  marker carrying `extraTags: ['payload-icons']`, so revalidatePlugin's auto-attached hooks bust
+  that tag on every published icon/set write and delete. (`iconRequest` ships
+  `custom: { revalidate: false }` — a diagnostic feed busting nothing.) The after-seed flush
+  busts it too.
+- **Read side** — when an `<Icon>` (or `getIconSvg`) runs inside one of your `'use cache'` scopes
+  and detects the revalidate plugin, it applies the same tag via `cacheTag`. Re-upload an SVG,
+  remap a name, or activate a different set, and every cache entry that inlined an icon
+  re-materializes on the next request.
+
+Without the revalidate plugin (or outside a `'use cache'` scope) the tagging is a silent no-op —
+no behavior change. One coarse tag on purpose: the active-set read isn't keyed by a doc id, icon
+writes are rare, and the whole set resolves in a single query. See it wired end-to-end in
+[`examples/revalidate-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/revalidate-sandbox).
 
 ## Seeding
 

@@ -8,8 +8,8 @@ out
 *.db-wal
 *.db-shm
 
-# Uploaded media (written at runtime to the local-disk storage)
-media/
+# Uploaded media (written at runtime to local-disk storage). Root-anchored by convention.
+/media/
 
 # Local seed video files — uploaded to Mux from local, never committed
 seed-assets/*

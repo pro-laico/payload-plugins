@@ -625,9 +625,30 @@ hooks.
 
 The one thing the plugin *doesn't* touch is your **Next.js page cache**, but that isn't
 image-specific. A page that cached an image doc keeps serving the old URL until you revalidate that
-route, exactly as it would for any Payload content. Handle it however you already do (a
-`revalidatePath` / `revalidateTag` in an `afterChange` hook, or a dynamic route). There's nothing
-extra to add for images.
+route, exactly as it would for any Payload content.
+
+With [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) installed that's automatic
+and atomic: fetch the image doc through an id-keyed `cacheDoc` getter and render
+`<ResponsiveImage image={doc} />` from it —
+
+```ts
+import { cacheDoc, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+
+export async function getImage(id: string | number) {
+  'use cache'
+  const payload = await getPayloadClient()
+  return cacheDoc(await payload.findByID({ collection: 'images', id, depth: 0, disableErrors: true }), 'images')
+}
+```
+
+An alt or focal-point edit busts `images:{id}` — exactly that one entry re-materializes (with a
+fresh `v=` token, so the binary variants re-derive), everywhere the image is used. The internal
+`generated-images` variant cache ships `custom: { revalidate: false }`, so on-demand variant
+writes never fire bust events. See it wired end-to-end in
+[`examples/revalidate-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/revalidate-sandbox).
+
+Without the revalidate plugin, handle it however you already do (a `revalidatePath` /
+`revalidateTag` in an `afterChange` hook, or a dynamic route).
 
 ## Seeding
 

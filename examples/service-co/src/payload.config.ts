@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig } from 'payload'
+import { buildConfig, type SharpDependency } from 'payload'
 import sharp from 'sharp'
 import { Projects } from './collections/Projects'
 import { Services } from './collections/Services'
@@ -19,10 +19,11 @@ const currentDir = dirname(filename)
 // the Mux CORS origin. Keep it in sync with the `dev` port (3060).
 const serverURL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3060'
 
-// Meridian — a fictional design-build studio. This one config wires all five @pro-laico plugins
+// Meridian — a fictional design-build studio. This one config wires all six @pro-laico plugins
 // together: payload-images (Projects/Services/Team photos), payload-icons (Service icons + the
 // active icon set), payload-mux (the optional showreel + project video), payload-fonts (the brand
-// typography), and payload-seed (which fills every collection above from `src/seed/`). The plugin
+// typography), payload-seed (which fills every collection above from `src/seed/`), and
+// payload-revalidate (surgical cache busts for the atomic getters in `src/lib/data.ts`). The plugin
 // collections/globals (`images`, `icon`, `iconSet`, `mux-video`, `font*`, `fontSet`) are injected
 // by `plugins` — only the app's own content collections are listed here.
 export default buildConfig({
@@ -40,6 +41,7 @@ export default buildConfig({
   typescript: { outputFile: resolve(currentDir, 'payload-types.ts') },
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URI || 'file:./service-co.db' } }),
   // Required by payload-images' transform endpoint (and Payload's own image processing).
-  sharp,
+  //TODO: drop the cast when Payload's SharpDependency catches up to sharp 0.35's input types.
+  sharp: sharp as unknown as SharpDependency,
   plugins,
 })

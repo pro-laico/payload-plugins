@@ -2,13 +2,16 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ButtonLink } from '@/components/ui/Button'
-import { getProjectBySlug } from '@/lib/data'
-import { asDoc, firstPlayback, type GalleryItem, type MediaImage, type Service } from '@/lib/types'
+import { getImage, getMuxVideo, getProjectBySlug, getService } from '@/lib/data'
+import { firstPlayback } from '@/lib/types'
 
-// Rendered on demand so seeds/edits show immediately (no build-time snapshot).
-export const dynamic = 'force-dynamic'
+// Atomic composition: the project is fetched depth 0, so the cover, gallery photos, video, and
+// related services are IDS — each renders through its own id-keyed cached entry. Editing a
+// gallery photo's alt or crop re-materializes exactly that image's entry; the project entry
+// (holding just the id) survives untouched.
 
 type Params = { params: Promise<{ slug: string }> }
 
@@ -18,15 +21,27 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: project?.title ?? 'Project', description: project?.summary ?? undefined }
 }
 
-export default async function ProjectPage({ params }: Params) {
+// Params are request data → the detail renders inside a Suspense boundary.
+export default function ProjectPage({ params }: Params) {
+  return (
+    <Suspense fallback={null}>
+      <ProjectDetail params={params} />
+    </Suspense>
+  )
+}
+
+async function ProjectDetail({ params }: Params) {
   const { slug } = await params
   const project = await getProjectBySlug(slug)
   if (!project) notFound()
 
-  const cover = asDoc<MediaImage>(project.coverImage)
-  const video = firstPlayback(project.video)
-  const gallery = (project.gallery ?? []).map((g: GalleryItem) => asDoc<MediaImage>(g.image)).filter(Boolean) as MediaImage[]
-  const services = (project.services ?? []).map((s) => asDoc<Service>(s)).filter(Boolean) as Service[]
+  const [cover, videoDoc, gallery, services] = await Promise.all([
+    project.coverImage != null ? getImage(project.coverImage) : null,
+    project.video != null ? getMuxVideo(project.video) : null,
+    Promise.all((project.gallery ?? []).map((g) => getImage(g.image))).then((docs) => docs.filter((d) => d !== null)),
+    Promise.all((project.services ?? []).map((id) => getService(id))).then((docs) => docs.filter((d) => d !== null)),
+  ])
+  const video = firstPlayback(videoDoc)
   const meta = [project.client, project.location, project.year].filter(Boolean).join(' · ')
 
   return (

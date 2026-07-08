@@ -45,8 +45,19 @@ export interface IconProps extends React.SVGAttributes<SVGSVGElement> {
  * <Icon name="logo" fallback={myCustomSvgString} />
  * ```
  */
+/** The draft-mode lane, resolved safely from ANY scope. `draftMode()` is a request API that
+ *  throws inside a `'use cache'` scope — where an inlined icon should read the published
+ *  lane anyway (draft previews render dynamically, so the request path still resolves). */
+const draftLane = async (): Promise<boolean> => {
+  try {
+    return (await draftMode()).isEnabled
+  } catch {
+    return false
+  }
+}
+
 export const Icon = async ({ name, fallback, ...svgProps }: IconProps): Promise<React.ReactElement> => {
-  const { isEnabled: draft } = await draftMode()
+  const draft = await draftLane()
   const svg = await getIconSvg(name, draft)
   // Name didn't resolve against the active set — record it (throttled,
   // fire-and-forget) so the admin "Requested icons" panel can surface real

@@ -1,4 +1,4 @@
 {
   "title": "Plugins",
-  "pages": ["payload-seed", "payload-images", "payload-icons", "payload-fonts", "payload-mux", "payload-dev-tools"]
+  "pages": ["payload-seed", "payload-images", "payload-icons", "payload-fonts", "payload-mux", "payload-revalidate", "payload-dev-tools"]
 }

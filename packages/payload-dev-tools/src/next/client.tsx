@@ -204,3 +204,60 @@ export function IconSetSwitcher({ sets }: { sets: { id: string | number; title: 
     </div>
   )
 }
+
+/** The `/dev/revalidate` manual bust box — POST one tag to payload-revalidate's map
+ *  endpoint and refresh, so the event log shows the manual bust immediately. */
+export function BustTagCard({ endpointPath }: { endpointPath: string }) {
+  const router = useRouter()
+  const [tag, setTag] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const bust = async () => {
+    if (!tag.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(endpointPath, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tag: tag.trim() }),
+      })
+      if (res.ok) {
+        setTag('')
+        router.refresh()
+      } else setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Failed (HTTP ${res.status}).`)
+    } catch {
+      setError('Request failed — is the dev server running?')
+    }
+    setBusy(false)
+  }
+
+  return (
+    <div className="pdtp-card" style={{ marginTop: 20 }}>
+      <h2>
+        Bust a tag <span className="pdtp-kind">manual</span>
+      </h2>
+      <form
+        style={{ display: 'flex', gap: 8 }}
+        onSubmit={(e) => {
+          e.preventDefault()
+          void bust()
+        }}
+      >
+        <input
+          className="pdtp-code"
+          style={{ flex: 1, padding: '6px 10px' }}
+          placeholder="posts:42 · posts · global:header · all"
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+        />
+        <button type="submit" className="pdtp-btn pdtp-btn-primary" disabled={busy || !tag.trim()}>
+          {busy ? 'Busting…' : 'Bust'}
+        </button>
+      </form>
+      {error ? <div className="pdtp-error">{error}</div> : null}
+    </div>
+  )
+}

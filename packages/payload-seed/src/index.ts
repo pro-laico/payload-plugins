@@ -22,6 +22,12 @@ export { file, isFileToken, isRef, ref } from './refs'
 
 // Run the seed from a script or test (the `payload seed` command and endpoint use this)
 export { seed } from './engine/run'
+export type { SeedResult } from './engine/run'
+
+// After-seed listeners: decoupled plugins register (by shared symbol slot or this helper) to run
+// once at the end of every seed — e.g. @pro-laico/payload-revalidate's cache flush.
+export { registerAfterSeedListener } from './listeners'
+export type { AfterSeedListener } from './listeners'
 
 // The error classes a failing run throws, so callers can branch on (and test) failure modes:
 // SeedValidationError collects every model issue; SeedRunError names the write that died.

@@ -1,28 +1,54 @@
 import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { connection } from 'next/server'
+import { Suspense } from 'react'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ProjectCard } from '@/components/ProjectCard'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ServiceCard } from '@/components/ServiceCard'
 import { ButtonLink } from '@/components/ui/Button'
-import { getFeaturedProject, getProjects, getServices, getSiteSettings, getTestimonials } from '@/lib/data'
-import { asDoc, firstPlayback, type MediaImage } from '@/lib/types'
+import {
+  getFeaturedProjectId,
+  getImage,
+  getMuxVideo,
+  getProject,
+  getProjectIds,
+  getServiceIds,
+  getSiteSettings,
+  getTestimonial,
+  getTestimonialIds,
+} from '@/lib/data'
+import { firstPlayback } from '@/lib/types'
 
-// Read live seeded data on every request so a seed/edit shows up on refresh.
-export const dynamic = 'force-dynamic'
+// Cache Components: the page composes at request time from the atomic cache entries the getters
+// materialize — a seed or an admin edit busts exactly the entries it touches, and the next
+// request recomposes from what survived.
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
+  )
+}
 
-export default async function HomePage() {
-  const [settings, services, projects, featured, testimonials] = await Promise.all([
+async function HomeContent() {
+  await connection()
+  const [settings, serviceIds, projectIds, featuredId, testimonialIds] = await Promise.all([
     getSiteSettings(),
-    getServices(),
-    getProjects(),
-    getFeaturedProject(),
-    getTestimonials(),
+    getServiceIds(),
+    getProjectIds(),
+    getFeaturedProjectId(),
+    getTestimonialIds(),
   ])
 
-  const hero = asDoc<MediaImage>(settings.heroImage)
-  const featuredCover = asDoc<MediaImage>(featured?.coverImage)
-  const showreel = firstPlayback(settings.showreel)
-  const others = projects.filter((p) => p.id !== featured?.id).slice(0, 4)
+  // Each reference resolves through its own id-keyed entry — the settings entry holds only ids.
+  const [hero, featured, showreelDoc] = await Promise.all([
+    settings.heroImage != null ? getImage(settings.heroImage) : null,
+    featuredId != null ? getProject(featuredId) : null,
+    settings.showreel != null ? getMuxVideo(settings.showreel) : null,
+  ])
+  const featuredCover = featured?.coverImage != null ? await getImage(featured.coverImage) : null
+  const showreel = firstPlayback(showreelDoc)
+  const others = projectIds.filter((id) => id !== featuredId).slice(0, 4)
   const name = settings.companyName ?? 'Meridian'
 
   return (
@@ -58,8 +84,8 @@ export default async function HomePage() {
           description="We design the building, the interiors, and the ground it sits on together — so the result reads as a single idea, not a set of handoffs."
         />
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {services.map((s) => (
-            <ServiceCard key={String(s.id)} service={s} />
+          {serviceIds.map((id) => (
+            <ServiceCard key={String(id)} id={id} />
           ))}
         </div>
       </section>
@@ -106,8 +132,8 @@ export default async function HomePage() {
             </ButtonLink>
           </div>
           <div className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2">
-            {others.map((p) => (
-              <ProjectCard key={String(p.id)} project={p} />
+            {others.map((id) => (
+              <ProjectCard key={String(id)} id={id} />
             ))}
           </div>
         </section>
@@ -124,18 +150,12 @@ export default async function HomePage() {
       ) : null}
 
       {/* Testimonials */}
-      {testimonials.length > 0 ? (
+      {testimonialIds.length > 0 ? (
         <section className="mx-auto max-w-6xl px-6 py-20">
           <SectionHeading eyebrow="Clients" title="In their words" align="center" className="mb-12" />
           <div className="grid gap-6 md:grid-cols-3">
-            {testimonials.map((t) => (
-              <figure key={String(t.id)} className="flex flex-col rounded-2xl border border-border bg-card p-7">
-                <blockquote className="font-serif text-lg leading-relaxed text-foreground">“{t.quote}”</blockquote>
-                <figcaption className="mt-6 text-sm">
-                  <div className="font-medium text-foreground">{t.author}</div>
-                  {t.company ? <div className="text-muted-foreground">{t.company}</div> : null}
-                </figcaption>
-              </figure>
+            {testimonialIds.map((id) => (
+              <TestimonialCard key={String(id)} id={id} />
             ))}
           </div>
         </section>
@@ -158,5 +178,20 @@ export default async function HomePage() {
         </div>
       </section>
     </>
+  )
+}
+
+/** One testimonial = one cache entry — editing a quote re-renders one card, not the row. */
+async function TestimonialCard({ id }: { id: string | number }) {
+  const t = await getTestimonial(id)
+  if (!t) return null
+  return (
+    <figure className="flex flex-col rounded-2xl border border-border bg-card p-7">
+      <blockquote className="font-serif text-lg leading-relaxed text-foreground">“{t.quote}”</blockquote>
+      <figcaption className="mt-6 text-sm">
+        <div className="font-medium text-foreground">{t.author}</div>
+        {t.company ? <div className="text-muted-foreground">{t.company}</div> : null}
+      </figcaption>
+    </figure>
   )
 }

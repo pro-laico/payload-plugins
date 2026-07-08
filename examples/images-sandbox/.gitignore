@@ -8,13 +8,13 @@ out
 *.db-wal
 *.db-shm
 
-# Uploaded media + generated variants (written at runtime to local-disk storage)
-media/
-images/
-generated-images/
+# Uploaded media + generated variants (written at runtime to local-disk storage).
+# Root-anchored so the seed-assets/* fixtures stay tracked.
+/media/
+/images/
+/generated-images/
 
 .env
 .env*.local
 next-env.d.ts
 *.tsbuildinfo
-generatedImages/

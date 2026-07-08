@@ -1,14 +1,15 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
+import { Suspense } from 'react'
 import { ProjectCard } from '@/components/ProjectCard'
 import { SectionHeading } from '@/components/SectionHeading'
-import { getProjects } from '@/lib/data'
+import { getProjectIds } from '@/lib/data'
 
-export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Work' }
 
-export default async function WorkPage() {
-  const projects = await getProjects()
-
+// The atomic list: this page holds an id-list entry (projects:list:work) — membership and the
+// declared sort fields (featured, year) bust it; a title/photo edit re-renders one card instead.
+export default function WorkPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-20">
       <SectionHeading
@@ -16,18 +17,27 @@ export default async function WorkPage() {
         title="Selected projects"
         description="A few of the buildings, interiors, and landscapes we’ve designed and built. Each one was a design-build engagement from first sketch to final detail."
       />
-      {projects.length === 0 ? (
-        <p className="mt-12 text-muted-foreground">
-          No projects yet — open <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">/admin</code>, click{' '}
-          <strong>Seed your database</strong>, then reload.
-        </p>
-      ) : (
-        <div className="mt-14 grid gap-x-6 gap-y-12 sm:grid-cols-2">
-          {projects.map((p, i) => (
-            <ProjectCard key={String(p.id)} project={p} priority={i < 2} />
-          ))}
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <WorkGrid />
+      </Suspense>
+    </div>
+  )
+}
+
+async function WorkGrid() {
+  await connection()
+  const projectIds = await getProjectIds()
+
+  return projectIds.length === 0 ? (
+    <p className="mt-12 text-muted-foreground">
+      No projects yet — open <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">/admin</code>, click{' '}
+      <strong>Seed your database</strong>, then reload.
+    </p>
+  ) : (
+    <div className="mt-14 grid gap-x-6 gap-y-12 sm:grid-cols-2">
+      {projectIds.map((id, i) => (
+        <ProjectCard key={String(id)} id={id} priority={i < 2} />
+      ))}
     </div>
   )
 }

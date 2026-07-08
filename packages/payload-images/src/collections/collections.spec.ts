@@ -93,6 +93,10 @@ describe('createImagesCollection', () => {
 })
 
 describe('createGeneratedImagesCollection', () => {
+  it('opts out of payload-revalidate — derived variants must not fire bust events', () => {
+    expect(createGeneratedImagesCollection().custom?.revalidate).toBe(false)
+  })
+
   it('is a hidden upload collection keyed by a unique cacheKey', () => {
     const c = createGeneratedImagesCollection()
     expect(c.admin?.hidden).toBe(true)

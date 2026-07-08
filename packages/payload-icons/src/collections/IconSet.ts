@@ -3,6 +3,7 @@ import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'pa
 import { activeField, enforceSingleActive } from '../lib/activeField'
 import { authd } from '../lib/authenticated'
 import { mergeHooks } from '../lib/mergeHooks'
+import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 import { toKebabCase } from '../lib/titleCase'
 
 /** The default slug for the icon-set collection. */
@@ -74,6 +75,10 @@ export const createIconSetCollection = (
     slug,
     labels: { singular: 'Icon Set', plural: 'Icon Sets' },
     access: { create: authd, delete: authd, read: authd, update: authd },
+    // Data-only marker for @pro-laico/payload-revalidate (no dependency): its hooks bust
+    // the shared icons tag on every published set write — activating a set, editing its
+    // iconsArray, publishing — matching the tag `getIconSvg` applies.
+    custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },
     admin: {
       group,
       useAsTitle: 'title',

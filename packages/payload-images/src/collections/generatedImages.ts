@@ -33,6 +33,9 @@ export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptio
   return {
     slug,
     access: { create: authd, delete: authd, read: authd, update: authd },
+    // Derived, disposable variants written on cache miss — opt out of @pro-laico/payload-revalidate's
+    // auto-attached hooks so every variant create doesn't fire a pointless bust event.
+    custom: { revalidate: false },
     admin: { hidden: true, group: 'Assets', useAsTitle: 'cacheKey', defaultColumns: ['cacheKey', 'width', 'height', 'format'] },
     fields: [
       { name: 'source', type: 'relationship', relationTo: sourceSlug, required: true, index: true },

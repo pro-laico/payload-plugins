@@ -93,5 +93,9 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.0.0",
+    "@xyflow/react": "12.11.1"
   }
 }

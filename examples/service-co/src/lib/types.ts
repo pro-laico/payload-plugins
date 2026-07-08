@@ -1,9 +1,13 @@
 // Light view models for the frontend. We deliberately don't import Payload's generated types here:
-// these name only the fields the site renders, and every relationship is `Doc | id` (what a
-// `depth`-limited query returns), so the pages stay decoupled from the full generated shapes.
+// these name only the fields the site renders. Every read is `depth: 0` (the payload-revalidate
+// atomic model — references stay ids and resolve through their own id-keyed getters), so every
+// relationship field is a bare id.
+
+/** A `depth: 0` relationship value — the referenced doc's id. */
+export type RelId = string | number
 
 export type MediaImage = {
-  id: string | number
+  id: RelId
   alt?: string | null
   width?: number | null
   height?: number | null
@@ -13,26 +17,26 @@ export type MediaImage = {
   url?: string | null
 }
 
-export type IconDoc = { id: string | number; svgString?: string | null; filename?: string | null }
+export type IconDoc = { id: RelId; svgString?: string | null; filename?: string | null }
 
 /** One Mux playback row — the virtual URLs are computed on read from the stored playback id. */
 export type MuxPlayback = { playbackId?: string | null; playbackUrl?: string | null; posterUrl?: string | null; gifUrl?: string | null }
-export type MuxVideoDoc = { id: string | number; title?: string | null; playbackOptions?: MuxPlayback[] | null }
+export type MuxVideoDoc = { id: RelId; title?: string | null; playbackOptions?: MuxPlayback[] | null }
 
 export type Service = {
-  id: string | number
+  id: RelId
   title: string
   slug: string
   summary?: string | null
   order?: number | null
-  icon?: IconDoc | string | null
-  image?: MediaImage | string | null
+  icon?: RelId | null
+  image?: RelId | null
 }
 
-export type GalleryItem = { image?: MediaImage | string | null }
+export type GalleryItem = { image: RelId }
 
 export type Project = {
-  id: string | number
+  id: RelId
   title: string
   slug: string
   client?: string | null
@@ -41,45 +45,39 @@ export type Project = {
   summary?: string | null
   description?: string | null
   featured?: boolean | null
-  coverImage?: MediaImage | string | null
+  coverImage?: RelId | null
   gallery?: GalleryItem[] | null
-  video?: MuxVideoDoc | string | null
-  services?: (Service | string)[] | null
+  video?: RelId | null
+  services?: RelId[] | null
 }
 
 export type TeamMember = {
-  id: string | number
+  id: RelId
   name: string
   role?: string | null
   bio?: string | null
   order?: number | null
-  photo?: MediaImage | string | null
+  photo?: RelId | null
 }
 
 export type Testimonial = {
-  id: string | number
+  id: RelId
   quote: string
   author: string
   company?: string | null
-  project?: Project | string | null
+  project?: RelId | null
 }
 
 export type SiteSettings = {
   companyName?: string | null
   tagline?: string | null
   description?: string | null
-  heroImage?: MediaImage | string | null
-  showreel?: MuxVideoDoc | string | null
-  featuredProject?: Project | string | null
+  heroImage?: RelId | null
+  showreel?: RelId | null
+  featuredProject?: RelId | null
   contact?: { email?: string | null; phone?: string | null; address?: string | null } | null
 }
 
-/** Narrow a `Doc | id | null` relationship to the populated doc, or `undefined` when it's just an id. */
-export const asDoc = <T>(value: T | string | number | null | undefined): T | undefined =>
-  value && typeof value === 'object' ? (value as T) : undefined
-
 /** The first playable Mux playback row (has a playback id), or undefined. */
-export const firstPlayback = (video: MuxVideoDoc | string | null | undefined): MuxPlayback | undefined => {
-  const doc = asDoc<MuxVideoDoc>(video)
-  return doc?.playbackOptions?.find((p) => p.playbackId) ?? undefined
-}
+export const firstPlayback = (video: MuxVideoDoc | null | undefined): MuxPlayback | undefined =>
+  video?.playbackOptions?.find((p) => p.playbackId) ?? undefined

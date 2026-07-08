@@ -1,0 +1,389 @@
+---
+title: "payload-revalidate"
+description: "Atomic Next.js cache revalidation for Payload — id-keyed entries, field-driven busts, and a dependency map showing exactly what revalidates when."
+---
+
+`@pro-laico/payload-revalidate` owns tag-based cache revalidation for Payload + Next.js
+(App Router, **Cache Components**), built around one idea: **atomic cache entries**.
+Every document is its own cache entry; lists are id-lists; references stay ids and render
+through the referenced doc's own entry. Then invalidation gets *surgical for free*: edit
+an image's alt text and exactly one small entry re-materializes — everywhere that image
+appears — while every page, list, and card entry around it survives. The write side
+computes each bust from **which fields changed**, and a live dependency map at
+`/dev/revalidate` shows the whole story so you can trust it.
+
+```bash
+pnpm add @pro-laico/payload-revalidate
+```
+
+Requires Next.js 16 with Cache Components enabled:
+
+```ts
+// next.config.ts
+const nextConfig = { cacheComponents: true }
+```
+
+## The atomic model
+
+Three rules, one consequence each:
+
+1. **Every doc renders through an id-keyed getter** (`cacheDoc`) → a content edit busts
+   `posts:{id}` and re-materializes exactly that entry, at every usage site at once.
+2. **Lists cache ids only** (`cacheIds`) → list entries change on membership/order
+   events, never on content. A title edit re-renders one card, not the archive.
+3. **References stay ids** (`depth: 0`) → an entry never bakes in another doc's content,
+   so it never needs to purge when that doc changes. The id is stable; freshness lives in
+   the referenced doc's own entry, and Next recomposes the page from surviving entries.
+
+Populated content that DOES get baked in (depth > 0) is still tagged for correctness —
+the walk finds it, including inside Lexical richText — but it's flagged in dev (console +
+the map) as a refactor candidate, with the exact field paths.
+
+## Setup
+
+Add it **last** in the plugins array, so collections other plugins contribute get hooks too:
+
+```ts
+import { buildConfig } from 'payload'
+import { revalidatePlugin } from '@pro-laico/payload-revalidate'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    seedPlugin(),
+    revalidatePlugin({
+      collections: {
+        posts: {
+          lists: {
+            recent: { fields: ['publishedAt'] },              // order determinant
+            featured: { fields: ['featured', 'publishedAt'] }, // filter + order
+          },
+        },
+      },
+    }),
+  ],
+})
+```
+
+Zero-config works too (`revalidatePlugin()`): every collection/global gets hooks, doc
+tags flow automatically. Declared `lists` are the one thing worth configuring — they give
+each list surface its own tag and tell the write side which fields can reorder it.
+
+## The getters
+
+```ts
+// src/lib/getters.ts
+import { cacheDoc, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+
+/** The id-list: membership/order only. Content edits never touch this entry. */
+export async function getRecentPostIds(page = 1) {
+  'use cache'
+  const payload = await getPayloadClient()
+  const res = await payload.find({ collection: 'posts', page, limit: 12, sort: '-publishedAt', select: {}, depth: 0 })
+  await cacheIds(res, 'posts', { list: 'recent' })
+  return res.docs.map((doc) => doc.id)
+}
+
+/** THE atomic unit: one doc, one entry, shared by every usage site. */
+export async function getPost(id: string | number) {
+  'use cache'
+  const payload = await getPayloadClient()
+  return cacheDoc(await payload.findByID({ collection: 'posts', id, depth: 0, disableErrors: true }), 'posts')
+}
+```
+
+```tsx
+// The list renders ids; each card self-fetches — one entry per card.
+async function PostList() {
+  const ids = await getRecentPostIds()
+  return ids.map((id) => <PostCard key={id} id={id} />)
+}
+
+async function PostCard({ id }: { id: string | number }) {
+  const post = await getPost(id)
+  if (!post) return null
+  return <article>…</article>
+}
+```
+
+## The tag vocabulary
+
+Id-based, colon-joined; never hand-spell one — build with the exported `tags` helper.
+
+| Tag | Meaning | Busted when |
+| --- | --- | --- |
+| `posts:42` | one doc + any entry baking it in | any write to doc 42 |
+| `posts:my-slug` | alias doc tag (`idField`, default `slug`) | same — old AND new alias on renames |
+| `posts:list:recent` | a declared list scope | membership events + its declared fields change |
+| `posts` | the bare (unscoped) list tag | membership events only |
+| `global:header` | a global | the global's writes |
+| `all` | on every tagged entry | `revalidateAll()` / post-seed flush |
+| `…:draft` | draft-lane variant of any of the above | lane-aware — draft saves touch only these |
+
+## What busts when — field-driven
+
+| You change… | Busts |
+| --- | --- |
+| a content field (`body`, `title`, …) | `posts:{id}` + alias — **doc only, the overwhelmingly common case** |
+| a scope's declared field (`publishedAt`) | doc tags + every scope declaring that field (`posts:list:recent`, …) |
+| the `idField` (slug) | doc tags + old and new alias — id-lists hold ids, so **no list bust** |
+| membership (create / delete / publish / unpublish) | doc tags + bare list + **all** declared scopes |
+| trash / restore-from-trash (`trash: true`) | same as membership — a soft delete changes list membership exactly like a delete, it just arrives as an update |
+| anything, on a draft-only doc | the `:draft` variants only |
+
+Scope fields support dotted paths (`contact.email`, `meta.featured`) — the diff compares
+the exact path. Relationship/upload determinants compare by **id**, so a populated doc
+never reads as a change against its previous raw id.
+
+`extraTags` follow the lanes: published writes bust the base tag, draft saves bust only
+the `:draft` variants. `rules` (whenFields-gated) cover flows the automation can't see —
+they fire when their fields changed **or on any membership event** (a publish's field
+delta may have arrived across earlier draft saves and be invisible to the publish-time
+diff); deletes fire rules unconditionally. Every hook honors `context.disableRevalidate`
+(which the [`payload-seed`](/docs/plugins/payload-seed) engine sets — the plugin's
+after-seed listener then flushes the seeded surface once, including declared scopes,
+`extraTags`, and rule targets for the touched slugs).
+
+## Visibility — `/dev/revalidate`
+
+With [`payload-dev-tools`](/docs/plugins/payload-dev-tools) installed, the map renders in
+four tabs:
+
+- **Explore** — the interactive dependency graph (pan/zoom, click a node): editing a node
+  makes its right-hand neighbors stale; **amber animated edges are observed bake-ins**
+  (the anti-pattern), grey edges are id-references, dashed is richText. Selecting a node
+  answers "what does editing this revalidate?" and "what makes this stale?" plus the
+  observed doc-level reality: which entries carry `media:3` right now, own-entry ✓ or
+  baked-in ⚠.
+- **Fields** — per collection, every field with its computed blast radius:
+  `title → doc`, `publishedAt → doc + list:recent`, `slug → doc + alias`.
+- **Reads** — every materialized entry with an atomic-health badge (`atomic ✓`,
+  `N baked-in ⚠`, `undeclared scope!`, `capped!`).
+- **Events** — the bust log (per-tag reasons) + a manual bust box.
+
+`GET /api/revalidate-map` serves it all as JSON (dev-gated);
+`POST /api/revalidate-map { "tag": "posts:42" }` busts one tag by hand.
+
+The plugin also **polices the pattern in dev**: a getter baking in populated docs logs
+the exact field paths to fix; a `cacheIds` read carrying an undeclared scope warns that
+reorders won't reach it; docs-with-content passed to `cacheIds` warn that content edits
+won't refresh the entry.
+
+## Examples
+
+### A detail page by slug
+
+The alias (`as: slug`) tags even a `null` result, so the cached miss purges the moment
+that slug is created. References stay ids and render through their own getters.
+
+```ts
+export async function getPostBySlug(slug: string) {
+  'use cache'
+  const payload = await getPayloadClient()
+  const res = await payload.find({ collection: 'posts', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
+  return cacheDoc(res.docs[0] ?? null, 'posts', { as: slug })
+}
+```
+
+```tsx
+// app/(frontend)/blog/[slug]/page.tsx — params are request data → Suspense boundary.
+export default function PostPage({ params }: { params: Promise<{ slug: string }> }) {
+  return (
+    <Suspense fallback={<PostSkeleton />}>
+      <PostDetail params={params} />
+    </Suspense>
+  )
+}
+
+async function PostDetail({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const post = await getPostBySlug(slug)
+  if (!post) notFound()
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      {typeof post.heroImage === 'string' || typeof post.heroImage === 'number' ? <HeroImage id={post.heroImage} /> : null}
+    </article>
+  )
+}
+
+/** The image's OWN entry — an alt edit re-materializes this, and only this. */
+async function HeroImage({ id }: { id: string | number }) {
+  const media = await getMedia(id)
+  return media ? <img src={media.url ?? ''} alt={media.alt ?? ''} /> : null
+}
+```
+
+### Multiple lists over one collection
+
+Each list surface gets its own scope, so their invalidation is independent:
+
+```ts
+revalidatePlugin({
+  collections: {
+    posts: {
+      lists: {
+        recent: { fields: ['publishedAt'] },
+        featured: { fields: ['featured', 'publishedAt'] },
+        byCategory: { fields: ['category'] },
+      },
+    },
+  },
+})
+```
+
+Flipping `featured` busts `posts:list:featured` — the recent and category archives stay
+cached. Changing `category` busts only `posts:list:byCategory`. **Declare every sort and
+filter field a scope depends on** — that's the one contract atomic lists ask of you (the
+dev map warns when a scope is observed but undeclared).
+
+### A global (header / site settings)
+
+```ts
+export async function getHeader() {
+  'use cache'
+  const payload = await getPayloadClient()
+  return cacheGlobal(await payload.findGlobal({ slug: 'header', depth: 0 }), 'header')
+}
+```
+
+Nav links stay ids; a `<NavLink id>` component fetches each target's title through its
+id-keyed getter — renaming a page updates every menu without touching the header entry.
+
+### Draft / preview reads
+
+Runtime APIs (`draftMode()`) can't run inside `'use cache'` — read them outside and pass
+`draft` as an **argument** (part of the cache key):
+
+```ts
+export async function getPagePreviewable(slug: string, draft: boolean) {
+  'use cache'
+  const payload = await getPayloadClient()
+  const res = await payload.find({ collection: 'pages', where: { slug: { equals: slug } }, limit: 1, depth: 0, draft })
+  return cacheDoc(res.docs[0] ?? null, 'pages', { as: slug, draft })
+}
+
+// caller (dynamic, under Suspense):
+const { isEnabled } = await draftMode()
+const page = await getPagePreviewable(slug, isEnabled)
+```
+
+Draft entries carry `:draft` variants; an editor's autosave purges only the preview
+surface. (Simplest alternative: leave preview reads uncached — they're dynamic anyway.)
+
+### A sitemap
+
+A sitemap renders every doc's slug — content, not just membership — so it's the one
+classic surface that wants collection-wide field coverage. The atomic answer is a
+declared scope over the slug field:
+
+```ts
+revalidatePlugin({ collections: { posts: { lists: { sitemap: { fields: ['slug'] } } } } })
+
+export async function getSitemapEntries() {
+  'use cache'
+  const payload = await getPayloadClient()
+  const posts = await payload.find({ collection: 'posts', limit: 0, select: { slug: true, updatedAt: true }, depth: 0 })
+  await cacheIds(posts, 'posts', { list: 'sitemap' })
+  return posts.docs
+}
+```
+
+(Yes — `cacheIds` warns that these docs carry `slug` content; the declared scope on
+`['slug']` is exactly the answer to that warning: slug changes bust this entry.)
+
+### Data the walk can't see — manual rules
+
+FAQ text denormalized into service pages by an app-level build step:
+
+```ts
+revalidatePlugin({
+  rules: [{ on: 'faqs', bust: ['services'], whenFields: ['question', 'answer'] }],
+})
+```
+
+### Another plugin shipping revalidation defaults
+
+Plain config, no import — the `custom.seedAsset` decoupling pattern:
+
+```ts
+{ slug: 'my-collection', custom: { revalidate: { extraTags: ['video-embeds'] } } }
+```
+
+The sibling `@pro-laico` plugins ship these markers already, so adding `revalidatePlugin()` last
+integrates them with zero config:
+
+| Plugin | What its collections declare |
+| --- | --- |
+| [payload-icons](/docs/plugins/payload-icons) | `icon` + `iconSet` carry `extraTags: ['payload-icons']` — and `<Icon>` applies the same tag via `cacheTag` inside your `'use cache'` scopes, so baked-in SVGs self-heal. `iconRequest` opts out. |
+| [payload-images](/docs/plugins/payload-images) | `images` gets the standard hooks (fetch it with an id-keyed `cacheDoc` getter); the internal `generated-images` variant cache opts out, so on-demand variant writes stay silent. |
+| [payload-mux](/docs/plugins/payload-mux) | `mux-video` gets the standard hooks — webhook writes go through `payload.update`, so a "processing" page heals itself when the asset goes ready. |
+| [payload-fonts](/docs/plugins/payload-fonts) | Derived `fontOriginal` / `fontOptimized` opt out (fonts are build-baked; nothing at runtime to bust). |
+| [payload-seed](/docs/plugins/payload-seed) | A seed run flushes once at the end: list tags + declared scopes + `extraTags` per touched slug, then `all`. |
+
+`examples/revalidate-sandbox` wires icons + images alongside posts/services to show the whole
+thing live.
+
+### Manual busts from a server action
+
+```ts
+'use server'
+
+import { revalidateDoc, revalidateList } from '@pro-laico/payload-revalidate/cache'
+
+export async function importProducts(rows: ProductRow[]) {
+  await syncToDatabase(rows)
+  await revalidateList('products')                       // bare + every declared scope
+  for (const row of rows) await revalidateDoc('products', row.id)
+}
+```
+
+Or hand-build a tag — never spell the string:
+
+```ts
+import { revalidateTag } from 'next/cache'
+import { tags } from '@pro-laico/payload-revalidate'
+
+revalidateTag(tags.doc('products', 42))
+revalidateTag(tags.list('posts', { scope: 'recent' }))
+```
+
+### Migrating from `unstable_cache`
+
+```ts
+// BEFORE — tags declared up front, whole-collection blast radius:
+const getPost = unstable_cache(async (slug: string) => fetchPost(slug), ['post-by-slug'], { tags: ['posts'] })
+
+// AFTER — keys automatic, entry-precise tags derived from the data itself:
+async function getPost(slug: string) {
+  'use cache'
+  return cacheDoc(await fetchPost(slug), 'posts', { as: slug })
+}
+```
+
+`unstable_cache`'s fundamental limit — tags must exist before the fetch — is why it
+needed broad collection tags. `cacheTag()` accepts data-derived tags after the fetch,
+which is what makes per-doc precision possible; the atomic pattern is that precision
+taken to its logical end.
+
+## Notes
+
+- **Add the plugin last** in `plugins: []` — it can only hook collections that exist when
+  it runs (a boot-time warning names anything registered after it).
+- Failure paths are loud in every environment, once per process: `cacheTag` failing
+  (entry materializing untagged), the config being unreachable (bake-in walk skipped),
+  and `revalidateTag` no-oping outside a request scope all `console.error`/`warn` — a
+  production jobs runner silently not revalidating is the one thing this plugin refuses
+  to be quiet about.
+- With `observe: true` forced on in production, the map endpoints additionally require an
+  authenticated Payload user.
+- The cache helpers resolve your Payload config from a `globalThis` stash filled when
+  Payload boots. If a helper runs before anything has called `getPayload()` in that
+  process, add `'@pro-laico/payload-revalidate'` to `transpilePackages`.
+- A draft save **over a published doc** is indistinguishable from an unpublish in the
+  hook signature, so both lanes bust — a harmless over-bust that keeps unpublish correct.
+- Collections without a slug field get no alias tag — id-keyed reads only.
+- The bake-in walk is capped (`walk.maxTags`, default 64; Next allows 128 tags/entry);
+  capped reads are flagged in the map.
+- Bare `posts` list tags bust on membership only — an unscoped `cacheIds` read that
+  depends on sort/filter fields should declare a scope instead.

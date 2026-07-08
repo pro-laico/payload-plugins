@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { formatSVGHook } from '../hooks/formatSVG'
 import { defaultAdminAccess, defaultReadAccess } from '../lib/defaultAccess'
 import { mergeHooks } from '../lib/mergeHooks'
+import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 import type { IconCollectionOverrides } from '../types'
 
 /** The default slug for the icon collection. */
@@ -32,6 +33,9 @@ export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig =>
       delete: access?.delete ?? defaultAdminAccess,
     },
     admin: { group: adminGroup, useAsTitle: 'filename', defaultColumns: ['filename', 'svgString', 'filesize', 'updatedAt'] },
+    // Data-only marker for @pro-laico/payload-revalidate (no dependency): its hooks bust
+    // the shared icons tag on every icon write, matching the tag `getIconSvg` applies.
+    custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },
     // Payload blocks SVG uploads by default (they're on its restricted-types list). This is an
     // SVG-only collection and `formatSVGHook` sanitizes every file (scripts / on* handlers /
     // javascript: URLs stripped) before storage, so we opt in. `mimeTypes` still scopes uploads

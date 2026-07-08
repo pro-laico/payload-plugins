@@ -8,7 +8,9 @@ const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Pa
 const run = (svg: string) => formatSvg({ filename: 'icon.svg' }, Buffer.from(svg), logger)
 
 describe('formatSvg', () => {
-  it('optimizes a valid SVG, themes it with currentColor, and reports the reduction', async () => {
+  // 20s: the first test pays svgo's cold import, which starves under a full parallel
+  // turbo run (15 vitest processes at once) — alone it finishes in well under a second.
+  it('optimizes a valid SVG, themes it with currentColor, and reports the reduction', { timeout: 20_000 }, async () => {
     const dirty = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="#ff0000">
       <path d="M10 14 L30 14 L20 34 Z" fill="#ff0000"/>
     </svg>`

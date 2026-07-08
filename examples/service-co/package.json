@@ -27,6 +27,7 @@
     "@pro-laico/payload-icons": "workspace:*",
     "@pro-laico/payload-images": "workspace:*",
     "@pro-laico/payload-mux": "workspace:*",
+    "@pro-laico/payload-revalidate": "workspace:*",
     "@pro-laico/payload-seed": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

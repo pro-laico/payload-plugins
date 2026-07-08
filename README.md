@@ -11,6 +11,7 @@ Composable [Payload CMS](https://payloadcms.com/) plugins published under the `@
 | [`@pro-laico/payload-fonts`](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts) | Custom fonts subset to served WOFF2s. |
 | [`@pro-laico/payload-icons`](https://payload-plugins.prolaico.com/docs/plugins/payload-icons) | Optimized, sanitized SVG icons. |
 | [`@pro-laico/payload-mux`](https://payload-plugins.prolaico.com/docs/plugins/payload-mux) | Mux Video collection. |
+| [`@pro-laico/payload-revalidate`](https://payload-plugins.prolaico.com/docs/plugins/payload-revalidate) | Surgical tag-based Next.js cache revalidation, with a dependency map. |
 | [`@pro-laico/payload-dev-tools`](https://payload-plugins.prolaico.com/docs/plugins/payload-dev-tools) | Dev toolbar, `/dev` pages, and an app snapshot for AI agents. |
 
 ## Development

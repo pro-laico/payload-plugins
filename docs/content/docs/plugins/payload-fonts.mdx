@@ -436,6 +436,12 @@ How a `fontSet` change reaches the browser depends on the serving path, by desig
   (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches
   the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface.
 
+Running [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate)? Same story — tag-based
+busting can't reach build-baked fonts, so there's deliberately no integration to configure. The
+derived `fontOriginal` / `fontOptimized` collections ship `custom: { revalidate: false }`, so the
+`Font` save hook's derived writes never fire bust events; `font` and the `fontSet` global keep the
+standard auto-attached hooks in case you cache reads of them (e.g. a font picker UI).
+
 ## Seeding
 
 `fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
 import type { DevSnapshot } from '../lib/snapshot'
 import { FontSpecimen, IconSetSwitcher } from './client'
+import { RevalidatePanel, type RevalidateInspection } from './revalidatePanel'
 import { facesToStyles, type OptimizedFace } from './specimen'
 
 /** `/dev/icons` — every set as a switcher button (activating one re-skins the site), the active
@@ -248,6 +249,20 @@ export async function ImagesView({
       </p>
     </>
   )
+}
+
+/** `/dev/revalidate` — the dependency map, rendered by the tabbed client panel (Explore /
+ *  Map / Reads / Events). All data comes live off payload-revalidate's inspection slot,
+ *  read here (server side, structural — no import) and passed down as plain props. */
+export function RevalidateView({ snapshot }: { snapshot: DevSnapshot }) {
+  const meta = snapshot.revalidate
+  const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
+    | (() => RevalidateInspection)
+    | undefined
+  const data = inspect?.()
+  if (!meta || !data) return <p className="pdtp-muted">payload-revalidate isn't active in this process.</p>
+
+  return <RevalidatePanel data={data} endpointPath={meta.endpointPath} />
 }
 
 const formatDuration = (seconds?: number | null): string => {

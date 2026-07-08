@@ -3,7 +3,7 @@ import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolb
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import type { Metadata } from 'next'
-import type { ReactNode } from 'react'
+import { type ReactNode, Suspense } from 'react'
 import definitionFonts from '@/app/definition'
 import { SiteFooter } from '@/components/SiteFooter'
 import { SiteHeader } from '@/components/SiteHeader'
@@ -22,23 +22,36 @@ export const metadata: Metadata = {
 //     `extractFonts` puts their classes on <html>.
 //   • Development — <DevFonts /> reads the active selection from Payload and inlines the matching
 //     @font-face + `--font-set*` vars at runtime, so a seed/edit shows on refresh with no build.
-export default async function FrontendLayout({ children }: { children: ReactNode }) {
-  // Dev-only chrome swap: a header/footer-kind test selected in the dev toolbar replaces the real
-  // chrome site-wide until reset. In production this returns the real components untouched.
-  const { header, footer } = await resolveDevChrome({ tests: devTests, header: <SiteHeader />, footer: <SiteFooter /> })
-
+//
+// Cache Components: DevFonts (a runtime Payload read in dev) and the chrome slots (resolveDevChrome
+// reads cookies in dev; the footer resolves icons at request time) are dynamic, so each renders
+// inside its own Suspense boundary while the rest of the shell stays static.
+export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
       <head>
-        <DevFonts config={config} definition={definitionFonts} />
+        <Suspense fallback={null}>
+          <DevFonts config={config} definition={definitionFonts} />
+        </Suspense>
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        {header}
+        <Suspense fallback={<div className="h-16 border-b border-border/70" />}>
+          <Chrome slot="header" />
+        </Suspense>
         <main>{children}</main>
-        {footer}
+        <Suspense fallback={null}>
+          <Chrome slot="footer" />
+        </Suspense>
         {/* Dev-only (renders null in production): the floating dev toolbar + test harness. */}
         <DevToolbar tests={devTests} links={devLinks} />
       </body>
     </html>
   )
+}
+
+/** Dev-only chrome swap: a header/footer-kind test selected in the dev toolbar replaces the real
+ *  chrome site-wide until reset. In production this returns the real components untouched. */
+async function Chrome({ slot }: { slot: 'header' | 'footer' }) {
+  const { header, footer } = await resolveDevChrome({ tests: devTests, header: <SiteHeader />, footer: <SiteFooter /> })
+  return slot === 'header' ? header : footer
 }

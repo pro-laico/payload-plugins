@@ -362,9 +362,29 @@ and write full metadata into the doc, so those videos play straight away whateve
 
 The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache, and some writes (the
 `video.asset.ready` / `deleted` webhook especially) land outside the request that rendered your page.
-Handle revalidation yourself with a Payload `afterChange` / `afterDelete` hook on `mux-video`: it fires
-for webhook writes, admin saves, and server-side ingest alike, so it's the one place to call
-`revalidateTag` / `revalidatePath` for the pages that embed videos.
+
+With [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) installed there's nothing
+to wire: its auto-attached hooks cover `mux-video` like any collection, and the webhook writes go
+through `payload.update`, so they fire the same hooks as admin saves and server-side ingest. Fetch
+the video doc through an id-keyed `cacheDoc` getter and derive the playback URLs from it —
+
+```ts
+import { cacheDoc, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+
+export async function getVideo(id: string | number) {
+  'use cache'
+  const payload = await getPayloadClient()
+  return cacheDoc(await payload.findByID({ collection: 'mux-video', id, depth: 0, disableErrors: true }), 'mux-video')
+}
+```
+
+— and a page showing "processing" heals itself: the `video.asset.ready` webhook busts
+`mux-video:{id}` the moment Mux finishes, so the next request re-materializes exactly that entry
+with the playback ids populated.
+
+Without the revalidate plugin, handle it yourself with a Payload `afterChange` / `afterDelete`
+hook on `mux-video`: it fires for webhook writes, admin saves, and server-side ingest alike, so
+it's the one place to call `revalidateTag` / `revalidatePath` for the pages that embed videos.
 
 ## Seeding
 

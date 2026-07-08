@@ -220,6 +220,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     ...(snapshot?.fonts ? [{ href: `${base}/fonts`, title: 'Fonts' }] : []),
     ...(snapshot?.images ? [{ href: `${base}/images`, title: 'Images' }] : []),
     ...(snapshot?.mux ? [{ href: `${base}/mux`, title: 'Mux' }] : []),
+    ...(snapshot?.revalidate ? [{ href: `${base}/revalidate`, title: 'Revalidate' }] : []),
     ...links,
     { href: snapshot?.adminRoute ?? '/admin', title: 'Payload admin' },
     { href: 'https://payload-plugins.prolaico.com/docs', title: 'Plugin docs ↗' },
@@ -364,6 +365,19 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                             MUX_TOKEN_ID / MUX_TOKEN_SECRET not set
                           </p>
                         ) : null}
+                      </div>
+                    ) : null}
+
+                    {snapshot.revalidate ? (
+                      <div className="pdt-card">
+                        <div className="pdt-card-head">
+                          <span className="pdt-card-title">Revalidate</span>
+                          <span className="pdt-kind">{snapshot.revalidate.edges} edges</span>
+                        </div>
+                        <p className="pdt-small" style={{ margin: 0 }}>
+                          {snapshot.revalidate.reads} reads · {snapshot.revalidate.events} events
+                          {!snapshot.revalidate.observing ? <span className="pdt-warn"> · not observing</span> : null}
+                        </p>
                       </div>
                     ) : null}
                   </>

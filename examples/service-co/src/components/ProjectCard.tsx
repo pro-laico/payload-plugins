@@ -1,10 +1,15 @@
 import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import Link from 'next/link'
-import { asDoc, type MediaImage, type Project } from '@/lib/types'
+import { getImage, getProject } from '@/lib/data'
 
-/** A project tile for the work grid and the home page — cover photo (focal-aware crop) + meta. */
-export function ProjectCard({ project, priority = false }: { project: Project; priority?: boolean }) {
-  const cover = asDoc<MediaImage>(project.coverImage)
+/** A project tile for the work grid and the home page — cover photo (focal-aware crop) + meta.
+ *  Takes the project's ID and self-fetches through the id-keyed getters (the atomic model): the
+ *  card renders from the project's own cache entry, the cover from the image's — so editing a
+ *  title re-materializes one small entry, and an alt/crop edit only the image's. */
+export async function ProjectCard({ id, priority = false }: { id: string | number; priority?: boolean }) {
+  const project = await getProject(id)
+  if (!project) return null
+  const cover = project.coverImage != null ? await getImage(project.coverImage) : null
   return (
     <Link href={`/work/${project.slug}`} className="group block">
       <div className="overflow-hidden rounded-2xl border border-border bg-muted">

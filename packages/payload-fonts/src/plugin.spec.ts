@@ -12,6 +12,15 @@ describe('fontsPlugin (unit)', () => {
     expect(slugs).toEqual(expect.arrayContaining(['font', 'fontOriginal', 'fontOptimized']))
   })
 
+  it('opts the derived collections out of payload-revalidate (fonts are build-baked)', () => {
+    const collections = apply(fontsPlugin()).collections ?? []
+    for (const slug of ['fontOriginal', 'fontOptimized']) {
+      expect(collections.find((c) => c.slug === slug)?.custom?.revalidate, slug).toBe(false)
+    }
+    // The editor-facing typeface collection keeps the standard auto-attached hooks.
+    expect(collections.find((c) => c.slug === 'font')?.custom?.revalidate).toBeUndefined()
+  })
+
   it('puts the typeface slots on `font`', () => {
     const font = (apply(fontsPlugin()).collections ?? []).find((c) => c.slug === 'font')
     const names = (font?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))

@@ -1,4 +1,5 @@
 import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { notifyAfterSeed } from '../listeners'
 import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
 import { file, isFileToken, isRef, ref } from '../refs'
 import type { SeedAssetMarker, SeedDefinition, SeedDisabledMarker } from '../types'
@@ -35,7 +36,9 @@ async function describeFailedDoc(
   id: string | number,
 ): Promise<string> {
   try {
-    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, overrideAccess: true, depth: 0 })) as Record<
+    // Through `unknown`: in an app context findByID returns the app's generated union, which
+    // needn't overlap with a plain record (e.g. PayloadMigration has no index signature).
+    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, overrideAccess: true, depth: 0 })) as unknown as Record<
       string,
       unknown
     >
@@ -52,6 +55,10 @@ async function describeFailedDoc(
 export interface SeedResult {
   /** Created doc counts keyed by collection slug. */
   created: Record<string, number>
+  /** Collection slugs the run touched — cleared and reseeded, even when zero records were created. */
+  collections: string[]
+  /** Global slugs the run seeded. */
+  globals: string[]
   /** The computed topological create order (doc node ids, `collection:_key`). */
   order: string[]
   /** Fields deferred to break a `ref` cycle: created null, then set in a second pass. */
@@ -392,7 +399,16 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   }
 
   payload.logger.info('[payload-seed] seed complete.')
-  return { created, order, deferred, skipped }
+  const result: SeedResult = {
+    created,
+    collections: model.collections.map((c) => c.slug),
+    globals: model.globals.map((g) => g.slug),
+    order,
+    deferred,
+    skipped,
+  }
+  await notifyAfterSeed(payload, req, result)
+  return result
 }
 
 /**

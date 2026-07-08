@@ -1,7 +1,7 @@
 # service-co
 
 A complete example site — **Meridian**, a fictional design-build studio — built on Payload CMS +
-Next.js that uses **all five `@pro-laico/*` plugins at once**. It's the broadest test app in the
+Next.js that uses **all six `@pro-laico/*` plugins at once**. It's the broadest test app in the
 repo: where each `*-sandbox` exercises one plugin in isolation, this wires them together the way a
 real project would, and doubles as an easy way to eyeball several plugins on one screen.
 
@@ -18,6 +18,7 @@ install, seed, and it works as-is. Mux is the one optional add-on (see below).
 | [`payload-fonts`](../../packages/payload-fonts) | The brand typography — a display face for the wordmark/hero, a serif for headings, a sans for body. Applied as `--font-set*` CSS variables (via `<DevFonts>` in dev, `next/font` in prod). |
 | [`payload-mux`](../../packages/payload-mux) | An **optional** showreel + per-project video. Credential-gated: with `MUX_*` env vars the seed ingests a clip and the home hero / project pages play it; without them, those sections are simply skipped. |
 | [`payload-seed`](../../packages/payload-seed) | Fills every collection and global above from `src/seed/`, resolving all cross-references (`ref()`) and attaching upload files (`file()`) — the same data the admin **Seed your database** button creates. |
+| [`payload-revalidate`](../../packages/payload-revalidate) | Surgical cache revalidation (Next 16 Cache Components). The getters in `src/lib/data.ts` follow the atomic model — id-lists (`cacheIds`), id-keyed doc entries (`cacheDoc`, depth 0), the global (`cacheGlobal`) — and the plugin's field-driven hooks bust exactly the entries an admin edit touches. Watch it live at [`/dev/revalidate`](http://localhost:3060/dev/revalidate). |
 
 ## Content model
 

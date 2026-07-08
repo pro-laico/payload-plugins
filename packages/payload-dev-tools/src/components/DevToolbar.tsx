@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { type Test, toTestMeta } from '../harness'
 import { type DevLink, DevToolbarClient } from './DevToolbarClient'
 import { PDT_CSS } from './styles'
@@ -33,7 +34,12 @@ export function DevToolbar({ tests = [], links = [], enabled }: DevToolbarProps)
     <>
       {/* dangerouslySetInnerHTML: our own static CSS — React would escape selector characters as a text child */}
       <style dangerouslySetInnerHTML={{ __html: PDT_CSS }} />
-      <DevToolbarClient tests={toTestMeta(tests)} links={links} />
+      {/* Suspense: the client panel reads the pathname (request-bound), which under Cache
+          Components (cacheComponents: true) must stream inside a boundary — without it every
+          page hosting the toolbar errors as a blocking route. */}
+      <Suspense fallback={null}>
+        <DevToolbarClient tests={toTestMeta(tests)} links={links} />
+      </Suspense>
     </>
   )
 }
