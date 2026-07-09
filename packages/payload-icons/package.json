@@ -1,6 +1,6 @@
 {
   "name": "@pro-laico/payload-icons",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SVG icons for Payload CMS: an Icon upload collection that optimizes and sanitizes SVGs on save (svgo + viewBox tightening + currentColor theming), a drop-in <Icon name> server component that fetches and inlines the SVG, and one-line declarative seeding via @pro-laico/payload-seed.",
   "license": "MIT",
   "repository": {

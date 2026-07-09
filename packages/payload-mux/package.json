@@ -1,6 +1,6 @@
 {
   "name": "@pro-laico/payload-mux",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mux Video for Payload CMS: a Videos collection that uploads straight to Mux, signed or public playback, virtual playback/poster/gif URLs, two-way delete, and an admin uploader + list-view previews.",
   "license": "MIT",
   "repository": {

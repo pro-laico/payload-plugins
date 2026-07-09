@@ -7,6 +7,25 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-09
+
+### Added
+
+- `@pro-laico/payload-revalidate` — surgical Next.js cache revalidation for Payload (App
+  Router, Cache Components): auto-attached hooks that bust exactly the tags a change touches
+  (doc tags always, scoped list tags only when a declared field or membership changes, draft
+  saves only the draft lane), atomic `cacheDoc` / `cacheIds` / `cacheGlobal` read helpers
+  that keep references id-keyed and walk fetched values to tag every embedded doc, join-aware
+  membership busts (`{child}:join:{on}:{parentId}`), a schema-derived dependency map at
+  `GET /api/revalidate-map` (rendered by `@pro-laico/payload-dev-tools` at `/dev/revalidate`),
+  and one precise flush at the end of a `@pro-laico/payload-seed` run. Requires `next >= 16`
+  with `cacheComponents: true`. Adds the `revalidate-sandbox` example and a docs page.
+- `payload revalidate-map` — a `@pro-laico/payload-revalidate` CLI (Payload custom bin) that
+  prints a project's cache dependency map — tag vocabulary, per-collection blast radius, and
+  the full reference graph — as Markdown or JSON, straight from the config with no server
+  booted. Handy for a committed `REVALIDATION.md` or as context for an AI working in the repo.
+  Exposed programmatically as `renderRevalidateMap(buildStaticInspection(config))`.
+
 ## [0.1.0] - 2026-07-02
 
 ### Added
