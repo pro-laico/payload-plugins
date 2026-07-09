@@ -48,6 +48,12 @@ describe('revalidatePlugin', () => {
     expect(apply({}, { endpoint: false }).endpoints ?? []).toHaveLength(0)
   })
 
+  it('registers the revalidate-map bin command and preserves existing bin entries', () => {
+    const bin = apply({ bin: [{ key: 'mine', scriptPath: '/mine.js' }] }).bin ?? []
+    expect(bin.map((b) => b.key)).toEqual(['mine', 'revalidate-map'])
+    expect(bin.find((b) => b.key === 'revalidate-map')?.scriptPath).toMatch(/bin[/\\]revalidate-map\.(ts|js)$/)
+  })
+
   it('writes the custom.payloadRevalidate marker and preserves existing custom entries', () => {
     const config = apply({ custom: { other: 1 } })
     expect(config.custom).toMatchObject({ other: 1, payloadRevalidate: { endpointPath: '/api/revalidate-map' } })

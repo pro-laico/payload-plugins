@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { CollectionConfig, Config, GlobalConfig, Plugin } from 'payload'
 
 import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
@@ -14,6 +16,14 @@ import { scanGettersLive } from './scan/live'
 import { registerSeedListener } from './seed/afterSeed'
 import { stashState } from './tags'
 import type { PayloadRevalidateMarker } from './types'
+
+/** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
+ *  own location (so `payload <key>` works both in-workspace and when published). */
+function binScriptPath(name: string): string {
+  const here = fileURLToPath(import.meta.url)
+  const ext = here.endsWith('.ts') ? 'ts' : 'js'
+  return resolve(dirname(here), 'bin', `${name}.${ext}`)
+}
 
 /**
  * Payload plugin that owns Next.js tag-based cache revalidation, surgically:
@@ -144,6 +154,9 @@ export const revalidatePlugin =
       ...config,
       collections,
       globals,
+      // `payload revalidate-map` — dump the dependency map as Markdown/JSON from the config,
+      // no server booted (Payload's CLI loads the config and calls the script with it).
+      bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidate-map') }],
       endpoints: resolved.endpoint ? [...(config.endpoints ?? []), ...createMapEndpoints({ observe: resolved.observe })] : config.endpoints,
       // Data-only discovery marker for decoupled tooling (dev-tools) — see PayloadRevalidateMarker.
       custom: { ...config.custom, payloadRevalidate: marker },
