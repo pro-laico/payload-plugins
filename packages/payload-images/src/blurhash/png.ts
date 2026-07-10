@@ -40,10 +40,9 @@ const rgbPng = (pixels: Uint8Array, width: number, height: number): Buffer => {
   const view = new DataView(ihdr.buffer)
   view.setUint32(0, width)
   view.setUint32(4, height)
-  ihdr[8] = 8 // bit depth
-  ihdr[9] = 2 // color type: truecolor RGB
+  ihdr[8] = 8
+  ihdr[9] = 2
 
-  // One filter byte (0 = None) per scanline, then the raw RGB bytes.
   const raw = new Uint8Array(height * (1 + width * 3))
   for (let y = 0; y < height; y++) raw.set(pixels.subarray(y * width * 3, (y + 1) * width * 3), y * (1 + width * 3) + 1)
 

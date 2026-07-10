@@ -54,7 +54,7 @@ export const isAllowedFetchTarget = (target: URL, trusted: URL | null): boolean 
 
 /** Resolve a collection's on-disk upload directory (absolute). */
 export const resolveStaticDir = (payload: Payload, slug: string): string => {
-  const collections = payload.collections as Record<string, { config?: { upload?: { staticDir?: string } } }>
+  const collections = payload.collections as Record<string, { config?: { upload?: { staticDir?: string } } }> //TODO: replace `as` cast with proper typing
   const dir = collections?.[slug]?.config?.upload?.staticDir
   const base = dir?.length ? dir : slug
   return path.isAbsolute(base) ? base : path.resolve(process.cwd(), base)
@@ -68,7 +68,7 @@ export const resolveStaticDir = (payload: Payload, slug: string): string => {
  * its unauthenticated request 403s and every variant read becomes a cache miss.)
  */
 const readViaStorageHandlers = async (payload: Payload, slug: string, doc: UploadDocLike): Promise<Buffer | null> => {
-  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }>
+  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }> //TODO: replace `as` cast with proper typing
   const handlers = collections?.[slug]?.config?.upload?.handlers
   if (!handlers?.length || !doc.filename) return null
   try {
@@ -77,9 +77,7 @@ const readViaStorageHandlers = async (payload: Payload, slug: string, doc: Uploa
       const res = await handler(req, { doc, params: { collection: slug, filename: doc.filename, prefix: doc.prefix ?? undefined } })
       if (res instanceof Response) return res.ok ? Buffer.from(await res.arrayBuffer()) : null
     }
-  } catch {
-    // fall through to the URL fetch
-  }
+  } catch {}
   return null
 }
 

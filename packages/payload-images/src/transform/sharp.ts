@@ -5,10 +5,10 @@
  */
 import type { Sharp } from 'sharp'
 
-import { coverCropGeometry, cropRegion, fitWithinSource, type HotspotOpts, hotspotWindow } from './geometry'
+import { loadSharp } from './sharpInstance'
 import { withTransformLimit } from './limit'
 import { type Fit, mimeForFormat, type OutputFormat } from './params'
-import { loadSharp } from './sharpInstance'
+import { coverCropGeometry, cropRegion, fitWithinSource, type HotspotOpts, hotspotWindow } from './geometry'
 
 export { coverCropGeometry, coverObjectPosition, fitWithinSource } from './geometry'
 export type { CropGeometry } from './geometry'
@@ -47,8 +47,6 @@ const encode = (pipeline: Sharp, format: OutputFormat, quality: number): Sharp =
     case 'png':
       return pipeline.png()
     default:
-      // JPEG has no alpha channel — composite transparent sources (logos, contain letterboxing)
-      // onto white instead of Sharp's default black.
       return pipeline.flatten({ background: '#ffffff' }).jpeg({ quality, mozjpeg: true })
   }
 }
@@ -73,15 +71,11 @@ export const transformImage = (src: Buffer, input: TransformInput): Promise<Tran
       focalY: input.focalY ?? input.hotspot?.focalY,
     }
     if (input.fit === 'cover' && input.w != null && input.h != null && sw > 0 && sh > 0) {
-      // No upscaling, even zoomed: the output is capped to the WINDOW's pixels, so a tight
-      // hotspot serves a smaller image (CSS scales it) rather than inventing resolution.
       const win = hotspotWindow(sw, sh, input.w / input.h, hotspot)
       const { w: tw, h: th } = fitWithinSource(input.w, input.h, win.w, win.h)
       const g = coverCropGeometry(sw, sh, tw, th, input.focalX ?? 50, input.focalY ?? 50, hotspot)
       pipeline = pipeline.resize(g.resizeWidth, g.resizeHeight).extract({ left: g.left, top: g.top, width: g.width, height: g.height })
     } else {
-      // Non-cover fits honor the stored crop by pre-extracting the kept region (the hotspot
-      // zoom only applies to cover — 'contain' et al are whole-region fits by definition).
       const region = cropRegion(sw, sh, hotspot)
       if (sw > 0 && sh > 0 && (region.w < sw || region.h < sh)) {
         pipeline = pipeline.extract({
@@ -91,8 +85,6 @@ export const transformImage = (src: Buffer, input: TransformInput): Promise<Tran
           height: Math.max(1, Math.round(region.h)),
         })
       }
-      // Transparent padding: 'contain' letterboxes when the box aspect differs from the source,
-      // and Sharp's default pad color is opaque black.
       pipeline = pipeline.resize({
         width: input.w,
         height: input.h,

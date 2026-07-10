@@ -120,16 +120,12 @@ export const decodeToLinearGrid = (
   height: number,
   window: { x0: number; y0: number; w: number; h: number } = { x0: 0, y0: 0, w: 1, h: 1 },
 ): LinearGrid => {
-  // Precomputed separable basis: cosX[i][s] = cos(πi·(x0 + w·(s+0.5)/W)), same for Y.
   const cosX = Array.from({ length: cx }, (_, i) =>
     Array.from({ length: width }, (_, s) => Math.cos(Math.PI * i * (window.x0 + (window.w * (s + 0.5)) / width))),
   )
   const cosY = Array.from({ length: cy }, (_, j) =>
     Array.from({ length: height }, (_, t) => Math.cos(Math.PI * j * (window.y0 + (window.h * (t + 0.5)) / height))),
   )
-  // Separable evaluation (two passes): rows[t][i] = Σⱼ coeffs[j][i]·cosY[j][t], then
-  // out[t][s] = Σᵢ rows[t][i]·cosX[i][s] — O(H·cy·cx + H·W·cx) instead of O(H·W·cx·cy),
-  // which is what makes the extended high-component tiers renderable in milliseconds.
   const grid: LinearGrid = []
   const rowCoef = new Float64Array(cx * 3)
   for (let t = 0; t < height; t++) {
@@ -181,9 +177,6 @@ export const encodeLinearGrid = (grid: LinearGrid, cx: number, cy: number, opts:
   const width = grid[0]!.length
   const cosX = Array.from({ length: cx }, (_, i) => Array.from({ length: width }, (_, s) => Math.cos((Math.PI * i * (s + 0.5)) / width)))
   const cosY = Array.from({ length: cy }, (_, j) => Array.from({ length: height }, (_, t) => Math.cos((Math.PI * j * (t + 0.5)) / height)))
-  // Separable projection (two passes): colSum[j][s] = Σₜ grid[t][s]·cosY[j][t], then
-  // coeffs[j][i] = norm/(W·H) · Σₛ colSum[j][s]·cosX[i][s] — O(cy·H·W + cy·cx·W) instead
-  // of O(cy·cx·H·W), making 64×64-component encodes take milliseconds, not seconds.
   const colSum = new Float64Array(cy * width * 3)
   for (let t = 0; t < height; t++) {
     const row = grid[t]!

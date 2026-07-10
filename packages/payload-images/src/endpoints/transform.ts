@@ -11,11 +11,14 @@
  */
 import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 
-import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
+import { routeId } from './routeId'
+import type { UploadDocLike } from '../transform/source'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { createSingleFlight } from '../transform/coalesce'
-import { type GenBytes, getOrCreateVariantBytes } from '../transform/getVariantBytes'
 import { setTransformConcurrency } from '../transform/limit'
+import { setSharpConcurrency } from '../transform/sharpInstance'
+import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
+import { type GenBytes, getOrCreateVariantBytes } from '../transform/getVariantBytes'
 import {
   DEFAULT_CONSTRAINTS,
   type Format,
@@ -24,9 +27,6 @@ import {
   parseTransformParams,
   type TransformConstraints,
 } from '../transform/params'
-import { setSharpConcurrency } from '../transform/sharpInstance'
-import type { UploadDocLike } from '../transform/source'
-import { routeId } from './routeId'
 
 export interface TransformEndpointConfig extends Partial<TransformConstraints> {
   /** Source image collection slug. Default `images`. */
@@ -55,7 +55,7 @@ type SourceDoc = UploadDocLike & {
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const PRIVATE_IMMUTABLE = 'private, max-age=31536000, immutable'
 
-const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit
+const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit //TODO: replace `as` cast with proper typing
 
 const resolveConstraints = (cfg: TransformEndpointConfig): TransformConstraints => ({
   maxDimension: cfg.maxDimension ?? DEFAULT_CONSTRAINTS.maxDimension,
@@ -85,15 +85,13 @@ const buildHeaders = (mime: string, key: string, isAuto: boolean, cdn: boolean, 
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
 export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endpoint => {
   const path = '/img'
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug
-  const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
+  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //TODO: replace `as` cast with proper typing
   const cdn = cfg.cdnCacheControl !== false
   const constraints = resolveConstraints(cfg)
   setTransformConcurrency(cfg.maxConcurrency)
   setSharpConcurrency(cfg.sharpConcurrency)
 
-  // Per-endpoint single-flight maps: dedupe the source read across one <img>'s srcset
-  // widths, and coalesce variant generation under a thundering herd. See ./coalesce.
   const sourceFlight = createSingleFlight<string, SourceDoc | null>()
   const genFlight = createSingleFlight<string, GenBytes>()
 
@@ -103,12 +101,6 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
     handler: async (req: PayloadRequest): Promise<Response> => {
       const { payload } = req
 
-      //NOTE: This origin is ONLY used to self-fetch an original from *relative-URL* storage.
-      //NOTE: Absolute-URL adapters (Vercel Blob, S3-public) fetch doc.url directly, and local disk
-      //NOTE: reads the filesystem — both paths ignore `base` entirely. The chain self-resolves per
-      //NOTE: environment (serverURL -> env -> req.origin -> localhost), so it works zero-config and
-      //NOTE: a missing serverURL is NOT a general 502 risk. The fallbacks are intentional — do not
-      //NOTE: "harden" this by requiring serverURL; relative-URL storage is the only case that needs it.
       const base = payload.config.serverURL || getServerSideURL()
 
       const id = routeId(req)
@@ -120,13 +112,11 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
 
       const readSource = async (user: PayloadRequest['user']): Promise<SourceDoc | null> => {
         try {
-          return (await payload.findByID({ collection: sourceSlug, id, depth: 0, overrideAccess: false, user })) as unknown as SourceDoc
+          return (await payload.findByID({ collection: sourceSlug, id, depth: 0, overrideAccess: false, user })) as unknown as SourceDoc //TODO: replace `as` cast with proper typing
         } catch {
           return null
         }
       }
-      // The anonymous read is shareable across the concurrent srcset requests for this
-      // id, so coalesce it; the per-user fallback (private sources) stays uncoalesced.
       let source = await sourceFlight(id, () => readSource(null))
       const isPublic = source != null
       if (!source && req.user) source = await readSource(req.user)
@@ -136,7 +126,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
       const isAuto = p.fmt === 'auto'
       const format: OutputFormat = isAuto
         ? negotiateFormat(req.headers.get('accept'), constraints.formats, constraints.preferAvif)
-        : (p.fmt as Exclude<Format, 'auto'>)
+        : (p.fmt as Exclude<Format, 'auto'>) //TODO: replace `as` cast with proper typing
 
       const result = await getOrCreateVariantBytes({
         payload,

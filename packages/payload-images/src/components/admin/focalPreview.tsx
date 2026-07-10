@@ -4,9 +4,11 @@ import { useDocumentInfo, useField, useForm, useUploadEdits } from '@payloadcms/
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { decodeToLinearGrid, linearToSrgb, type ParsedBlurhash } from '../../blurhash/codec'
+import { coverCropWindow } from '../../blurhash/window'
 import { projectCoefficients } from '../../blurhash/cropCoefficients'
+import { clamp, type HotspotOpts, windowCss } from '../../transform/geometry'
 import { encodeBlurhashFromImageSource } from '../../blurhash/encodeFromCanvas'
+import { decodeToLinearGrid, linearToSrgb, type ParsedBlurhash } from '../../blurhash/codec'
 import {
   BLURHASH_QUALITIES,
   type BlurhashQuality,
@@ -15,8 +17,6 @@ import {
   WEBP_QUALITIES,
   type WebpQuality,
 } from '../../blurhash/qualities'
-import { coverCropWindow } from '../../blurhash/window'
-import { clamp, type HotspotOpts, windowCss } from '../../transform/geometry'
 
 /**
  * The image's art-direction editor: an inline focal/hotspot/crop picker + live ratio preview
@@ -47,11 +47,9 @@ const DEFAULT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9']
 
 const clampPct = (n: number): number => clamp(n, 0, 100)
 
-// The tiers come from the shared module so this preview can never drift from what the
-// upload hook stores and the croppedBlurHash virtual field serves.
 const QUALITIES = BLURHASH_QUALITIES
 type Quality = PlaceholderQuality
-const TIER_OPTIONS = [...Object.keys(BLURHASH_QUALITIES), ...Object.keys(WEBP_QUALITIES)] as Quality[]
+const TIER_OPTIONS = [...Object.keys(BLURHASH_QUALITIES), ...Object.keys(WEBP_QUALITIES)] as Quality[] //TODO: replace `as` cast with proper typing
 const tierLabel = (q: Quality): string =>
   isWebpQuality(q) ? `${q} · webp ${WEBP_QUALITIES[q]}px` : `${q} · ${BLURHASH_QUALITIES[q][0]}×${BLURHASH_QUALITIES[q][1]}`
 
@@ -216,7 +214,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
   const { uploadEdits, updateUploadEdits } = useUploadEdits()
   const { setModified } = useForm()
 
-  // The stored hotspot layers (our own hidden number fields).
   const focalSizeField = useField<number>({ path: 'focalSize' })
   const cropLeftField = useField<number>({ path: 'cropLeft' })
   const cropTopField = useField<number>({ path: 'cropTop' })
@@ -253,8 +250,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     typeof data?.width === 'number' && typeof data?.height === 'number' ? { w: data.width, h: data.height } : null,
   )
 
-  // Client-side blurhash of whatever is displayed (saved URL or just-selected file) — the
-  // placeholder tiles derive every crop/quality from this one 9×9 hash, live, no server.
   const [hash, setHash] = useState<ParsedBlurhash | null>(null)
   const [mode, setMode] = useState<DisplayMode>('normal')
   const [quality, setQuality] = useState<Quality>('sm')
@@ -270,14 +265,13 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
         if (!cancelled) setHash(parsed)
       })
       .catch(() => {
-        if (!cancelled) setHash(null) // CORS-tainted canvas or load failure — preview simply hides
+        if (!cancelled) setHash(null)
       })
     return () => {
       cancelled = true
     }
   }, [src])
 
-  // Close the inspect dialog on Escape.
   useEffect(() => {
     if (!dialogRatio) return
     const onKey = (e: KeyboardEvent): void => {
@@ -289,13 +283,10 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
 
   const stageRef = useRef<HTMLDivElement>(null)
   const dragMode = useRef<DragMode>(null)
-  // Where the size handle sits on the circle's circumference — it follows the pointer while
-  // resizing (free-floating), starting at the bottom-right since people drag diagonally.
   const [handleAngle, setHandleAngle] = useState(Math.PI / 4)
 
   const setCrop = useCallback(
     (side: 'nw' | 'se', xPct: number, yPct: number) => {
-      // Keep ≥10% of the image on each axis, mirroring the geometry's own guard.
       if (side === 'nw') {
         cropLeftField.setValue(Math.round(clamp(xPct, 0, 90 - cropRight)))
         cropTopField.setValue(Math.round(clamp(yPct, 0, 90 - cropBottom)))
@@ -324,9 +315,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
         return
       }
       if (dm === 'size') {
-        // Circle diameter from pointer distance to the focal center, as % of the crop
-        // region's shorter side (matching the geometry's definition of focalSize). The
-        // handle itself follows the pointer around the circumference.
         const fxPx = (focalX / 100) * rect.width
         const fyPx = (focalY / 100) * rect.height
         const dx = clientX - rect.left - fxPx
@@ -340,7 +328,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
         setModified(true)
         return
       }
-      // Focal move, clamped into the crop region.
       const x = clamp(xPct, cropLeft, 100 - cropRight)
       const y = clamp(yPct, cropTop, 100 - cropBottom)
       updateUploadEdits({ ...uploadEdits, focalPoint: { x, y } })
@@ -349,14 +336,13 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     [readOnly, uploadEdits, updateUploadEdits, setModified, setCrop, focalX, focalY, focalSizeField, cropLeft, cropTop, cropRight, cropBottom],
   )
 
-  if (!src) {
+  if (!src)
     return (
       <div style={{ marginBottom: '1rem' }}>
         <strong style={{ fontSize: '0.95rem' }}>Focus &amp; crop</strong>
         <p style={note}>Upload an image to set its focus point, hotspot size, and crop.</p>
       </div>
     )
-  }
 
   // Stage-space (percent) hotspot circle: diameter = focalSize% of the crop region's shorter
   // side in DISPLAY px — computed from the stage's aspect via the doc dims when available.
@@ -373,7 +359,7 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     if (readOnly) return
     dragMode.current = m
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
+    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId) //TODO: replace `as` cast with proper typing
     if (m !== 'focal') return
     applyFromEvent(e.clientX, e.clientY)
   }
@@ -382,7 +368,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
   const tileSurface = (r: string): React.ReactElement => {
     const tileAr = parseRatio(r)
     const css = srcDims ? windowCss(srcDims.w, srcDims.h, tileAr, hotspot) : null
-    // Webp tiers preview straight from the image; blurhash tiers need the client-side hash.
     const placeholderReady = srcDims != null && (isWebpQuality(quality) || hash != null)
     const showImage = mode !== 'blurhash' || !placeholderReady
     const showPlaceholder = mode !== 'normal' && placeholderReady && srcDims
@@ -413,8 +398,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
             style={{
               position: 'absolute',
               inset: 0,
-              // Half & half: the placeholder overlays only the right half — same crop,
-              // so the seam lines the two renderings up against each other.
               ...(mode === 'half' ? { clipPath: 'inset(0 0 0 50%)', borderLeft: '1px solid rgba(255,255,255,0.6)' } : null),
             }}
           >
@@ -431,12 +414,21 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
   }
 
   const modeSelect = (
-    <select aria-label="Preview display mode" value={mode} onChange={(e) => setMode(e.target.value as DisplayMode)} style={selectStyle}>
-      {(Object.keys(MODE_LABELS) as DisplayMode[]).map((m) => (
-        <option key={m} value={m} disabled={m !== 'normal' && !srcDims}>
-          {MODE_LABELS[m]}
-        </option>
-      ))}
+    <select
+      aria-label="Preview display mode"
+      value={mode}
+      onChange={(e) => setMode(e.target.value as DisplayMode)} //TODO: replace `as` cast with proper typing
+      style={selectStyle}
+    >
+      {(Object.keys(MODE_LABELS) as DisplayMode[]).map(
+        (
+          m, //TODO: replace `as` cast with proper typing
+        ) => (
+          <option key={m} value={m} disabled={m !== 'normal' && !srcDims}>
+            {MODE_LABELS[m]}
+          </option>
+        ),
+      )}
     </select>
   )
 
@@ -444,7 +436,7 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     <select
       aria-label="Placeholder quality tier"
       value={quality}
-      onChange={(e) => setQuality(e.target.value as Quality)}
+      onChange={(e) => setQuality(e.target.value as Quality)} //TODO: replace `as` cast with proper typing
       disabled={mode === 'normal'}
       style={{ ...selectStyle, ...(mode === 'normal' ? { opacity: 0.45, cursor: 'default' } : null) }}
     >
@@ -499,7 +491,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
           : 'Click to set the focus point · drag the circle’s handle to zoom · drag the corners to crop. Non-destructive: the original file is never modified. Click a preview to inspect it.'}
       </p>
 
-      {/* The stage and the filmstrip fill the panel, so the strip edge-aligns to the image. */}
       <div>
         <div
           ref={stageRef}
@@ -534,7 +525,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
             draggable={false}
           />
 
-          {/* Crop region: the kept rect, dimming everything outside it. */}
           <div
             aria-hidden
             style={{
@@ -550,7 +540,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
             }}
           />
 
-          {/* Hotspot circle + its resize handle. */}
           <span
             aria-hidden
             style={{
@@ -634,8 +623,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
           )}
         </div>
 
-        {/* Filmstrip: flex-grow = aspect ratio ⇒ widths ∝ ratios ⇒ one shared height, and the
-            strip exactly spans the stage width at any container size (no overflow, ever). */}
         <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
           {previewRatios.map((r) => (
             <button
@@ -661,7 +648,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
         </div>
       </div>
 
-      {/* Inspect dialog: the clicked ratio at full size, with the same mode/quality controls. */}
       {dialogRatio && (
         // biome-ignore lint/a11y/useKeyWithClickEvents: Escape is handled globally while open
         // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-close supplements Escape and the ✕ button
@@ -718,7 +704,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
                 position: 'relative',
                 overflow: 'hidden',
                 aspectRatio: String(parseRatio(dialogRatio)),
-                // Tall ratios are height-bound, wide ones width-bound.
                 ...(parseRatio(dialogRatio) >= 1 ? { width: '100%' } : { height: 'min(78vh, 720px)' }),
                 borderRadius: 'var(--style-radius-s, 3px)',
                 border: '1px solid var(--theme-elevation-100)',

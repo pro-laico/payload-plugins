@@ -10,9 +10,9 @@
  * two small basis-overlap matrices and a separable multiply. Exact up to the output
  * truncation + quantization every blurhash pays.
  */
+import type { CropWindow } from './window'
 import type { Coefficient, ParsedBlurhash } from './codec'
 import { encodeCoefficients, parseBlurhash } from './codec'
-import type { CropWindow } from './window'
 
 /** ∫₀¹ cos(α + δ·u) du — the degenerate δ→0 limit is cos(α). */
 const cosIntegral = (alpha: number, delta: number): number =>
@@ -48,7 +48,6 @@ export const projectCoefficients = (parsed: ParsedBlurhash, window: CropWindow, 
   const mx = overlapMatrix(outCx, cx, window.x0, window.w)
   const my = overlapMatrix(outCy, cy, window.y0, window.h)
 
-  // Separable apply: rows first (temp[j][k] = Σᵢ c[j][i]·Mx[k][i]), then columns.
   const temp: Coefficient[][] = Array.from({ length: cy }, (_, j) =>
     Array.from({ length: outCx }, (_, k): Coefficient => {
       let r = 0

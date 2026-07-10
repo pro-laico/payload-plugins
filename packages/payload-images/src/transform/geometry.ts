@@ -59,7 +59,6 @@ export const hotspotWindow = (sw: number, sh: number, targetAr: number, o: Hotsp
   const region = cropRegion(sw, sh, o)
   const a = targetAr > 0 ? targetAr : 1
 
-  // Smallest AR-rect containing the circle (short side = diameter), clamped into the region.
   const d = (clamp(pct(o.focalSize, 100), 5, 100) / 100) * Math.min(region.w, region.h)
   let w = a >= 1 ? d * a : d
   let h = w / a
@@ -111,13 +110,11 @@ export const coverCropGeometry = (
   focalY = 50,
   opts: HotspotOpts = {},
 ): CropGeometry => {
-  const tw = targetW ?? Math.max(1, Math.round(((targetH as number) * sw) / sh))
-  const th = targetH ?? Math.max(1, Math.round(((targetW as number) * sh) / sw))
+  const tw = targetW ?? Math.max(1, Math.round(((targetH as number) * sw) / sh)) //TODO: replace `as` cast with proper typing
+  const th = targetH ?? Math.max(1, Math.round(((targetW as number) * sh) / sw)) //TODO: replace `as` cast with proper typing
   const o: HotspotOpts = { ...opts, focalX: opts.focalX ?? focalX, focalY: opts.focalY ?? focalY }
   const win = hotspotWindow(sw, sh, tw / th, o)
 
-  // Rounding happens in resized space (mirrors the original implementation, so default
-  // opts produce bit-identical geometry).
   const scale = tw / win.w
   const resizeWidth = Math.max(tw, Math.round(sw * scale))
   const resizeHeight = Math.max(th, Math.round(sh * scale))

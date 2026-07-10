@@ -10,9 +10,7 @@ const mergeHooks = <T>(base: T, extra?: T): T => {
   const b = base as unknown as Record<string, unknown[] | undefined>
   const e = extra as unknown as Record<string, unknown[] | undefined>
   const out: Record<string, unknown[]> = { ...b } as Record<string, unknown[]>
-  for (const key of Object.keys(e)) {
-    out[key] = [...(b[key] ?? []), ...(e[key] ?? [])]
-  }
+  for (const key of Object.keys(e)) out[key] = [...(b[key] ?? []), ...(e[key] ?? [])]
   return out as unknown as T
 }
 

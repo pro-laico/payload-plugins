@@ -17,8 +17,8 @@
 import type { SanitizedConfig } from 'payload'
 import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
 
-import { blurhashToPngDataUri } from '../blurhash/png'
 import { stashedConfig } from '../lib/configStash'
+import { blurhashToPngDataUri } from '../blurhash/png'
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
 import {
   type BuildSrcsetOptions,
@@ -32,9 +32,6 @@ import {
   stepWidths,
 } from '../utils/urls'
 
-// Re-export the isomorphic URL builders so this single subpath covers the whole frontend API —
-// `import { ResponsiveImage, getImageUrl } from '@pro-laico/payload-images/components/image'`.
-// (The `utils/urls` subpath stays available for importing the builders without the component.)
 export { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths }
 export type { BuildSrcsetOptions, BuildUrlOptions, Fit, Format, GetImageUrlOptions, ImageResource }
 
@@ -120,7 +117,6 @@ const CSS_OBJECT_FIT: Record<Fit, NonNullable<CSSProperties['objectFit']>> = {
 
 const idOf = (image: ResponsiveImageInput): string => (typeof image === 'object' ? String(image.id ?? '') : String(image ?? ''))
 
-// Once-per-process dev warnings — these failures repeat on every render, so warning each time would flood the console.
 let warnedNoConfig = false
 let warnedBadBlurhash = false
 
@@ -151,14 +147,9 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   const id = idOf(image)
   if (!id) return null
 
-  // Resolve the Payload config once (only the srcset's `pixelStep` comes off it): the explicit
-  // prop, else the globalThis stash the plugin's `onInit` filled (set the moment Payload boots —
-  // no bundler involvement), else the `@payload-config` alias — which only resolves from a
-  // published package when the consumer transpiles it (`transpilePackages`). `as string` keeps TS
-  // from resolving the alias at this package's build. Stays undefined if unreadable (defaults apply).
   let cfg: SanitizedConfig | undefined
   try {
-    cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
+    cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>)) //TODO: replace `as` casts with proper typing
   } catch {
     cfg = undefined
   }
@@ -168,14 +159,12 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
       "[payload-images] <ResponsiveImage> could not resolve the Payload config — the project pixelStep setting is skipped (default step applies). Pass the `config` prop, or add `transpilePackages: ['@pro-laico/payload-images']` to next.config so the `@payload-config` alias resolves.",
     )
   }
-  const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep
+  const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep //TODO: replace `as` cast with proper typing
 
   const doc = typeof image === 'object' ? image : undefined
   const altText = alt ?? doc?.alt ?? ''
   const naturalW = doc?.width ?? undefined
   const naturalH = doc?.height ?? undefined
-  // Warn (dev only) when an aspectRatio was passed but doesn't parse — we silently fall back to the
-  // natural ratio, which is easy to miss; mirrors how Sanity's reference component surfaces this.
   if (!fill && aspectRatio != null && parseAspectRatio(aspectRatio) === undefined && process.env.NODE_ENV !== 'production') {
     console.warn(
       `[payload-images] Invalid aspectRatio ${JSON.stringify(aspectRatio)} — expected "w/h", "w:h", or a positive number. Falling back to the image's natural ratio.`,
@@ -196,10 +185,6 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   }
   const { srcset, src } = buildSrcset(id, opts)
 
-  // The placeholder: `croppedBlurHash` as the read delivered it, painted as the <img>'s own
-  // background — instant, zero network, zero client JS, covered when the real image loads.
-  // A read that declared intent (`req.context.blurhash`) hands over a finished data URI;
-  // a raw hash string (no declared intent) is rendered to an inline PNG here as a fallback.
   let lqip: string | undefined
   const placeholderValue = placeholder !== false ? doc?.croppedBlurHash : undefined
   if (placeholderValue?.startsWith('data:')) lqip = placeholderValue
@@ -244,6 +229,7 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
           : null),
         ...style,
       }}
+      //TODO: replace `as` cast with proper typing
       {...(dataAttributes as ImgHTMLAttributes<HTMLImageElement>)}
     />
   )

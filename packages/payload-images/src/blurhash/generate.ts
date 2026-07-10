@@ -14,11 +14,11 @@
  */
 import type { Sharp } from 'sharp'
 
+import { loadSharp } from '../transform/sharpInstance'
+import { encodeWebpPlaceholder } from './webpPlaceholder'
+import { buildPalette, type ImagePalette } from '../metadata/palette'
 import { encodeCoefficients, encodeLinearGrid, type LinearGrid, srgbToLinear } from './codec'
 import { BLURHASH_QUALITIES, type BlurhashQuality, blurhashFieldName, WEBP_QUALITIES, type WebpQuality, webpFieldName } from './qualities'
-import { encodeWebpPlaceholder } from './webpPlaceholder'
-import { loadSharp } from '../transform/sharpInstance'
-import { buildPalette, type ImagePalette } from '../metadata/palette'
 
 /** Longest sampling edge for the raw grid (blurhash + palette) — comfortably out-resolves
  *  the largest hash tier's 9 components on either axis. */
@@ -39,7 +39,7 @@ export interface ImageMetadataAnalysis {
 
 export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataAnalysis> => {
   const sharp = await loadSharp()
-  const base = sharp(file, { failOn: 'none' }).rotate() // EXIF orientation, same as the transform pipeline
+  const base = sharp(file, { failOn: 'none' }).rotate()
   const meta = await base.metadata()
   const { data: raw, info } = await base
     .clone()
@@ -62,17 +62,18 @@ export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataA
 
   const placeholderFields: Record<string, string> = {}
   for (const quality of Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]) {
+    //TODO: replace `as` cast with proper typing
     const [cx, cy] = BLURHASH_QUALITIES[quality]
     placeholderFields[blurhashFieldName(quality)] = encodeCoefficients(encodeLinearGrid(grid, cx, cy))
   }
-  for (const quality of Object.keys(WEBP_QUALITIES) as WebpQuality[])
+  for (const quality of Object.keys(WEBP_QUALITIES) as WebpQuality[]) //TODO: replace `as` cast with proper typing
     placeholderFields[webpFieldName(quality)] = await encodeWebpPlaceholder(base, WEBP_QUALITIES[quality])
 
   return {
     placeholderFields,
     palette: buildPalette(grid),
     hasAlpha: meta.hasAlpha === true,
-    isOpaque: minAlpha >= 250, // resampling can shave a hair off edge alpha; ~2% tolerance
+    isOpaque: minAlpha >= 250,
     attention: await attentionFocal(base.clone(), sourceDims(meta)),
   }
 }
@@ -92,8 +93,6 @@ const attentionFocal = async (pipeline: Sharp, dims: { w: number; h: number } | 
     const { info } = await pipeline.clone().resize(tw, th, { fit: 'cover', position: 'attention' }).toBuffer({ resolveWithObject: true })
     const { attentionX, attentionY } = info
     if (typeof attentionX !== 'number' || typeof attentionY !== 'number') return undefined
-    // attentionX/Y are relative to the resized image BEFORE extraction — source dims × the
-    // cover scale (reconstructing from cropOffset is wrong: the offset only bounds one side).
     const scale = Math.max(tw / dims.w, th / dims.h)
     const clamp = (v: number): number => Math.max(0, Math.min(100, Math.round(v * 10) / 10))
     return { x: clamp((attentionX / (dims.w * scale)) * 100), y: clamp((attentionY / (dims.h * scale)) * 100) }

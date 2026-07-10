@@ -165,7 +165,6 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
 
   if (w == null && h == null) return { ok: false, error: 'width or height required' }
 
-  // Snap to the dimension grid so the variant space stays finite (anti-DoS); `<= 1` disables.
   if (c.dimensionStep > 1) {
     const snap = (n: number | undefined): number | undefined =>
       n == null ? n : clampInt(Math.round(n / c.dimensionStep) * c.dimensionStep, Math.min(c.dimensionStep, c.maxDimension), c.maxDimension)
@@ -177,8 +176,8 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   const fmtRaw = read(q, 'fmt')
   const qRaw = numeric(read(q, 'q'))
   const quality = qRaw == null ? c.defaultQuality : bucketQuality(qRaw, c.qualityRange)
-  const fit: Fit = FITS.includes(fitRaw as Fit) ? (fitRaw as Fit) : 'cover'
-  const fmt: Format = c.formats.includes(fmtRaw as Format) ? (fmtRaw as Format) : c.defaultFormat
+  const fit: Fit = FITS.includes(fitRaw as Fit) ? (fitRaw as Fit) : 'cover' //TODO: replace `as` cast with proper typing
+  const fmt: Format = c.formats.includes(fmtRaw as Format) ? (fmtRaw as Format) : c.defaultFormat //TODO: replace `as` cast with proper typing
 
   return { ok: true, params: { w, h, fit, q: quality, fmt } }
 }

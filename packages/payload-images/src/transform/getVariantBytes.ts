@@ -6,13 +6,12 @@
  * (source, size, fit, quality, format) variant is generated once.
  */
 import { after } from 'next/server'
-
 import type { CollectionSlug, Payload } from 'payload'
 
 import { variantCacheKey } from '../variants/key'
-import { extForFormat, mimeForFormat, type OutputFormat, type ParsedParams } from './params'
 import { transformImage, type TransformOutput } from './sharp'
 import { readBytes, resolveStaticDir, type UploadDocLike } from './source'
+import { extForFormat, mimeForFormat, type OutputFormat, type ParsedParams } from './params'
 
 /** A resolved source doc: id + where-the-bytes-live + focal/hotspot layers. */
 export type VariantSourceDoc = UploadDocLike & {
@@ -63,11 +62,11 @@ const isDuplicateKeyError = (err: unknown): boolean => {
   let e: unknown = err
   for (let depth = 0; depth < 4 && e; depth++) {
     const msg = e instanceof Error ? e.message : String(e)
-    const code = (e as { code?: unknown })?.code
+    const code = (e as { code?: unknown })?.code //TODO: replace `as` cast with proper typing
     if (/duplicate|unique/i.test(`${msg} ${typeof code === 'string' ? code : ''}`)) return true
-    e = (e as { cause?: unknown })?.cause
+    e = (e as { cause?: unknown })?.cause //TODO: replace `as` cast with proper typing
   }
-  const fieldErrors = (err as { data?: { errors?: Array<{ message?: string; path?: string }> } })?.data?.errors
+  const fieldErrors = (err as { data?: { errors?: Array<{ message?: string; path?: string }> } })?.data?.errors //TODO: replace `as` cast with proper typing
   return Array.isArray(fieldErrors) && fieldErrors.some((f) => f.path === 'cacheKey' || /unique/i.test(f.message ?? ''))
 }
 
@@ -80,9 +79,9 @@ const isForeignKeyError = (err: unknown): boolean => {
   let e: unknown = err
   for (let depth = 0; depth < 4 && e; depth++) {
     const msg = e instanceof Error ? e.message : String(e)
-    const code = (e as { code?: unknown })?.code
+    const code = (e as { code?: unknown })?.code //TODO: replace `as` cast with proper typing
     if (/foreign key/i.test(msg) || /FOREIGNKEY|23503|ER_NO_REFERENCED_ROW/.test(`${typeof code === 'string' ? code : ''}`)) return true
-    e = (e as { cause?: unknown })?.cause
+    e = (e as { cause?: unknown })?.cause //TODO: replace `as` cast with proper typing
   }
   return false
 }
@@ -90,7 +89,7 @@ const isForeignKeyError = (err: unknown): boolean => {
 /** True when Sharp itself failed to load (module missing or native binding broken) — the fix is
  *  the install, not this image, so the generic "transform failed" line alone would mislead. */
 const isSharpLoadError = (err: unknown): boolean => {
-  const s = `${String(err)} ${String((err as { code?: unknown })?.code ?? '')}`
+  const s = `${String(err)} ${String((err as { code?: unknown })?.code ?? '')}` //TODO: replace `as` cast with proper typing
   return /sharp|libvips/i.test(s) && /cannot find module|module_not_found|could not load|native|binding/i.test(s)
 }
 
@@ -109,23 +108,20 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
   const { payload, source: src, params: p, format, sourceSlug, variantSlug, base, maxInputPixels, genFlight } = args
   const key = variantCacheKey(src, p, format)
 
-  // Cache hit → the stored variant's bytes.
   try {
     const hit = await payload.find({
-      collection: variantSlug as CollectionSlug,
+      collection: variantSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
       where: { cacheKey: { equals: key } },
       limit: 1,
       depth: 0,
       overrideAccess: true,
     })
-    const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined
+    const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined //TODO: replace `as` cast with proper typing
     if (variant) {
       const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
       if (bytes) return { ok: true, data: bytes, mimeType: mimeForFormat(format), key }
     }
   } catch (err) {
-    // Fall through to regeneration, but not SILENTLY: a broken variant collection would otherwise
-    // masquerade as a perpetual cache miss — every request re-transforms, with zero signal.
     if (!warnedCacheLookup) {
       warnedCacheLookup = true
       payload.logger.warn({
@@ -138,8 +134,6 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
   const generate = async (): Promise<GenBytes> => {
     const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug })
     if (!original) {
-      // Only the relative-URL path needs an origin to resolve; surface the serverURL hint
-      // just here, when a read has actually failed — not preemptively at boot.
       const relative = !!src.url && !/^https?:\/\//i.test(src.url)
       const hint = relative ? ' — relative-URL storage and the request origin did not resolve; set serverURL in buildConfig' : ''
       payload.logger.warn(`[payload-images] source ${src.id} unreadable (filename=${src.filename ?? 'none'}, url=${src.url ?? 'none'})${hint}`)
@@ -174,10 +168,10 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
     const persist = async (): Promise<void> => {
       try {
         await payload.create({
-          collection: variantSlug as CollectionSlug,
+          collection: variantSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
           file: { data: out.data, mimetype: out.mimeType, name: `${key}.${extForFormat(format)}`, size: out.data.byteLength },
           data: {
-            source: src.id as never,
+            source: src.id as never, //TODO: replace `as` cast with proper typing
             cacheKey: key,
             fit: p.fit,
             format,
@@ -190,7 +184,6 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
         })
       } catch (err) {
         if (isForeignKeyError(err)) {
-          // Source vanished between generation and persist — served the bytes, skip the cache row.
           payload.logger.info(`[payload-images] source ${src.id} was deleted before variant ${key} persisted — skipped.`)
         } else if (!isDuplicateKeyError(err)) {
           payload.logger.warn(`[payload-images] failed to persist variant ${key} for source ${src.id}: ${String(err)}`)

@@ -5,8 +5,8 @@
  * both halves run on the tiny sample grid. Matches what stock blurhash tooling would
  * produce (including its quirky both-axes-AC normalization).
  */
-import { decodeToLinearGrid, encodeCoefficients, encodeLinearGrid, parseBlurhash } from './codec'
 import type { CropWindow } from './window'
+import { decodeToLinearGrid, encodeCoefficients, encodeLinearGrid, parseBlurhash } from './codec'
 
 export interface CropResampleOptions {
   /** Output components. Default: same as the source hash. */

@@ -21,10 +21,7 @@ export const BLURHASH_QUALITIES = {
 } as const satisfies Record<string, readonly [number, number]>
 
 /** Stored full-frame width (px) of each micro-webp placeholder tier. */
-export const WEBP_QUALITIES = {
-  xxl: 32,
-  x3: 64,
-} as const satisfies Record<string, number>
+export const WEBP_QUALITIES = { xxl: 32, x3: 64 } as const satisfies Record<string, number>
 
 export type BlurhashQuality = keyof typeof BLURHASH_QUALITIES
 export type WebpQuality = keyof typeof WEBP_QUALITIES
@@ -46,10 +43,10 @@ export const blurhashFieldName = (q: BlurhashQuality): string => `blurHash${capi
 export const webpFieldName = (q: WebpQuality): string => `placeholder${capitalize(q)}`
 
 /** The five stored blurhash field names, tier order. */
-export const BLURHASH_FIELD_NAMES = (Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]).map(blurhashFieldName)
+export const BLURHASH_FIELD_NAMES = (Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]).map(blurhashFieldName) //TODO: replace `as` cast with proper typing
 
 /** The stored webp placeholder field names, tier order. */
-export const WEBP_FIELD_NAMES = (Object.keys(WEBP_QUALITIES) as WebpQuality[]).map(webpFieldName)
+export const WEBP_FIELD_NAMES = (Object.keys(WEBP_QUALITIES) as WebpQuality[]).map(webpFieldName) //TODO: replace `as` cast with proper typing
 
 /** Every stored placeholder field name (blurhash tiers, then webp tiers). */
 export const PLACEHOLDER_FIELD_NAMES = [...BLURHASH_FIELD_NAMES, ...WEBP_FIELD_NAMES]

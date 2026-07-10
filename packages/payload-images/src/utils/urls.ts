@@ -66,8 +66,6 @@ export const deriveVersion = (src?: VersionSource | null): string | undefined =>
   if (!src) return undefined
   const { filename, focalX, focalY } = src
   if (filename == null && focalX == null && focalY == null) return undefined
-  // Hotspot layers join only when set off their defaults, so untouched docs keep their
-  // pre-hotspot v token (and the immutable URLs already in browser/CDN caches stay valid).
   const hotspot = [src.focalSize ?? 100, src.cropLeft ?? 0, src.cropTop ?? 0, src.cropRight ?? 0, src.cropBottom ?? 0]
   const suffix = hotspot[0] !== 100 || hotspot.slice(1).some((v) => v !== 0) ? `|${hotspot.join('|')}` : ''
   return fnv1a(`${filename ?? ''}|${focalX ?? ''}|${focalY ?? ''}${suffix}`)
@@ -150,7 +148,7 @@ export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = 
     ].sort((a, b) => a - b)
     if (known == null) return ladder.length ? ladder : [maxWidth]
     const widths = ladder.filter((w) => w < known)
-    widths.push(known) // exact source width as the top candidate
+    widths.push(known)
     return widths
   }
 

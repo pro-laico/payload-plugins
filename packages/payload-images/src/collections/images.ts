@@ -1,15 +1,17 @@
 import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 'payload'
 
 import { anyone, authd } from '../access'
-import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
-import { blurhashStorageFields, croppedBlurhashField } from '../fields/croppedBlurhash'
-import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
-import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
-import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
-import { generateImageMetadataBeforeChange } from '../hooks/generateImageMetadata'
-import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hooks/purge'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
+import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
+import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
+import { generateImageMetadataBeforeChange } from '../hooks/generateImageMetadata'
+import { blurhashStorageFields, croppedBlurhashField } from '../fields/croppedBlurhash'
+import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
+import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hooks/purge'
+import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
+
+const d = { alt: 'Describe the image for screen readers and SEO.' }
 
 /** Admin component subpaths (referenced by the Payload import map). */
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
@@ -80,8 +82,6 @@ const adminUIFields = (
           type: 'ui',
           admin: { components: { Field: { path: FocalPreviewFieldPath, ...(previewRatios ? { clientProps: { previewRatios } } : {}) } } },
         },
-        // The purge button POSTs to the purge endpoint and the join lists endpoint-generated
-        // variants — with the endpoints unregistered, both would be dead UI.
         ...(endpoints
           ? ([
               {
@@ -117,10 +117,6 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
-  // Lean relationship population: when an image is referenced (e.g. `page.heroImage`), populate the
-  // renderable fields + the virtual URLs + the placeholder, and skip the `variants` join (which would
-  // run an extra query per populated image). `forceSelect` keeps the virtual fields' inputs (including
-  // the stored blurhash tiers) present under `select`.
   const renderableFields = {
     alt: true,
     url: true,
@@ -141,8 +137,6 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   )
 
   return {
-    // Admin UI is gated by focalUI; the virtual URL fields + blurhash placeholder are for API
-    // consumers, so they're added independently (hidden in the admin).
     fields: [
       ...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled),
       ...(virtualFields ? virtualUrlFields() : []),
@@ -184,30 +178,19 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       description: 'Upload images here. Display sizes are generated on demand and cached — store the original once, render any size.',
       enableListViewSelectAPI: true,
       useAsTitle: 'alt',
-      // `filename` first: the list view renders the (on-demand, adminThumbnail) preview on that cell.
       defaultColumns: ['filename', 'alt', 'updatedAt'],
       listSearchableFields: ['alt', 'filename'],
     },
     defaultPopulate: enh.defaultPopulate,
     ...(enh.forceSelect ? { forceSelect: enh.forceSelect } : {}),
     ...(folders ? { folders: true } : {}),
-    fields: [
-      {
-        name: 'alt',
-        type: 'text',
-        required: true,
-        localized: localizeAlt,
-        admin: { description: 'Describe the image for screen readers and SEO.' },
-      },
-      ...(enh.fields ?? []),
-    ],
+    fields: [{ name: 'alt', type: 'text', required: true, localized: localizeAlt, admin: { description: d.alt } }, ...(enh.fields ?? [])],
     hooks: enh.hooks,
     upload: {
       focalPoint: true,
-      displayPreview: true, // show image thumbnails in upload/relationship fields that target this collection
+      displayPreview: true,
       mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
       ...(adminThumbnail ? { adminThumbnail } : {}),
-      // Off by default — the stored original is kept untouched; only downsize when asked, to bound storage.
       ...(maxOriginalSize
         ? { resizeOptions: { width: maxOriginalSize, height: maxOriginalSize, fit: 'inside', withoutEnlargement: true } }
         : {}),

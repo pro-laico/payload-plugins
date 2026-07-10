@@ -1,16 +1,16 @@
-import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
-import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
-import { createImagesCollection, imageEnhancements } from './collections/images'
-import { createPurgeEndpoint } from './endpoints/purge'
-import { createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
 import { stashConfig } from './lib/configStash'
+import { loadSharp } from './transform/sharpInstance'
+import { createPurgeEndpoint } from './endpoints/purge'
 import { mergeCollection } from './lib/mergeCollection'
 import { SHARP_INSTALL_HINT } from './transform/getVariantBytes'
 import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './transform/params'
-import { loadSharp } from './transform/sharpInstance'
+import { createImagesCollection, imageEnhancements } from './collections/images'
+import { createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
+import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 
 /** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
  *  own location (so `payload <key>` works both in-workspace and when published). */
@@ -134,14 +134,11 @@ export const imagesPlugin =
 
     const transformCfg: TransformEndpointConfig = transform === false ? {} : transform
     const variantSlug = transformCfg.variantSlug || GENERATED_IMAGES_SLUG
-    // With extendCollection, the source IS that collection; otherwise the default `images`.
     const sourceSlug = extendCollection || transformCfg.sourceSlug || 'images'
     const basePath = '/img'
     const purgePath = `${basePath}/purge`
     const apiRoute = config.routes?.api ?? '/api'
     const endpointsEnabled = transform !== false
-    // With transforms off the virtual URL fields would point at an unregistered endpoint, so they
-    // default off; an explicit `virtualFields: true` is honored (warned at boot — the URLs 404).
     const virtualFields = opts.virtualFields ?? endpointsEnabled
 
     const generated = mergeCollection(createGeneratedImagesCollection({ slug: variantSlug, sourceSlug }), generatedImagesOverrides)
@@ -151,7 +148,6 @@ export const imagesPlugin =
       const target = (config.collections ?? []).find((c) => c.slug === extendCollection)
       if (!target) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' not found`)
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
-      // On-demand admin thumbnail only when the endpoint exists AND the target hasn't set its own.
       const ownThumbnail =
         (typeof target.upload === 'object' && !!target.upload.adminThumbnail) ||
         !!(target.admin as { thumbnail?: unknown } | undefined)?.thumbnail
@@ -166,8 +162,6 @@ export const imagesPlugin =
         endpointsEnabled,
         adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
       })
-      // Merge, never overwrite: the target's own defaultPopulate / forceSelect entries win over
-      // (and add to) the parity defaults, so its populated reads keep behaving as it declared.
       const parity: Partial<CollectionConfig> = {
         ...enh,
         defaultPopulate: {
@@ -187,7 +181,6 @@ export const imagesPlugin =
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
     } else {
       const images = mergeCollection(
-        // No transform endpoint → no on-demand thumbnail; fall back to Payload's default.
         createImagesCollection({
           focalUI,
           previewRatios,
@@ -207,9 +200,6 @@ export const imagesPlugin =
       collections = [...(config.collections ?? []), images, generated]
     }
 
-    // A custom transform.sourceSlug gets the same guard extendCollection does — a typo here would
-    // otherwise just 404/500 every image request at runtime. Checked against the FINAL collections
-    // array (registration is unchanged; the default `images` collection is still created).
     if (!extendCollection && transformCfg.sourceSlug) {
       const src = collections.find((c) => c.slug === transformCfg.sourceSlug)
       if (!src) throw new Error(`[payload-images] transform.sourceSlug: collection '${transformCfg.sourceSlug}' not found`)
@@ -223,8 +213,6 @@ export const imagesPlugin =
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
-            // A custom width ladder (array) can't double as the endpoint's numeric snap grid, so the
-            // grid falls back to the default; a numeric pixelStep stays coupled to it as before.
             createTransformEndpoint({
               dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep,
               ...transformCfg,
@@ -235,8 +223,6 @@ export const imagesPlugin =
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]
     const shadowed = transform !== false && collections.some((c) => c.slug === baseSegment)
-    // These options only shape the CREATED `images` collection; with extendCollection the target's
-    // own upload config governs, so a set value would be silently ignored — surface it at boot.
     const ignoredWithExtend = extendCollection
       ? (['mimeTypes', 'localizeAlt', 'maxOriginalSize'] as const).filter((k) => opts[k] !== undefined)
       : []
@@ -244,13 +230,8 @@ export const imagesPlugin =
     return {
       ...config,
       collections,
-      // `payload images:backfill` — stamp the upload-time metadata (blurhash tiers, palette,
-      // alpha flags; `--focal` opt-in) onto images that predate the hook.
       bin: [...(config.bin ?? []), { key: 'images:backfill', scriptPath: binScriptPath('imagesBackfill') }],
       endpoints,
-      // Stash the resolved config so decoupled tooling (an OG/sitemap generator, a CDN purge
-      // script, a migration) and `<ResponsiveImage>` (inline LQIP) can read the slugs + options
-      // from just `payload`, no import.
       custom: {
         ...config.custom,
         payloadImages: {
@@ -264,26 +245,19 @@ export const imagesPlugin =
       },
       onInit: async (payload) => {
         await config.onInit?.(payload)
-        // Remember the app's config so <ResponsiveImage> resolves it from globalThis — no
-        // `@payload-config` alias (and thus no transpilePackages) required once Payload has booted.
         stashConfig(payload.config)
-        if (shadowed) {
+        if (shadowed)
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
           )
-        }
-        if (ignoredWithExtend.length) {
+        if (ignoredWithExtend.length)
           payload.logger.warn(
             `[payload-images] extendCollection: option(s) ${ignoredWithExtend.join(', ')} are ignored — you own '${extendCollection}'s upload config; set the equivalent on the collection itself.`,
           )
-        }
-        if (!endpointsEnabled && opts.virtualFields === true) {
+        if (!endpointsEnabled && opts.virtualFields === true)
           payload.logger.warn(
             '[payload-images] virtualFields: true with transform: false — the virtual src/srcset/placeholderURL/thumbnailURL fields point at the unregistered transform endpoint and will 404.',
           )
-        }
-        // Probe Sharp once at boot so a missing install / broken native binding surfaces as one
-        // actionable error here instead of a 500 on the first image request.
         try {
           await loadSharp()
         } catch (err) {

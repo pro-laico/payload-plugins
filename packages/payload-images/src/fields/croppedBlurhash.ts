@@ -17,8 +17,11 @@
  */
 import type { Field, FieldHook } from 'payload'
 
-import { cropBlurhashCoefficients } from '../blurhash/cropCoefficients'
 import { blurhashToPngDataUri } from '../blurhash/png'
+import { parseAspectRatio } from '../transform/params'
+import { cropWebpDataUri } from '../blurhash/webpPlaceholder'
+import { coverCropWindow, type CropWindow } from '../blurhash/window'
+import { cropBlurhashCoefficients } from '../blurhash/cropCoefficients'
 import {
   BLURHASH_QUALITIES,
   type BlurhashQuality,
@@ -33,9 +36,11 @@ import {
   webpFieldName,
   type WebpQuality,
 } from '../blurhash/qualities'
-import { cropWebpDataUri } from '../blurhash/webpPlaceholder'
-import { coverCropWindow, type CropWindow } from '../blurhash/window'
-import { parseAspectRatio } from '../transform/params'
+
+const d = {
+  croppedBlurHash:
+    'Placeholder for the read: a finished data URI focal-cropped to the declared render (req.context.blurhash = { ar, quality, format } or an X-Blurhash header); the raw sm-tier hash when nothing is declared.',
+}
 
 export type PlaceholderFormat = 'uri' | 'hash'
 
@@ -148,15 +153,11 @@ export const croppedBlurhashField = (): Field => {
     const doc = (data ?? {}) as ImageDocLike
     const wanted = readRequest(req)
 
-    // No declared intent → the raw default-tier hash, uncropped. The cheap path for every
-    // read that never renders a placeholder (admin lists, API consumers, population).
     if (wanted.ar === undefined && wanted.quality === undefined && wanted.format === undefined)
       return storedHash(doc, DEFAULT_BLURHASH_QUALITY) ?? null
 
     const quality = wanted.quality ?? DEFAULT_BLURHASH_QUALITY
 
-    // Raw-hash consumers (stock blurhash decoders): the cropped hash string. Webp tiers
-    // have no hash form, so they degrade to the best hash tier (`xl`).
     if (wanted.format === 'hash') {
       const hash = storedHash(doc, isBlurhashQuality(quality) ? quality : 'xl')
       if (!hash) return null
@@ -165,19 +166,16 @@ export const croppedBlurhashField = (): Field => {
       try {
         return cropBlurhashCoefficients(hash, window)
       } catch {
-        return hash // a malformed stored hash still yields a usable placeholder
+        return hash
       }
     }
 
-    // Finished data URI. Webp tiers crop the stored micro-webp; hash tiers crop in
-    // coefficient space and render to a tiny inline PNG.
     if (isWebpQuality(quality)) {
       const uri = storedWebp(doc, quality)
       if (uri) {
         const window = cropWindow(doc, wanted.ar)
         return window ? await cropWebpDataUri(uri, window) : uri
       }
-      // No stored webp (docs predating the tier) → fall through to the best hash tier.
     }
 
     const hash = storedHash(doc, isBlurhashQuality(quality) ? quality : 'xl')
@@ -190,18 +188,14 @@ export const croppedBlurhashField = (): Field => {
       const ar = wanted.ar ?? (sw && sh ? sw / sh : undefined)
       return blurhashToPngDataUri(cropped, ar ? { aspectRatio: ar } : {})
     } catch {
-      return null // a malformed stored hash — render without a placeholder
+      return null
     }
   }
   return {
     name: 'croppedBlurHash',
     type: 'text',
     virtual: true,
-    admin: {
-      hidden: true,
-      description:
-        'Placeholder for the read: a finished data URI focal-cropped to the declared render (req.context.blurhash = { ar, quality, format } or an X-Blurhash header); the raw sm-tier hash when nothing is declared.',
-    },
+    admin: { hidden: true, description: d.croppedBlurHash },
     hooks: { afterRead: [afterRead] },
   }
 }

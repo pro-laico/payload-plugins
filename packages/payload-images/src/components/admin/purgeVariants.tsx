@@ -1,8 +1,8 @@
 'use client'
 
-import { toast, useConfig, useDocumentInfo } from '@payloadcms/ui'
 import type React from 'react'
 import { useState } from 'react'
+import { toast, useConfig, useDocumentInfo } from '@payloadcms/ui'
 
 /**
  * A button that purges every on-demand variant generated from this source image
@@ -41,7 +41,7 @@ export const PurgeVariants: React.FC<PurgeVariantsProps> = ({ purgePath = '/img/
     setBusy(true)
     try {
       const res = await fetch(`${apiRoute}${purgePath}/${id}`, { method: 'POST', credentials: 'include' })
-      const json = (await res.json().catch(() => ({}))) as { deleted?: number; error?: string }
+      const json = (await res.json().catch(() => ({}))) as { deleted?: number; error?: string } //TODO: replace `as` cast with proper typing
       if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`)
       const n = json?.deleted ?? 0
       toast.success(`Purged ${n} generated image${n === 1 ? '' : 's'}.`)

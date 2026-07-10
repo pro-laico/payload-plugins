@@ -4,9 +4,9 @@
  */
 import type { CollectionSlug, Endpoint, Payload, PayloadRequest } from 'payload'
 
-import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
-import { purgeVariantsForSource } from '../hooks/purge'
 import { routeId } from './routeId'
+import { purgeVariantsForSource } from '../hooks/purge'
+import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
 
 export interface PurgeEndpointConfig {
   /** Generated-images collection slug. Default `generated-images`. */
@@ -23,7 +23,7 @@ export interface PurgeEndpointConfig {
 export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => {
   const path = '/img/purge'
   const variantSlug = cfg.variantSlug || GENERATED_IMAGES_SLUG
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug
+  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //TODO: replace `as` cast with proper typing
 
   return {
     path: `${path}/:id`,
@@ -40,7 +40,7 @@ export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => 
       }
 
       try {
-        const deleted = await purgeVariantsForSource(req.payload as Payload, variantSlug, id, req)
+        const deleted = await purgeVariantsForSource(req.payload as Payload, variantSlug, id, req) //TODO: replace `as` cast with proper typing
         return Response.json({ deleted })
       } catch (err) {
         req.payload.logger.error(`[payload-images] purge failed for ${id}: ${String(err)}`)

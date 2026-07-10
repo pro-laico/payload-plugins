@@ -20,7 +20,7 @@ const isUnsetFocal = (x: unknown, y: unknown): boolean => (x == null && y == nul
 export const generateImageMetadataBeforeChange = (): CollectionBeforeChangeHook => {
   return async ({ data, req, operation }) => {
     const file = req.file
-    if (!file?.data) return data // no new file bytes → keep whatever metadata the doc has
+    if (!file?.data) return data
 
     try {
       const analysis = await analyzeImageMetadata(file.data)
@@ -35,8 +35,6 @@ export const generateImageMetadataBeforeChange = (): CollectionBeforeChangeHook 
         doc.focalY = analysis.attention.y
       }
     } catch (err) {
-      // Metadata is progressive enhancement — a decode failure (SVG, corrupt file,
-      // sharp missing) must never block the upload itself.
       req.payload.logger.warn(`[payload-images] image metadata generation failed for '${String(file.name)}': ${String(err)}`)
     }
     return data

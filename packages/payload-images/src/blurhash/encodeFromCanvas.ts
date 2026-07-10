@@ -5,8 +5,8 @@
  * and stays in perfect sync with focal dragging because everything downstream is pure math.
  * DOM-only (canvas + Image); never import from server code.
  */
-import { encodeLinearGrid, type LinearGrid, type ParsedBlurhash, srgbToLinear } from './codec'
 import { BLURHASH_QUALITIES } from './qualities'
+import { encodeLinearGrid, type LinearGrid, type ParsedBlurhash, srgbToLinear } from './codec'
 
 /** Longest canvas edge — sized so the shorter side out-resolves the largest tier's components. */
 const SAMPLE_EDGE = 64

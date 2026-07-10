@@ -72,13 +72,12 @@ const toSwatch = (c: Candidate, total: number): PaletteSwatch => {
   }
 }
 
-const VIBRANT_SAT = 0.35
 const DARK_MAX = 0.32
 const LIGHT_MIN = 0.68
+const VIBRANT_SAT = 0.35
 
 /** Build the palette from a linear-RGB pixel grid (any size; the blurhash 64px grid is plenty). */
 export const buildPalette = (grid: LinearGrid): ImagePalette => {
-  // 5-bits-per-channel histogram with per-bin color accumulators.
   const bins = new Map<number, { r: number; g: number; b: number; count: number }>()
   let total = 0
   for (const row of grid)

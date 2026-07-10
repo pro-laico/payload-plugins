@@ -53,8 +53,6 @@ const virtualUrl = (
     const doc = (data ?? {}) as ImageDocLike
     if (doc.id == null || !doc.filename) return null
     const cfg = req?.payload?.config
-    // Explicit '' (not undefined) so these fields keep their serverURL-or-relative rule — passing
-    // undefined would let getImageUrl's NEXT_PUBLIC_SERVER_URL default leak in for `src`.
     const baseUrl = cfg?.serverURL || ''
     const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number | number[] } | undefined)?.pixelStep
     return compute(doc, baseUrl, pixelStep)
@@ -79,13 +77,7 @@ export const virtualUrlFields = (): Field[] => [
     (d) => deriveVersion(d) ?? null,
   ),
   virtualUrl('src', 'Optimized URL (≤1280px) for a plain <img> or OG tag.', (d, baseUrl) =>
-    getImageUrl(
-      { ...d, id: d.id as string | number },
-      {
-        width: Math.min(d.width ?? 1280, 1280),
-        baseUrl,
-      },
-    ),
+    getImageUrl({ ...d, id: d.id as string | number }, { width: Math.min(d.width ?? 1280, 1280), baseUrl }),
   ),
   virtualUrl(
     'srcset',
