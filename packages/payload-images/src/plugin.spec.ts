@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config, Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { imagesPlugin, resolvePlaceholder } from './plugin'
+import { imagesPlugin } from './plugin'
 
 const baseConfig = (collections: CollectionConfig[] = []): Config => ({ collections }) as Config
 // The Payload `Plugin` type returns `Config | Promise<Config>`; this plugin is synchronous, so
@@ -33,10 +33,9 @@ describe('imagesPlugin — default (creates the images collection)', () => {
   })
 
   it('stashes the resolved config on config.custom for external tooling', () => {
-    const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string; placeholder?: unknown } }).payloadImages
+    const stash = (out.custom as { payloadImages?: { sourceSlug?: string; variantSlug?: string } }).payloadImages
     expect(stash?.sourceSlug).toBe('images')
     expect(stash?.variantSlug).toBe('generated-images')
-    expect(stash?.placeholder).toEqual({ width: 24, quality: 40, format: 'webp', maxWidth: 64 })
   })
 
   it('folders + maxOriginalSize are off by default, opt-in on the images collection', () => {
@@ -84,22 +83,6 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(() => run({ transform: { sourceSlug: 'pages' } }, [pages])).toThrow(/not an upload/)
     const media: CollectionConfig = { slug: 'media', upload: true, fields: [] }
     expect(slugs(run({ transform: { sourceSlug: 'media' } }, [media]))).toContain('images') // registration unchanged
-  })
-})
-
-describe('resolvePlaceholder', () => {
-  it('fills the 24 / 40 / webp / maxWidth 64 defaults', () => {
-    expect(resolvePlaceholder(undefined)).toEqual({ width: 24, quality: 40, format: 'webp', maxWidth: 64 })
-  })
-  it('honors overrides and passes false through (disabled)', () => {
-    expect(resolvePlaceholder({ width: 16, quality: 30, format: 'jpeg', maxWidth: 96 })).toEqual({
-      width: 16,
-      quality: 30,
-      format: 'jpeg',
-      maxWidth: 96,
-    })
-    expect(resolvePlaceholder({ width: 32 })).toEqual({ width: 32, quality: 40, format: 'webp', maxWidth: 64 })
-    expect(resolvePlaceholder(false)).toBe(false)
   })
 })
 

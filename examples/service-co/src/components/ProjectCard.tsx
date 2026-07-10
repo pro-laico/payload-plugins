@@ -1,6 +1,6 @@
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import Link from 'next/link'
-import { getImage, getProject } from '@/lib/data'
+import { Image } from '@/components/Image'
+import { getProject } from '@/lib/data'
 
 /** A project tile for the work grid and the home page — cover photo (focal-aware crop) + meta.
  *  Takes the project's ID and self-fetches through the id-keyed getters (the atomic model): the
@@ -9,14 +9,13 @@ import { getImage, getProject } from '@/lib/data'
 export async function ProjectCard({ id, priority = false }: { id: string | number; priority?: boolean }) {
   const project = await getProject(id)
   if (!project) return null
-  const cover = project.coverImage != null ? await getImage(project.coverImage) : null
   return (
     <Link href={`/work/${project.slug}`} className="group block">
       <div className="overflow-hidden rounded-2xl border border-border bg-muted">
-        {cover ? (
+        {project.coverImage != null ? (
           <div className="transition-transform duration-500 ease-out group-hover:scale-[1.03]">
-            <ResponsiveImage
-              image={cover}
+            <Image
+              id={project.coverImage}
               aspectRatio="3:2"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 560px"
               quality={priority ? 82 : 74}

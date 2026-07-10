@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Config, Plugin } from 'payload'
-import { createSeedEndpoint } from './endpoint'
+import { createSeedEndpoint } from './endpoints/seed'
 import { type SeedPluginOptions, resolveOptions } from './options'
 import { buildSeedRegistry } from './typegen'
 

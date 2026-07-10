@@ -1,5 +1,6 @@
 import config from '@payload-config'
-import { buildSrcset, deriveVersion, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { buildSrcset, deriveVersion } from '@pro-laico/payload-images/components/image'
+import { Image } from '../../../components/Image'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import { shellProps } from '../shell'
@@ -71,7 +72,7 @@ export default async function ResponsivePage() {
 
       {/* Full-bleed: break out of the centered column so `sizes="100vw"` is honest. */}
       <div style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', marginTop: 24 }}>
-        <ResponsiveImage image={img} sizes="100vw" loading="eager" fetchPriority="high" />
+        <Image id={img.id} sizes="100vw" loading="eager" fetchPriority="high" />
       </div>
 
       <h2>The srcset it emitted</h2>

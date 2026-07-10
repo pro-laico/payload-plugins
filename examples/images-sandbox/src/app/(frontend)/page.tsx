@@ -1,25 +1,26 @@
 import config from '@payload-config'
-import { getImageUrl, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { getImageUrl } from '@pro-laico/payload-images/components/image'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import type { CSSProperties } from 'react'
+import { Image } from '../../components/Image'
 import { shellProps } from './shell'
 
 // The slugs the seed definitions in src/seed/ fill.
 const SEEDED_SLUGS = ['images', 'pages']
 
-type ImageDoc = {
+// The page-level list read is a light projection for the card headers; the pixels + placeholder
+// are each tile's own concern — <Image id> self-fetches exactly what it renders.
+type ImageListItem = {
   id: string | number
   alt?: string | null
   width?: number | null
   height?: number | null
   focalX?: number | null
   focalY?: number | null
-  filename?: string | null
-  url?: string | null
 }
 
-type PageDoc = { id: string | number; title?: string | null; heroImage?: ImageDoc | string | null }
+type PageDoc = { id: string | number; title?: string | null; heroImage?: { id: string | number } | string | number | null }
 
 // The crops the demo renders for each source — all cut to the image's focal point, so an
 // off-center subject stays in frame whether the box is wide, square, or tall.
@@ -47,8 +48,17 @@ export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  const images = (await payload.find({ collection: 'images', limit: 50, depth: 0, sort: 'createdAt', overrideAccess: true })).docs as ImageDoc[]
-  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 1, sort: 'createdAt', overrideAccess: true })).docs as PageDoc[]
+  const images = (
+    await payload.find({
+      collection: 'images',
+      limit: 50,
+      depth: 0,
+      sort: 'createdAt',
+      select: { alt: true, width: true, height: true, focalX: true, focalY: true },
+      overrideAccess: true,
+    })
+  ).docs as ImageListItem[]
+  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt', overrideAccess: true })).docs as PageDoc[]
 
   return (
     <SandboxShell
@@ -57,7 +67,8 @@ export default async function HomePage() {
         <>
           Upload stores only the original; every size below is generated <strong>on demand</strong> by the transform endpoint at{' '}
           <code>/api/img/:id</code>, cropped to each image&apos;s focal point, and rendered through <code>&lt;ResponsiveImage&gt;</code> (a
-          server-rendered <code>&lt;img&gt;</code> with a baked-in <code>srcset</code>) over a low-res blur built from the smallest variant.
+          server-rendered <code>&lt;img&gt;</code> with a baked-in <code>srcset</code>) over an instant <strong>BlurHash</strong> placeholder —
+          a string stored on the doc at upload, focal-cropped to each ratio by the read itself.
         </>
       }
     >
@@ -93,7 +104,7 @@ export default async function HomePage() {
             <div style={ratiosGrid}>
               {RATIOS.map(({ label, ar }) => (
                 <div style={ratioTile} key={label}>
-                  <ResponsiveImage image={img} aspectRatio={ar} sizes={TILE_SIZES} />
+                  <Image id={img.id} aspectRatio={ar} sizes={TILE_SIZES} />
                   <small style={ratioLabel}>{label}</small>
                 </div>
               ))}
@@ -119,15 +130,16 @@ export default async function HomePage() {
         <EmptyState>No pages yet — seed the database above.</EmptyState>
       ) : (
         pages.map((page) => {
-          const hero = page.heroImage && typeof page.heroImage === 'object' ? page.heroImage : undefined
+          // depth 0 → heroImage is the bare id; <Image> owns fetching what it renders.
+          const heroId = typeof page.heroImage === 'object' && page.heroImage ? page.heroImage.id : (page.heroImage ?? undefined)
           return (
             <div className="shell-card" key={String(page.id)}>
               <div className="shell-row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
                 <strong>{page.title ?? '(untitled)'}</strong>
-                <small className="shell-muted">heroImage → {hero ? (hero.alt ?? hero.filename) : '(none)'}</small>
+                <small className="shell-muted">heroImage → {heroId ? `#${heroId}` : '(none)'}</small>
               </div>
-              {hero ? (
-                <ResponsiveImage image={hero} aspectRatio="16:9" sizes="(max-width: 920px) 100vw, 880px" />
+              {heroId ? (
+                <Image id={heroId} aspectRatio="16:9" sizes="(max-width: 920px) 100vw, 880px" blurhashQuality="md" />
               ) : (
                 <EmptyState>No hero image set.</EmptyState>
               )}
@@ -137,17 +149,26 @@ export default async function HomePage() {
       )}
 
       <h2>How it works</h2>
-      <pre className="shell-code">{`import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+      <pre className="shell-code">{`// The project owns one <Image> component (src/components/Image.tsx): pass an id + presentation
+// props; it fetches its own doc — leanest possible read — and hands everything to the passive
+// <ResponsiveImage>:
+<Image id={imageId} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
 
-// In any server or client component, pass a populated doc (or just its id):
-<ResponsiveImage image={image} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
+// Inside it:
+const doc = await payload.findByID({
+  collection: 'images',
+  id,
+  depth: 0,
+  select: { alt: true, width: true, height: true, croppedBlurHash: true, variantVersion: true },
+  context: { blurhash: { ar: aspectRatio, quality: 'sm' } }, // placeholder arrives as a finished data URI, cropped to this ratio
+})
+return <ResponsiveImage image={doc} aspectRatio={aspectRatio} {...rest} />
 
-// Emits a plain <img> whose srcset points at the transform endpoint (the v= token is
-// derived from the source's filename + focal, so editing either busts immutable caches):
+// <ResponsiveImage> emits a plain <img>: srcset → the transform endpoint (v= busts immutable
+// caches on file/focal edits), background → the croppedBlurHash data URI, as-is:
 //   <img
 //     srcset="/api/img/<id>?w=320&h=180&fit=cover&q=75&fmt=auto&v=1a2b3c 320w, … "
-//     sizes="(max-width: 768px) 100vw, 50vw"
-//     style="aspect-ratio: 1.777…"
+//     style="aspect-ratio: 1.777…; background-image: url(data:image/png;base64,…)"
 //   />`}</pre>
 
       {images.length > 0 && (

@@ -52,7 +52,19 @@ describe('payload-images wiring', () => {
     await payload.db.deleteMany({ collection: 'images', req, where: {} })
     await payload.db.deleteMany({ collection: 'pages', req, where: {} })
 
-    const png = await sharp({ create: { width: 1200, height: 800, channels: 3, background: { r: 20, g: 140, b: 90 } } })
+    // A gradient, not a solid: a solid image has all-zero blurhash AC coefficients, which would
+    // make "cropping changes the hash" untestable (a crop of a solid IS the solid).
+    const gw = 1200
+    const gh = 800
+    const raw = Buffer.alloc(gw * gh * 3)
+    for (let y = 0; y < gh; y++)
+      for (let x = 0; x < gw; x++) {
+        const o = (y * gw + x) * 3
+        raw[o] = Math.round((x / gw) * 255) // red ramps left→right
+        raw[o + 1] = 140
+        raw[o + 2] = Math.round((y / gh) * 255) // blue ramps top→bottom
+      }
+    const png = await sharp(raw, { raw: { width: gw, height: gh, channels: 3 } })
       .png()
       .toBuffer()
     const doc = await payload.create({
@@ -131,56 +143,116 @@ describe('payload-images wiring', () => {
     expect(meta.width).toBe(750) // 730 snapped up to the nearest 50px grid point
   })
 
-  it('blurDataURL is a gated inline LQIP: null on a normal read, a real data-URI when the read opts in', async () => {
-    // Normal read → the gated field is a no-op (null), no LQIP generated.
-    const plain = (await payload.findByID({ collection: 'images', id: sourceId, overrideAccess: true })) as { blurDataURL?: string | null }
-    expect(plain.blurDataURL ?? null).toBeNull()
+  it('stores the placeholder tiers at upload, and croppedBlurHash serves the read a finished placeholder', async () => {
+    // The seed uploads ran the beforeChange generator — every tier is a non-empty string.
+    const doc = (await payload.findByID({ collection: 'images', id: sourceId, overrideAccess: true })) as unknown as Record<string, unknown>
+    for (const f of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl']) {
+      expect(typeof doc[f], f).toBe('string')
+      expect((doc[f] as string).length).toBeGreaterThan(5)
+    }
+    // Tier component counts encode into the string length: 4 + 2·cx·cy chars.
+    expect((doc.blurHashSm as string).length).toBe(4 + 2 * 4 * 3)
+    expect((doc.blurHashXl as string).length).toBe(4 + 2 * 9 * 9)
+    // The micro-webp tiers store full-frame data URIs.
+    for (const f of ['placeholderXxl', 'placeholderX3']) expect(doc[f], f).toMatch(/^data:image\/webp;base64,/)
 
-    // Opt in via req.context.lqip → a faithful inline LQIP at the requested ratio/focal, end to end
-    // (afterRead hook → generateInlineLqip → shared variant engine → Sharp → base64 data-URI).
-    const withLqip = (await payload.findByID({
+    // The same analysis stamps the palette and alpha flags (RGB gradient: opaque, no alpha).
+    const palette = doc.palette as { dominant?: { background?: string; foreground?: string; population?: number } } | null
+    expect(palette?.dominant?.background).toMatch(/^#[0-9a-f]{6}$/)
+    expect(['#000000', '#ffffff']).toContain(palette?.dominant?.foreground)
+    expect(doc.hasAlpha).toBe(false)
+    expect(doc.isOpaque).toBe(true)
+
+    // The fixture was created with an explicit focal (40/60) — the saliency suggestion must not override it.
+    expect(doc.focalX).toBe(40)
+    expect(doc.focalY).toBe(60)
+
+    // No request info → croppedBlurHash defaults to the raw sm tier hash, uncropped (the
+    // cheap path for reads that never render a placeholder).
+    expect(doc.croppedBlurHash).toBe(doc.blurHashSm)
+
+    // Declare the render (req.context.blurhash) → a FINISHED placeholder data URI, cropped
+    // to that ratio in the field hook — no variant rows, nothing written.
+    const before = await countVariants(payload, sourceId)
+    const cropped = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { lqip: { ar: '16/9', fit: 'cover' } },
-    })) as { blurDataURL?: string | null }
-    const uri = withLqip.blurDataURL
-    expect(uri).toMatch(/^data:image\/webp;base64,/)
+      context: { blurhash: { ar: '16/9' } },
+    })) as { croppedBlurHash?: string | null }
+    expect(cropped.croppedBlurHash).toMatch(/^data:image\/png;base64,/)
+    expect(await countVariants(payload, sourceId)).toBe(before) // read-side crop touches no files
 
-    // The data-URI decodes to a real tiny webp at the placeholder width + ar-derived height.
-    const meta = await sharp(Buffer.from((uri as string).split(',')[1], 'base64')).metadata()
-    expect(meta.format).toBe('webp')
-    expect(meta.width).toBe(24) // placeholder.width default
-    expect(meta.height).toBe(14) // round(24 / (16/9))
-
-    // It rode through the SAME variant cache — a generated-images row now exists for the source.
-    expect(await countVariants(payload, sourceId)).toBeGreaterThan(0)
-
-    // Per-read width override (untrusted door → honored up to maxWidth, snapped to /8).
-    const sized = (await payload.findByID({
+    // A webp tier serves the stored micro-webp, cropped per read.
+    const webp = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { lqip: { ar: '1/1', fit: 'cover', width: 48 } },
-    })) as { blurDataURL?: string | null }
-    const m48 = await sharp(Buffer.from((sized.blurDataURL as string).split(',')[1], 'base64')).metadata()
-    expect(m48.width).toBe(48)
-    expect(m48.height).toBe(48)
+      context: { blurhash: { ar: '16/9', quality: 'xxl' } },
+    })) as { croppedBlurHash?: string | null }
+    expect(webp.croppedBlurHash).toMatch(/^data:image\/webp;base64,/)
+    expect(webp.croppedBlurHash).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
 
-    // An over-cap request is clamped to maxWidth (64) — the external door can't ask for a huge LQIP.
-    const capped = (await payload.findByID({
+    // format: 'hash' keeps the raw-hash contract for stock blurhash decoders: the cropped
+    // hash string — same shape as the stored tier, different coefficients.
+    const rawHash = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { lqip: { ar: '1/1', width: 200 } },
-    })) as { blurDataURL?: string | null }
-    const m200 = await sharp(Buffer.from((capped.blurDataURL as string).split(',')[1], 'base64')).metadata()
-    expect(m200.width).toBe(64)
+      context: { blurhash: { ar: '16/9', format: 'hash' } },
+    })) as { croppedBlurHash?: string | null }
+    expect((rawHash.croppedBlurHash as string).length).toBe((doc.blurHashSm as string).length)
+    expect(rawHash.croppedBlurHash).not.toBe(doc.blurHashSm)
+
+    // Quality tier selection rides the same request object (no ar → full-frame PNG of that tier).
+    const xl = (await payload.findByID({
+      collection: 'images',
+      id: sourceId,
+      overrideAccess: true,
+      context: { blurhash: { quality: 'xl', format: 'hash' } },
+    })) as { croppedBlurHash?: string | null }
+    expect(xl.croppedBlurHash).toBe(doc.blurHashXl)
   })
 
-  it('<ResponsiveImage> renders a single <img> (Shape B) with the faithful inline LQIP in its background-image', async () => {
+  it('suggests a saliency focal on create when the editor picked none (attention crop)', async () => {
+    // A bright saturated blob in the top-right of a dark field — unambiguous saliency target.
+    const w = 640
+    const h = 640
+    const raw = Buffer.alloc(w * h * 3)
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const o = (y * w + x) * 3
+        const inBlob = (x - 480) ** 2 + (y - 160) ** 2 < 80 ** 2
+        raw[o] = inBlob ? 255 : 18
+        raw[o + 1] = inBlob ? 90 : 20
+        raw[o + 2] = inBlob ? 40 : 22
+      }
+    const png = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer()
+    const doc = (await payload.create({
+      collection: 'images',
+      data: { alt: 'saliency blob' }, // no focal → the hook may suggest one
+      file: { data: png, mimetype: 'image/png', name: 'blob.png', size: png.byteLength },
+      overrideAccess: true,
+    })) as { id: string | number; focalX?: number | null; focalY?: number | null }
+
+    // The blob sits at (75%, 25%) — the suggestion should land in that quadrant, never the 50/50 default.
+    expect(doc.focalX).toBeGreaterThan(55)
+    expect(doc.focalY).toBeLessThan(45)
+    await payload.delete({ collection: 'images', id: doc.id, overrideAccess: true })
+  })
+
+  it('<ResponsiveImage> renders a single <img> (Shape B) painting the croppedBlurHash it was handed', async () => {
     const { ResponsiveImage } = await import('@pro-laico/payload-images/components/image')
-    const doc = await payload.findByID({ collection: 'images', id: sourceId, depth: 0, overrideAccess: true })
+    // The consumption pattern: the READ declares the render, the component stays passive.
+    const doc = await payload.findByID({
+      collection: 'images',
+      id: sourceId,
+      depth: 0,
+      overrideAccess: true,
+      context: { blurhash: { ar: '16/9' } },
+    })
 
     // A Server Component is just an async function → call it and inspect the returned element.
     const el = (await ResponsiveImage({ image: doc, aspectRatio: '16/9', config } as never)) as {
@@ -191,21 +263,26 @@ describe('payload-images wiring', () => {
     expect(el.props.srcSet).toContain('/api/img/')
     expect(el.props.loading).toBe('lazy')
     expect(el.props.style?.objectFit).toBe('cover')
-    expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/webp;base64,/) // inline LQIP painted in
+    // The blurhash is rendered to a tiny inline PNG at the render's aspect ratio.
+    expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/png;base64,/)
+    const b64 = (el.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]
+    const meta = await sharp(Buffer.from(b64 as string, 'base64')).metadata()
+    expect(meta.format).toBe('png')
+    expect(meta.width).toBe(32)
+    expect(meta.height).toBe(18) // round(32 / (16/9))
 
-    // placeholder={48} → a larger LQIP, honored on the trusted component path.
-    const big = (await ResponsiveImage({ image: doc, aspectRatio: '1/1', config, placeholder: 48 } as never)) as {
-      props: { style?: { backgroundImage?: string } }
-    }
-    const b64 = (big.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]
-    expect(b64).toBeTruthy()
-    expect((await sharp(Buffer.from(b64 as string, 'base64')).metadata()).width).toBe(48)
-
-    // placeholder={false} disables it (supersedes the deprecated blur).
+    // placeholder={false} skips the paint even though the doc carries a hash.
     const off = (await ResponsiveImage({ image: doc, aspectRatio: '1/1', config, placeholder: false } as never)) as {
       props: { style?: { backgroundImage?: string } }
     }
     expect(off.props.style?.backgroundImage).toBeUndefined()
+
+    // Fully passive: a doc without croppedBlurHash renders without a placeholder — the
+    // component never fetches or generates one.
+    const bare = (await ResponsiveImage({ image: { id: sourceId, width: 1200, height: 800 }, aspectRatio: '1/1', config } as never)) as {
+      props: { style?: { backgroundImage?: string } }
+    }
+    expect(bare.props.style?.backgroundImage).toBeUndefined()
   })
 
   it('getImageUrl builds an absolute, focal-cropped OG URL that the endpoint serves (the generateMetadata pattern)', async () => {
@@ -241,6 +318,17 @@ describe('payload-images wiring', () => {
   })
 
   it('seeds the sample images + page via @pro-laico/payload-seed (native asset flow + focal points)', async () => {
+    // The endpoint persists variants AFTER responding (fire-and-forget under vitest, no
+    // request scope for next's after()) — let any in-flight persist land before the seed
+    // clears `images`, or its insert hits a freshly-deleted source FK.
+    let settled = await countVariants(payload, sourceId)
+    for (let i = 0; i < 20; i++) {
+      await new Promise((res) => setTimeout(res, 100))
+      const now = await countVariants(payload, sourceId)
+      if (now === settled) break
+      settled = now
+    }
+
     // The same run the admin "Seed" button / the frontend demo trigger: uploads the three
     // sample photos into `images` (carrying focal points), then a page referencing one.
     const result = await seed({ payload, options: seedOptions })

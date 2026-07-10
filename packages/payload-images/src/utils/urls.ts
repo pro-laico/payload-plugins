@@ -39,6 +39,11 @@ export interface VersionSource {
   filename?: string | null
   focalX?: number | null
   focalY?: number | null
+  focalSize?: number | null
+  cropLeft?: number | null
+  cropTop?: number | null
+  cropRight?: number | null
+  cropBottom?: number | null
 }
 
 const fnv1a = (s: string): string => {
@@ -61,7 +66,11 @@ export const deriveVersion = (src?: VersionSource | null): string | undefined =>
   if (!src) return undefined
   const { filename, focalX, focalY } = src
   if (filename == null && focalX == null && focalY == null) return undefined
-  return fnv1a(`${filename ?? ''}|${focalX ?? ''}|${focalY ?? ''}`)
+  // Hotspot layers join only when set off their defaults, so untouched docs keep their
+  // pre-hotspot v token (and the immutable URLs already in browser/CDN caches stay valid).
+  const hotspot = [src.focalSize ?? 100, src.cropLeft ?? 0, src.cropTop ?? 0, src.cropRight ?? 0, src.cropBottom ?? 0]
+  const suffix = hotspot[0] !== 100 || hotspot.slice(1).some((v) => v !== 0) ? `|${hotspot.join('|')}` : ''
+  return fnv1a(`${filename ?? ''}|${focalX ?? ''}|${focalY ?? ''}${suffix}`)
 }
 
 /** A bare id, or a populated image doc (so the version token + a default width can be read off it). */

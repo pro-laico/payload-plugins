@@ -1,10 +1,10 @@
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { Image } from '@/components/Image'
 import { SectionHeading } from '@/components/SectionHeading'
 import { Icon } from '@/components/ui/Icon'
-import { getIcon, getImage, getService, getServiceIds } from '@/lib/data'
+import { getIcon, getService, getServiceIds } from '@/lib/data'
 
 export const metadata: Metadata = { title: 'Services' }
 
@@ -40,16 +40,13 @@ async function ServiceSections() {
 async function ServiceSection({ id, index, count }: { id: string | number; index: number; count: number }) {
   const service = await getService(id)
   if (!service) return null
-  const [image, icon] = await Promise.all([
-    service.image != null ? getImage(service.image) : null,
-    service.icon != null ? getIcon(service.icon) : null,
-  ])
+  const icon = service.icon != null ? await getIcon(service.icon) : null
   const flip = index % 2 === 1
   return (
     <section className="grid items-center gap-10 lg:grid-cols-2">
       <div className={`overflow-hidden rounded-2xl border border-border ${flip ? 'lg:order-2' : ''}`}>
-        {image ? (
-          <ResponsiveImage image={image} aspectRatio="4:3" sizes="(max-width: 1024px) 100vw, 560px" quality={80} className="w-full" />
+        {service.image != null ? (
+          <Image id={service.image} aspectRatio="4:3" sizes="(max-width: 1024px) 100vw, 560px" quality={80} className="w-full" />
         ) : null}
       </div>
       <div className={flip ? 'lg:order-1' : ''}>

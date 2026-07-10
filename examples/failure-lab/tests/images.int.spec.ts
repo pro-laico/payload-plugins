@@ -123,12 +123,12 @@ describe('transform endpoint failures (handlers called directly — no Next serv
     const badW = await handler(makeReq(goneId, 'w=0'))
     const noDim = await handler(makeReq(goneId, ''))
     expect(noId.status).toBe(400)
-    expect(await noId.text()).toBe('Missing id')
+    expect(await noId.text()).toBe('Missing target collections id')
     expect(badW.status).toBe(400)
     expect(await badW.text()).toBe('invalid w')
     expect(noDim.status).toBe(400)
     expect(await noDim.text()).toBe('width or height required')
-    record('transform 400s', 'Missing id', 'invalid w', 'width or height required')
+    record('transform 400s', 'Missing target collections id', 'invalid w', 'width or height required')
   })
 
   it('404s for an unknown source id', async () => {

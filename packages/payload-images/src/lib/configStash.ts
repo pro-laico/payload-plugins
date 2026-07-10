@@ -2,7 +2,9 @@ import type { SanitizedConfig } from 'payload'
 
 /** The globalThis slot the plugin's `onInit` fills with the app's sanitized config.
  *  `Symbol.for` → one shared registry entry, so every pro-laico package reads the same
- *  stash without importing each other. */
+ *  stash without importing each other. Config only — the render path is pure (the
+ *  placeholder is a blurhash string already on the doc), so no instance is ever needed
+ *  outside a request, and this package never calls `getPayload`. */
 const CONFIG_SLOT = Symbol.for('pro-laico.payload-config')
 
 /** Called from the plugin's `onInit`: remember the running app's config for the server components. */

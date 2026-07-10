@@ -1,7 +1,12 @@
 import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 'payload'
 
 import { anyone, authd } from '../access'
+import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
+import { blurhashStorageFields, croppedBlurhashField } from '../fields/croppedBlurhash'
+import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
+import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
 import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
+import { generateImageMetadataBeforeChange } from '../hooks/generateImageMetadata'
 import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hooks/purge'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
@@ -113,19 +118,41 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
   // Lean relationship population: when an image is referenced (e.g. `page.heroImage`), populate the
-  // renderable fields + the virtual URLs, and skip the `variants` join (which would run an extra
-  // query per populated image). `forceSelect` keeps the virtual fields' inputs present under `select`.
-  const renderableFields = { alt: true, url: true, filename: true, width: true, height: true, focalX: true, focalY: true }
+  // renderable fields + the virtual URLs + the placeholder, and skip the `variants` join (which would
+  // run an extra query per populated image). `forceSelect` keeps the virtual fields' inputs (including
+  // the stored blurhash tiers) present under `select`.
+  const renderableFields = {
+    alt: true,
+    url: true,
+    filename: true,
+    width: true,
+    height: true,
+    focalX: true,
+    focalY: true,
+    croppedBlurHash: true,
+    ...Object.fromEntries(MEDIA_METADATA_FIELD_NAMES.map((f) => [f, true])),
+    ...Object.fromEntries(HOTSPOT_FIELD_NAMES.map((f) => [f, true])),
+  }
   const defaultPopulate = virtualFields
     ? { ...renderableFields, ...Object.fromEntries(VIRTUAL_URL_FIELDS.map((f) => [f, true])) }
     : renderableFields
-  const forceSelect = virtualFields ? Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])) : undefined
+  const forceSelect = Object.fromEntries(
+    [...(virtualFields ? VIRTUAL_URL_INPUTS : []), ...PLACEHOLDER_FIELD_NAMES, ...HOTSPOT_FIELD_NAMES].map((f) => [f, true]),
+  )
 
   return {
-    // Admin UI is gated by focalUI; the virtual URL fields are for API consumers, so they're
-    // added independently (hidden in the admin).
-    fields: [...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled), ...(virtualFields ? virtualUrlFields() : [])],
+    // Admin UI is gated by focalUI; the virtual URL fields + blurhash placeholder are for API
+    // consumers, so they're added independently (hidden in the admin).
+    fields: [
+      ...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled),
+      ...(virtualFields ? virtualUrlFields() : []),
+      ...blurhashStorageFields(),
+      croppedBlurhashField(),
+      ...mediaMetadataFields(),
+      ...hotspotFields(),
+    ],
     hooks: {
+      beforeChange: [generateImageMetadataBeforeChange()],
       afterChange: [purgeStaleVariantsAfterChange({ variantSlug })],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },

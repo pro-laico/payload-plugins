@@ -74,8 +74,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "next": "^16.2.9",
-    "payload": "^3.85.1",
+    "next": "^16.2.10",
+    "payload": "^3.85.2",
     "react": "^19.2.7",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

@@ -247,6 +247,10 @@ export interface Image {
     totalDocs?: number;
   };
   /**
+   * Cache-busting version token for transform URLs (changes on file replace / focal / hotspot edits).
+   */
+  variantVersion?: string | null;
+  /**
    * Optimized URL (≤1280px) for a plain <img> or OG tag.
    */
   src?: string | null;
@@ -258,10 +262,57 @@ export interface Image {
    * Tiny low-quality placeholder (LQIP) for a blur-up / CSS background.
    */
   placeholderURL?: string | null;
+  blurHashXs?: string | null;
+  blurHashSm?: string | null;
+  blurHashMd?: string | null;
+  blurHashLg?: string | null;
+  blurHashXl?: string | null;
+  placeholderXxl?: string | null;
+  placeholderX3?: string | null;
   /**
-   * Inline LQIP data-URI; generated only when a read sets req.context.lqip ({ ar, fit }) or sends an X-LQIP header. Null otherwise.
+   * Placeholder for the read: a finished data URI focal-cropped to the declared render (req.context.blurhash = { ar, quality, format } or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
    */
-  blurDataURL?: string | null;
+  croppedBlurHash?: string | null;
+  /**
+   * Color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }.
+   */
+  palette?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * The file carries an alpha channel.
+   */
+  hasAlpha?: boolean | null;
+  /**
+   * No pixel is actually transparent (sampled).
+   */
+  isOpaque?: boolean | null;
+  /**
+   * Hotspot circle diameter, % of the crop region’s shorter side. 100 = maximal window (no zoom).
+   */
+  focalSize?: number | null;
+  /**
+   * Non-destructive edge trim, % of the image removed from the left.
+   */
+  cropLeft?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the top.
+   */
+  cropTop?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the right.
+   */
+  cropRight?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the bottom.
+   */
+  cropBottom?: number | null;
   folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
@@ -855,10 +906,26 @@ export interface TestimonialsSelect<T extends boolean = true> {
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
   variants?: T;
+  variantVersion?: T;
   src?: T;
   srcset?: T;
   placeholderURL?: T;
-  blurDataURL?: T;
+  blurHashXs?: T;
+  blurHashSm?: T;
+  blurHashMd?: T;
+  blurHashLg?: T;
+  blurHashXl?: T;
+  placeholderXxl?: T;
+  placeholderX3?: T;
+  croppedBlurHash?: T;
+  palette?: T;
+  hasAlpha?: T;
+  isOpaque?: T;
+  focalSize?: T;
+  cropLeft?: T;
+  cropTop?: T;
+  cropRight?: T;
+  cropBottom?: T;
   folder?: T;
   updatedAt?: T;
   createdAt?: T;

@@ -71,12 +71,19 @@ describe('createImagesCollection', () => {
     expect((byName(createImagesCollection().fields, 'alt') as { localized?: boolean }).localized).toBe(false)
   })
 
-  it('generates no placeholder at upload (no beforeChange hook); blurDataURL is virtual, not stored', () => {
+  it('stores the upload-time metadata (beforeChange hook): placeholder tiers, palette, alpha flags; croppedBlurHash is virtual', () => {
     const c = createImagesCollection()
-    expect(c.hooks?.beforeChange ?? []).toHaveLength(0)
-    // The LQIP is generated on demand, never stored — the blurDataURL field is virtual.
-    const blur = byName(c.fields, 'blurDataURL') as { virtual?: boolean } | undefined
-    expect(blur?.virtual).toBe(true)
+    expect(c.hooks?.beforeChange ?? []).toHaveLength(1) // the metadata analyzer
+    for (const name of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl', 'placeholderXxl', 'placeholderX3']) {
+      const f = byName(c.fields, name) as { virtual?: boolean; type?: string } | undefined
+      expect(f?.type).toBe('text')
+      expect(f?.virtual).toBeUndefined() // stored, not computed
+    }
+    expect((byName(c.fields, 'palette') as { type?: string } | undefined)?.type).toBe('json')
+    expect((byName(c.fields, 'hasAlpha') as { type?: string } | undefined)?.type).toBe('checkbox')
+    expect((byName(c.fields, 'isOpaque') as { type?: string } | undefined)?.type).toBe('checkbox')
+    const cropped = byName(c.fields, 'croppedBlurHash') as { virtual?: boolean } | undefined
+    expect(cropped?.virtual).toBe(true)
   })
 
   it('renders the focal + purge UI and the variants join only when focalUI is on', () => {

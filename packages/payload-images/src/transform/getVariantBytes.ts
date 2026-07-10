@@ -1,10 +1,9 @@
 /**
  * The shared "give me the bytes for this variant" engine: compute the cache key, return the
  * cached variant if one exists, otherwise generate it with Sharp once, persist it after the
- * response, and return the bytes. Extracted from the transform endpoint so the on-demand
- * `/api/img` route and `<ResponsiveImage>`'s inline LQIP run the EXACT same
+ * response, and return the bytes. The on-demand `/api/img` route runs this
  * read-or-generate-or-persist path against the one `generated-images` cache — a given
- * (source, size, fit, quality, format) variant is generated once, whichever door triggered it.
+ * (source, size, fit, quality, format) variant is generated once.
  */
 import { after } from 'next/server'
 
@@ -15,8 +14,17 @@ import { extForFormat, mimeForFormat, type OutputFormat, type ParsedParams } fro
 import { transformImage, type TransformOutput } from './sharp'
 import { readBytes, resolveStaticDir, type UploadDocLike } from './source'
 
-/** A resolved source doc: id + where-the-bytes-live + focal point. */
-export type VariantSourceDoc = UploadDocLike & { id: string | number; focalX?: number | null; focalY?: number | null }
+/** A resolved source doc: id + where-the-bytes-live + focal/hotspot layers. */
+export type VariantSourceDoc = UploadDocLike & {
+  id: string | number
+  focalX?: number | null
+  focalY?: number | null
+  focalSize?: number | null
+  cropLeft?: number | null
+  cropTop?: number | null
+  cropRight?: number | null
+  cropBottom?: number | null
+}
 
 /** Generation outcome (bytes or a typed failure). */
 export type GenBytes = { ok: true; data: Buffer; mimeType: string } | { ok: false; status: number; msg: string }
@@ -63,6 +71,22 @@ const isDuplicateKeyError = (err: unknown): boolean => {
   return Array.isArray(fieldErrors) && fieldErrors.some((f) => f.path === 'cacheKey' || /unique/i.test(f.message ?? ''))
 }
 
+/** True for a foreign-key violation on the variant create: the SOURCE doc was deleted while
+ *  this persist was in flight (post-response fire-and-forget), so the variant has nothing to
+ *  attach to. Expected in delete/reseed races — the bytes were already served; dropping the
+ *  cache row is the correct outcome, not an error. Same cause-chain walk as the duplicate
+ *  detector (sqlite SQLITE_CONSTRAINT_FOREIGNKEY, postgres 23503, mysql ER_NO_REFERENCED_ROW). */
+const isForeignKeyError = (err: unknown): boolean => {
+  let e: unknown = err
+  for (let depth = 0; depth < 4 && e; depth++) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const code = (e as { code?: unknown })?.code
+    if (/foreign key/i.test(msg) || /FOREIGNKEY|23503|ER_NO_REFERENCED_ROW/.test(`${typeof code === 'string' ? code : ''}`)) return true
+    e = (e as { cause?: unknown })?.cause
+  }
+  return false
+}
+
 /** True when Sharp itself failed to load (module missing or native binding broken) — the fix is
  *  the install, not this image, so the generic "transform failed" line alone would mislead. */
 const isSharpLoadError = (err: unknown): boolean => {
@@ -83,7 +107,7 @@ let warnedCacheLookup = false
  */
 export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> => {
   const { payload, source: src, params: p, format, sourceSlug, variantSlug, base, maxInputPixels, genFlight } = args
-  const key = variantCacheKey({ id: src.id, filename: src.filename, focalX: src.focalX, focalY: src.focalY }, p, format)
+  const key = variantCacheKey(src, p, format)
 
   // Cache hit → the stored variant's bytes.
   try {
@@ -132,6 +156,13 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
         format,
         focalX: src.focalX,
         focalY: src.focalY,
+        hotspot: {
+          focalSize: src.focalSize,
+          cropLeft: src.cropLeft,
+          cropTop: src.cropTop,
+          cropRight: src.cropRight,
+          cropBottom: src.cropBottom,
+        },
         maxInputPixels,
       })
     } catch (err) {
@@ -158,8 +189,12 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
           overrideAccess: true,
         })
       } catch (err) {
-        if (!isDuplicateKeyError(err))
+        if (isForeignKeyError(err)) {
+          // Source vanished between generation and persist — served the bytes, skip the cache row.
+          payload.logger.info(`[payload-images] source ${src.id} was deleted before variant ${key} persisted — skipped.`)
+        } else if (!isDuplicateKeyError(err)) {
           payload.logger.warn(`[payload-images] failed to persist variant ${key} for source ${src.id}: ${String(err)}`)
+        }
       }
     }
     try {

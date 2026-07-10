@@ -1,21 +1,24 @@
 /**
  * `<ResponsiveImage>` — a single plain `<img>` carrying a `srcset` of on-demand transform URLs,
- * with a faithful **inline LQIP** painted as its own `background-image`: a tiny base64 data-URI
- * (generated server-side at the requested aspect-ratio + focal point, zero network) shows
- * instantly, and the real image paints over it on load — the swap is native, no JS, no `<head>`
- * script. An async server component: it resolves the project config (pixel step + placeholder
- * settings), generates the LQIP via the shared variant cache, and renders one `<img>`. Not
- * `next/image`.
+ * with the doc's placeholder painted as its own `background-image`: shows instantly, and the
+ * real image paints over it on load — the swap is native, no JS, no `<head>` script. A passive
+ * async server component: it renders what it's handed, fetches nothing, and never touches
+ * Payload. Not `next/image`.
+ *
+ * The placeholder work happens in the READ, not here: fetch the doc with
+ * `req.context.blurhash = { ar, quality }` and `croppedBlurHash` arrives as a finished,
+ * focal-cropped data URI this component just paints. (A raw hash string — a read that didn't
+ * declare intent — is still rendered to an inline PNG here as a fallback.)
  *
  * `className` / `style` / `dataAttributes` all go on the `<img>` itself (size / space / round it
- * there). The LQIP is on by default; pass `blur={false}` (or the plugin's `placeholder: false`)
- * to skip it, and it's skipped automatically when there's no populated doc to generate from.
+ * there). The placeholder renders whenever the doc carries `croppedBlurHash`; pass
+ * `placeholder={false}` to skip it.
  */
 import type { SanitizedConfig } from 'payload'
 import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
 
+import { blurhashToPngDataUri } from '../blurhash/png'
 import { stashedConfig } from '../lib/configStash'
-import type { VariantSourceDoc } from '../transform/getVariantBytes'
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
 import {
   type BuildSrcsetOptions,
@@ -35,7 +38,12 @@ import {
 export { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths }
 export type { BuildSrcsetOptions, BuildUrlOptions, Fit, Format, GetImageUrlOptions, ImageResource }
 
-/** A bare id, or a populated image doc (for natural dims, alt, the version token, and inline-LQIP generation). */
+/**
+ * A bare id, or a populated image doc. The component is passive: it renders what it's handed.
+ * Fetch the doc with `req.context.blurhash = { ar, quality }` so `croppedBlurHash` arrives as
+ * a finished data URI cropped to the ratio you're rendering, and select `variantVersion` so
+ * URLs carry the cache-busting token — nothing else placeholder-related needs selecting.
+ */
 export type ResponsiveImageInput =
   | string
   | number
@@ -46,23 +54,11 @@ export type ResponsiveImageInput =
       alt?: string | null
       filename?: string | null
       url?: string | null
-      focalX?: number | null
-      focalY?: number | null
+      croppedBlurHash?: string | null
+      variantVersion?: string | null
     }
 
 type Awaitable<T> = T | Promise<T>
-
-/** Placeholder override: `false` off · `true`/unset on (defaults) · a number = LQIP width (px) · `{ width?, quality? }` = tuned. */
-export type PlaceholderProp = boolean | number | { width?: number; quality?: number }
-
-/** Resolve the `placeholder` prop (falling back to the deprecated `blur`) to on/off + optional width/quality. */
-const resolvePlaceholderProp = (placeholder: PlaceholderProp | undefined, blur: boolean): { on: boolean; width?: number; quality?: number } => {
-  if (placeholder === false) return { on: false }
-  if (placeholder === true) return { on: true }
-  if (typeof placeholder === 'number') return { on: true, width: placeholder }
-  if (placeholder && typeof placeholder === 'object') return { on: true, width: placeholder.width, quality: placeholder.quality }
-  return { on: blur } // `placeholder` unset → legacy `blur` (default true)
-}
 
 export interface ResponsiveImageProps {
   image: ResponsiveImageInput
@@ -101,17 +97,15 @@ export interface ResponsiveImageProps {
    *  component uses the config the plugin stashed at init, falling back to the `@payload-config`
    *  alias `withPayload` sets up. Pass it explicitly only for a non-standard setup. */
   config?: Awaitable<SanitizedConfig>
-  /** Explicit cache-busting version token (`v=`); overrides the one derived from the doc's filename + focal. */
+  /** Explicit cache-busting version token (`v=`); overrides the doc's `variantVersion` (and the
+   *  filename-derived fallback). */
   version?: string
   /**
-   * Inline LQIP placeholder. `false` disables it; a **number** sets the LQIP width in px; an object
-   * tunes `{ width, quality }`. Keep the width small — the LQIP is base64-inlined in **every**
-   * response (~0.6 KB at 24px, ~2 KB at 48, ~3–4 KB at 64), so **24–64 is the sweet spot**; larger
-   * just bloats the HTML. Defaults to the project `placeholder` config (24px). Supersedes `blur`.
+   * Paint the doc's `croppedBlurHash` behind the image while it loads (a tiny inline image,
+   * zero network, zero client JS). `false` skips it even when the doc carries one. The
+   * quality/crop are decided by the READ that fetched the doc (`req.context.blurhash`), not here.
    */
-  placeholder?: PlaceholderProp
-  /** @deprecated Use `placeholder` instead (`placeholder={false}` to disable). */
-  blur?: boolean
+  placeholder?: boolean
   /** Extra attributes (e.g. `data-*`) spread onto the `<img>`. */
   dataAttributes?: Record<string, string>
 }
@@ -128,7 +122,7 @@ const idOf = (image: ResponsiveImageInput): string => (typeof image === 'object'
 
 // Once-per-process dev warnings — these failures repeat on every render, so warning each time would flood the console.
 let warnedNoConfig = false
-let warnedLqipFailed = false
+let warnedBadBlurhash = false
 
 export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<ReactElement | null> => {
   const {
@@ -150,7 +144,6 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
     path,
     version,
     placeholder,
-    blur = true,
     dataAttributes,
     config,
   } = props
@@ -158,12 +151,11 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   const id = idOf(image)
   if (!id) return null
 
-  // Resolve the Payload config once (the srcset's `pixelStep` and the placeholder settings both
-  // come off it): the explicit prop, else the globalThis stash the plugin's `onInit` filled (set
-  // the moment Payload boots — no bundler involvement), else the `@payload-config` alias — which
-  // only resolves from a published package when the consumer transpiles it (`transpilePackages`).
-  // `as string` keeps TS from resolving the alias at this package's build. Stays undefined if
-  // unreadable (defaults apply).
+  // Resolve the Payload config once (only the srcset's `pixelStep` comes off it): the explicit
+  // prop, else the globalThis stash the plugin's `onInit` filled (set the moment Payload boots —
+  // no bundler involvement), else the `@payload-config` alias — which only resolves from a
+  // published package when the consumer transpiles it (`transpilePackages`). `as string` keeps TS
+  // from resolving the alias at this package's build. Stays undefined if unreadable (defaults apply).
   let cfg: SanitizedConfig | undefined
   try {
     cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
@@ -173,7 +165,7 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
   if (!cfg && process.env.NODE_ENV !== 'production' && !warnedNoConfig) {
     warnedNoConfig = true
     console.warn(
-      "[payload-images] <ResponsiveImage> could not resolve the Payload config — project pixelStep/placeholder settings are skipped and the inline LQIP is disabled. Pass the `config` prop, or add `transpilePackages: ['@pro-laico/payload-images']` to next.config so the `@payload-config` alias resolves.",
+      "[payload-images] <ResponsiveImage> could not resolve the Payload config — the project pixelStep setting is skipped (default step applies). Pass the `config` prop, or add `transpilePackages: ['@pro-laico/payload-images']` to next.config so the `@payload-config` alias resolves.",
     )
   }
   const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep
@@ -200,26 +192,25 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
     path,
     pixelStep,
     sourceWidth: sourceWidth ?? naturalW,
-    version: version ?? deriveVersion(doc),
+    version: version ?? doc?.variantVersion ?? deriveVersion(doc),
   }
   const { srcset, src } = buildSrcset(id, opts)
 
-  // The faithful inline LQIP: a tiny base64 variant at this exact ratio/focal, generated
-  // server-side (shared variant cache) and painted as the <img>'s own background — instant,
-  // zero network, covered when the real image loads. Needs a populated doc + the config;
-  // the engine is dynamic-imported so the non-placeholder path never bundles Sharp/getPayload.
-  const ph = resolvePlaceholderProp(placeholder, blur)
+  // The placeholder: `croppedBlurHash` as the read delivered it, painted as the <img>'s own
+  // background — instant, zero network, zero client JS, covered when the real image loads.
+  // A read that declared intent (`req.context.blurhash`) hands over a finished data URI;
+  // a raw hash string (no declared intent) is rendered to an inline PNG here as a fallback.
   let lqip: string | undefined
-  if (ph.on && cfg && doc?.filename) {
+  const placeholderValue = placeholder !== false ? doc?.croppedBlurHash : undefined
+  if (placeholderValue?.startsWith('data:')) lqip = placeholderValue
+  else if (placeholderValue) {
     try {
-      const { generateInlineLqip } = await import('./inlineLqip')
-      // Trusted (component) call: the requested width is honored (no `untrusted` clamp).
-      lqip = await generateInlineLqip({ config: cfg, source: doc as VariantSourceDoc, ar, fit, width: ph.width, quality: ph.quality })
+      lqip = blurhashToPngDataUri(placeholderValue, ar ? { aspectRatio: ar } : {})
     } catch (err) {
       lqip = undefined
-      if (process.env.NODE_ENV !== 'production' && !warnedLqipFailed) {
-        warnedLqipFailed = true
-        console.warn(`[payload-images] <ResponsiveImage> inline LQIP generation failed — rendering without a placeholder. ${String(err)}`)
+      if (process.env.NODE_ENV !== 'production' && !warnedBadBlurhash) {
+        warnedBadBlurhash = true
+        console.warn(`[payload-images] <ResponsiveImage> got an unparseable croppedBlurHash — rendering without a placeholder. ${String(err)}`)
       }
     }
   }

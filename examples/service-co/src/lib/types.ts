@@ -11,10 +11,9 @@ export type MediaImage = {
   alt?: string | null
   width?: number | null
   height?: number | null
-  focalX?: number | null
-  focalY?: number | null
-  filename?: string | null
   url?: string | null
+  croppedBlurHash?: string | null
+  variantVersion?: string | null
 }
 
 export type IconDoc = { id: RelId; svgString?: string | null; filename?: string | null }

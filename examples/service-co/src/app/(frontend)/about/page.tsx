@@ -1,9 +1,9 @@
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { Image } from '@/components/Image'
 import { SectionHeading } from '@/components/SectionHeading'
-import { getImage, getSiteSettings, getTeamIds, getTeamMember } from '@/lib/data'
+import { getSiteSettings, getTeamIds, getTeamMember } from '@/lib/data'
 
 export const metadata: Metadata = { title: 'Studio' }
 
@@ -48,12 +48,11 @@ async function AboutContent() {
 async function TeamCard({ id }: { id: string | number }) {
   const member = await getTeamMember(id)
   if (!member) return null
-  const photo = member.photo != null ? await getImage(member.photo) : null
   return (
     <div>
       <div className="overflow-hidden rounded-2xl border border-border bg-muted">
-        {photo ? (
-          <ResponsiveImage image={photo} aspectRatio="1:1" sizes="(max-width: 640px) 100vw, 360px" quality={80} className="w-full" />
+        {member.photo != null ? (
+          <Image id={member.photo} aspectRatio="1:1" sizes="(max-width: 640px) 100vw, 360px" quality={80} className="w-full" />
         ) : (
           <div className="aspect-square" />
         )}

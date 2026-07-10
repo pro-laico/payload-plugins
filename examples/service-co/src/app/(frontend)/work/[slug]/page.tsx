@@ -1,11 +1,11 @@
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
+import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ButtonLink } from '@/components/ui/Button'
-import { getImage, getMuxVideo, getProjectBySlug, getService } from '@/lib/data'
+import { getMuxVideo, getProjectBySlug, getService } from '@/lib/data'
 import { firstPlayback } from '@/lib/types'
 
 // Atomic composition: the project is fetched depth 0, so the cover, gallery photos, video, and
@@ -35,12 +35,11 @@ async function ProjectDetail({ params }: Params) {
   const project = await getProjectBySlug(slug)
   if (!project) notFound()
 
-  const [cover, videoDoc, gallery, services] = await Promise.all([
-    project.coverImage != null ? getImage(project.coverImage) : null,
+  const [videoDoc, services] = await Promise.all([
     project.video != null ? getMuxVideo(project.video) : null,
-    Promise.all((project.gallery ?? []).map((g) => getImage(g.image))).then((docs) => docs.filter((d) => d !== null)),
     Promise.all((project.services ?? []).map((id) => getService(id))).then((docs) => docs.filter((d) => d !== null)),
   ])
+  const gallery = (project.gallery ?? []).map((g) => g.image).filter((id) => id != null)
   const video = firstPlayback(videoDoc)
   const meta = [project.client, project.location, project.year].filter(Boolean).join(' · ')
 
@@ -48,7 +47,9 @@ async function ProjectDetail({ params }: Params) {
     <article>
       {/* Cover */}
       <div className="relative h-[62vh] min-h-[420px] w-full overflow-hidden bg-muted">
-        {cover ? <ResponsiveImage image={cover} fill sizes="100vw" quality={86} className="object-cover" /> : null}
+        {project.coverImage != null ? (
+          <Image id={project.coverImage} fill sizes="100vw" quality={86} blurhashQuality="md" className="object-cover" />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
         <div className="absolute inset-0 flex items-end">
           <div className="mx-auto w-full max-w-5xl px-6 pb-12">
@@ -96,13 +97,13 @@ async function ProjectDetail({ params }: Params) {
         {/* Gallery */}
         {gallery.length > 0 ? (
           <div className="mt-14 grid gap-5 sm:grid-cols-2">
-            {gallery.map((img, i) => (
+            {gallery.map((imageId, i) => (
               <div
-                key={String(img.id)}
+                key={String(imageId)}
                 className={`overflow-hidden rounded-2xl border border-border ${i === 0 && gallery.length > 1 ? 'sm:col-span-2' : ''}`}
               >
-                <ResponsiveImage
-                  image={img}
+                <Image
+                  id={imageId}
                   aspectRatio={i === 0 && gallery.length > 1 ? '16:9' : '4:3'}
                   sizes="(max-width: 640px) 100vw, 900px"
                   quality={80}

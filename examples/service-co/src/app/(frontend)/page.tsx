@@ -1,6 +1,6 @@
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ProjectCard } from '@/components/ProjectCard'
 import { SectionHeading } from '@/components/SectionHeading'
@@ -8,7 +8,6 @@ import { ServiceCard } from '@/components/ServiceCard'
 import { ButtonLink } from '@/components/ui/Button'
 import {
   getFeaturedProjectId,
-  getImage,
   getMuxVideo,
   getProject,
   getProjectIds,
@@ -41,12 +40,10 @@ async function HomeContent() {
   ])
 
   // Each reference resolves through its own id-keyed entry — the settings entry holds only ids.
-  const [hero, featured, showreelDoc] = await Promise.all([
-    settings.heroImage != null ? getImage(settings.heroImage) : null,
+  const [featured, showreelDoc] = await Promise.all([
     featuredId != null ? getProject(featuredId) : null,
     settings.showreel != null ? getMuxVideo(settings.showreel) : null,
   ])
-  const featuredCover = featured?.coverImage != null ? await getImage(featured.coverImage) : null
   const showreel = firstPlayback(showreelDoc)
   const others = projectIds.filter((id) => id !== featuredId).slice(0, 4)
   const name = settings.companyName ?? 'Meridian'
@@ -55,7 +52,9 @@ async function HomeContent() {
     <>
       {/* Hero — a full-bleed payload-images crop (object-fit fill) under an editorial overlay. */}
       <section className="relative h-[80vh] min-h-[540px] w-full overflow-hidden bg-muted">
-        {hero ? <ResponsiveImage image={hero} fill sizes="100vw" quality={86} className="object-cover" /> : null}
+        {settings.heroImage != null ? (
+          <Image id={settings.heroImage} fill sizes="100vw" quality={86} blurhashQuality="md" className="object-cover" />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
         <div className="absolute inset-0 flex items-end">
           <div className="mx-auto w-full max-w-6xl px-6 pb-16">
@@ -95,14 +94,8 @@ async function HomeContent() {
         <section className="border-y border-border bg-card">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 lg:grid-cols-2">
             <div className="overflow-hidden rounded-2xl border border-border">
-              {featuredCover ? (
-                <ResponsiveImage
-                  image={featuredCover}
-                  aspectRatio="4:3"
-                  sizes="(max-width: 1024px) 100vw, 560px"
-                  quality={82}
-                  className="w-full"
-                />
+              {featured?.coverImage != null ? (
+                <Image id={featured.coverImage} aspectRatio="4:3" sizes="(max-width: 1024px) 100vw, 560px" quality={82} className="w-full" />
               ) : null}
             </div>
             <div>

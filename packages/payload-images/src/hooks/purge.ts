@@ -65,7 +65,10 @@ export const purgeStaleVariantsAfterChange = (opts: PurgeOptions = {}): Collecti
     if (operation !== 'update') return doc
     const fileChanged = previousDoc?.filename !== doc?.filename
     const focalChanged = previousDoc?.focalX !== doc?.focalX || previousDoc?.focalY !== doc?.focalY
-    if (fileChanged || focalChanged) {
+    const hotspotChanged = (['focalSize', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom'] as const).some(
+      (f) => (previousDoc?.[f] ?? null) !== (doc?.[f] ?? null),
+    )
+    if (fileChanged || focalChanged || hotspotChanged) {
       try {
         await purgeVariantsForSource(req.payload, variantSlug, doc.id, req)
       } catch (err) {

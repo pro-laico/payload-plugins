@@ -190,10 +190,15 @@ export interface Image {
    * Tiny low-quality placeholder (LQIP) for a blur-up / CSS background.
    */
   placeholderURL?: string | null;
+  blurHashXs?: string | null;
+  blurHashSm?: string | null;
+  blurHashMd?: string | null;
+  blurHashLg?: string | null;
+  blurHashXl?: string | null;
   /**
-   * Inline LQIP data-URI; generated only when a read sets req.context.lqip ({ ar, fit }) or sends an X-LQIP header. Null otherwise.
+   * BlurHash placeholder, focal-cropped to the aspect ratio the read declares (req.context.blurhash = { ar, quality } or an X-Blurhash header). Defaults to the sm tier uncropped.
    */
-  blurDataURL?: string | null;
+  croppedBlurHash?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -356,7 +361,12 @@ export interface ImagesSelect<T extends boolean = true> {
   src?: T;
   srcset?: T;
   placeholderURL?: T;
-  blurDataURL?: T;
+  blurHashXs?: T;
+  blurHashSm?: T;
+  blurHashMd?: T;
+  blurHashLg?: T;
+  blurHashXl?: T;
+  croppedBlurHash?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

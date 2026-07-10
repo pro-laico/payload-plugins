@@ -1,8 +1,8 @@
 import type { Endpoint } from 'payload'
-import { runSeed } from './engine/run'
-import { SeedRunError, SeedValidationError } from './engine/validate'
-import { SEED_DISABLED_MESSAGE, seedingEnabled } from './guard'
-import type { ResolvedSeedOptions } from './options'
+import { runSeed } from '../engine/run'
+import { SeedRunError, SeedValidationError } from '../engine/validate'
+import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
+import type { ResolvedSeedOptions } from '../options'
 
 /**
  * Builds `POST /api/seed`. Gated by the `ENABLE_SEED` runtime guard and requires an

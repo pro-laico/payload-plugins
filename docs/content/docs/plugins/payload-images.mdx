@@ -23,9 +23,10 @@ pnpm add @pro-laico/payload-images
 A Sanity-style image pipeline, driven from your CMS:
 
 - **Never bigger than it needs to be:** every layout requests the exact size, crop, and format it needs; the endpoint renders it once on demand, then caches it forever.
-- **Focal-point cropping:** mark the subject once and every crop, at any aspect ratio, stays centered on it — no more lopped-off heads.
+- **Focal-point cropping, subject-aware by default:** every upload gets a saliency-detected focal point automatically; refine it once and every crop, at any aspect ratio, stays centered on it — no more lopped-off heads.
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **Resize, recrop, reformat from anywhere:** point a `<ResponsiveImage>` or a virtual `srcset` at any ratio in code, or drag the focal point / replace the file in the admin.
+- **Instant placeholders, cropped like the image:** a ladder of quality tiers stored on the doc at upload (five BlurHash strings + two micro-webp data URIs); every read gets a finished placeholder focal-cropped to the exact ratio being rendered — computed in the field hook, next to the data — and `<ResponsiveImage>` paints it before the pixels arrive.
 - **Self-busting cache + declarative seeding:** content-addressed URLs refresh themselves when a file or focal point changes, and seeded media (focal point and all) is declared in code through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
 ![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)
@@ -127,7 +128,6 @@ export const options = [
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
   { name: 'folders', type: 'boolean', default: 'false', description: `Enable Payload's native folder organization on the managed collection (the created images, or the extendCollection target) so editors can organize a large library.` },
   { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
-  { name: 'placeholder', type: 'false | { width?, quality?, format?, maxWidth? }', default: '{ width: 24, quality: 40, format: \'webp\', maxWidth: 64 }', description: `Inline LQIP placeholder for <ResponsiveImage>: a tiny, faithful (per ratio + focal) image generated server-side, base64-inlined behind the real image, painted instantly with zero network. width/quality/format set the defaults; maxWidth caps per-read overrides from the untrusted external door (clamped + snapped to /8). Keep widths in 24–64, since the LQIP inlines as base64 in every response. Pass false to disable placeholders project-wide.` },
 ]
 
 Pass options to customize. The **Reference** tab is the interactive view (`transform` expands to its
@@ -174,7 +174,6 @@ imagesPlugin({
   mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],
   folders: false,
   // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
-  placeholder: { width: 24, quality: 40, format: 'webp', maxWidth: 64 },
 })
 ```
 
@@ -206,9 +205,15 @@ logged-in-admin only.
     variants: { description: "Lists this image's cached generated-images. Only with focalUI.", type: "join" },
     src: { description: "Default-width optimized URL, computed on read and hidden in admin. Only with virtualFields.", type: "virtual" },
     srcset: { description: "Responsive srcset of optimized URLs. Only with virtualFields.", type: "virtual" },
-    placeholderURL: { description: "Tiny blurred LQIP URL (URL form, for non-React consumers). Only with virtualFields.", type: "virtual" },
+    placeholderURL: { description: "Tiny 32px blurred image URL (URL form, for non-React consumers). Only with virtualFields.", type: "virtual" },
     thumbnailURL: { description: "160px focal-cropped thumbnail URL. Only with virtualFields.", type: "virtual" },
-    blurDataURL: { description: "On-demand inline LQIP data-URI; null unless the read sets req.context.lqip / X-LQIP. Only with virtualFields.", type: "virtual" },
+    variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields. Only with virtualFields.", type: "virtual" },
+    "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
+    "placeholderXxl / placeholderX3": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
+    croppedBlurHash: { description: "The placeholder every read carries: a finished data URI focal-cropped to the render the read declares (req.context.blurhash / X-Blurhash header); the raw sm tier hash when nothing is declared.", type: "virtual" },
+    palette: { description: "Sanity-style color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }. Hidden in the admin.", type: "json" },
+    hasAlpha: { description: "The file carries an alpha channel.", type: "checkbox" },
+    isOpaque: { description: "No sampled pixel is actually transparent.", type: "checkbox" },
   }}
 />
 
@@ -216,6 +221,7 @@ logged-in-admin only.
 
 <TypeTable
   type={{
+    generateImageMetadataBeforeChange: { description: "When a save carries a new file, one decode stores the placeholder tiers (five BlurHash strings + the micro-webp data URIs), the color palette, the alpha flags, and — when the editor hasn't picked one — a saliency-based focal point, all in the same write (payload images:backfill covers pre-existing images).", type: "beforeChange" },
     purgeStaleVariantsAfterChange: { description: "Purges this image's stale cached variants when its file or focal point changes.", type: "afterChange" },
     purgeVariantsBeforeDelete: { description: "Purges all of this image's cached variants before the doc is deleted.", type: "beforeDelete" },
   }}
@@ -284,8 +290,8 @@ The URLs are absolute when `serverURL` is set (relative otherwise), hidden in th
 **flow through relationship population**: a populated `page.heroImage` already carries `srcset`
 / `placeholderURL`, ready to render. Population is kept lean via `defaultPopulate`: referenced
 images return these renderable fields and **not** the `variants` cache join (which would cost an
-extra query per image). Disable with `virtualFields: false`. (A `blurDataURL`, an on-demand inline
-LQIP, sits on the doc too, but stays `null` until a read opts in; see [Placeholder](#placeholder).)
+extra query per image). Disable with `virtualFields: false`. (The `croppedBlurHash` placeholder rides along too — it isn't
+gated by `virtualFields`; see [Placeholder](#placeholder).)
 One cost to know: a wide original at the default `pixelStep: 50` emits dozens of `srcset` URLs
 (several KB of string) on every read and population — raise `pixelStep` or pass an explicit ladder
 if response size matters.
@@ -364,7 +370,7 @@ The transform endpoint is public-facing, so it's bounded on several fronts:
 A plain `<img>` whose `srcset` points at the transform endpoint, so the browser fetches the one size it
 needs. Not `next/image`: an async server component (no client JS), imported from `components/image`.
 **Component** = what you write; **Rendered HTML** = a single `<img>` with a full `srcset` (one URL per
-width, capped at the source) and an inline LQIP painted as its own `background-image`:
+width, capped at the source) and the doc's placeholder painted as its own `background-image`:
 
 <Tabs items={['Component', 'Rendered HTML']}>
 
@@ -377,7 +383,13 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
 export async function Hero({ id }: { id: string }) {
   const payload = await getPayload({ config })
-  const image = await payload.findByID({ collection: 'images', id, depth: 0 })
+  const image = await payload.findByID({
+    collection: 'images',
+    id,
+    depth: 0,
+    // Declare the render → `croppedBlurHash` arrives as a finished data URI, focal-cropped to this ratio.
+    context: { blurhash: { ar: '16:9' } },
+  })
   return (
     <ResponsiveImage
       image={image}
@@ -394,7 +406,7 @@ export async function Hero({ id }: { id: string }) {
 <Tab value="Rendered HTML">
 
 ```html
-<!-- one element: your className + the layout plumbing + the inline LQIP, all on the <img> -->
+<!-- one element: your className + the layout plumbing + the inline placeholder, all on the <img> -->
 <img
   class="rounded-xl"
   src="/api/img/64a…?w=1280&h=720&fit=cover&q=75&fmt=auto&v=1a2b3c"
@@ -411,7 +423,7 @@ export async function Hero({ id }: { id: string }) {
   fetchpriority="auto"
   decoding="async"
   style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777777; object-fit:cover;
-         background-image:url(data:image/webp;base64,UklGR…); background-size:cover; background-position:center" />
+         background-image:url(data:image/png;base64,iVBOR…); background-size:cover; background-position:center" />
 ```
 
 </Tab>
@@ -423,8 +435,8 @@ explicit ladder if you pass an array. It's built server-side, the same for every
 the top.
 
 Pass the **populated doc** (the `findByID` result) and it reads `width`/`height` (no layout shift),
-`alt`, the srcset's source-width cap, and the `v` cache-bust token off it. No focal point needed: the
-endpoint crops from the doc server-side.
+`alt`, the srcset's source-width cap, and the `variantVersion` cache-bust token off it. No focal
+point needed: the endpoint crops from the doc server-side.
 
 Or a bare **id**:
 
@@ -432,8 +444,8 @@ Or a bare **id**:
 <ResponsiveImage image="64a1f2c…" aspectRatio="16:9" sizes="50vw" />
 ```
 
-Degraded: dims guessed from the ratio, empty `alt`, no `v`, srcset climbs to the 4096 ceiling. Prefer
-the populated doc; you usually have one.
+Degraded: dims guessed from the ratio, empty `alt`, no `v`, no placeholder (it lives on the doc),
+and the srcset climbs to the 4096 ceiling. Prefer the populated doc; you usually have one.
 
 <Callout type="warn">
   **Set `sizes` to how big the image actually renders.** Default `100vw`; leave it on an image in a
@@ -475,10 +487,9 @@ export const imageProps = [
   { name: 'style', type: 'CSSProperties', description: `Merged onto the <img>'s style.` },
   { name: 'baseUrl', type: 'string', default: "'' (same-origin)", description: `Absolute base for the generated URLs (OG / email contexts).` },
   { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
-  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep + placeholder settings and generate the inline LQIP. Rarely needed: without it the component uses the config the plugin stashed at init, falling back to the @payload-config alias (which, from a published package, needs transpilePackages: ['@pro-laico/payload-images']).` },
-  { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the one derived from the doc.` },
-  { name: 'placeholder', type: "boolean | number | { width?, quality? }", default: 'true (project config)', description: `Inline LQIP placeholder. false disables it; a number sets the LQIP width in px; an object tunes { width, quality }. Keep widths small (24–64 is the sweet spot); it's base64-inlined in every response. Supersedes blur.` },
-  { name: 'blur', type: 'boolean', default: 'true', description: `Deprecated alias for placeholder (blur={false} to disable).` },
+  { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep. Rarely needed: without it the component uses the config the plugin stashed at init, falling back to the @payload-config alias (which, from a published package, needs transpilePackages: ['@pro-laico/payload-images']).` },
+  { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the doc's variantVersion.` },
+  { name: 'placeholder', type: 'boolean', default: 'true', description: `Paint the doc's croppedBlurHash behind the image while it loads (a tiny inline image, zero network, zero client JS). false skips it even when the doc carries one. The quality/crop are decided by the READ that fetched the doc, not here.` },
   { name: 'dataAttributes', type: 'Record<string, string>', description: `Extra attributes (e.g. data-*) spread onto the rendered img element.` },
 ]
 
@@ -506,7 +517,7 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   loading="lazy"
   fetchPriority="auto"
   decoding="async"
-  placeholder      // on by default (24px); = false to disable, = 48 / { width, quality } to size
+  placeholder      // on by default; renders the doc's croppedBlurHash — false to skip
   baseUrl=""          // same-origin
   path="/api/img"
   // optional, no default:
@@ -529,30 +540,87 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
 No pop-in: a blurred preview paints from the first render, covered when the real image loads.
 
-It's an **inline LQIP**: a tiny (default **24px**), **faithful** crop (generated at your exact ratio
-+ focal) resolved to a base64 data-URI and painted as the `<img>`'s own `background-image`. Inline in
-the HTML, so it shows on the first frame with **zero network**; the real pixels cover it on load.
-Native swap, **no JS, no `<head>` script**. On for every image (eager too, since it's inline and doesn't
-count as the LCP element); skipped for a bare id. Disable with `placeholder={false}` per-image or
-`imagesPlugin({ placeholder: false })` project-wide.
+At upload time the hook stores the image as a ladder of placeholder tiers on the doc — two
+formats, one knob. The low tiers are **[BlurHash](https://github.com/woltapp/blurhash)** strings
+(cosine **components**, not pixels, so a hash renders at any size); above 9×9 components blurhash
+spends bytes far less efficiently than a real image, so the top tiers store a **micro-webp**:
 
-**Sizing.** 24px suits most images; a large hero can take a bigger blur, so pass a width:
+| Tier | Stored as | Size | Looks like |
+| --- | --- | --- | --- |
+| `xs` | blurhash 2×2 | 12 chars | a corner-to-corner gradient |
+| `sm` | blurhash 4×3 | 28 chars | the classic blurhash (the default) |
+| `md` | blurhash 6×4 | 52 chars | soft composition blobs |
+| `lg` | blurhash 8×6 | 100 chars | clear composition |
+| `xl` | blurhash 9×9 | 166 chars | maximum blurhash detail — still very much a blur |
+| `xxl` | webp 32px | ~0.5–1 KB | shapes and light read clearly |
+| `x3` | webp 64px | ~1–3 KB | a heavily blurred thumbnail |
 
-```tsx
-<ResponsiveImage image={hero} placeholder={48} />            // 48px LQIP
-<ResponsiveImage image={hero} placeholder={{ width: 48, quality: 50 }} />
+On read, the virtual `croppedBlurHash` field does **all the placeholder work in the field hook**,
+next to the data — consumers select one field and paint what they get back. Declare what the read
+is rendering and a **finished, focal-cropped data URI** comes back: blurhash tiers crop in
+coefficient space (pure string math, microseconds) and render to a tiny inline PNG; webp tiers crop
+the stored micro-image (a ~1 KB Sharp decode, milliseconds). The same crop the transform endpoint
+makes, applied to the placeholder — no files, no extra cache rows:
+
+```ts
+const image = await payload.findByID({
+  collection: 'images',
+  id,
+  depth: 0,
+  select: { alt: true, width: true, height: true, croppedBlurHash: true, variantVersion: true },
+  context: { blurhash: { ar: '16:9', quality: 'sm' } }, // croppedBlurHash arrives as a finished data URI
+})
 ```
 
-Keep it small: the LQIP inlines in **every** response (~0.6 KB @24 → ~3–4 KB @64), so **24–64 is the
-sweet spot**. The component honors whatever you pass (no `maxWidth` clamp, just a 256px sanity guard),
-so reserve the big ones for heroes.
+`<ResponsiveImage>` is passive here: it paints the string it was handed as its own
+`background-image` — zero network, zero client JS, native swap when the real pixels load. A read
+that declares nothing gets the raw `sm` tier hash (28 chars — admin and API reads stay light;
+the component still renders a raw hash to a PNG as a fallback), and a doc with no stored tiers
+(predating the hook) simply renders without a placeholder. Disable per-image with
+`placeholder={false}`.
 
 <Callout type="info">
-  **Non-React consumers** can pull the same LQIP: set `req.context.lqip = { ar, fit, width?, quality? }`
-  on a read (or send `X-LQIP: 16/9; w=48`) and the doc returns a `blurDataURL` data-URI, a no-op on
-  every other read. It's **untrusted**, so `width` is clamped to `placeholder.maxWidth` (default 64)
-  and snapped to /8.
+  **Non-React consumers** get the same placeholder: send `X-Blurhash: 16:9; q=md` on a REST read
+  (or set `req.context.blurhash` on a Local API one) and `croppedBlurHash` comes back as a data URI
+  cropped to that ratio at that tier. Decoding client-side with a stock blurhash library instead?
+  Add `format=hash` and the cropped **raw hash string** comes back (blurhash tiers only — webp
+  tiers degrade to `xl`).
 </Callout>
+
+**Migrating an existing project.** Images uploaded before the hook existed have no stored tiers.
+Stamp them once with the bundled command — reads degrade gracefully until you do:
+
+```sh
+payload images:backfill                    # only images missing metadata (idempotent)
+payload images:backfill --force            # regenerate every image
+payload images:backfill --focal            # also set the saliency focal on docs still at 50/50
+payload images:backfill --collection media # an extendCollection target
+```
+
+`--focal` is opt-in because it **changes crops on a live site** (busts caches, regenerates
+variants); everything else is additive metadata that alters no rendered pixels.
+
+### Palette & alpha metadata
+
+The same upload-time decode extracts a **Sanity-style color palette** and alpha flags, stored on
+the doc and riding through reads and relationship population:
+
+```jsonc
+{
+  "palette": {
+    "dominant":  { "background": "#8a6748", "foreground": "#ffffff", "title": "#ffffff", "population": 0.31 },
+    "vibrant":   { "background": "#d97a2b", "foreground": "#ffffff", "title": "#ffffff", "population": 0.08 },
+    "muted": {}, "darkVibrant": {}, "darkMuted": {},
+    "lightVibrant": {}, "lightMuted": {} // same shape; any may be null
+  },
+  "hasAlpha": false,  // the file carries an alpha channel
+  "isOpaque": true    // no sampled pixel is actually transparent
+}
+```
+
+Use `palette.dominant.background` as a solid-color placeholder behind tiny thumbs (cheaper than a
+blurhash PNG), `foreground`/`title` for contrast-safe text over the image, and the alpha flags for
+format decisions (e.g. don't JPEG-flatten a transparent logo).
 
 ## OG images & raw URLs
 
@@ -586,19 +654,35 @@ default OG can just use `image.src`. Reach for `getImageUrl` only when you need 
 ratio the presets don't cover, like OG's 1200×630; `buildSrcset` / `buildVariantUrl` are there for
 a hand-rolled `<img>` / `<picture>`.
 
-## Focal-point cropping
+## Focal point, hotspot & crop
 
 Optimization is only half the job: a 16:9 hero and a 1:1 thumbnail of the same photo need
-different crops, and a naive center-crop lops off heads. So you mark the **focal point** (the part
-that must stay in frame) once per image, and the endpoint crops around it at every aspect ratio.
+different crops, and a naive center-crop lops off heads. Three stored, **non-destructive**
+layers (Sanity's model) shape every crop — the original file is never modified, unlike
+Payload's built-in destructive "Edit image" crop:
 
-- **Set it once.** The `images` collection ships Payload's focal-point picker plus a ratio-preview
-  field, so an editor drags the focus onto the subject and sees how it crops at common ratios.
-- **It rides along automatically.** The endpoint reads the focal point from the document and crops
-  server-side on any `fit=cover` request, so `<ResponsiveImage>`, the virtual URLs, and raw
-  endpoint calls all honor it with nothing extra to pass.
-- **Move it and stale crops refresh.** Changing the focal point purges that image's cached variants
-  and bumps its `v` token, so anything already served refetches the new crop.
+| Layer | Stored as | Meaning |
+| --- | --- | --- |
+| Crop | `cropLeft/Top/Right/Bottom` (%) | "only this region may ever be used" — everything outside is trimmed at transform time |
+| Focal point | `focalX`/`focalY` (%) | crop windows center here |
+| Hotspot size | `focalSize` (%) | the circle's diameter: how much context must stay in frame — smaller = tighter zoom, 100 = the classic maximal window |
+
+- **Set automatically, refined once.** Every upload gets an initial focal point from Sharp's
+  saliency (attention) analysis. The **Focus & crop** component does the rest: click/drag sets
+  the focal point, the circle's edge handle sizes the hotspot, the corner handles draw the crop
+  (everything outside dims). Two selects switch what the ratio tiles show — **Normal** (the real
+  crop), **Placeholder** (the instant placeholder), or **Half & half** (real left, placeholder
+  right) plus the quality tier — and every tile live-tracks all three layers with the exact
+  geometry the endpoint uses.
+- **It rides along automatically.** The endpoint reads all three layers from the document on any
+  `fit=cover` request, so `<ResponsiveImage>`, the virtual URLs, raw endpoint calls, and the
+  `croppedBlurHash` placeholder all honor them with nothing extra to pass. Non-cover fits honor
+  the crop rect.
+- **No upscaling, even zoomed.** A tight hotspot crops a small pixel region; the endpoint serves
+  that region at its native resolution (CSS scales it up) rather than inventing pixels.
+- **Change any layer and stale renders refresh.** Edits purge that image's cached variants and
+  bump its `v` token, so anything already served refetches — while untouched docs keep their
+  existing keys and URLs (the layers only join the cache identity when set off their defaults).
 
 ![Custom focal point setter component](/screenshots/images-back-end.png)
 
@@ -730,8 +814,11 @@ A few things to keep in mind:
   the `v` token and purges stale variants, but a cached page keeps serving the old URL until you
   revalidate that route — exactly as for any other Payload content.
 - **A bare id degrades `<ResponsiveImage>`.** Dimensions are guessed from the ratio, `alt` is empty,
-  there's no `v` token, and the srcset climbs to the 4096 ceiling. Pass the populated doc; you
-  usually have one.
+  there's no `v` token or placeholder, and the srcset climbs to the 4096 ceiling. Pass the populated
+  doc; you usually have one.
+- **Pre-existing images have no placeholder/palette until you backfill.** The metadata is stamped by
+  the upload hook, so images uploaded before the plugin (or before this feature) carry none. Run
+  `payload images:backfill` once; new uploads and file replacements analyze themselves.
 - **`extendCollection` hands you the upload config.** The plugin adds the pipeline to your collection,
   but `mimeTypes`, `localizeAlt`, and `maxOriginalSize` are ignored there — that collection's
   `upload` (and its `imageSizes`) stays yours to manage.
@@ -746,5 +833,12 @@ A few things to keep in mind:
 | `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image id. |
 | `buildVariantUrl` | `@pro-laico/payload-images/utils/urls` | Build a single transform URL for an id at a given width. |
 | `deriveVersion` | `@pro-laico/payload-images/utils/urls` | Compute the cache-busting `v` token from a source doc (filename + focal point). |
-| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio-preview field (wired via the import map when `focalUI` is on). |
+| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `focalUI` is on). |
 | `PurgeVariants` | `@pro-laico/payload-images/admin/purgeVariants` | Admin **Purge variants** button (wired via the import map when `focalUI` is on). |
+| `BLURHASH_QUALITIES` / `WEBP_QUALITIES` / `PlaceholderQuality` | `@pro-laico/payload-images` | The placeholder tier definitions (blurhash component counts, webp widths) and the tier union type. |
+| `cropBlurhashCoefficients` / `coverCropWindow` | `@pro-laico/payload-images` | Crop a blurhash to a target ratio + focal point in coefficient space (pure, µs). |
+| `blurhashToPngDataUri` | `@pro-laico/payload-images` | Render a blurhash string to an inline PNG `data:` URI (server-only; the raw-hash fallback in `<ResponsiveImage>`). |
+
+The plugin also registers one command on Payload's CLI: **`payload images:backfill`** — stamp the
+upload-time metadata (placeholder tiers, palette, alpha flags; `--focal` opt-in) onto images that
+predate the hook (`--force` to regenerate all, `--collection <slug>` for an `extendCollection` target).

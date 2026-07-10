@@ -15,13 +15,21 @@ const read = (name: string, doc: Record<string, unknown>, serverURL?: string): u
 const doc = { id: 'abc', width: 800, height: 600, filename: 'a.png', focalX: 50, focalY: 50 }
 
 describe('virtualUrlFields', () => {
-  it('exposes the four URL fields, all virtual + hidden from the admin', () => {
-    expect(VIRTUAL_URL_FIELDS).toEqual(['src', 'srcset', 'placeholderURL', 'thumbnailURL'])
+  it('exposes the virtual fields (URLs + version token), all virtual + hidden from the admin', () => {
+    expect(VIRTUAL_URL_FIELDS).toEqual(['src', 'srcset', 'placeholderURL', 'thumbnailURL', 'variantVersion'])
     for (const name of VIRTUAL_URL_FIELDS) {
       const f = fieldByName(name)
       expect(f.virtual).toBe(true)
       expect(f.admin?.hidden).toBe(true)
     }
+  })
+
+  it('variantVersion matches the token the URL builders derive, and moves on focal/hotspot edits', () => {
+    const v = read('variantVersion', doc) as string
+    expect(typeof v).toBe('string')
+    expect(read('src', doc)).toContain(`v=${v}`)
+    expect(read('variantVersion', { ...doc, focalX: 70 })).not.toBe(v)
+    expect(read('variantVersion', { ...doc, focalSize: 60 })).not.toBe(v)
   })
 
   it('builds relative URLs by default and absolute ones when serverURL is set', () => {
@@ -47,15 +55,5 @@ describe('virtualUrlFields', () => {
   it('returns null without an id or a filename (an unsaved / fileless doc)', () => {
     expect(read('src', { width: 800 })).toBeNull()
     expect(read('src', { id: 'x' })).toBeNull()
-  })
-
-  it('blurDataURL is a gated, defaultPopulate-excluded field that no-ops unless a read opts in', async () => {
-    const f = fieldByName('blurDataURL')
-    expect(f.virtual).toBe(true)
-    expect(f.admin?.hidden).toBe(true)
-    expect(VIRTUAL_URL_FIELDS).not.toContain('blurDataURL') // never rides along in relationship population
-    const hook = f.hooks?.afterRead?.[0] as FieldHook
-    // No req.context.lqip / X-LQIP → cheap no-op, even with a fully populated doc.
-    await expect(hook({ data: doc, req: {} } as never)).resolves.toBeNull()
   })
 })
