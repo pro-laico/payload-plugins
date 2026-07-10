@@ -18,7 +18,7 @@ export async function ProjectCard({ id, priority = false }: { id: string | numbe
               id={project.coverImage}
               aspectRatio="3:2"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 560px"
-              quality={priority ? 82 : 74}
+              image={{ aspectRatio: '3:2', quality: priority ? 82 : 74 }}
               className="block w-full"
             />
           </div>

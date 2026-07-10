@@ -171,14 +171,14 @@ describe('payload-images wiring', () => {
     // cheap path for reads that never render a placeholder).
     expect(doc.croppedBlurHash).toBe(doc.blurHashSm)
 
-    // Declare the render (req.context.blurhash) → a FINISHED placeholder data URI, cropped
+    // Declare the render (context.image.aspectRatio) → a FINISHED placeholder data URI, cropped
     // to that ratio in the field hook — no variant rows, nothing written.
     const before = await countVariants(payload, sourceId)
     const cropped = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { blurhash: { ar: '16/9' } },
+      context: { image: { aspectRatio: '16/9' } },
     })) as { croppedBlurHash?: string | null }
     expect(cropped.croppedBlurHash).toMatch(/^data:image\/png;base64,/)
     expect(await countVariants(payload, sourceId)).toBe(before) // read-side crop touches no files
@@ -188,28 +188,28 @@ describe('payload-images wiring', () => {
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { blurhash: { ar: '16/9', quality: 'xxl' } },
+      context: { image: { aspectRatio: '16/9' }, blur: { quality: 'xxl' } },
     })) as { croppedBlurHash?: string | null }
     expect(webp.croppedBlurHash).toMatch(/^data:image\/webp;base64,/)
     expect(webp.croppedBlurHash).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
 
-    // format: 'hash' keeps the raw-hash contract for stock blurhash decoders: the cropped
+    // blur.format: 'hash' keeps the raw-hash contract for stock blurhash decoders: the cropped
     // hash string — same shape as the stored tier, different coefficients.
     const rawHash = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { blurhash: { ar: '16/9', format: 'hash' } },
+      context: { image: { aspectRatio: '16/9' }, blur: { format: 'hash' } },
     })) as { croppedBlurHash?: string | null }
     expect((rawHash.croppedBlurHash as string).length).toBe((doc.blurHashSm as string).length)
     expect(rawHash.croppedBlurHash).not.toBe(doc.blurHashSm)
 
-    // Quality tier selection rides the same request object (no ar → full-frame PNG of that tier).
+    // Quality tier selection rides context.blur alone (no ratio → full-frame hash of that tier).
     const xl = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { blurhash: { quality: 'xl', format: 'hash' } },
+      context: { blur: { quality: 'xl', format: 'hash' } },
     })) as { croppedBlurHash?: string | null }
     expect(xl.croppedBlurHash).toBe(doc.blurHashXl)
   })
@@ -243,27 +243,36 @@ describe('payload-images wiring', () => {
     await payload.delete({ collection: 'images', id: doc.id, overrideAccess: true })
   })
 
-  it('<ResponsiveImage> renders a single <img> (Shape B) painting the croppedBlurHash it was handed', async () => {
-    const { ResponsiveImage } = await import('@pro-laico/payload-images/components/image')
-    // The consumption pattern: the READ declares the render, the component stays passive.
-    const doc = await payload.findByID({
+  it('<ResponsiveImage> renders a single <img> (Shape B) painting the render-ready doc it was handed', async () => {
+    const { RESPONSIVE_IMAGE_SELECT, ResponsiveImage } = await import('@pro-laico/payload-images/components/image')
+    // The consumption pattern: ONE read declares the render, the component stays passive.
+    const doc = (await payload.findByID({
       collection: 'images',
       id: sourceId,
       depth: 0,
       overrideAccess: true,
-      context: { blurhash: { ar: '16/9' } },
-    })
+      select: RESPONSIVE_IMAGE_SELECT,
+      context: { image: { aspectRatio: '16/9', quality: 80 } },
+    })) as { id: string | number; alt?: string; src?: string; srcset?: string; croppedBlurHash?: string }
 
-    // A Server Component is just an async function → call it and inspect the returned element.
-    const el = (await ResponsiveImage({ image: doc, aspectRatio: '16/9', config } as never)) as {
+    // The doc arrives render-ready: srcset for THIS render, v= baked in, placeholder finished.
+    expect(doc.srcset).toContain('q=80')
+    expect(doc.srcset).toMatch(/w=800&h=450/) // 16/9 h derived per width, not the natural ratio
+    expect(doc.srcset).toContain('v=') // cache-bust token baked in — nothing left for the client to derive
+    expect(doc.src).toContain('/api/img/')
+
+    // The component is a plain sync function → call it and inspect the returned element.
+    const render = { id: doc.id, alt: doc.alt ?? '', src: doc.src, srcset: doc.srcset }
+    const el = ResponsiveImage({ ...render, placeholder: doc.croppedBlurHash, aspectRatio: '16/9' }) as unknown as {
       type: string
-      props: { srcSet?: string; loading?: string; style?: { objectFit?: string; backgroundImage?: string } }
+      props: { srcSet?: string; loading?: string; style?: { objectFit?: string; aspectRatio?: string; backgroundImage?: string } }
     }
     expect(el.type).toBe('img') // Shape B: one element, no wrapper
     expect(el.props.srcSet).toContain('/api/img/')
     expect(el.props.loading).toBe('lazy')
     expect(el.props.style?.objectFit).toBe('cover')
-    // The blurhash is rendered to a tiny inline PNG at the render's aspect ratio.
+    expect(el.props.style?.aspectRatio).toBe('16/9')
+    // The placeholder is the finished PNG data URI, painted as-is at the render's ratio.
     expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/png;base64,/)
     const b64 = (el.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]
     const meta = await sharp(Buffer.from(b64 as string, 'base64')).metadata()
@@ -271,18 +280,12 @@ describe('payload-images wiring', () => {
     expect(meta.width).toBe(32)
     expect(meta.height).toBe(18) // round(32 / (16/9))
 
-    // placeholder={false} skips the paint even though the doc carries a hash.
-    const off = (await ResponsiveImage({ image: doc, aspectRatio: '1/1', config, placeholder: false } as never)) as {
-      props: { style?: { backgroundImage?: string } }
-    }
+    // No placeholder passed → no paint; the component never fetches or generates one.
+    const off = ResponsiveImage(render) as unknown as { props: { style?: { backgroundImage?: string } } }
     expect(off.props.style?.backgroundImage).toBeUndefined()
 
-    // Fully passive: a doc without croppedBlurHash renders without a placeholder — the
-    // component never fetches or generates one.
-    const bare = (await ResponsiveImage({ image: { id: sourceId, width: 1200, height: 800 }, aspectRatio: '1/1', config } as never)) as {
-      props: { style?: { backgroundImage?: string } }
-    }
-    expect(bare.props.style?.backgroundImage).toBeUndefined()
+    // No src/srcset (a doc that skipped the read contract) → renders nothing.
+    expect(ResponsiveImage({ id: doc.id, alt: '' })).toBeNull()
   })
 
   it('getImageUrl builds an absolute, focal-cropped OG URL that the endpoint serves (the generateMetadata pattern)', async () => {

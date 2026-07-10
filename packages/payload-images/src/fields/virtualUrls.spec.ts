@@ -6,17 +6,20 @@ import { VIRTUAL_URL_FIELDS, virtualUrlFields } from './virtualUrls'
 const fieldByName = (name: string): Field & { hooks?: { afterRead?: FieldHook[] }; virtual?: boolean; admin?: { hidden?: boolean } } =>
   virtualUrlFields().find((f) => 'name' in f && f.name === name) as never
 
-const read = (name: string, doc: Record<string, unknown>, serverURL?: string): unknown => {
+const read = (name: string, doc: Record<string, unknown>, opts: { serverURL?: string; intent?: Record<string, unknown> } = {}): unknown => {
   const hook = fieldByName(name).hooks?.afterRead?.[0] as FieldHook
-  const req = serverURL ? { payload: { config: { serverURL } } } : {}
+  const req = {
+    ...(opts.serverURL ? { payload: { config: { serverURL: opts.serverURL } } } : {}),
+    ...(opts.intent ? { context: { image: opts.intent } } : {}),
+  }
   return hook({ data: doc, req } as never)
 }
 
 const doc = { id: 'abc', width: 800, height: 600, filename: 'a.png', focalX: 50, focalY: 50 }
 
 describe('virtualUrlFields', () => {
-  it('exposes the virtual fields (URLs + version token), all virtual + hidden from the admin', () => {
-    expect(VIRTUAL_URL_FIELDS).toEqual(['src', 'srcset', 'placeholderURL', 'thumbnailURL', 'variantVersion'])
+  it('exposes the virtual fields (URLs + ratio + version token), all virtual + hidden from the admin', () => {
+    expect(VIRTUAL_URL_FIELDS).toEqual(['src', 'srcset', 'aspectRatio', 'placeholderURL', 'thumbnailURL', 'variantVersion'])
     for (const name of VIRTUAL_URL_FIELDS) {
       const f = fieldByName(name)
       expect(f.virtual).toBe(true)
@@ -34,7 +37,19 @@ describe('virtualUrlFields', () => {
 
   it('builds relative URLs by default and absolute ones when serverURL is set', () => {
     expect(read('src', doc)).toMatch(/^\/api\/img\/abc\?/)
-    expect(read('src', doc, 'https://site.com')).toMatch(/^https:\/\/site\.com\/api\/img\/abc\?/)
+    expect(read('src', doc, { serverURL: 'https://site.com' })).toMatch(/^https:\/\/site\.com\/api\/img\/abc\?/)
+  })
+
+  it('honors the declared render intent (context.image): srcset geometry + params, and aspectRatio echoes it', () => {
+    const srcset = read('srcset', doc, { intent: { aspectRatio: '16/9', quality: 80, fit: 'contain', format: 'webp' } }) as string
+    expect(srcset).toContain('w=800&h=450') // 16/9 h derived per width, not the natural 4/3
+    expect(srcset).toContain('q=80')
+    expect(srcset).toContain('fit=contain')
+    expect(srcset).toContain('fmt=webp')
+    expect(read('aspectRatio', doc, { intent: { aspectRatio: '16/9' } })).toBeCloseTo(16 / 9)
+    expect(read('aspectRatio', doc)).toBeCloseTo(800 / 600) // undeclared → natural
+    // Garbage intent values are ignored, not trusted.
+    expect(read('srcset', doc, { intent: { fit: 'zoom', format: 'gif' } })).toContain('fit=cover')
   })
 
   it('caps `src` at 1280px and emits a width-descriptor `srcset`', () => {

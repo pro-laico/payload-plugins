@@ -247,15 +247,19 @@ export interface Image {
     totalDocs?: number;
   };
   /**
+   * The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one.
+   */
+  aspectRatio?: number | null;
+  /**
    * Cache-busting version token for transform URLs (changes on file replace / focal / hotspot edits).
    */
   variantVersion?: string | null;
   /**
-   * Optimized URL (≤1280px) for a plain <img> or OG tag.
+   * Optimized URL (≤1280px) for a plain <img> or OG tag, honoring the declared render.
    */
   src?: string | null;
   /**
-   * Responsive srcset at the natural ratio, up to the source width.
+   * Responsive srcset up to the source width, honoring the declared render (else the natural ratio).
    */
   srcset?: string | null;
   /**
@@ -270,7 +274,7 @@ export interface Image {
   placeholderXxl?: string | null;
   placeholderX3?: string | null;
   /**
-   * Placeholder for the read: a finished data URI focal-cropped to the declared render (req.context.blurhash = { ar, quality, format } or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
+   * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
    */
   croppedBlurHash?: string | null;
   /**
@@ -906,6 +910,7 @@ export interface TestimonialsSelect<T extends boolean = true> {
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
   variants?: T;
+  aspectRatio?: T;
   variantVersion?: T;
   src?: T;
   srcset?: T;

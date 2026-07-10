@@ -52,7 +52,13 @@ async function TeamCard({ id }: { id: string | number }) {
     <div>
       <div className="overflow-hidden rounded-2xl border border-border bg-muted">
         {member.photo != null ? (
-          <Image id={member.photo} aspectRatio="1:1" sizes="(max-width: 640px) 100vw, 360px" quality={80} className="w-full" />
+          <Image
+            id={member.photo}
+            aspectRatio="1:1"
+            sizes="(max-width: 640px) 100vw, 360px"
+            image={{ aspectRatio: '1:1', quality: 80 }}
+            className="w-full"
+          />
         ) : (
           <div className="aspect-square" />
         )}

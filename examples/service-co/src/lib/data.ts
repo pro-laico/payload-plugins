@@ -1,5 +1,5 @@
 import 'server-only'
-import type { PlaceholderQuality } from '@pro-laico/payload-images'
+import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
 import { cacheDoc, cacheGlobal, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
 import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, TeamMember, Testimonial } from './types'
 
@@ -118,26 +118,21 @@ export const getTestimonial = async (id: string | number): Promise<Testimonial |
   return cacheDoc(doc, 'testimonials', { label: 'testimonial-by-id' })
 }
 
-/** The payload-images doc is an ordinary id-keyed entry — `<ResponsiveImage image={doc}>` renders
- *  FROM it, so an alt/focal edit busts `images:{id}` and exactly this entry re-materializes
- *  (with a new `variantVersion` token, so the derived binary variants refresh too). `blurhash`
- *  declares the render (aspect ratio + tier), so `croppedBlurHash` arrives as a FINISHED
- *  placeholder data URI — the focal/crop processing lives in the plugin's field hook, and this
- *  select stays down to exactly what rendering consumes. 'use cache' keys on the args, giving
- *  each (id, ratio) its own entry — all tagged `images:{id}`, so one edit busts every ratio's
- *  entry together. */
-export const getImage = async (
-  id: string | number,
-  blurhash?: { ar?: number | string; quality?: PlaceholderQuality },
-): Promise<MediaImage | null> => {
+/** The cached variant of the image read the `<Image>` component does directly — the payload-images
+ *  doc as an ordinary id-keyed entry, so an alt/focal edit busts `images:{id}` and exactly this
+ *  entry re-materializes (with fresh `v=` tokens baked into the srcset, so the derived binary
+ *  variants refresh too). The render context (`{ image, blur }`) declares what's being rendered,
+ *  so `src`/`srcset`/`croppedBlurHash` arrive finished for it; 'use cache' keys on the args,
+ *  giving each (id, render) its own entry — all tagged `images:{id}`, busted together. */
+export const getImage = async (id: string | number, render?: ImageRenderContext): Promise<MediaImage | null> => {
   'use cache'
   const payload = await getPayloadClient()
   const doc = (await payload.findByID({
     collection: 'images',
     id,
     depth: 0,
-    select: { alt: true, width: true, height: true, croppedBlurHash: true, variantVersion: true },
-    context: { blurhash },
+    select: RESPONSIVE_IMAGE_SELECT,
+    context: { ...render },
     disableErrors: true,
     overrideAccess: true,
   })) as MediaImage | null

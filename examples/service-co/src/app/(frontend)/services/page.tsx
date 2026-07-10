@@ -46,7 +46,13 @@ async function ServiceSection({ id, index, count }: { id: string | number; index
     <section className="grid items-center gap-10 lg:grid-cols-2">
       <div className={`overflow-hidden rounded-2xl border border-border ${flip ? 'lg:order-2' : ''}`}>
         {service.image != null ? (
-          <Image id={service.image} aspectRatio="4:3" sizes="(max-width: 1024px) 100vw, 560px" quality={80} className="w-full" />
+          <Image
+            id={service.image}
+            aspectRatio="4:3"
+            sizes="(max-width: 1024px) 100vw, 560px"
+            image={{ aspectRatio: '4:3', quality: 80 }}
+            className="w-full"
+          />
         ) : null}
       </div>
       <div className={flip ? 'lg:order-1' : ''}>

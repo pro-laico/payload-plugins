@@ -53,7 +53,7 @@ async function HomeContent() {
       {/* Hero — a full-bleed payload-images crop (object-fit fill) under an editorial overlay. */}
       <section className="relative h-[80vh] min-h-[540px] w-full overflow-hidden bg-muted">
         {settings.heroImage != null ? (
-          <Image id={settings.heroImage} fill sizes="100vw" quality={86} blurhashQuality="md" className="object-cover" />
+          <Image id={settings.heroImage} fill sizes="100vw" image={{ quality: 86 }} blur={{ quality: 'md' }} className="object-cover" />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/10" />
         <div className="absolute inset-0 flex items-end">
@@ -95,7 +95,13 @@ async function HomeContent() {
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 lg:grid-cols-2">
             <div className="overflow-hidden rounded-2xl border border-border">
               {featured?.coverImage != null ? (
-                <Image id={featured.coverImage} aspectRatio="4:3" sizes="(max-width: 1024px) 100vw, 560px" quality={82} className="w-full" />
+                <Image
+                  id={featured.coverImage}
+                  aspectRatio="4:3"
+                  sizes="(max-width: 1024px) 100vw, 560px"
+                  image={{ aspectRatio: '4:3', quality: 82 }}
+                  className="w-full"
+                />
               ) : null}
             </div>
             <div>

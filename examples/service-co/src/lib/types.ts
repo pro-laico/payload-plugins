@@ -9,11 +9,9 @@ export type RelId = string | number
 export type MediaImage = {
   id: RelId
   alt?: string | null
-  width?: number | null
-  height?: number | null
-  url?: string | null
+  src?: string | null
+  srcset?: string | null
   croppedBlurHash?: string | null
-  variantVersion?: string | null
 }
 
 export type IconDoc = { id: RelId; svgString?: string | null; filename?: string | null }

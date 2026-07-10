@@ -41,4 +41,4 @@ export const getConfig = async (): Promise<SanitizedConfig> => {
 
 /** A booted Payload instance, using the host app's config — the shared server-side entry
  *  point for the `./cache` helpers, so the config-resolution trick lives in one place. */
-export const getPayloadClient = async (): Promise<Payload> => getPayload({ config: await getConfig() })
+export const getPayloadClient = async (): Promise<Payload> => getPayload({ config: await getConfig() }) //TODO: DELETE THIS. Nothing should be relying on it.

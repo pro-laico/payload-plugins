@@ -1,5 +1,6 @@
 import config from '@payload-config'
-import { getImageUrl } from '@pro-laico/payload-images/components/image'
+import type { AspectRatio } from '@pro-laico/payload-images'
+import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import type { CSSProperties } from 'react'
@@ -24,7 +25,7 @@ type PageDoc = { id: string | number; title?: string | null; heroImage?: { id: s
 
 // The crops the demo renders for each source — all cut to the image's focal point, so an
 // off-center subject stays in frame whether the box is wide, square, or tall.
-const RATIOS: { label: string; ar?: string }[] = [
+const RATIOS: { label: string; ar?: AspectRatio }[] = [
   { label: 'natural' },
   { label: '16:9', ar: '16:9' },
   { label: '1:1', ar: '1:1' },
@@ -104,7 +105,7 @@ export default async function HomePage() {
             <div style={ratiosGrid}>
               {RATIOS.map(({ label, ar }) => (
                 <div style={ratioTile} key={label}>
-                  <Image id={img.id} aspectRatio={ar} sizes={TILE_SIZES} />
+                  <Image id={img.id} aspectRatio={ar} image={{ aspectRatio: ar }} sizes={TILE_SIZES} />
                   <small style={ratioLabel}>{label}</small>
                 </div>
               ))}
@@ -139,7 +140,13 @@ export default async function HomePage() {
                 <small className="shell-muted">heroImage → {heroId ? `#${heroId}` : '(none)'}</small>
               </div>
               {heroId ? (
-                <Image id={heroId} aspectRatio="16:9" sizes="(max-width: 920px) 100vw, 880px" blurhashQuality="md" />
+                <Image
+                  id={heroId}
+                  aspectRatio="16:9"
+                  image={{ aspectRatio: '16:9' }}
+                  blur={{ quality: 'md' }}
+                  sizes="(max-width: 920px) 100vw, 880px"
+                />
               ) : (
                 <EmptyState>No hero image set.</EmptyState>
               )}
@@ -149,26 +156,25 @@ export default async function HomePage() {
       )}
 
       <h2>How it works</h2>
-      <pre className="shell-code">{`// The project owns one <Image> component (src/components/Image.tsx): pass an id + presentation
-// props; it fetches its own doc — leanest possible read — and hands everything to the passive
-// <ResponsiveImage>:
-<Image id={imageId} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
+      <pre className="shell-code">{`// The project owns one <Image> component (src/components/Image.tsx) — its props type
+// (ImageProps) ships with the plugin. Pass an id + the declared render:
+<Image id={imageId} aspectRatio="16:9" image={{ aspectRatio: '16:9', quality: 80 }} blur={{ quality: 'md' }} sizes="50vw" />
 
-// Inside it:
+// Inside it — ONE findByID does all the work; the doc arrives render-ready:
 const doc = await payload.findByID({
-  collection: 'images',
   id,
+  collection: 'images',
   depth: 0,
-  select: { alt: true, width: true, height: true, croppedBlurHash: true, variantVersion: true },
-  context: { blurhash: { ar: aspectRatio, quality: 'sm' } }, // placeholder arrives as a finished data URI, cropped to this ratio
+  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + croppedBlurHash
+  context: { image, blur },        // the declared render, verbatim
 })
-return <ResponsiveImage image={doc} aspectRatio={aspectRatio} {...rest} />
+return <ResponsiveImage id={doc.id} alt={doc.alt} src={doc.src} srcset={doc.srcset} placeholder={doc.croppedBlurHash} {...rest} />
 
-// <ResponsiveImage> emits a plain <img>: srcset → the transform endpoint (v= busts immutable
-// caches on file/focal edits), background → the croppedBlurHash data URI, as-is:
+// The doc carries a finished srcset for THIS render (v= busts immutable caches on file/focal
+// edits) and a focal-cropped placeholder — <ResponsiveImage> just paints a plain <img>:
 //   <img
-//     srcset="/api/img/<id>?w=320&h=180&fit=cover&q=75&fmt=auto&v=1a2b3c 320w, … "
-//     style="aspect-ratio: 1.777…; background-image: url(data:image/png;base64,…)"
+//     srcset="/api/img/<id>?w=320&h=180&fit=cover&q=80&fmt=auto&v=1a2b3c 320w, … "
+//     style="aspect-ratio: 16 / 9; background-image: url(data:image/png;base64,…)"
 //   />`}</pre>
 
       {images.length > 0 && (

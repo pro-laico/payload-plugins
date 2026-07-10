@@ -133,17 +133,27 @@ async function PostCard({ id }: { id: string | number }) {
   )
 }
 
-/** One image = one cache entry (`getImage(id)` → tagged images:{id}). `<ResponsiveImage>`
- *  renders FROM the cached doc — an alt or focal-point edit re-materializes exactly this
- *  entry (and mints a new `v=` token, so the derived binary variants refresh too). */
+/** One image = one cache entry (`getImage(id, render)` → tagged images:{id}). The getter
+ *  declares the render, so the cached doc carries a finished src/srcset/placeholder for this
+ *  exact box — an alt or focal-point edit re-materializes exactly this entry (with fresh `v=`
+ *  tokens, so the derived binary variants refresh too). */
 async function ImageCard({ id }: { id: string | number }) {
-  const image = await getImage(id)
+  const image = await getImage(id, { image: { aspectRatio: '16/9' } })
   if (!image) return null
   return (
     <div style={{ margin: '4px 0', maxWidth: 420 }}>
-      <ResponsiveImage image={image} sizes="420px" aspectRatio="16/9" style={{ borderRadius: 8 }} />
+      <ResponsiveImage
+        id={image.id}
+        alt={image.alt ?? ''}
+        src={image.src}
+        srcset={image.srcset}
+        placeholder={image.croppedBlurHash}
+        aspectRatio="16/9"
+        sizes="420px"
+        style={{ borderRadius: 8 }}
+      />
       <small className="shell-muted">
-        {image.alt} — focal {image.focalX ?? 50}/{image.focalY ?? 50}, entry tagged images:{image.id}
+        {image.alt} — entry tagged images:{image.id}
       </small>
     </div>
   )

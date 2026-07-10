@@ -6,12 +6,12 @@
  *
  *  - **no declared intent** → the raw `sm` tier hash, uncropped (28 chars) — admin, list,
  *    and API reads that never render a placeholder stay light.
- *  - **declared intent** (`req.context.blurhash = { ar, quality }`, or an
- *    `X-Blurhash: ar=16/9; q=md` header) → a FINISHED placeholder data URI, focal-cropped
- *    to the requested aspect ratio: hash tiers render to a tiny inline PNG (coefficient
- *    crop, pure math); webp tiers (`xxl`/`x3`) crop the stored micro-webp (a ~1 KB Sharp
- *    decode, milliseconds).
- *  - **`format: 'hash'`** → the focal-cropped raw hash string, for consumers decoding
+ *  - **declared intent** (`context.image = { aspectRatio }` and/or `context.blur = { quality }`,
+ *    or an `X-Blurhash: ar=16/9; q=md` header on REST) → a FINISHED placeholder data URI,
+ *    focal-cropped to the declared aspect ratio: hash tiers render to a tiny inline PNG
+ *    (coefficient crop, pure math); webp tiers (`xxl`/`x3`) crop the stored micro-webp (a
+ *    ~1 KB Sharp decode, milliseconds).
+ *  - **`blur.format: 'hash'`** → the focal-cropped raw hash string, for consumers decoding
  *    client-side with a stock blurhash library (hash tiers only; webp tiers fall back to
  *    `xl`).
  */
@@ -19,30 +19,33 @@ import type { Field, FieldHook } from 'payload'
 
 import { blurhashToPngDataUri } from '../blurhash/png'
 import { parseAspectRatio } from '../transform/params'
+import { readBlurIntent, readImageIntent } from '../lib/renderIntent'
 import { cropWebpDataUri } from '../blurhash/webpPlaceholder'
 import { coverCropWindow, type CropWindow } from '../blurhash/window'
 import { cropBlurhashCoefficients } from '../blurhash/cropCoefficients'
 import {
-  BLURHASH_QUALITIES,
+  BLURHASH_TIERS,
   type BlurhashQuality,
   blurhashFieldName,
   DEFAULT_BLURHASH_QUALITY,
   isBlurhashQuality,
+  isPlaceholderFormat,
   isPlaceholderQuality,
   isWebpQuality,
   PLACEHOLDER_FIELD_NAMES,
+  type PlaceholderFormat,
   type PlaceholderQuality,
-  WEBP_QUALITIES,
+  WEBP_TIERS,
   webpFieldName,
   type WebpQuality,
 } from '../blurhash/qualities'
 
+export type { PlaceholderFormat }
+
 const d = {
   croppedBlurHash:
-    'Placeholder for the read: a finished data URI focal-cropped to the declared render (req.context.blurhash = { ar, quality, format } or an X-Blurhash header); the raw sm-tier hash when nothing is declared.',
+    'Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.',
 }
-
-export type PlaceholderFormat = 'uri' | 'hash'
 
 export interface BlurhashRequest {
   /** Target aspect ratio (`16/9`, `"16:9"`, `1.78`) — crops the placeholder to match, from the focal point. */
@@ -54,7 +57,7 @@ export interface BlurhashRequest {
   format?: PlaceholderFormat
 }
 
-const isFormat = (v: unknown): v is PlaceholderFormat => v === 'uri' || v === 'hash'
+const isFormat = isPlaceholderFormat
 
 /** Parse an `X-Blurhash` header: a bare ratio (`16/9`) or a `;`-list (`ar=16/9; q=md; format=hash`). */
 const parseHeader = (h: string): BlurhashRequest => {
@@ -78,19 +81,14 @@ const parseHeader = (h: string): BlurhashRequest => {
   return out
 }
 
-/** Read the blurhash request off the operation: `req.context.blurhash` (Local API) or the `X-Blurhash` header (REST). */
+/** Read the placeholder request off the operation: the declared render (`context.image.aspectRatio`
+ *  for the crop, `context.blur` for tier/answer form — Local API), else the `X-Blurhash` header (REST). */
 const readRequest = (
   req: { context?: Record<string, unknown>; headers?: { get?: (k: string) => string | null } } | undefined,
 ): BlurhashRequest => {
-  const ctx = req?.context?.blurhash
-  if (ctx && typeof ctx === 'object') {
-    const o = ctx as { ar?: number | string; quality?: unknown; format?: unknown }
-    return {
-      ar: parseAspectRatio(o.ar),
-      quality: isPlaceholderQuality(o.quality) ? o.quality : undefined,
-      format: isFormat(o.format) ? o.format : undefined,
-    }
-  }
+  const image = readImageIntent(req)
+  const blur = readBlurIntent(req)
+  if (image.declared || blur.declared) return { ar: image.aspectRatio, quality: blur.quality, format: blur.format }
   const header = req?.headers?.get?.('x-blurhash')
   return header ? parseHeader(header) : {}
 }
@@ -116,9 +114,8 @@ const storedString = (doc: ImageDocLike, field: string): string | undefined => {
 /** The best stored hash at or below the requested tier (docs predating a tier still get
  *  the best placeholder they have, instead of none). */
 const storedHash = (doc: ImageDocLike, quality: BlurhashQuality): string | undefined => {
-  const tiers = Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]
-  for (let i = tiers.indexOf(quality); i >= 0; i--) {
-    const hash = storedString(doc, blurhashFieldName(tiers[i]!))
+  for (let i = BLURHASH_TIERS.indexOf(quality); i >= 0; i--) {
+    const hash = storedString(doc, blurhashFieldName(BLURHASH_TIERS[i]!))
     if (hash) return hash
   }
   return undefined
@@ -126,9 +123,8 @@ const storedHash = (doc: ImageDocLike, quality: BlurhashQuality): string | undef
 
 /** The best stored micro-webp at or below the requested tier. */
 const storedWebp = (doc: ImageDocLike, quality: WebpQuality): string | undefined => {
-  const tiers = Object.keys(WEBP_QUALITIES) as WebpQuality[]
-  for (let i = tiers.indexOf(quality); i >= 0; i--) {
-    const uri = storedString(doc, webpFieldName(tiers[i]!))
+  for (let i = WEBP_TIERS.indexOf(quality); i >= 0; i--) {
+    const uri = storedString(doc, webpFieldName(WEBP_TIERS[i]!))
     if (uri) return uri
   }
   return undefined

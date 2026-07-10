@@ -47,8 +47,9 @@ export interface ImagesPluginOptions {
   /** Override for the hidden generated-images (variant cache) collection. */
   generatedImagesOverrides?: Partial<CollectionConfig>
   /**
-   * The project-wide srcset widths, set once and applied uniformly to the API virtual `srcset`,
-   * `<ResponsiveImage>`, and the endpoint's anti-DoS dimension grid. Two forms:
+   * The project-wide srcset widths, set once and applied uniformly to the API virtual `srcset`
+   * and the endpoint's anti-DoS dimension grid (`<ResponsiveImage>` always steps by the default
+   * 50 — off-grid widths just snap server-side). Two forms:
    *  - a **number** (default 50): the width increment AND the grid the endpoint snaps requests
    *    to — a bigger step means fewer srcset widths and fewer cached variants.
    *  - an **array**: an explicit, non-linear width ladder (e.g. `[200, 450, 750, 1200, 2000]`)

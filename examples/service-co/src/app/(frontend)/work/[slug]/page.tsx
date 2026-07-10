@@ -48,7 +48,7 @@ async function ProjectDetail({ params }: Params) {
       {/* Cover */}
       <div className="relative h-[62vh] min-h-[420px] w-full overflow-hidden bg-muted">
         {project.coverImage != null ? (
-          <Image id={project.coverImage} fill sizes="100vw" quality={86} blurhashQuality="md" className="object-cover" />
+          <Image id={project.coverImage} fill sizes="100vw" image={{ quality: 86 }} blur={{ quality: 'md' }} className="object-cover" />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
         <div className="absolute inset-0 flex items-end">
@@ -106,7 +106,7 @@ async function ProjectDetail({ params }: Params) {
                   id={imageId}
                   aspectRatio={i === 0 && gallery.length > 1 ? '16:9' : '4:3'}
                   sizes="(max-width: 640px) 100vw, 900px"
-                  quality={80}
+                  image={{ aspectRatio: i === 0 && gallery.length > 1 ? '16:9' : '4:3', quality: 80 }}
                   className="w-full"
                 />
               </div>

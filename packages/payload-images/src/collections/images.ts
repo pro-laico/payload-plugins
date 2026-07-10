@@ -3,13 +3,14 @@ import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 
 import { anyone, authd } from '../access'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
+import { RESPONSIVE_IMAGE_SELECT } from '../lib/renderIntent'
 import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
 import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
 import { generateImageMetadataBeforeChange } from '../hooks/generateImageMetadata'
 import { blurhashStorageFields, croppedBlurhashField } from '../fields/croppedBlurhash'
 import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
 import { purgeStaleVariantsAfterChange, purgeVariantsBeforeDelete } from '../hooks/purge'
-import { VIRTUAL_URL_FIELDS, VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
+import { VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
 
 const d = { alt: 'Describe the image for screen readers and SEO.' }
 
@@ -117,21 +118,18 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
-  const renderableFields = {
-    alt: true,
-    url: true,
-    filename: true,
-    width: true,
-    height: true,
-    focalX: true,
-    focalY: true,
-    croppedBlurHash: true,
-    ...Object.fromEntries(MEDIA_METADATA_FIELD_NAMES.map((f) => [f, true])),
-    ...Object.fromEntries(HOTSPOT_FIELD_NAMES.map((f) => [f, true])),
-  }
+  // With the virtuals on, a populated image carries exactly what `<ResponsiveImage>` renders —
+  // finished src/srcset/aspectRatio/croppedBlurHash — so population stays lean (anything else,
+  // e.g. palette/filename/thumbnailURL, is an explicit select away). Without them the component
+  // builds URLs itself, so the identity fields ride along instead.
   const defaultPopulate = virtualFields
-    ? { ...renderableFields, ...Object.fromEntries(VIRTUAL_URL_FIELDS.map((f) => [f, true])) }
-    : renderableFields
+    ? RESPONSIVE_IMAGE_SELECT
+    : {
+        alt: true,
+        url: true,
+        ...Object.fromEntries(MEDIA_METADATA_FIELD_NAMES.map((f) => [f, true])),
+        ...Object.fromEntries(HOTSPOT_FIELD_NAMES.map((f) => [f, true])),
+      }
   const forceSelect = Object.fromEntries(
     [...(virtualFields ? VIRTUAL_URL_INPUTS : []), ...PLACEHOLDER_FIELD_NAMES, ...HOTSPOT_FIELD_NAMES].map((f) => [f, true]),
   )

@@ -57,11 +57,14 @@ describe('createImagesCollection', () => {
     expect(byName(off.fields, 'src')).toBeUndefined()
   })
 
-  it('populates renderable fields + virtual URLs by default, never the variants join', () => {
+  it('populates the lean <ResponsiveImage> set by default (finished virtuals only), never the variants join', () => {
     const dp = createImagesCollection().defaultPopulate as Record<string, boolean>
-    expect(dp.url).toBe(true)
-    expect(dp.src).toBe(true)
+    for (const name of ['alt', 'src', 'srcset', 'croppedBlurHash']) expect(dp[name]).toBe(true)
+    expect(dp.url).toBeUndefined() // identity/metadata fields are an explicit select away
     expect(dp.variants).toBeUndefined()
+    // Without the virtuals there are no finished URLs, so the raw url + metadata ride along.
+    const off = createImagesCollection({ virtualFields: false }).defaultPopulate as Record<string, boolean>
+    expect(off.url).toBe(true)
     // forceSelect keeps the virtual fields' inputs present even under `select`.
     expect((createImagesCollection().forceSelect as Record<string, boolean>).width).toBe(true)
   })

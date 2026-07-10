@@ -10,6 +10,7 @@ export type Format = 'auto' | 'avif' | 'webp' | 'jpeg' | 'png'
 export type OutputFormat = Exclude<Format, 'auto'>
 
 export const FITS: Fit[] = ['cover', 'contain', 'inside', 'outside', 'fill']
+export const FORMATS: Format[] = ['auto', 'avif', 'webp', 'jpeg', 'png']
 
 export interface TransformConstraints {
   /** Hard ceiling on either output dimension. */
@@ -59,7 +60,7 @@ export const DEFAULT_CONSTRAINTS: TransformConstraints = {
   maxDimension: 4096,
   qualityRange: [40, 95],
   defaultQuality: 75,
-  formats: ['auto', 'avif', 'webp', 'jpeg', 'png'],
+  formats: FORMATS,
   defaultFormat: 'auto',
   preferAvif: false,
   dimensionStep: DEFAULT_PIXEL_STEP,

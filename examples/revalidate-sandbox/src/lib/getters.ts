@@ -1,3 +1,4 @@
+import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
 import { cacheDoc, cacheGlobal, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
 import type { Image, Media, Post, Service, SiteSetting } from '@/payload-types'
 
@@ -63,12 +64,23 @@ export async function getService(id: string | number): Promise<Service | null> {
 
 /** The @pro-laico/payload-images integration: the images doc is an ordinary id-keyed
  *  cacheDoc entry — `<ResponsiveImage image={doc} />` renders FROM it, so an alt/focal
- *  edit busts `images:{id}` and exactly this entry re-materializes (with a new `v=`
- *  token, so the binary variants re-derive too). */
-export async function getImage(id: string | number): Promise<Image | null> {
+ *  edit busts `images:{id}` and exactly this entry re-materializes (with fresh `v=`
+ *  tokens in the srcset, so the binary variants re-derive too). The render context
+ *  (`{ image, blur }`) declares what's being rendered, so the doc arrives with
+ *  `src`/`srcset`/`croppedBlurHash` finished for it; 'use cache' keys on the args, one
+ *  entry per (id, render). */
+export async function getImage(id: string | number, render?: ImageRenderContext): Promise<Image | null> {
   'use cache'
   const payload = await getPayloadClient()
-  const doc = (await payload.findByID({ collection: 'images', id, depth: 0, disableErrors: true, overrideAccess: false })) as Image | null
+  const doc = (await payload.findByID({
+    collection: 'images',
+    id,
+    depth: 0,
+    select: RESPONSIVE_IMAGE_SELECT,
+    context: { ...render },
+    disableErrors: true,
+    overrideAccess: false,
+  })) as Image | null
   return cacheDoc(doc, 'images', { label: 'image-by-id' })
 }
 

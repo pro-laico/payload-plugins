@@ -1,5 +1,5 @@
 import config from '@payload-config'
-import { buildSrcset, deriveVersion } from '@pro-laico/payload-images/components/image'
+import { buildSrcset, deriveVersion } from '@pro-laico/payload-images/utils/urls'
 import { Image } from '../../../components/Image'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'

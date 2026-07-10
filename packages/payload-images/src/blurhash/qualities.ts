@@ -39,6 +39,10 @@ export const isBlurhashQuality = (v: unknown): v is BlurhashQuality => typeof v 
 export const isWebpQuality = (v: unknown): v is WebpQuality => typeof v === 'string' && v in WEBP_QUALITIES
 export const isPlaceholderQuality = (v: unknown): v is PlaceholderQuality => isBlurhashQuality(v) || isWebpQuality(v)
 
+/** How the `croppedBlurHash` virtual answers: `uri` = a finished data URI, `hash` = the cropped raw hash string. */
+export type PlaceholderFormat = 'uri' | 'hash'
+export const isPlaceholderFormat = (v: unknown): v is PlaceholderFormat => v === 'uri' || v === 'hash'
+
 const capitalize = (s: string): string => `${s[0]!.toUpperCase()}${s.slice(1)}`
 
 /** The stored field name for a blurhash tier (`blurHashXs` … `blurHashXl`). */
