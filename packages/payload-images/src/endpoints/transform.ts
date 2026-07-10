@@ -19,14 +19,7 @@ import { setTransformConcurrency } from '../transform/limit'
 import { setSharpConcurrency } from '../transform/sharpInstance'
 import { GENERATED_IMAGES_SLUG } from '../collections/generatedImages'
 import { type GenBytes, getOrCreateVariantBytes } from '../transform/getVariantBytes'
-import {
-  DEFAULT_CONSTRAINTS,
-  type Format,
-  negotiateFormat,
-  type OutputFormat,
-  parseTransformParams,
-  type TransformConstraints,
-} from '../transform/params'
+import { DEFAULT_CONSTRAINTS, negotiateFormat, type OutputFormat, parseTransformParams, type TransformConstraints } from '../transform/params'
 
 export interface TransformEndpointConfig extends Partial<TransformConstraints> {
   /** Source image collection slug. Default `images`. */
@@ -55,7 +48,7 @@ type SourceDoc = UploadDocLike & {
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const PRIVATE_IMMUTABLE = 'private, max-age=31536000, immutable'
 
-const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit //TODO: replace `as` cast with proper typing
+const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit //EXCUSE: Buffer's ArrayBufferLike backing fails lib.dom's BodyInit, but Response accepts Node Buffers at runtime; a typed view would copy the bytes
 
 const resolveConstraints = (cfg: TransformEndpointConfig): TransformConstraints => ({
   maxDimension: cfg.maxDimension ?? DEFAULT_CONSTRAINTS.maxDimension,
@@ -85,8 +78,8 @@ const buildHeaders = (mime: string, key: string, isAuto: boolean, cdn: boolean, 
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
 export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endpoint => {
   const path = '/img'
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //TODO: replace `as` cast with proper typing
-  const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //TODO: replace `as` cast with proper typing
+  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+  const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //EXCUSE: same as sourceSlug above
   const cdn = cfg.cdnCacheControl !== false
   const constraints = resolveConstraints(cfg)
   setTransformConcurrency(cfg.maxConcurrency)
@@ -112,7 +105,8 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
 
       const readSource = async (user: PayloadRequest['user']): Promise<SourceDoc | null> => {
         try {
-          return (await payload.findByID({ collection: sourceSlug, id, depth: 0, overrideAccess: false, user })) as unknown as SourceDoc //TODO: replace `as` cast with proper typing
+          //EXCUSE: a doc of a runtime-configured collection is untyped; downstream reads are null-guarded
+          return (await payload.findByID({ collection: sourceSlug, id, depth: 0, overrideAccess: false, user })) as unknown as SourceDoc
         } catch {
           return null
         }
@@ -123,10 +117,9 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
       if (!source || (!source.url && !source.filename)) return new Response('Not found', { status: 404 })
       const src = source
 
+      const format: OutputFormat =
+        p.fmt === 'auto' ? negotiateFormat(req.headers.get('accept'), constraints.formats, constraints.preferAvif) : p.fmt
       const isAuto = p.fmt === 'auto'
-      const format: OutputFormat = isAuto
-        ? negotiateFormat(req.headers.get('accept'), constraints.formats, constraints.preferAvif)
-        : (p.fmt as Exclude<Format, 'auto'>) //TODO: replace `as` cast with proper typing
 
       const result = await getOrCreateVariantBytes({
         payload,

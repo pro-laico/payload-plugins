@@ -97,7 +97,8 @@ export interface CropGeometry {
 /**
  * Cover-crop geometry honoring the hotspot layers. Given the (orientation-corrected)
  * source dims, a target box (one side may be omitted and is derived from the source
- * aspect), the focal percentages, and optional hotspot/crop opts, returns the resize
+ * aspect; both omitted falls back to the source dims), the focal percentages, and
+ * optional hotspot/crop opts, returns the resize
  * dims and the extract window. With default opts this reproduces the plain focal
  * cover-crop exactly.
  */
@@ -110,8 +111,8 @@ export const coverCropGeometry = (
   focalY = 50,
   opts: HotspotOpts = {},
 ): CropGeometry => {
-  const tw = targetW ?? Math.max(1, Math.round(((targetH as number) * sw) / sh)) //TODO: replace `as` cast with proper typing
-  const th = targetH ?? Math.max(1, Math.round(((targetW as number) * sh) / sw)) //TODO: replace `as` cast with proper typing
+  const tw = targetW ?? Math.max(1, Math.round(((targetH ?? sh) * sw) / sh))
+  const th = targetH ?? Math.max(1, Math.round(((targetW ?? sw) * sh) / sw))
   const o: HotspotOpts = { ...opts, focalX: opts.focalX ?? focalX, focalY: opts.focalY ?? focalY }
   const win = hotspotWindow(sw, sh, tw / th, o)
 

@@ -11,10 +11,13 @@ import { encodeBlurhashFromImageSource } from '../../blurhash/encodeFromCanvas'
 import { decodeToLinearGrid, linearToSrgb, type ParsedBlurhash } from '../../blurhash/codec'
 import {
   BLURHASH_QUALITIES,
+  BLURHASH_TIERS,
   type BlurhashQuality,
+  isPlaceholderQuality,
   isWebpQuality,
   type PlaceholderQuality,
   WEBP_QUALITIES,
+  WEBP_TIERS,
   type WebpQuality,
 } from '../../blurhash/qualities'
 
@@ -49,12 +52,14 @@ const clampPct = (n: number): number => clamp(n, 0, 100)
 
 const QUALITIES = BLURHASH_QUALITIES
 type Quality = PlaceholderQuality
-const TIER_OPTIONS = [...Object.keys(BLURHASH_QUALITIES), ...Object.keys(WEBP_QUALITIES)] as Quality[] //TODO: replace `as` cast with proper typing
+const TIER_OPTIONS: Quality[] = [...BLURHASH_TIERS, ...WEBP_TIERS]
 const tierLabel = (q: Quality): string =>
   isWebpQuality(q) ? `${q} · webp ${WEBP_QUALITIES[q]}px` : `${q} · ${BLURHASH_QUALITIES[q][0]}×${BLURHASH_QUALITIES[q][1]}`
 
 type DisplayMode = 'normal' | 'half' | 'blurhash'
+const DISPLAY_MODES: DisplayMode[] = ['normal', 'half', 'blurhash']
 const MODE_LABELS: Record<DisplayMode, string> = { normal: 'Normal', half: 'Half & half', blurhash: 'Placeholder' }
+const isDisplayMode = (v: string): v is DisplayMode => v in MODE_LABELS
 
 /**
  * Paints a focal-cropped blurhash: project the full hash onto the crop window at the tier's
@@ -359,7 +364,7 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     if (readOnly) return
     dragMode.current = m
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId) //TODO: replace `as` cast with proper typing
+    e.currentTarget.setPointerCapture?.(e.pointerId)
     if (m !== 'focal') return
     applyFromEvent(e.clientX, e.clientY)
   }
@@ -417,18 +422,16 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     <select
       aria-label="Preview display mode"
       value={mode}
-      onChange={(e) => setMode(e.target.value as DisplayMode)} //TODO: replace `as` cast with proper typing
+      onChange={(e) => {
+        if (isDisplayMode(e.target.value)) setMode(e.target.value)
+      }}
       style={selectStyle}
     >
-      {(Object.keys(MODE_LABELS) as DisplayMode[]).map(
-        (
-          m, //TODO: replace `as` cast with proper typing
-        ) => (
-          <option key={m} value={m} disabled={m !== 'normal' && !srcDims}>
-            {MODE_LABELS[m]}
-          </option>
-        ),
-      )}
+      {DISPLAY_MODES.map((m) => (
+        <option key={m} value={m} disabled={m !== 'normal' && !srcDims}>
+          {MODE_LABELS[m]}
+        </option>
+      ))}
     </select>
   )
 
@@ -436,7 +439,9 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     <select
       aria-label="Placeholder quality tier"
       value={quality}
-      onChange={(e) => setQuality(e.target.value as Quality)} //TODO: replace `as` cast with proper typing
+      onChange={(e) => {
+        if (isPlaceholderQuality(e.target.value)) setQuality(e.target.value)
+      }}
       disabled={mode === 'normal'}
       style={{ ...selectStyle, ...(mode === 'normal' ? { opacity: 0.45, cursor: 'default' } : null) }}
     >

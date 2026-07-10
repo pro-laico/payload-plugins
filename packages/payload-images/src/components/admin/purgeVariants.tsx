@@ -41,9 +41,11 @@ export const PurgeVariants: React.FC<PurgeVariantsProps> = ({ purgePath = '/img/
     setBusy(true)
     try {
       const res = await fetch(`${apiRoute}${purgePath}/${id}`, { method: 'POST', credentials: 'include' })
-      const json = (await res.json().catch(() => ({}))) as { deleted?: number; error?: string } //TODO: replace `as` cast with proper typing
-      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`)
-      const n = json?.deleted ?? 0
+      const raw: unknown = await res.json().catch(() => null)
+      const json = typeof raw === 'object' && raw !== null ? raw : {}
+      const errorMsg = 'error' in json && typeof json.error === 'string' ? json.error : undefined
+      if (!res.ok) throw new Error(errorMsg || `HTTP ${res.status}`)
+      const n = 'deleted' in json && typeof json.deleted === 'number' ? json.deleted : 0
       toast.success(`Purged ${n} generated image${n === 1 ? '' : 's'}.`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to purge variants.')

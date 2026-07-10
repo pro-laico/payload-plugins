@@ -10,6 +10,7 @@
  */
 import type { Field, FieldHook } from 'payload'
 
+import { readPluginMarker } from '../lib/pluginMarker'
 import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl } from '../utils/urls'
 
 interface ImageDocLike {
@@ -54,7 +55,7 @@ const virtualUrl = (
     if (doc.id == null || !doc.filename) return null
     const cfg = req?.payload?.config
     const baseUrl = cfg?.serverURL || ''
-    const pixelStep = (cfg?.custom?.payloadImages as { pixelStep?: number | number[] } | undefined)?.pixelStep
+    const pixelStep = readPluginMarker(cfg).pixelStep
     return compute(doc, baseUrl, pixelStep)
   }
   return { name, type: 'text', virtual: true, admin: { hidden: true, description }, hooks: { afterRead: [afterRead] } }

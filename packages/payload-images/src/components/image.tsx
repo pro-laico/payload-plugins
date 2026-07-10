@@ -15,9 +15,10 @@
  * `placeholder={false}` to skip it.
  */
 import type { SanitizedConfig } from 'payload'
-import type { CSSProperties, ImgHTMLAttributes, ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 
 import { stashedConfig } from '../lib/configStash'
+import { readPluginMarker } from '../lib/pluginMarker'
 import { blurhashToPngDataUri } from '../blurhash/png'
 import { type Fit, type Format, parseAspectRatio } from '../transform/params'
 import {
@@ -103,8 +104,8 @@ export interface ResponsiveImageProps {
    * quality/crop are decided by the READ that fetched the doc (`req.context.blurhash`), not here.
    */
   placeholder?: boolean
-  /** Extra attributes (e.g. `data-*`) spread onto the `<img>`. */
-  dataAttributes?: Record<string, string>
+  /** Extra `data-*` attributes spread onto the `<img>`. */
+  dataAttributes?: Record<`data-${string}`, string>
 }
 
 const CSS_OBJECT_FIT: Record<Fit, NonNullable<CSSProperties['objectFit']>> = {
@@ -149,7 +150,8 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
 
   let cfg: SanitizedConfig | undefined
   try {
-    cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>)) //TODO: replace `as` casts with proper typing
+    //EXCUSE: `as string` defeats compile-time resolution of the `@payload-config` alias (it only exists in the consuming Next app), so the module — and its default — is untyped
+    cfg = await (config ?? stashedConfig() ?? ((await import('@payload-config' as string)).default as Awaitable<SanitizedConfig>))
   } catch {
     cfg = undefined
   }
@@ -159,7 +161,7 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
       "[payload-images] <ResponsiveImage> could not resolve the Payload config — the project pixelStep setting is skipped (default step applies). Pass the `config` prop, or add `transpilePackages: ['@pro-laico/payload-images']` to next.config so the `@payload-config` alias resolves.",
     )
   }
-  const pixelStep = (cfg as { custom?: { payloadImages?: { pixelStep?: number | number[] } } } | undefined)?.custom?.payloadImages?.pixelStep //TODO: replace `as` cast with proper typing
+  const pixelStep = readPluginMarker(cfg).pixelStep
 
   const doc = typeof image === 'object' ? image : undefined
   const altText = alt ?? doc?.alt ?? ''
@@ -229,8 +231,7 @@ export const ResponsiveImage = async (props: ResponsiveImageProps): Promise<Reac
           : null),
         ...style,
       }}
-      //TODO: replace `as` cast with proper typing
-      {...(dataAttributes as ImgHTMLAttributes<HTMLImageElement>)}
+      {...dataAttributes}
     />
   )
 }

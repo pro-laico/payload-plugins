@@ -2,7 +2,7 @@
  * The authed variant-purge endpoint. Config-level — registered by the plugin so it mounts
  * at `/api/img/purge/...` (see the routing note in ./transform.ts).
  */
-import type { CollectionSlug, Endpoint, Payload, PayloadRequest } from 'payload'
+import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 
 import { routeId } from './routeId'
 import { purgeVariantsForSource } from '../hooks/purge'
@@ -23,7 +23,7 @@ export interface PurgeEndpointConfig {
 export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => {
   const path = '/img/purge'
   const variantSlug = cfg.variantSlug || GENERATED_IMAGES_SLUG
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
 
   return {
     path: `${path}/:id`,
@@ -40,7 +40,7 @@ export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => 
       }
 
       try {
-        const deleted = await purgeVariantsForSource(req.payload as Payload, variantSlug, id, req) //TODO: replace `as` cast with proper typing
+        const deleted = await purgeVariantsForSource(req.payload, variantSlug, id, req)
         return Response.json({ deleted })
       } catch (err) {
         req.payload.logger.error(`[payload-images] purge failed for ${id}: ${String(err)}`)

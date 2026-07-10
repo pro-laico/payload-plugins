@@ -1,5 +1,6 @@
-import { getPayload, type SanitizedConfig } from 'payload'
+import { type CollectionSlug, getPayload, type SanitizedConfig } from 'payload'
 
+import { readPluginMarker } from '../lib/pluginMarker'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { analyzeImageMetadata } from '../blurhash/generate'
 import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
@@ -25,8 +26,8 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const force = argv.includes('--force')
   const focal = argv.includes('--focal')
   const collectionIdx = argv.indexOf('--collection')
-  const marker = (config.custom as { payloadImages?: { sourceSlug?: string } } | undefined)?.payloadImages //TODO: replace `as` cast with proper typing
-  const slug = (collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker?.sourceSlug ?? 'images'
+  const marker = readPluginMarker(config)
+  const slug = ((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker.sourceSlug ?? 'images') as CollectionSlug //EXCUSE: runtime-chosen slug can't satisfy the consuming app's generated CollectionSlug union
 
   const payload = await getPayload({ config })
   try {
@@ -42,10 +43,10 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
 
     let page = 1
     for (;;) {
-      //TODO: replace `as never` cast with proper typing
-      const res = await payload.find({ collection: slug as never, limit: 50, page, depth: 0, overrideAccess: true, sort: 'id' })
+      const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, overrideAccess: true, sort: 'id' })
       for (const raw of res.docs) {
-        const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number } //TODO: replace `as` cast with proper typing
+        //EXCUSE: docs of a runtime-chosen collection are untyped; the shape is duck-checked field by field below
+        const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number }
         processed++
         const wantsFocal = focal && doc.focalX === 50 && doc.focalY === 50
         if (!force && !wantsFocal && hasAllMetadata(doc)) {
@@ -72,9 +73,9 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
             data.focalY = analysis.attention.y
           }
           await payload.update({
-            collection: slug as never, //TODO: replace `as` cast with proper typing
+            collection: slug,
             id: doc.id,
-            data: data as never, //TODO: replace `as` cast with proper typing
+            data: data as never, //EXCUSE: data for a runtime-chosen collection can't satisfy the generated per-collection data type
             overrideAccess: true,
             ...(settingFocal ? {} : { context: { disableRevalidate: true } }),
           })

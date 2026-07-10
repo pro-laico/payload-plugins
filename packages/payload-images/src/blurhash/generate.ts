@@ -18,7 +18,7 @@ import { loadSharp } from '../transform/sharpInstance'
 import { encodeWebpPlaceholder } from './webpPlaceholder'
 import { buildPalette, type ImagePalette } from '../metadata/palette'
 import { encodeCoefficients, encodeLinearGrid, type LinearGrid, srgbToLinear } from './codec'
-import { BLURHASH_QUALITIES, type BlurhashQuality, blurhashFieldName, WEBP_QUALITIES, type WebpQuality, webpFieldName } from './qualities'
+import { BLURHASH_QUALITIES, BLURHASH_TIERS, blurhashFieldName, WEBP_QUALITIES, WEBP_TIERS, webpFieldName } from './qualities'
 
 /** Longest sampling edge for the raw grid (blurhash + palette) — comfortably out-resolves
  *  the largest hash tier's 9 components on either axis. */
@@ -61,13 +61,11 @@ export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataA
   }
 
   const placeholderFields: Record<string, string> = {}
-  for (const quality of Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]) {
-    //TODO: replace `as` cast with proper typing
+  for (const quality of BLURHASH_TIERS) {
     const [cx, cy] = BLURHASH_QUALITIES[quality]
     placeholderFields[blurhashFieldName(quality)] = encodeCoefficients(encodeLinearGrid(grid, cx, cy))
   }
-  for (const quality of Object.keys(WEBP_QUALITIES) as WebpQuality[]) //TODO: replace `as` cast with proper typing
-    placeholderFields[webpFieldName(quality)] = await encodeWebpPlaceholder(base, WEBP_QUALITIES[quality])
+  for (const quality of WEBP_TIERS) placeholderFields[webpFieldName(quality)] = await encodeWebpPlaceholder(base, WEBP_QUALITIES[quality])
 
   return {
     placeholderFields,

@@ -176,8 +176,8 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   const fmtRaw = read(q, 'fmt')
   const qRaw = numeric(read(q, 'q'))
   const quality = qRaw == null ? c.defaultQuality : bucketQuality(qRaw, c.qualityRange)
-  const fit: Fit = FITS.includes(fitRaw as Fit) ? (fitRaw as Fit) : 'cover' //TODO: replace `as` cast with proper typing
-  const fmt: Format = c.formats.includes(fmtRaw as Format) ? (fmtRaw as Format) : c.defaultFormat //TODO: replace `as` cast with proper typing
+  const fit: Fit = FITS.find((f) => f === fitRaw) ?? 'cover'
+  const fmt: Format = c.formats.find((f) => f === fmtRaw) ?? c.defaultFormat
 
   return { ok: true, params: { w, h, fit, q: quality, fmt } }
 }

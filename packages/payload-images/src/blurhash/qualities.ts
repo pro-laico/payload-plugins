@@ -12,19 +12,24 @@
  * the `croppedBlurHash` virtual field (which serves the requested tier), and the admin
  * focal preview (which showcases them).
  */
+/** Blurhash tier keys, tier order — the key source of truth (`satisfies` below keeps the records in sync). */
+export const BLURHASH_TIERS = ['xs', 'sm', 'md', 'lg', 'xl'] as const
+/** Webp tier keys, tier order. */
+export const WEBP_TIERS = ['xxl', 'x3'] as const
+
+export type BlurhashQuality = (typeof BLURHASH_TIERS)[number]
+export type WebpQuality = (typeof WEBP_TIERS)[number]
+
 export const BLURHASH_QUALITIES = {
   xs: [2, 2],
   sm: [4, 3],
   md: [6, 4],
   lg: [8, 6],
   xl: [9, 9],
-} as const satisfies Record<string, readonly [number, number]>
+} as const satisfies Record<BlurhashQuality, readonly [number, number]>
 
 /** Stored full-frame width (px) of each micro-webp placeholder tier. */
-export const WEBP_QUALITIES = { xxl: 32, x3: 64 } as const satisfies Record<string, number>
-
-export type BlurhashQuality = keyof typeof BLURHASH_QUALITIES
-export type WebpQuality = keyof typeof WEBP_QUALITIES
+export const WEBP_QUALITIES = { xxl: 32, x3: 64 } as const satisfies Record<WebpQuality, number>
 /** Any placeholder tier — blurhash (`xs`…`xl`) or micro-webp (`xxl`, `x3`). */
 export type PlaceholderQuality = BlurhashQuality | WebpQuality
 
@@ -43,10 +48,10 @@ export const blurhashFieldName = (q: BlurhashQuality): string => `blurHash${capi
 export const webpFieldName = (q: WebpQuality): string => `placeholder${capitalize(q)}`
 
 /** The five stored blurhash field names, tier order. */
-export const BLURHASH_FIELD_NAMES = (Object.keys(BLURHASH_QUALITIES) as BlurhashQuality[]).map(blurhashFieldName) //TODO: replace `as` cast with proper typing
+export const BLURHASH_FIELD_NAMES = BLURHASH_TIERS.map(blurhashFieldName)
 
 /** The stored webp placeholder field names, tier order. */
-export const WEBP_FIELD_NAMES = (Object.keys(WEBP_QUALITIES) as WebpQuality[]).map(webpFieldName) //TODO: replace `as` cast with proper typing
+export const WEBP_FIELD_NAMES = WEBP_TIERS.map(webpFieldName)
 
 /** Every stored placeholder field name (blurhash tiers, then webp tiers). */
 export const PLACEHOLDER_FIELD_NAMES = [...BLURHASH_FIELD_NAMES, ...WEBP_FIELD_NAMES]
