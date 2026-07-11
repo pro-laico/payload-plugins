@@ -1,6 +1,6 @@
 /**
  * `<ResponsiveImage>` — a single plain `<img>` painting exactly what the read delivered: the
- * doc's `src`/`srcset` virtuals and its `croppedBlurHash` as the placeholder background.
+ * doc's `src`/`srcset` virtuals and its `placeholder` painted behind it while it loads.
  * Passive and sync: fetches nothing, never touches Payload, server- and client-tree safe.
  */
 import type { CSSProperties, ReactElement } from 'react'
@@ -45,13 +45,13 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
     // biome-ignore lint/performance/noImgElement: intentional plain <img> — a hand-built srcset + inline LQIP that next/image would defeat
     <img
       src={src}
-      srcSet={srcset}
       sizes={sizes}
-      alt={alt}
+      srcSet={srcset}
       loading={loading}
-      fetchPriority={fetchPriority}
       decoding={decoding}
       className={className}
+      alt={alt || undefined}
+      fetchPriority={fetchPriority}
       style={{
         display: 'block',
         width: '100%',

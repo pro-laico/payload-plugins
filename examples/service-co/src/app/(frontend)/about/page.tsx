@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
-import { Image } from '@/components/Image'
+import { ImageFor } from '@/components/ImageFor'
 import { SectionHeading } from '@/components/SectionHeading'
 import { getSiteSettings, getTeamIds, getTeamMember } from '@/lib/data'
 
@@ -52,7 +52,7 @@ async function TeamCard({ id }: { id: string | number }) {
     <div>
       <div className="overflow-hidden rounded-2xl border border-border bg-muted">
         {member.photo != null ? (
-          <Image
+          <ImageFor
             id={member.photo}
             aspectRatio="1:1"
             sizes="(max-width: 640px) 100vw, 360px"

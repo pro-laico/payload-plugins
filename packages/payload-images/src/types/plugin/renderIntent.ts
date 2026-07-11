@@ -41,7 +41,7 @@ export interface ResponsiveImageDoc {
   alt?: string | null
   src?: string | null
   srcset?: string | null
-  croppedBlurHash?: string | null
+  placeholder?: string | null
 }
 
 /** The getter a project writes around `payload.findByID` (its own caching/access — the plugin

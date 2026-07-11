@@ -26,7 +26,7 @@ const binScriptPath = (name: string): string => {
  * Registers the `images` (source) and hidden `generated-images` (variant cache) collections,
  * plus the on-demand transform + purge endpoints. Uploads store only the original; every
  * rendered size is generated on first request (focal-cropped), then cached. Placeholders are a
- * quality-tier ladder stored on the doc at upload; the virtual `croppedBlurHash` serves each
+ * quality-tier ladder stored on the doc at upload; the virtual `placeholder` serves each
  * read a finished, focal-cropped placeholder. The transform endpoint mounts at `/api/img`; do
  * not name a collection `img` or it shadows the endpoint.
  */

@@ -59,7 +59,7 @@ describe('createImagesCollection', () => {
 
   it('populates the lean <ResponsiveImage> set by default (finished virtuals only), never the variants join', () => {
     const dp = createImagesCollection().defaultPopulate as Record<string, boolean>
-    for (const name of ['alt', 'src', 'srcset', 'croppedBlurHash']) expect(dp[name]).toBe(true)
+    for (const name of ['alt', 'src', 'srcset', 'placeholder']) expect(dp[name]).toBe(true)
     expect(dp.url).toBeUndefined() // identity/metadata fields are an explicit select away
     expect(dp.variants).toBeUndefined()
     // Without the virtuals there are no finished URLs, so the raw url + metadata ride along.
@@ -74,7 +74,7 @@ describe('createImagesCollection', () => {
     expect((byName(createImagesCollection().fields, 'alt') as { localized?: boolean }).localized).toBe(false)
   })
 
-  it('stores the upload-time metadata (beforeChange hook): placeholder tiers, palette, alpha flags; croppedBlurHash is virtual', () => {
+  it('stores the upload-time metadata (beforeChange hook): placeholder tiers, palette, alpha flags; placeholder is virtual', () => {
     const c = createImagesCollection()
     expect(c.hooks?.beforeChange ?? []).toHaveLength(1) // the metadata analyzer
     for (const name of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl', 'placeholderXxl', 'placeholderX3']) {
@@ -85,8 +85,8 @@ describe('createImagesCollection', () => {
     expect((byName(c.fields, 'palette') as { type?: string } | undefined)?.type).toBe('json')
     expect((byName(c.fields, 'hasAlpha') as { type?: string } | undefined)?.type).toBe('checkbox')
     expect((byName(c.fields, 'isOpaque') as { type?: string } | undefined)?.type).toBe('checkbox')
-    const cropped = byName(c.fields, 'croppedBlurHash') as { virtual?: boolean } | undefined
-    expect(cropped?.virtual).toBe(true)
+    const ph = byName(c.fields, 'placeholder') as { virtual?: boolean } | undefined
+    expect(ph?.virtual).toBe(true)
   })
 
   it('renders the focal + purge UI and the variants join only when focalUI is on', () => {

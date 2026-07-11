@@ -122,7 +122,7 @@ export const getTestimonial = async (id: string | number): Promise<Testimonial |
  *  doc as an ordinary id-keyed entry, so an alt/focal edit busts `images:{id}` and exactly this
  *  entry re-materializes (with fresh `v=` tokens baked into the srcset, so the derived binary
  *  variants refresh too). The render context (`{ image, blur }`) declares what's being rendered,
- *  so `src`/`srcset`/`croppedBlurHash` arrive finished for it; 'use cache' keys on the args,
+ *  so `src`/`srcset`/`placeholder` arrive finished for it; 'use cache' keys on the args,
  *  giving each (id, render) its own entry — all tagged `images:{id}`, busted together. */
 export const getImage = async (id: string | number, render?: ImageRenderContext): Promise<MediaImage | null> => {
   'use cache'

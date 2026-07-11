@@ -9,4 +9,5 @@ export const devLinks: DevLink[] = [
   { href: '/about', title: 'About' },
   { href: '/contact', title: 'Contact' },
   { href: '/dev/revalidate', title: 'Revalidate map' },
+  { href: '/dev/compare', title: 'Image vs ImageFor' },
 ]

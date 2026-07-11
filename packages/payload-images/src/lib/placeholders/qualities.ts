@@ -1,6 +1,6 @@
 /**
  * The placeholder quality tiers, shared by the upload analyzer (stores one value per tier),
- * the `croppedBlurHash` virtual field (serves the requested tier), and the admin preview.
+ * the `placeholder` virtual field (serves the requested tier), and the admin preview.
  * `xs`…`xl` are blurhash component counts (resolution-free strings, croppable in coefficient
  * space); `xxl`/`x3` are stored micro-webp data URIs (value = full-frame width in px).
  */
@@ -11,7 +11,7 @@ export type BlurhashQuality = (typeof BLURHASH_TIERS)[number]
 export type WebpQuality = (typeof WEBP_TIERS)[number]
 /** Any placeholder tier — blurhash (`xs`…`xl`) or micro-webp (`xxl`, `x3`). */
 export type PlaceholderQuality = BlurhashQuality | WebpQuality
-/** How the `croppedBlurHash` virtual answers: `uri` = a finished data URI, `hash` = the raw hash string. */
+/** How the `placeholder` virtual answers: `uri` = a finished data URI, `hash` = the raw hash string. */
 export type PlaceholderFormat = 'uri' | 'hash'
 
 export const BLURHASH_QUALITIES = {

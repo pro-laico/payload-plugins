@@ -5,5 +5,5 @@ export type MediaImage = {
   alt?: string | null
   src?: string | null
   srcset?: string | null
-  croppedBlurHash?: string | null
+  placeholder?: string | null
 }

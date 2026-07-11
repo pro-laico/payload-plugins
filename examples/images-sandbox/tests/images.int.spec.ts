@@ -143,7 +143,7 @@ describe('payload-images wiring', () => {
     expect(meta.width).toBe(750) // 730 snapped up to the nearest 50px grid point
   })
 
-  it('stores the placeholder tiers at upload, and croppedBlurHash serves the read a finished placeholder', async () => {
+  it('stores the placeholder tiers at upload, and placeholder serves the read a finished placeholder', async () => {
     // The seed uploads ran the beforeChange generator — every tier is a non-empty string.
     const doc = (await payload.findByID({ collection: 'images', id: sourceId, overrideAccess: true })) as unknown as Record<string, unknown>
     for (const f of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl']) {
@@ -167,9 +167,9 @@ describe('payload-images wiring', () => {
     expect(doc.focalX).toBe(40)
     expect(doc.focalY).toBe(60)
 
-    // No request info → croppedBlurHash defaults to the raw sm tier hash, uncropped (the
+    // No request info → placeholder defaults to the raw sm tier hash, uncropped (the
     // cheap path for reads that never render a placeholder).
-    expect(doc.croppedBlurHash).toBe(doc.blurHashSm)
+    expect(doc.placeholder).toBe(doc.blurHashSm)
 
     // Declare the render (context.image.aspectRatio) → a FINISHED placeholder data URI, cropped
     // to that ratio in the field hook — no variant rows, nothing written.
@@ -179,8 +179,8 @@ describe('payload-images wiring', () => {
       id: sourceId,
       overrideAccess: true,
       context: { image: { aspectRatio: '16:9' } },
-    })) as { croppedBlurHash?: string | null }
-    expect(cropped.croppedBlurHash).toMatch(/^data:image\/png;base64,/)
+    })) as { placeholder?: string | null }
+    expect(cropped.placeholder).toMatch(/^data:image\/png;base64,/)
     expect(await countVariants(payload, sourceId)).toBe(before) // read-side crop touches no files
 
     // A webp tier serves the stored micro-webp, cropped per read.
@@ -189,9 +189,9 @@ describe('payload-images wiring', () => {
       id: sourceId,
       overrideAccess: true,
       context: { image: { aspectRatio: '16:9' }, blur: { quality: 'xxl' } },
-    })) as { croppedBlurHash?: string | null }
-    expect(webp.croppedBlurHash).toMatch(/^data:image\/webp;base64,/)
-    expect(webp.croppedBlurHash).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
+    })) as { placeholder?: string | null }
+    expect(webp.placeholder).toMatch(/^data:image\/webp;base64,/)
+    expect(webp.placeholder).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
 
     // blur.format: 'hash' keeps the raw-hash contract for stock blurhash decoders: the cropped
     // hash string — same shape as the stored tier, different coefficients.
@@ -200,9 +200,9 @@ describe('payload-images wiring', () => {
       id: sourceId,
       overrideAccess: true,
       context: { image: { aspectRatio: '16:9' }, blur: { format: 'hash' } },
-    })) as { croppedBlurHash?: string | null }
-    expect((rawHash.croppedBlurHash as string).length).toBe((doc.blurHashSm as string).length)
-    expect(rawHash.croppedBlurHash).not.toBe(doc.blurHashSm)
+    })) as { placeholder?: string | null }
+    expect((rawHash.placeholder as string).length).toBe((doc.blurHashSm as string).length)
+    expect(rawHash.placeholder).not.toBe(doc.blurHashSm)
 
     // Quality tier selection rides context.blur alone (no ratio → full-frame hash of that tier).
     const xl = (await payload.findByID({
@@ -210,8 +210,8 @@ describe('payload-images wiring', () => {
       id: sourceId,
       overrideAccess: true,
       context: { blur: { quality: 'xl', format: 'hash' } },
-    })) as { croppedBlurHash?: string | null }
-    expect(xl.croppedBlurHash).toBe(doc.blurHashXl)
+    })) as { placeholder?: string | null }
+    expect(xl.placeholder).toBe(doc.blurHashXl)
   })
 
   it('suggests a saliency focal on create when the editor picked none (attention crop)', async () => {
@@ -254,7 +254,7 @@ describe('payload-images wiring', () => {
       overrideAccess: true,
       select: RESPONSIVE_IMAGE_SELECT,
       context: { image: { aspectRatio: '16:9', quality: 80 } },
-    })) as { id: string | number; alt?: string; src?: string; srcset?: string; croppedBlurHash?: string }
+    })) as { id: string | number; alt?: string; src?: string; srcset?: string; placeholder?: string }
 
     // The doc arrives render-ready: srcset for THIS render, v= baked in, placeholder finished.
     expect(doc.srcset).toContain('q=80')
@@ -264,7 +264,7 @@ describe('payload-images wiring', () => {
 
     // The component is a plain sync function → call it and inspect the returned element.
     const render = { id: doc.id, alt: doc.alt ?? '', src: doc.src, srcset: doc.srcset }
-    const el = ResponsiveImage({ ...render, placeholder: doc.croppedBlurHash, aspectRatio: '16:9' }) as unknown as {
+    const el = ResponsiveImage({ ...render, placeholder: doc.placeholder, aspectRatio: '16:9' }) as unknown as {
       type: string
       props: { srcSet?: string; loading?: string; style?: { objectFit?: string; aspectRatio?: number; backgroundImage?: string } }
     }

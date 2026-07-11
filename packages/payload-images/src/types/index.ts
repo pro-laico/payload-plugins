@@ -8,6 +8,7 @@
  * barrel). Consumers of the latter import it directly from `types/placeholders/blurhashDoc`.
  */
 export type * from './collections'
+export type * from './fetch'
 export type * from './metadata'
 export type * from './placeholders'
 export type * from './plugin'

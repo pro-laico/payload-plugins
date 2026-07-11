@@ -147,7 +147,7 @@ async function ImageCard({ id }: { id: string | number }) {
         alt={image.alt ?? ''}
         src={image.src}
         srcset={image.srcset}
-        placeholder={image.croppedBlurHash}
+        placeholder={image.placeholder}
         aspectRatio="16:9"
         sizes="420px"
         style={{ borderRadius: 8 }}

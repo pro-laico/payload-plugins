@@ -6,13 +6,24 @@ On-demand image optimization for [Payload CMS](https://payloadcms.com/) — an I
 pnpm add @pro-laico/payload-images
 ```
 
+Fetch images Sanity-style — seed `createImageFor` once with your app's Payload handle, then one
+chain resolves the render-ready doc (`src`/`srcset`/`alt`/`placeholder`), ready to spread into
+`<ResponsiveImage>`:
+
+```ts
+export const imageFor = createImageFor(getPayload({ config }))
+
+const img = await imageFor(post.hero).aspectRatio('16:9').blur('md').fetch()
+if (img) return <ResponsiveImage {...img} alt={img.alt ?? ''} sizes="50vw" />
+```
+
 Placeholders are a **quality-tier ladder** stored on the doc at upload time: five BlurHash
 strings (`xs`…`xl`) plus two micro-webp data URIs (`xxl`/`x3`). A read that declares what it's
-rendering (`req.context.blurhash = { ar, quality }`) gets a **finished, focal-cropped data URI**
-back from the virtual `croppedBlurHash` field — the processing happens in the field hook, and
-`<ResponsiveImage>` just paints it. The same upload-time decode also stores a Sanity-style color
-**palette**, `hasAlpha`/`isOpaque` flags, and a saliency-based initial **focal point** (applied
-only when the editor hasn't picked one).
+rendering (`context: { image, blur }`) gets a **finished, focal-cropped data URI** back from the
+virtual `placeholder` field — the processing happens in the field hook, and `<ResponsiveImage>`
+just paints it. The same upload-time decode also stores a Sanity-style color **palette**,
+`hasAlpha`/`isOpaque` flags, and a saliency-based initial **focal point** (applied only when the
+editor hasn't picked one).
 
 ## Migrating an existing project
 

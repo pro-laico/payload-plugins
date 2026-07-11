@@ -1,4 +1,4 @@
-/** What the read asked the `croppedBlurHash` virtual for: crop ratio, tier, and answer form. */
+/** What the read asked the `placeholder` virtual for: crop ratio, tier, and answer form. */
 import type { PlaceholderFormat, PlaceholderQuality } from '../../lib/placeholders/qualities'
 
 export interface BlurhashRequest {

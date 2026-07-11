@@ -179,11 +179,19 @@ export interface Image {
     totalDocs?: number;
   };
   /**
-   * Optimized URL (≤1280px) for a plain <img> or OG tag.
+   * The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one.
+   */
+  aspectRatio?: number | null;
+  /**
+   * Cache-busting version token for transform URLs (changes on file replace / focal / hotspot edits).
+   */
+  variantVersion?: string | null;
+  /**
+   * Optimized URL (≤1280px) for a plain <img> or OG tag, honoring the declared render.
    */
   src?: string | null;
   /**
-   * Responsive srcset at the natural ratio, up to the source width.
+   * Responsive srcset up to the source width, honoring the declared render (else the natural ratio).
    */
   srcset?: string | null;
   /**
@@ -195,10 +203,52 @@ export interface Image {
   blurHashMd?: string | null;
   blurHashLg?: string | null;
   blurHashXl?: string | null;
+  placeholderXxl?: string | null;
+  placeholderX3?: string | null;
   /**
-   * BlurHash placeholder, focal-cropped to the aspect ratio the read declares (req.context.blurhash = { ar, quality } or an X-Blurhash header). Defaults to the sm tier uncropped.
+   * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
    */
-  croppedBlurHash?: string | null;
+  placeholder?: string | null;
+  /**
+   * Color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }.
+   */
+  palette?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * The file carries an alpha channel.
+   */
+  hasAlpha?: boolean | null;
+  /**
+   * No pixel is actually transparent (sampled).
+   */
+  isOpaque?: boolean | null;
+  /**
+   * Hotspot circle diameter, % of the crop region’s shorter side. 100 = maximal window (no zoom).
+   */
+  focalSize?: number | null;
+  /**
+   * Non-destructive edge trim, % of the image removed from the left.
+   */
+  cropLeft?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the top.
+   */
+  cropTop?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the right.
+   */
+  cropRight?: number | null;
+  /**
+   * Non-destructive edge trim, % removed from the bottom.
+   */
+  cropBottom?: number | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -358,6 +408,8 @@ export interface PagesSelect<T extends boolean = true> {
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
   variants?: T;
+  aspectRatio?: T;
+  variantVersion?: T;
   src?: T;
   srcset?: T;
   placeholderURL?: T;
@@ -366,7 +418,17 @@ export interface ImagesSelect<T extends boolean = true> {
   blurHashMd?: T;
   blurHashLg?: T;
   blurHashXl?: T;
-  croppedBlurHash?: T;
+  placeholderXxl?: T;
+  placeholderX3?: T;
+  placeholder?: T;
+  palette?: T;
+  hasAlpha?: T;
+  isOpaque?: T;
+  focalSize?: T;
+  cropLeft?: T;
+  cropTop?: T;
+  cropRight?: T;
+  cropBottom?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

@@ -276,7 +276,7 @@ export interface Image {
   /**
    * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
    */
-  croppedBlurHash?: string | null;
+  placeholder?: string | null;
   /**
    * Color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }.
    */
@@ -922,7 +922,7 @@ export interface ImagesSelect<T extends boolean = true> {
   blurHashXl?: T;
   placeholderXxl?: T;
   placeholderX3?: T;
-  croppedBlurHash?: T;
+  placeholder?: T;
   palette?: T;
   hasAlpha?: T;
   isOpaque?: T;

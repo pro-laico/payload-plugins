@@ -210,7 +210,7 @@ logged-in-admin only.
     variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields. Only with virtualFields.", type: "virtual" },
     "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
     "placeholderXxl / placeholderX3": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
-    croppedBlurHash: { description: "The placeholder every read carries: a finished data URI focal-cropped to the render the read declares (req.context.blurhash / X-Blurhash header); the raw sm tier hash when nothing is declared.", type: "virtual" },
+    placeholder: { description: "The placeholder every read carries: a finished data URI focal-cropped to the render the read declares (context: { image, blur } / X-Blurhash header); the raw sm tier hash when nothing is declared.", type: "virtual" },
     palette: { description: "Sanity-style color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }. Hidden in the admin.", type: "json" },
     hasAlpha: { description: "The file carries an alpha channel.", type: "checkbox" },
     isOpaque: { description: "No sampled pixel is actually transparent.", type: "checkbox" },
@@ -290,7 +290,7 @@ The URLs are absolute when `serverURL` is set (relative otherwise), hidden in th
 **flow through relationship population**: a populated `page.heroImage` already carries `srcset`
 / `placeholderURL`, ready to render. Population is kept lean via `defaultPopulate`: referenced
 images return these renderable fields and **not** the `variants` cache join (which would cost an
-extra query per image). Disable with `virtualFields: false`. (The `croppedBlurHash` placeholder rides along too — it isn't
+extra query per image). Disable with `virtualFields: false`. (The `placeholder` virtual rides along too — it isn't
 gated by `virtualFields`; see [Placeholder](#placeholder).)
 One cost to know: a wide original at the default `pixelStep: 50` emits dozens of `srcset` URLs
 (several KB of string) on every read and population — raise `pixelStep` or pass an explicit ladder
@@ -387,7 +387,7 @@ export async function Hero({ id }: { id: string }) {
     collection: 'images',
     id,
     depth: 0,
-    // Declare the render → `croppedBlurHash` arrives as a finished data URI, focal-cropped to this ratio.
+    // Declare the render → `placeholder` arrives as a finished data URI, focal-cropped to this ratio.
     context: { blurhash: { ar: '16:9' } },
   })
   return (
@@ -489,7 +489,7 @@ export const imageProps = [
   { name: 'path', type: 'string', default: "'/api/img'", description: `Transform endpoint base; set only for a custom API route / Next basePath.` },
   { name: 'config', type: 'SanitizedConfig', description: `Payload config used to resolve the project pixelStep. Rarely needed: without it the component uses the config the plugin stashed at init, falling back to the @payload-config alias (which, from a published package, needs transpilePackages: ['@pro-laico/payload-images']).` },
   { name: 'version', type: 'string', description: `Explicit cache-bust v token; overrides the doc's variantVersion.` },
-  { name: 'placeholder', type: 'boolean', default: 'true', description: `Paint the doc's croppedBlurHash behind the image while it loads (a tiny inline image, zero network, zero client JS). false skips it even when the doc carries one. The quality/crop are decided by the READ that fetched the doc, not here.` },
+  { name: 'placeholder', type: 'boolean', default: 'true', description: `Paint the doc's placeholder behind the image while it loads (a tiny inline image, zero network, zero client JS). false skips it even when the doc carries one. The quality/crop are decided by the READ that fetched the doc, not here.` },
   { name: 'dataAttributes', type: 'Record<string, string>', description: `Extra attributes (e.g. data-*) spread onto the rendered img element.` },
 ]
 
@@ -517,7 +517,7 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   loading="lazy"
   fetchPriority="auto"
   decoding="async"
-  placeholder      // on by default; renders the doc's croppedBlurHash — false to skip
+  placeholder      // on by default; renders the doc's placeholder — false to skip
   baseUrl=""          // same-origin
   path="/api/img"
   // optional, no default:
@@ -555,7 +555,7 @@ spends bytes far less efficiently than a real image, so the top tiers store a **
 | `xxl` | webp 32px | ~0.5–1 KB | shapes and light read clearly |
 | `x3` | webp 64px | ~1–3 KB | a heavily blurred thumbnail |
 
-On read, the virtual `croppedBlurHash` field does **all the placeholder work in the field hook**,
+On read, the virtual `placeholder` field does **all the placeholder work in the field hook**,
 next to the data — consumers select one field and paint what they get back. Declare what the read
 is rendering and a **finished, focal-cropped data URI** comes back: blurhash tiers crop in
 coefficient space (pure string math, microseconds) and render to a tiny inline PNG; webp tiers crop
@@ -567,8 +567,8 @@ const image = await payload.findByID({
   collection: 'images',
   id,
   depth: 0,
-  select: { alt: true, width: true, height: true, croppedBlurHash: true, variantVersion: true },
-  context: { blurhash: { ar: '16:9', quality: 'sm' } }, // croppedBlurHash arrives as a finished data URI
+  select: { alt: true, width: true, height: true, placeholder: true, variantVersion: true },
+  context: { image: { aspectRatio: '16:9' }, blur: { quality: 'sm' } }, // placeholder arrives as a finished data URI
 })
 ```
 
@@ -581,7 +581,7 @@ the component still renders a raw hash to a PNG as a fallback), and a doc with n
 
 <Callout type="info">
   **Non-React consumers** get the same placeholder: send `X-Blurhash: 16:9; q=md` on a REST read
-  (or set `req.context.blurhash` on a Local API one) and `croppedBlurHash` comes back as a data URI
+  (or declare `context: { image, blur }` on a Local API one) and `placeholder` comes back as a data URI
   cropped to that ratio at that tier. Decoding client-side with a stock blurhash library instead?
   Add `format=hash` and the cropped **raw hash string** comes back (blurhash tiers only — webp
   tiers degrade to `xl`).
@@ -676,7 +676,7 @@ Payload's built-in destructive "Edit image" crop:
   geometry the endpoint uses.
 - **It rides along automatically.** The endpoint reads all three layers from the document on any
   `fit=cover` request, so `<ResponsiveImage>`, the virtual URLs, raw endpoint calls, and the
-  `croppedBlurHash` placeholder all honor them with nothing extra to pass. Non-cover fits honor
+  `placeholder` virtual all honor them with nothing extra to pass. Non-cover fits honor
   the crop rect.
 - **No upscaling, even zoomed.** A tight hotspot crops a small pixel region; the endpoint serves
   that region at its native resolution (CSS scales it up) rather than inventing pixels.
@@ -733,6 +733,47 @@ writes never fire bust events. See it wired end-to-end in
 
 Without the revalidate plugin, handle it however you already do (a `revalidatePath` /
 `revalidateTag` in an `afterChange` hook, or a dynamic route).
+
+## `imageFor` — the fetch helper
+
+The Sanity-style getter: seed it **once** with your app's Payload handle, chain the declared
+render, and `fetch()` the render-ready doc — `{ id, alt, src, srcset, placeholder }`, ready to
+spread straight into `<ResponsiveImage>`. Packages can't reach your app's cached Payload
+instance, so the factory takes it from you — the `getPayload({ config })` promise as-is (only
+`fetch()` awaits it, so no top-level `await`):
+
+```ts title="src/lib/imageFor.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createImageFor } from '@pro-laico/payload-images'
+
+export const imageFor = createImageFor(getPayload({ config }))
+```
+
+```tsx
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { imageFor } from '@/lib/imageFor'
+
+export async function Hero({ id }: { id: string }) {
+  const img = await imageFor(id).aspectRatio('16:9').quality(80).blur('md').fetch()
+  if (!img) return null
+  return <ResponsiveImage {...img} alt={img.alt ?? ''} sizes="(max-width: 768px) 100vw, 50vw" />
+}
+```
+
+Every setter maps onto the read contract — one `findByID` with the lean render select
+(`RESPONSIVE_IMAGE_SELECT`) and the chain as `context: { image, blur }`: `aspectRatio` /
+`quality` / `fit` / `format` → `context.image`, `blur(tier)` → `context.blur.quality`. A whole
+declared render can also seed the chain in one go (`imageFor(id, { image, blur })` — handy for a
+project `<Image>` wrapper), and the chain is immutable, so a partially-applied one
+(`imageFor(id).aspectRatio('1:1')`) can be shared and branched safely. The source is an id or a
+populated doc; `fetch()` resolves `null` for an empty source or a missing doc, and reads the
+source collection off the plugin config (`extendCollection` setups included).
+
+`fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their
+own access control or cache layer keep writing the same `findByID` themselves (declare the render
+as `context`, select `RESPONSIVE_IMAGE_SELECT`) and wrap it however they like (`'use cache'`,
+payload-revalidate, …).
 
 ## Seeding
 
@@ -829,6 +870,8 @@ A few things to keep in mind:
 | --- | --- | --- |
 | `imagesPlugin` | `@pro-laico/payload-images` | The Payload plugin; put `imagesPlugin()` in your config's `plugins`. |
 | `ResponsiveImage` | `@pro-laico/payload-images/components/image` | The responsive `<img>` async server component. |
+| `createImageFor` | `@pro-laico/payload-images` | Seed once with your Payload handle → `imageFor(id).aspectRatio('16:9').blur('md').fetch()` resolves the render-ready doc for `<ResponsiveImage>`. |
+| `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
 | `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
 | `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image id. |
 | `buildVariantUrl` | `@pro-laico/payload-images/utils/urls` | Build a single transform URL for an id at a given width. |

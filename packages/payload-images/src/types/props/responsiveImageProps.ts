@@ -6,7 +6,7 @@ import type { AspectRatio, BlurRenderIntent, ImageRenderIntent } from '../plugin
 
 export interface ResponsiveImageProps {
   id: string | number
-  alt: string
+  alt?: string | null
   /** The `sizes` attribute. Default `100vw`. */
   sizes?: string
   /** CSS aspect-ratio for the box (`16 / 9` | `"16:9"`) — match what the read declared.
@@ -25,7 +25,7 @@ export interface ResponsiveImageProps {
   decoding?: 'async' | 'auto' | 'sync'
   className?: string
   style?: CSSProperties
-  /** The doc's `croppedBlurHash` — painted as the `<img>`'s background while it loads. */
+  /** The doc's `placeholder` — painted as the `<img>`'s background while it loads. */
   placeholder?: string | null
   /** Extra `data-*` attributes spread onto the `<img>`. */
   dataAttributes?: Record<`data-${string}`, string>

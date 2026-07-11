@@ -5,6 +5,9 @@ export type { ImagesPluginOptions, TransformEndpointConfig } from './types'
 // The read-side render contract: declare the render on the fetch (`context: { image, blur }`),
 // select RESPONSIVE_IMAGE_SELECT, hand the doc's fields to <ResponsiveImage>.
 export { RESPONSIVE_IMAGE_SELECT } from './lib/renderIntent'
+// The Sanity-style helper around it: seed once with the app's Payload handle, chain the render.
+export { createImageFor } from './lib/imageFor'
+export type { ImageFor, ImageForChain, ImageSource } from './types'
 export type {
   AspectRatio,
   BlurRenderIntent,
@@ -15,7 +18,7 @@ export type {
 } from './types'
 export type { Fit, Format, OutputFormat } from './types'
 
-// Placeholders: the quality tiers, the request shape the virtual `croppedBlurHash` field
+// Placeholders: the quality tiers, the request shape the virtual `placeholder` field
 // answers to, and the pure crop/render helpers.
 export { coverCropWindow } from './lib/placeholders/window'
 export type { CropWindow } from './types'

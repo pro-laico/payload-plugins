@@ -6,7 +6,7 @@ import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
 import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
 import { VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
 import { generateImageMetadataBeforeChange } from '../hooks/collection/generateImageMetadata'
-import { blurhashStorageFields, croppedBlurhashField } from '../fields/croppedBlurhash'
+import { blurhashStorageFields, placeholderField } from '../fields/placeholder'
 import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
 import { purgeStaleVariantsAfterChange } from '../hooks/collection/purgeStaleVariants'
 import { purgeVariantsBeforeDelete } from '../hooks/collection/purgeVariantsOnDelete'
@@ -89,7 +89,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       ...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled),
       ...(virtualFields ? virtualUrlFields() : []),
       ...blurhashStorageFields(),
-      croppedBlurhashField(),
+      placeholderField(),
       ...mediaMetadataFields(),
       ...hotspotFields(),
     ],

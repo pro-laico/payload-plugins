@@ -1,7 +1,7 @@
 /**
  * The read-side render contract: a getter declares WHAT it's rendering on the read
  * (`context: { image, blur }`), and the doc comes back self-sufficient — virtual `src`/`srcset`
- * built for exactly that render, `croppedBlurHash` a finished placeholder for the same box.
+ * built for exactly that render, the virtual `placeholder` finished for the same box.
  * `context` is an untyped bag, so everything is validated structurally.
  */
 import { FITS, FORMATS, parseAspectRatio } from './transform/params'
@@ -13,7 +13,7 @@ export const RESPONSIVE_IMAGE_SELECT = {
   alt: true,
   src: true,
   srcset: true,
-  croppedBlurHash: true,
+  placeholder: true,
 } as const
 
 /** Read + validate `context.image` off the operation. Absent → `declared: false`. */

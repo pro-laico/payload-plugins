@@ -67,7 +67,7 @@ export async function getService(id: string | number): Promise<Service | null> {
  *  edit busts `images:{id}` and exactly this entry re-materializes (with fresh `v=`
  *  tokens in the srcset, so the binary variants re-derive too). The render context
  *  (`{ image, blur }`) declares what's being rendered, so the doc arrives with
- *  `src`/`srcset`/`croppedBlurHash` finished for it; 'use cache' keys on the args, one
+ *  `src`/`srcset`/`placeholder` finished for it; 'use cache' keys on the args, one
  *  entry per (id, render). */
 export async function getImage(id: string | number, render?: ImageRenderContext): Promise<Image | null> {
   'use cache'

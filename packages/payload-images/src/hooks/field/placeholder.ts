@@ -1,5 +1,5 @@
 /**
- * The `croppedBlurHash` field's afterRead — the read side of the placeholder pipeline. Three
+ * The `placeholder` field's afterRead — the read side of the placeholder pipeline. Three
  * behaviors, chosen by the read: no declared intent → the raw `sm` hash (light for admin/API
  * reads); a declared intent (`context.image`/`context.blur`, or an `X-Blurhash` header on REST)
  * → a FINISHED data URI focal-cropped to the declared ratio; `blur.format: 'hash'` → the cropped
@@ -11,11 +11,11 @@ import { blurhashToPngDataUri } from '../../lib/placeholders/png'
 import { cropWebpDataUri } from '../../lib/placeholders/webpPlaceholder'
 import { cropBlurhashCoefficients } from '../../lib/placeholders/cropCoefficients'
 import { DEFAULT_BLURHASH_QUALITY, isBlurhashQuality, isWebpQuality } from '../../lib/placeholders/qualities'
-import { readRequest } from '../../fields/croppedBlurhash/request'
-import { cropWindow, storedHash, storedWebp } from '../../fields/croppedBlurhash/stored'
+import { readRequest } from '../../fields/placeholder/request'
+import { cropWindow, storedHash, storedWebp } from '../../fields/placeholder/stored'
 import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 
-export const croppedBlurhashAfterRead: FieldHook = async ({ data, req }) => {
+export const placeholderAfterRead: FieldHook = async ({ data, req }) => {
   const doc = (data ?? {}) as ImageDocLike //EXCUSE: hook data is untyped; every field is duck-checked before use
   const wanted = readRequest(req)
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
-import { Image } from '@/components/Image'
+import { ImageFor } from '@/components/ImageFor'
 import { SectionHeading } from '@/components/SectionHeading'
 import { Icon } from '@/components/ui/Icon'
 import { getIcon, getService, getServiceIds } from '@/lib/data'
@@ -46,7 +46,7 @@ async function ServiceSection({ id, index, count }: { id: string | number; index
     <section className="grid items-center gap-10 lg:grid-cols-2">
       <div className={`overflow-hidden rounded-2xl border border-border ${flip ? 'lg:order-2' : ''}`}>
         {service.image != null ? (
-          <Image
+          <ImageFor
             id={service.image}
             aspectRatio="4:3"
             sizes="(max-width: 1024px) 100vw, 560px"

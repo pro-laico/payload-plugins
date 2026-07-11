@@ -7,6 +7,25 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Added
+
+- `@pro-laico/payload-images` — `createImageFor`, a Sanity-style fetch helper: seed it once
+  with your app's Payload handle (`createImageFor(getPayload({ config }))` — the promise is
+  fine as-is), then `imageFor(id).aspectRatio('16:9').blur('md').fetch()` runs the declared
+  read for you and resolves the render-ready doc (`{ id, alt, src, srcset, placeholder }`),
+  ready to spread into `<ResponsiveImage>`. A whole render can seed the chain in one go
+  (`imageFor(id, { image, blur })`), and chains are immutable, so partially-applied ones can
+  be shared and branched.
+
+### Changed
+
+- **BREAKING** `@pro-laico/payload-images` — the virtual `croppedBlurHash` field is now
+  `placeholder` (the old name matched neither what it returns — a finished data URI for
+  declared renders — nor the `<ResponsiveImage>` prop it feeds; the read-contract doc now
+  spreads straight into the component). The field is virtual, so nothing is stored under the
+  old name: update selects (`RESPONSIVE_IMAGE_SELECT` already carries the new name) and any
+  code reading `doc.croppedBlurHash`, then regenerate your payload types.
+
 ## [0.2.0] - 2026-07-09
 
 ### Added

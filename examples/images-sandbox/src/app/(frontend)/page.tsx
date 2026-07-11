@@ -144,19 +144,23 @@ export default async function HomePage() {
       )}
 
       <h2>How it works</h2>
-      <pre className="shell-code">{`// The project owns one <Image> component (src/components/Image.tsx) — its props type
-// (ImageProps) ships with the plugin. Pass an id + the declared render:
-<Image id={imageId} aspectRatio="16:9" image={{ aspectRatio: '16:9', quality: 80 }} blur={{ quality: 'md' }} sizes="50vw" />
+      <pre className="shell-code">{`// Seed the Sanity-style getter ONCE with the app's Payload handle (src/lib/imageFor.ts) —
+// createImageFor takes the getPayload promise as-is; only fetch() awaits it:
+export const imageFor = createImageFor(getPayload({ config }))
 
-// Inside it — ONE findByID does all the work; the doc arrives render-ready:
+// Then anywhere on the server, chain the declared render and fetch the render-ready doc:
+const img = await imageFor(imageId).aspectRatio('16:9').quality(80).blur('md').fetch()
+if (img) return <ResponsiveImage {...img} sizes="50vw" />   // { id, alt, src, srcset, placeholder }
+
+// Under the hood that is ONE findByID declaring the render on the read — the raw contract
+// stays available for access-scoped or cached getters:
 const doc = await payload.findByID({
   id,
   collection: 'images',
   depth: 0,
-  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + croppedBlurHash
+  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
   context: { image, blur },        // the declared render, verbatim
 })
-return <ResponsiveImage id={doc.id} alt={doc.alt} src={doc.src} srcset={doc.srcset} placeholder={doc.croppedBlurHash} {...rest} />
 
 // The doc carries a finished srcset for THIS render (v= busts immutable caches on file/focal
 // edits) and a focal-cropped placeholder — <ResponsiveImage> just paints a plain <img>:
