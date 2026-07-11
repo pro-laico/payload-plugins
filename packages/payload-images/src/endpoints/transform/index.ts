@@ -129,7 +129,11 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
       }
       if (!result && !standIn) result = await generateVariantBytes(engineArgs)
 
-      if (result && !result.ok) return new Response(result.msg, { status: result.status })
+      if (result && !result.ok) {
+        // 503 = the transform queue shed load; ask the client to retry shortly.
+        const headers = result.status === 503 ? { 'Retry-After': '2', 'Cache-Control': 'no-store' } : undefined
+        return new Response(result.msg, { status: result.status, headers })
+      }
 
       // Prewarm observation — ground truth of what the site actually serves. Synchronous O(1)
       // buffer work (the recorder flushes on its own timer); the response never waits on it.

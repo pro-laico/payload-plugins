@@ -22,13 +22,24 @@ export interface EnqueuePrewarmArgs {
 export const enqueuePrewarmJob = async (payload: Payload, args: EnqueuePrewarmArgs): Promise<void> => {
   const sourceId = String(args.sourceId)
   try {
-    // Skip when an un-started job for this source is already pending. Nested-JSON `where` on
-    // `input` is not portable across DB adapters, so filter the candidate rows in JS. Best-effort:
-    // a failed check enqueues anyway — the job itself is idempotent, duplicates are cheap no-ops.
+    // Skip when a RUNNABLE job for this source is already pending. The `hasError` filter mirrors
+    // Payload's own runnable-jobs query: a job that exhausted its retries stays uncompleted
+    // (completedAt null, processing false) but the runner never picks it again — without this
+    // clause a single dead job would dedupe every future enqueue and silently kill prewarm for
+    // that source forever. Nested-JSON `where` on `input` is not portable across DB adapters, so
+    // filter the candidate rows in JS. Best-effort: a failed check enqueues anyway — the job is
+    // idempotent, duplicates are cheap no-ops.
     try {
       const pending = await payload.find({
         collection: 'payload-jobs',
-        where: { and: [{ taskSlug: { equals: args.taskSlug } }, { completedAt: { exists: false } }, { processing: { not_equals: true } }] },
+        where: {
+          and: [
+            { taskSlug: { equals: args.taskSlug } },
+            { completedAt: { exists: false } },
+            { hasError: { not_equals: true } },
+            { processing: { not_equals: true } },
+          ],
+        },
         limit: 100,
         depth: 0,
         overrideAccess: true,

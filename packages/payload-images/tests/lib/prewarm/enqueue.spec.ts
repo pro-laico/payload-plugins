@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Payload } from 'payload'
 
 import { enqueuePrewarmAfterChange } from '../../../src/hooks/collection/enqueuePrewarm'
+import { enqueuePrewarmJob } from '../../../src/lib/prewarm/enqueue'
 import { detectVariantIdentityChange } from '../../../src/hooks/collection/variantIdentity'
 
 const fakeReq = (pending: { input?: unknown }[] = []) => {
@@ -64,5 +65,25 @@ describe('enqueuePrewarmAfterChange', () => {
     queue.mockRejectedValueOnce(new Error('no jobs runner'))
     await expect(run({ doc, operation: 'create', req })).resolves.toBe(doc)
     expect(logger.warn).toHaveBeenCalled()
+  })
+})
+
+describe('enqueuePrewarmJob dedupe eligibility', () => {
+  it('excludes permanently-failed (hasError) jobs from the pending-dedupe query', async () => {
+    const { req, find } = fakeReq()
+    await enqueuePrewarmJob(req.payload, { sourceId: 'img1', reason: 'create', taskSlug: 'imagesPrewarm', queue: 'default' })
+    const where = find.mock.calls[0]?.[0]?.where
+    // Without the hasError clause a dead retries-exhausted job (completedAt null, processing false)
+    // would dedupe every future enqueue forever — the runner never picks it up again.
+    expect(where.and).toContainEqual({ hasError: { not_equals: true } })
+    expect(where.and).toContainEqual({ completedAt: { exists: false } })
+    expect(where.and).toContainEqual({ processing: { not_equals: true } })
+  })
+
+  it('still enqueues when the only matching job is a failed one (the query filters it out)', async () => {
+    // The failed job is NOT returned by the runnable-jobs query, so find yields no dupe → enqueue.
+    const { req, queue } = fakeReq([])
+    await enqueuePrewarmJob(req.payload, { sourceId: 'img1', reason: 'replace', taskSlug: 'imagesPrewarm', queue: 'default' })
+    expect(queue).toHaveBeenCalledOnce()
   })
 })

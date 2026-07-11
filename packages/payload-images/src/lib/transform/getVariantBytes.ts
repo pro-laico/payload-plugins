@@ -11,6 +11,7 @@ import { resolveStaticDir } from './staticDir'
 import { transformImage } from './sharp'
 import { readBytes } from './source'
 import { extForFormat, mimeForFormat } from './params'
+import { TransformOverloadError } from './limit'
 import { isDuplicateKeyError, isForeignKeyError } from '../errors'
 import type { GenBytes, GetVariantBytesArgs, TransformOutput, UploadDocLike, VariantBytes } from '../../types'
 
@@ -92,6 +93,8 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
         maxInputPixels,
       })
     } catch (err) {
+      // Queue full → shed load with 503 (transient), don't log it as a transform error.
+      if (err instanceof TransformOverloadError) return { ok: false, status: 503, msg: 'Server busy' }
       const hint = isSharpLoadError(err) ? ` — sharp failed to load; ${SHARP_INSTALL_HINT}` : ''
       payload.logger.error(`[payload-images] transform failed for ${src.id}: ${String(err)}${hint}`)
       return { ok: false, status: 500, msg: 'Transform failed' }
