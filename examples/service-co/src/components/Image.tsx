@@ -1,6 +1,7 @@
 import config from '@payload-config'
 import { getPayload } from 'payload'
-import { type ImageProps, RESPONSIVE_IMAGE_SELECT as select, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { RESPONSIVE_IMAGE_SELECT as select } from '@pro-laico/payload-images'
+import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
 /**
  * The project's image component — pass an id + the declared render ({@link ImageProps}, exported

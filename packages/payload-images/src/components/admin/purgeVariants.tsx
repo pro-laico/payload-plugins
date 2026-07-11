@@ -4,14 +4,6 @@ import type React from 'react'
 import { useState } from 'react'
 import { toast, useConfig, useDocumentInfo } from '@payloadcms/ui'
 
-/**
- * A button that purges every on-demand variant generated from this source image
- * (POST `<apiRoute><purgePath>/:id`, logged-in users only). Useful after editing the
- * focal point or re-uploading, or to reclaim storage. Only shown on a saved doc.
- *
- * `purgePath` defaults to the endpoint's fixed `/img/purge` route. The POST is
- * authenticated by Payload's session cookie (SameSite-protected).
- */
 interface PurgeVariantsProps {
   /** Purge route under the API base. Default `/img/purge`. */
   purgePath?: string
@@ -29,6 +21,8 @@ const button: React.CSSProperties = {
 
 const note: React.CSSProperties = { color: 'var(--theme-elevation-500)', fontSize: '0.8rem', margin: '0.25rem 0 0' }
 
+/** A button that purges every on-demand variant of this source image (POST, authenticated by
+ *  Payload's session cookie). Only shown on a saved doc. */
 export const PurgeVariants: React.FC<PurgeVariantsProps> = ({ purgePath = '/img/purge' }) => {
   const { config } = useConfig()
   const { id } = useDocumentInfo()

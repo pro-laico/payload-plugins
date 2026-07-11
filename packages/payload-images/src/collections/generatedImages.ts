@@ -1,7 +1,7 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
-import { authd } from '../access'
-import { IMAGE_MIME_TYPES } from '../transform/params'
+import { authd } from './access'
+import { IMAGE_MIME_TYPES } from '../lib/transform/params'
 
 export const GENERATED_IMAGES_SLUG = 'generated-images'
 
@@ -13,22 +13,15 @@ export interface CreateGeneratedImagesOptions {
 }
 
 /**
- * The hidden, durable cache of on-demand image variants. The transform endpoint
- * writes one upload doc here per (source, settings, focal) combination; the source
- * `images` collection surfaces them through a `join` field and purges them when the
- * source changes or is deleted.
- *
- * It is an UPLOAD collection so variant bytes flow through whatever storage adapter
- * is configured (local disk, S3, Vercel Blob, …) — keeping the feature
- * platform-agnostic. With a cloud storage adapter, register it with a SERVER-upload
- * storage instance, since the endpoint creates docs server-side via the Local API.
- *
- * Deliberately carries NO revalidation hooks: variants are derived and disposable,
- * so busting cache tags on every cache-miss create would be pure churn.
+ * The hidden, durable cache of on-demand image variants — one upload doc per (source, settings,
+ * focal) combination. An UPLOAD collection so variant bytes flow through whatever storage adapter
+ * is configured; with cloud storage, register it with a SERVER-upload instance (the endpoint
+ * creates docs via the Local API). Carries NO revalidation hooks on purpose: variants are derived
+ * and disposable, so busting cache tags on every cache-miss create would be pure churn.
  */
 export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptions = {}): CollectionConfig => {
   const slug = opts.slug || GENERATED_IMAGES_SLUG
-  const sourceSlug = (opts.sourceSlug || 'images') as CollectionSlug
+  const sourceSlug = (opts.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
 
   return {
     slug,
@@ -57,6 +50,3 @@ export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptio
     upload: { mimeTypes: IMAGE_MIME_TYPES },
   }
 }
-
-/** The default generated-images collection. */
-export const GeneratedImages: CollectionConfig = createGeneratedImagesCollection()

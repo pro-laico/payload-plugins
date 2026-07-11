@@ -2,20 +2,17 @@
  * The read-side render contract: a getter declares WHAT it's rendering on the read
  * (`context: { image, blur }`), and the doc comes back self-sufficient — virtual `src`/`srcset`
  * built for exactly that render, `croppedBlurHash` a finished placeholder for the same box.
- * `<ResponsiveImage>` then just paints the doc; no config, no URL math, no client anything
- * (the Sanity-style "pass a client/config to a builder at every call site" dance inverted).
- *
- * Everything here is validated structurally — `context` is an untyped bag, nothing is trusted.
+ * `context` is an untyped bag, so everything is validated structurally.
  */
-import { FITS, type Fit, FORMATS, type Format, parseAspectRatio } from '../transform/params'
-import { isPlaceholderFormat, isPlaceholderQuality, type PlaceholderFormat, type PlaceholderQuality } from '../blurhash/qualities'
+import { FITS, type Fit, FORMATS, type Format, parseAspectRatio } from './transform/params'
+import { isPlaceholderFormat, isPlaceholderQuality, type PlaceholderFormat, type PlaceholderQuality } from './placeholders/qualities'
 
 /** A render aspect ratio: `16/9`, `"16/9"`, or `"16:9"`. */
 export type AspectRatio = number | `${number}/${number}` | `${number}:${number}`
 
 /** What a read declares about the render it's fetching for — pass as `context.image`. */
 export interface ImageRenderIntent {
-  /** Render aspect ratio — shapes the srcset/src `h` and the placeholder crop. Omit for the natural ratio. */
+  /** Shapes the srcset/src `h` and the placeholder crop. Omit for the natural ratio. */
   aspectRatio?: AspectRatio
   /** Transform quality (1–100). Default 75. */
   quality?: number
@@ -30,7 +27,7 @@ export interface ImageRenderIntent {
 export interface BlurRenderIntent {
   /** Placeholder tier: `xs`…`xl` (blurhash) or `xxl`/`x3` (micro-webp). Default `sm`. */
   quality?: PlaceholderQuality
-  /** `uri` (default): a finished data URI, ready to paint. `hash`: the cropped raw hash string. */
+  /** `uri` (default): a finished data URI. `hash`: the cropped raw hash string. */
   format?: PlaceholderFormat
 }
 
@@ -49,14 +46,12 @@ export interface ResponsiveImageDoc {
   croppedBlurHash?: string | null
 }
 
-/**
- * The getter a project writes around `payload.findByID` (plus its own caching/access rules —
- * the plugin never fetches). Select {@link RESPONSIVE_IMAGE_SELECT} and pass the render as
- * `context`; hand the result's fields straight to `<ResponsiveImage>`.
- */
+/** The getter a project writes around `payload.findByID` (its own caching/access — the plugin
+ *  never fetches). Select {@link RESPONSIVE_IMAGE_SELECT}, pass the render as `context`, hand
+ *  the result's fields straight to `<ResponsiveImage>`. */
 export type ImageGetter = (id: string | number, render?: ImageRenderContext) => Promise<ResponsiveImageDoc | null>
 
-/** The lean select for a read that feeds `<ResponsiveImage>` — everything it renders, nothing else. */
+/** The lean select for a read that feeds `<ResponsiveImage>`. */
 export const RESPONSIVE_IMAGE_SELECT = {
   alt: true,
   src: true,
@@ -82,7 +77,7 @@ export interface ParsedBlurIntent {
   format?: PlaceholderFormat
 }
 
-/** Read + validate `context.image` off the operation (Local API). Absent → `declared: false`. */
+/** Read + validate `context.image` off the operation. Absent → `declared: false`. */
 export const readImageIntent = (req: { context?: Record<string, unknown> } | undefined): ParsedRenderIntent => {
   const raw = req?.context?.image
   if (typeof raw !== 'object' || raw === null) return { declared: false }
@@ -95,7 +90,7 @@ export const readImageIntent = (req: { context?: Record<string, unknown> } | und
   return out
 }
 
-/** Read + validate `context.blur` off the operation (Local API). Absent → `declared: false`. */
+/** Read + validate `context.blur` off the operation. Absent → `declared: false`. */
 export const readBlurIntent = (req: { context?: Record<string, unknown> } | undefined): ParsedBlurIntent => {
   const raw = req?.context?.blur
   if (typeof raw !== 'object' || raw === null) return { declared: false }

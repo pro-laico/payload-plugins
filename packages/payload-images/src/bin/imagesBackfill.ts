@@ -1,17 +1,6 @@
-import { type CollectionSlug, getPayload, type SanitizedConfig } from 'payload'
-
-import { readPluginMarker } from '../lib/pluginMarker'
-import { getServerSideURL } from '../lib/getServerSideURL'
-import { analyzeImageMetadata } from '../blurhash/generate'
-import { PLACEHOLDER_FIELD_NAMES } from '../blurhash/qualities'
-import { readBytes, resolveStaticDir, type UploadDocLike } from '../transform/source'
-
 /**
- * Payload custom-bin entry. `imagesPlugin` registers this under `config.bin` as the
- * `images:backfill` command, so `payload images:backfill` stamps the upload-time metadata
- * (placeholder tiers, palette, alpha flags) onto every image that predates the hook — the
- * one-time migration for existing projects. Reads run pure afterwards; new uploads are
- * hooked already.
+ * Payload custom-bin entry, registered as `payload images:backfill` — stamps the upload-time
+ * metadata (placeholder tiers, palette, alpha flags) onto every image that predates the hook.
  *
  *   payload images:backfill                    # only images missing metadata (idempotent)
  *   payload images:backfill --force            # regenerate every image
@@ -19,8 +8,17 @@ import { readBytes, resolveStaticDir, type UploadDocLike } from '../transform/so
  *   payload images:backfill --collection media # an extendCollection target
  *
  * `--focal` is opt-in because it CHANGES CROPS on a live site (busts caches, regenerates
- * variants) — everything else is additive metadata that alters no rendered pixels.
+ * variants); everything else is additive metadata that alters no rendered pixels.
  */
+import { type CollectionSlug, getPayload, type SanitizedConfig } from 'payload'
+
+import { readPluginMarker } from '../lib/pluginMarker'
+import { analyzeImageMetadata } from '../lib/metadata/analyze'
+import { resolveStaticDir } from '../lib/transform/staticDir'
+import { getServerSideURL } from '../lib/getServerSideURL'
+import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
+import { readBytes, type UploadDocLike } from '../lib/transform/source'
+
 export const script = async (config: SanitizedConfig): Promise<void> => {
   const argv = process.argv.slice(2)
   const force = argv.includes('--force')

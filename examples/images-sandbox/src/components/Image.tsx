@@ -1,6 +1,7 @@
 import config from '@payload-config'
 import { getPayload } from 'payload'
-import { type ImageProps, RESPONSIVE_IMAGE_SELECT, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
+import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
 /**
  * The project's image component — THE consumption pattern for payload-images, all in one place:

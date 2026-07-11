@@ -1,27 +1,11 @@
 /**
  * `<ResponsiveImage>` — a single plain `<img>` painting exactly what the read delivered: the
- * doc's `src`/`srcset` virtuals (built server-side for the render the getter declared via
- * `context.image`) and its `croppedBlurHash` as the `placeholder` background. Passive and sync:
- * fetches nothing, never touches Payload, server- and client-tree safe. Not `next/image`.
- *
- * The app owns one thin wrapper ({@link ImageProps}) that does the fetch: `payload.findByID`
- * with `select: RESPONSIVE_IMAGE_SELECT` and `context: { image, blur }`, then spreads the doc's
- * fields here.
+ * doc's `src`/`srcset` virtuals and its `croppedBlurHash` as the placeholder background.
+ * Passive and sync: fetches nothing, never touches Payload, server- and client-tree safe.
  */
 import type { CSSProperties, ReactElement } from 'react'
-import type { Fit } from '../transform/params'
-import {
-  type AspectRatio,
-  type BlurRenderIntent,
-  type ImageGetter,
-  type ImageRenderContext,
-  type ImageRenderIntent,
-  RESPONSIVE_IMAGE_SELECT,
-  type ResponsiveImageDoc,
-} from '../lib/renderIntent'
-
-export { RESPONSIVE_IMAGE_SELECT }
-export type { AspectRatio, BlurRenderIntent, Fit, ImageGetter, ImageRenderContext, ImageRenderIntent, ResponsiveImageDoc }
+import type { Fit } from '../lib/transform/params'
+import type { AspectRatio, BlurRenderIntent, ImageRenderIntent } from '../lib/renderIntent'
 
 export interface ResponsiveImageProps {
   id: string | number
@@ -31,15 +15,10 @@ export interface ResponsiveImageProps {
   /** CSS aspect-ratio for the box (`16/9` | `"16/9"` | `"16:9"`) — match what the read declared.
    *  Ignored when `fill` is set. */
   aspectRatio?: AspectRatio
-  /**
-   * Cover-fill a height-driven parent instead of acting as an aspect-ratio box. The `<img>`
-   * becomes `position:absolute; inset:0; size:100%` with `object-fit:<fit>` and NO aspect-ratio
-   * — so it fills a parent that sets its own height (full-bleed hero, carousel slide, map panel).
-   * The parent must be positioned. The placeholder still applies. Default false.
-   */
+  /** Cover-fill a height-driven, positioned parent instead of acting as an aspect-ratio box
+   *  (`position:absolute; inset:0; size:100%`, no aspect-ratio). Default false. */
   fill?: boolean
-  /** CSS `object-fit` (and the fit for fallback-built URLs). Default `cover`. A read declaring
-   *  `context.image.fit` should pass the same value here so the CSS matches the crop. */
+  /** CSS `object-fit`. Default `cover`. Pass the same value the read declared so the CSS matches the crop. */
   fit?: Fit
   /** Native `<img>` `loading`. Default `lazy`; set `eager` for an above-the-fold hero. */
   loading?: 'lazy' | 'eager'
@@ -47,12 +26,9 @@ export interface ResponsiveImageProps {
   fetchPriority?: 'high' | 'low' | 'auto'
   /** Native `<img>` `decoding` hint. Default `async`. */
   decoding?: 'async' | 'auto' | 'sync'
-  /** Applied to the `<img>` (size / space / round it here). */
   className?: string
-  /** Merged onto the `<img>`'s style. */
   style?: CSSProperties
-  /** The doc's `croppedBlurHash` — a finished placeholder data URI painted as the `<img>`'s
-   *  background while it loads. Omit to skip the placeholder. */
+  /** The doc's `croppedBlurHash` — painted as the `<img>`'s background while it loads. */
   placeholder?: string | null
   /** Extra `data-*` attributes spread onto the `<img>`. */
   dataAttributes?: Record<`data-${string}`, string>
@@ -61,17 +37,15 @@ export interface ResponsiveImageProps {
 }
 
 /**
- * Props for the ONE image component an app writes around its getter — pass an id + the declared
- * render, get back `<ResponsiveImage>` painting a doc fetched for exactly that render:
+ * Props for the ONE image component an app writes around its getter:
  *
  *   export async function Image({ id, image, blur, ...rest }: ImageProps) {
  *     const payload = await getPayload({ config })
  *     const doc = await payload.findByID({ id, collection: 'images', depth: 0, select: RESPONSIVE_IMAGE_SELECT, context: { image, blur } })
- *     return <ResponsiveImage id={doc.id} alt={doc.alt} src={doc.src} srcset={doc.srcset} placeholder={doc.croppedBlurHash} {...rest} />
+ *     return <ResponsiveImage {...doc} {...rest} />
  *   }
  *
- * `image`/`blur` go into the read's `context` verbatim; everything else is presentation, passed
- * through. Wrap the fetch in your cache layer (keyed by id + render) when you have one.
+ * `image`/`blur` go into the read's `context` verbatim; everything else is presentation.
  */
 export interface ImageProps extends Omit<ResponsiveImageProps, 'id' | 'alt' | 'src' | 'srcset' | 'placeholder'> {
   /** The image doc id — the component fetches the rest itself. */

@@ -38,14 +38,14 @@
         "default": "./dist/components/image.js"
       },
       "./utils/urls": {
-        "types": "./dist/utils/urls.d.ts",
-        "import": "./dist/utils/urls.js",
-        "default": "./dist/utils/urls.js"
+        "types": "./dist/lib/urls/index.d.ts",
+        "import": "./dist/lib/urls/index.js",
+        "default": "./dist/lib/urls/index.js"
       },
       "./admin/focalPreview": {
-        "types": "./dist/components/admin/focalPreview.d.ts",
-        "import": "./dist/components/admin/focalPreview.js",
-        "default": "./dist/components/admin/focalPreview.js"
+        "types": "./dist/components/admin/focalPreview/index.d.ts",
+        "import": "./dist/components/admin/focalPreview/index.js",
+        "default": "./dist/components/admin/focalPreview/index.js"
       },
       "./admin/purgeVariants": {
         "types": "./dist/components/admin/purgeVariants.d.ts",
@@ -68,14 +68,14 @@
       "default": "./src/components/image.tsx"
     },
     "./utils/urls": {
-      "import": "./src/utils/urls.ts",
-      "types": "./src/utils/urls.ts",
-      "default": "./src/utils/urls.ts"
+      "import": "./src/lib/urls/index.ts",
+      "types": "./src/lib/urls/index.ts",
+      "default": "./src/lib/urls/index.ts"
     },
     "./admin/focalPreview": {
-      "import": "./src/components/admin/focalPreview.tsx",
-      "types": "./src/components/admin/focalPreview.tsx",
-      "default": "./src/components/admin/focalPreview.tsx"
+      "import": "./src/components/admin/focalPreview/index.tsx",
+      "types": "./src/components/admin/focalPreview/index.tsx",
+      "default": "./src/components/admin/focalPreview/index.tsx"
     },
     "./admin/purgeVariants": {
       "import": "./src/components/admin/purgeVariants.tsx",

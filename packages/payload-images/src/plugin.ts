@@ -3,18 +3,19 @@ import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { stashConfig } from './lib/configStash'
-import { loadSharp } from './transform/sharpInstance'
+import { loadSharp } from './lib/transform/sharpInstance'
 import { createPurgeEndpoint } from './endpoints/purge'
-import { mergeCollection } from './lib/mergeCollection'
-import { SHARP_INSTALL_HINT } from './transform/getVariantBytes'
-import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './transform/params'
-import { createImagesCollection, imageEnhancements } from './collections/images'
+import { createImagesCollection } from './collections/images'
+import { imageEnhancements } from './collections/imageEnhancements'
+import { mergeCollection } from './collections/mergeCollection'
+import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
+import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './lib/transform/params'
 import { createTransformEndpoint, type TransformEndpointConfig } from './endpoints/transform'
 import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 
-/** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
- *  own location (so `payload <key>` works both in-workspace and when published). */
-function binScriptPath(name: string): string {
+/** Absolute path to a bundled bin script, resolving the src→dist swap from this module's own
+ *  location so `payload <key>` works both in-workspace and when published. */
+const binScriptPath = (name: string): string => {
   const here = fileURLToPath(import.meta.url)
   const ext = here.endsWith('.ts') ? 'ts' : 'js'
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
@@ -22,42 +23,30 @@ function binScriptPath(name: string): string {
 
 export interface ImagesPluginOptions {
   /**
-   * When false, the plugin registers NO collections, endpoints, or hooks. This is
-   * "not installed", not "temporarily disabled": on SQL adapters, flipping it off for
-   * an existing project produces a migration that DROPS the images / generated-images
-   * tables (and their data). Defaults to true.
+   * When false, the plugin registers NOTHING. This is "not installed", not "temporarily
+   * disabled": on SQL adapters, flipping it off produces a migration that DROPS the images /
+   * generated-images tables and their data. Default true.
    */
   enabled?: boolean
   /**
-   * Slug of an EXISTING upload collection to add the image pipeline to (focal UI, the
-   * `variants` join, the purge hooks, and `upload.focalPoint`), instead of creating the
-   * default `images` collection. Use this when your project already has a `media`/`images`
-   * upload collection — no second collection, no migration. The target must be an upload
-   * collection (you own the collection's `upload` config, including any `imageSizes`).
+   * Slug of an EXISTING upload collection to add the image pipeline to, instead of creating the
+   * default `images` collection — no second collection, no migration. You own that collection's
+   * `upload` config (including any `imageSizes`).
    */
   extendCollection?: string
   /**
-   * Override for the Images collection. Top-level keys replace, but
-   * `upload`/`access`/`admin` are deep-merged and `fields`/`hooks` are merged. Note
-   * `fields` are APPENDED (not replaced) — don't redeclare a base field's `name`
-   * (e.g. `alt`/`variants`), or Payload errors on the duplicate. With `extendCollection`,
-   * these tweaks are merged onto the target collection instead.
+   * Override for the Images collection. Top-level keys replace; `upload`/`access`/`admin`
+   * deep-merge; `fields`/`hooks` APPEND (don't redeclare a base field's `name`). With
+   * `extendCollection`, merged onto the target collection instead.
    */
   imagesOverrides?: Partial<CollectionConfig>
   /** Override for the hidden generated-images (variant cache) collection. */
   generatedImagesOverrides?: Partial<CollectionConfig>
   /**
-   * The project-wide srcset widths, set once and applied uniformly to the API virtual `srcset`
-   * and the endpoint's anti-DoS dimension grid (`<ResponsiveImage>` always steps by the default
-   * 50 — off-grid widths just snap server-side). Two forms:
-   *  - a **number** (default 50): the width increment AND the grid the endpoint snaps requests
-   *    to — a bigger step means fewer srcset widths and fewer cached variants.
-   *  - an **array**: an explicit, non-linear width ladder (e.g. `[200, 450, 750, 1200, 2000]`)
-   *    for the srcset — denser where it matters, fewer entries than a fine linear step. The
-   *    endpoint's snap grid then falls back to the default 50, so use ladder widths that are
-   *    multiples of 50 (or set `transform.dimensionStep`) to have them pass through unchanged.
-   *
-   * `transform.maxDimension` caps the largest width in either form.
+   * The project-wide srcset widths. A **number** (default 50) is the width increment AND the
+   * endpoint's anti-DoS snap grid; an **array** is an explicit non-linear width ladder for the
+   * srcset (use multiples of 50, or set `transform.dimensionStep`, so ladder widths pass the
+   * snap unchanged). `transform.maxDimension` caps either form.
    */
   pixelStep?: number | number[]
   /** On-demand transform endpoint config. Pass `false` to not register the endpoints. */
@@ -68,51 +57,31 @@ export interface ImagesPluginOptions {
   previewRatios?: string[]
   /**
    * Add virtual `src` / `srcset` / `placeholderURL` / `thumbnailURL` fields, computed on read,
-   * so optimized URLs ride along in every REST / GraphQL / Local-API response (and through
-   * relationship population). Absolute when `serverURL` is set, relative otherwise. Default true;
-   * defaults to false with `transform: false` (the URLs would 404 — an explicit true is honored,
-   * with a boot warning).
+   * so optimized URLs ride along in every response and through relationship population.
+   * Default true; defaults to false with `transform: false` (the URLs would 404).
    */
   virtualFields?: boolean
   /** Mark the `alt` field `localized: true` (requires Payload localization). Ignored with
    *  `extendCollection`. Default false. */
   localizeAlt?: boolean
-  /**
-   * Accepted upload mime types for the `images` collection. Defaults to the raster formats the
-   * transform pipeline can process (avif/webp/jpeg/png). Widen it to accept more (e.g. add
-   * `'image/svg+xml'`) or narrow it — but the endpoint only meaningfully resizes/crops raster
-   * images, so non-raster uploads are stored and served as-is. Ignored with `extendCollection`
-   * (you own that collection's `upload.mimeTypes`).
-   */
+  /** Accepted upload mime types. Defaults to the raster formats the pipeline can transform
+   *  (avif/webp/jpeg/png); non-raster uploads are stored and served as-is. Ignored with
+   *  `extendCollection`. */
   mimeTypes?: string[]
-  /**
-   * Enable Payload's native **folder organization** on the managed collection (the created `images`,
-   * or the `extendCollection` target) — adds a folder relationship to the schema so editors can
-   * organize a large library. Default false.
-   */
+  /** Enable Payload's native folder organization on the managed collection. Default false. */
   folders?: boolean
-  /**
-   * Cap the *stored* original's longest edge, in px (applied once on upload via Payload's
-   * `resizeOptions`). **Off by default — your original stays untouched** (so the collection can
-   * double as original storage); set it only to bound storage. Ignored with `extendCollection`.
-   */
+  /** Cap the *stored* original's longest edge in px (applied once on upload). Off by default —
+   *  the original stays untouched. Ignored with `extendCollection`. */
   maxOriginalSize?: number
 }
 
 /**
  * Registers the `images` (source) and hidden `generated-images` (variant cache) collections,
- * plus the on-demand transform + purge endpoints.
- *
- * Uploads store only the original; every rendered size is generated the first time a page asks
- * for it (resized and cropped to the focal point set in the admin), then cached in
- * `generated-images` so it's only ever built once. Placeholders are a quality-tier ladder
- * (five BlurHash strings + two micro-webp data URIs) stored on the doc at upload time; the
- * virtual `croppedBlurHash` field serves each read a finished, focal-cropped placeholder
- * (hash tiers are pure math; webp tiers decode ~1 KB — never the original).
- *
- * Pass `extendCollection: '<slug>'` to add the pipeline to an upload collection you already have
- * instead of creating `images`. The transform endpoint mounts at `/api/img`; do not name a
- * collection `img` or it shadows the endpoint.
+ * plus the on-demand transform + purge endpoints. Uploads store only the original; every
+ * rendered size is generated on first request (focal-cropped), then cached. Placeholders are a
+ * quality-tier ladder stored on the doc at upload; the virtual `croppedBlurHash` serves each
+ * read a finished, focal-cropped placeholder. The transform endpoint mounts at `/api/img`; do
+ * not name a collection `img` or it shadows the endpoint.
  */
 export const imagesPlugin =
   (opts: ImagesPluginOptions = {}): Plugin =>
@@ -163,18 +132,19 @@ export const imagesPlugin =
         endpointsEnabled,
         adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
       })
+      // Re-merge the target's own populate/select on top so the enhancements never clobber them.
       const parity: Partial<CollectionConfig> = {
         ...enh,
         defaultPopulate: {
-          ...(enh.defaultPopulate as Record<string, unknown>),
-          ...(target.defaultPopulate as Record<string, unknown> | undefined),
-        } as CollectionConfig['defaultPopulate'],
+          ...(enh.defaultPopulate as Record<string, unknown>), //EXCUSE: Payload's per-collection select generics don't exist inside the plugin
+          ...(target.defaultPopulate as Record<string, unknown> | undefined), //EXCUSE: same as above
+        } as CollectionConfig['defaultPopulate'], //EXCUSE: same as above
         ...(enh.forceSelect || target.forceSelect
           ? {
               forceSelect: {
-                ...(enh.forceSelect as Record<string, unknown> | undefined),
-                ...(target.forceSelect as Record<string, unknown> | undefined),
-              } as CollectionConfig['forceSelect'],
+                ...(enh.forceSelect as Record<string, unknown> | undefined), //EXCUSE: same as defaultPopulate above
+                ...(target.forceSelect as Record<string, unknown> | undefined), //EXCUSE: same as defaultPopulate above
+              } as CollectionConfig['forceSelect'], //EXCUSE: same as defaultPopulate above
             }
           : {}),
       }

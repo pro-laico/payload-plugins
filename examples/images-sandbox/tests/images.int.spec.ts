@@ -244,7 +244,8 @@ describe('payload-images wiring', () => {
   })
 
   it('<ResponsiveImage> renders a single <img> (Shape B) painting the render-ready doc it was handed', async () => {
-    const { RESPONSIVE_IMAGE_SELECT, ResponsiveImage } = await import('@pro-laico/payload-images/components/image')
+    const { RESPONSIVE_IMAGE_SELECT } = await import('@pro-laico/payload-images')
+    const { ResponsiveImage } = await import('@pro-laico/payload-images/components/image')
     // The consumption pattern: ONE read declares the render, the component stays passive.
     const doc = (await payload.findByID({
       collection: 'images',
