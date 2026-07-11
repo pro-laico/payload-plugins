@@ -10,10 +10,22 @@ const mergeHooks = <T>(base: T, extra?: T): T => {
   return out as unknown as T //EXCUSE: reverse of the generic widening above
 }
 
+/** Shallow key-merge for the select-shaped configs, so an override adds keys without dropping the
+ *  plugin's required ones. Returns undefined only when neither side has any. */
+const mergeSelect = (
+  base: CollectionConfig['defaultPopulate'],
+  override: CollectionConfig['defaultPopulate'],
+): CollectionConfig['defaultPopulate'] =>
+  base || override
+    ? ({ ...(base as Record<string, unknown>), ...(override as Record<string, unknown> | undefined) } as CollectionConfig['defaultPopulate']) //EXCUSE: the generated per-collection select type doesn't exist inside the plugin
+    : undefined
+
 /**
  * Deep-merge a partial override onto a base `CollectionConfig`. Top-level keys replace, but
  * `access`/`admin` shallow-merge, `fields` APPEND, `upload` shallow-merges when both are objects,
- * and `hooks` merge per-phase (override hooks run AFTER base hooks).
+ * `hooks` merge per-phase (override after base), and `defaultPopulate`/`forceSelect` key-merge so
+ * a user override can add fields but never drops the plugin's virtual-field inputs (which would
+ * null out `src`/`srcset`/`placeholder` on every populated read).
  */
 export const mergeCollection = (base: CollectionConfig, override?: Partial<CollectionConfig>): CollectionConfig =>
   override
@@ -28,5 +40,16 @@ export const mergeCollection = (base: CollectionConfig, override?: Partial<Colle
             ? { ...base.upload, ...override.upload }
             : (override.upload ?? base.upload),
         hooks: override.hooks ? mergeHooks(base.hooks ?? {}, override.hooks) : base.hooks,
+        ...(base.defaultPopulate || override.defaultPopulate
+          ? { defaultPopulate: mergeSelect(base.defaultPopulate, override.defaultPopulate) }
+          : {}),
+        ...(base.forceSelect || override.forceSelect
+          ? {
+              forceSelect: mergeSelect(
+                base.forceSelect as CollectionConfig['defaultPopulate'],
+                override.forceSelect as CollectionConfig['defaultPopulate'],
+              ) as CollectionConfig['forceSelect'],
+            } //EXCUSE: forceSelect and defaultPopulate share the select shape the generated types don't expose here
+          : {}),
       }
     : base

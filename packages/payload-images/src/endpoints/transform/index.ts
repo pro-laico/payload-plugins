@@ -15,7 +15,7 @@ import { setSharpConcurrency } from '../../lib/transform/sharpInstance'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
-import { pickFallbackVariant } from '../../lib/transform/fallback'
+import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
 import { resolveStaticDir } from '../../lib/transform/staticDir'
 import { readBytes } from '../../lib/transform/source'
 import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
@@ -89,12 +89,23 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
       // Cache miss with a nearby variant ready → serve the stand-in NOW (never cached: no-store)
       // and generate the exact variant in the background; the next request gets the exact one.
       let standIn: { data: Buffer; mimeType: string } | null = null
-      if (!result && fallback) {
+      if (!result && fallback && p.w != null) {
         try {
+          // Push the picker's hard predicates into the query and sort by width, so a source with
+          // thousands of variants can't bury a valid stand-in past an arbitrary first-100 page.
+          const effectiveW = Math.min(p.w, src.width && src.width > 0 ? src.width : p.w)
           const rows = await payload.find({
             collection: variantSlug,
-            where: { source: { equals: src.id } },
-            limit: 100,
+            where: {
+              and: [
+                { source: { equals: src.id } },
+                { fit: { equals: p.fit } },
+                { width: { greater_than_equal: Math.ceil(FALLBACK_MIN_WIDTH_RATIO * effectiveW) } },
+                ...(format !== 'avif' ? [{ format: { not_equals: 'avif' } }] : []),
+              ],
+            },
+            sort: '-width',
+            limit: 24,
             depth: 0,
             overrideAccess: true,
             select: {
@@ -104,6 +115,8 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
               format: true,
               quality: true,
               mimeType: true,
+              focalX: true,
+              focalY: true,
               filename: true,
               url: true,
               prefix: true,

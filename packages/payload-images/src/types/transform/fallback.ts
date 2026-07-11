@@ -9,4 +9,8 @@ export type FallbackCandidate = UploadDocLike & {
   format?: string | null
   quality?: number | null
   mimeType?: string | null
+  /** The focal point baked into this variant's crop — compared to the source's CURRENT focal so a
+   *  stale-focal variant (e.g. one persisted by a request that raced a focal edit) is never served. */
+  focalX?: number | null
+  focalY?: number | null
 }

@@ -28,6 +28,23 @@ export const SHARP_INSTALL_HINT = "install it (`pnpm add sharp`) and externalize
 
 let warnedCacheLookup = false
 
+/** In-flight original-bytes reads, keyed by source identity, so a cold page firing many srcset
+ *  widths (or any concurrent miss burst) reads each original ONCE and shares the Buffer while it's
+ *  resolving — cleared on settle, so no Buffer is retained past the reads that need it. */
+const originalReadFlight = new Map<string, Promise<Buffer | null>>()
+
+const readOriginalCoalesced = (args: GetVariantBytesArgs): Promise<Buffer | null> => {
+  const { payload, source: src, sourceSlug, base } = args
+  const key = `${sourceSlug}|${src.id}|${src.filename ?? ''}`
+  const existing = originalReadFlight.get(key)
+  if (existing) return existing
+  const p = readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug }).finally(() =>
+    originalReadFlight.delete(key),
+  )
+  originalReadFlight.set(key, p)
+  return p
+}
+
 /** The cache-hit half of the engine: exact-key lookup + stored bytes, or null on any miss —
  *  including a failed lookup (warned once per process), which degrades to regeneration. */
 export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes | null> => {
@@ -61,11 +78,11 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
 
 /** The generation half: Sharp once (coalesced per key via `genFlight`), persist per `deferPersist`. */
 export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> => {
-  const { payload, source: src, params: p, format, sourceSlug, variantSlug, base, maxInputPixels, genFlight } = args
+  const { payload, source: src, params: p, format, variantSlug, maxInputPixels, genFlight } = args
   const key = variantCacheKey(src, p, format)
 
   const generate = async (): Promise<GenBytes> => {
-    const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug })
+    const original = args.originalBytes ?? (await readOriginalCoalesced(args))
     if (!original) {
       const relative = !!src.url && !/^https?:\/\//i.test(src.url)
       const hint = relative ? ' — relative-URL storage and the request origin did not resolve; set serverURL in buildConfig' : ''

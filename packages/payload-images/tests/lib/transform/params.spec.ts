@@ -120,6 +120,25 @@ describe('parseTransformParams', () => {
     const r = parseTransformParams({ h: '99999' }, C)
     expect(r.ok && r.params.h).toBe(C.maxDimension)
   })
+  it('preserves the aspect ratio when an ar-derived height exceeds maxDimension (scales both, not just one)', () => {
+    // w=4000, ar=0.5 (tall) → h would be 8000 > 4096; both must scale to keep ratio 0.5, not squash to 4000×4096.
+    const r = parseTransformParams({ w: '4000', ar: '1:2' }, { ...C, dimensionStep: 1 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.params.h).toBe(C.maxDimension) // clipped dimension pinned to the ceiling
+      expect(r.params.w).toBe(Math.round(C.maxDimension * 0.5)) // partner rescaled → ratio preserved
+      expect(r.params.w! / r.params.h!).toBeCloseTo(0.5, 5)
+    }
+  })
+  it('preserves the aspect ratio when an ar-derived width exceeds maxDimension', () => {
+    const r = parseTransformParams({ h: '4000', ar: '2:1' }, { ...C, dimensionStep: 1 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.params.w).toBe(C.maxDimension)
+      expect(r.params.h).toBe(Math.round(C.maxDimension / 2))
+      expect(r.params.w! / r.params.h!).toBeCloseTo(2, 5)
+    }
+  })
   it('falls back on unknown fit / format', () => {
     const r = parseTransformParams({ w: '640', fit: 'bogus', fmt: 'tiff' }, C)
     expect(r.ok && r.params.fit).toBe('cover')

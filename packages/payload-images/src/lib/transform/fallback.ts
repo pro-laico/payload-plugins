@@ -27,7 +27,7 @@ const replayHeight = (w: number, ratio: number, constraints: TransformConstraint
 export const pickFallbackVariant = (
   p: ParsedParams,
   format: OutputFormat,
-  source: { width?: number | null; height?: number | null },
+  source: { width?: number | null; height?: number | null; focalX?: number | null; focalY?: number | null },
   candidates: FallbackCandidate[],
   constraints: TransformConstraints,
 ): FallbackCandidate | null => {
@@ -36,11 +36,19 @@ export const pickFallbackVariant = (
   if (reqRatio == null || reqRatio <= 0) return null
 
   const effectiveW = Math.min(p.w, source.width && source.width > 0 ? source.width : p.w)
+  // Default focal is 50/50 (stored null on both sides). Focal is a percentage; the source field and
+  // the persisted variant field can round differently (e.g. a saliency 96.9 stored as 97), so compare
+  // within 1pp — enough to absorb rounding while still rejecting a real focal edit (which moves it far).
+  const srcFocalX = source.focalX ?? 50
+  const srcFocalY = source.focalY ?? 50
+  const sameFocal = (c: FallbackCandidate): boolean =>
+    Math.abs((c.focalX ?? 50) - srcFocalX) <= 1 && Math.abs((c.focalY ?? 50) - srcFocalY) <= 1
 
   const qualifies = (c: FallbackCandidate): boolean => {
     if (!c.width || !c.height || c.width <= 0 || c.height <= 0) return false
     if ((c.fit ?? 'cover') !== p.fit) return false
     if (c.format === 'avif' && format !== 'avif') return false // the client may not decode avif
+    if (!sameFocal(c)) return false // stale-focal crop (a variant left by a request that raced an edit)
     if (c.width < FALLBACK_MIN_WIDTH_RATIO * effectiveW) return false
     if (replayHeight(c.width, reqRatio, constraints) === c.height) return true
     if (p.h != null && p.w != null && replayHeight(p.w, c.width / c.height, constraints) === p.h) return true

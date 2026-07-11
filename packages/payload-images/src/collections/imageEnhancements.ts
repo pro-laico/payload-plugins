@@ -3,7 +3,7 @@ import type { CollectionConfig, CollectionSlug, Field, GetAdminThumbnail } from 
 import { RESPONSIVE_IMAGE_SELECT } from '../lib/renderIntent'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
 import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
-import { HOTSPOT_FIELD_NAMES, hotspotFields } from '../fields/hotspot'
+import { hotspotFields } from '../fields/hotspot'
 import { VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
 import { generateImageMetadataBeforeChange } from '../hooks/collection/generateImageMetadata'
 import { blurhashStorageFields, placeholderField } from '../fields/placeholder'
@@ -72,18 +72,19 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
   // With the virtuals on, a populated image carries exactly what <ResponsiveImage> renders;
-  // without them the component builds URLs itself, so the identity fields ride along instead.
+  // without them the component builds URLs itself — so the identity fields buildSrcset /
+  // getImageUrl / deriveVersion and the placeholder crop need must ride along in EITHER mode.
   const defaultPopulate = virtualFields
     ? RESPONSIVE_IMAGE_SELECT
     : {
         alt: true,
         url: true,
+        ...Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])),
         ...Object.fromEntries(MEDIA_METADATA_FIELD_NAMES.map((f) => [f, true])),
-        ...Object.fromEntries(HOTSPOT_FIELD_NAMES.map((f) => [f, true])),
       }
-  const forceSelect = Object.fromEntries(
-    [...(virtualFields ? VIRTUAL_URL_INPUTS : []), ...PLACEHOLDER_FIELD_NAMES, ...HOTSPOT_FIELD_NAMES].map((f) => [f, true]),
-  )
+  // VIRTUAL_URL_INPUTS already includes the hotspot fields; always force the crop/version inputs so
+  // the placeholder virtual and the build-URLs-yourself mode have their inputs regardless of virtualFields.
+  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES].map((f) => [f, true]))
 
   return {
     fields: [

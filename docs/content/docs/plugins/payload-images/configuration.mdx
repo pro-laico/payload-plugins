@@ -180,6 +180,15 @@ collection's change/delete hooks.
 **Hooks**: none. Variants are derived and disposable, so the collection carries no revalidation
 hooks (busting cache tags on every cache-miss create would be pure churn).
 
+<Callout type="warn">
+  **Private images? Scope the variant cache's read access to match.** `generated-images` defaults
+  to authenticated read, independent of your source collection's policy. If you restrict `images`
+  read (e.g. to owners), tighten the cache too, or a variant's bytes stay readable to any logged-in
+  user: `imagesPlugin({ generatedImagesOverrides: { access: { read: yourSourceReadPolicy } } })`.
+  The transform endpoint itself always gates on the source's read access — this only concerns
+  direct reads of the `generated-images` collection.
+</Callout>
+
 ### `image-render-profiles`
 
 Registered only with [`prewarm`](/docs/plugins/payload-images/caching#smart-prewarm) on: the hidden

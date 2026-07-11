@@ -54,6 +54,26 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(on.upload?.resizeOptions).toMatchObject({ width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true })
   })
 
+  it('key-merges imagesOverrides.forceSelect instead of replacing the plugin required select', () => {
+    const images = (c: Config) =>
+      (c.collections ?? []).find((col) => col.slug === 'images') as CollectionConfig & { forceSelect?: Record<string, boolean> }
+    const merged = images(run({ imagesOverrides: { forceSelect: { credit: true } as CollectionConfig['forceSelect'] } }))
+    expect(merged.forceSelect?.credit).toBe(true) // the override key is added…
+    expect(merged.forceSelect?.width).toBe(true) // …without dropping the plugin's virtual-field inputs
+  })
+
+  it('forces the crop/version inputs even with virtualFields: false (build-URLs-yourself mode)', () => {
+    const images = (run({ virtualFields: false }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig & {
+      forceSelect?: Record<string, boolean>
+      defaultPopulate?: Record<string, boolean>
+    }
+    expect(images.forceSelect?.width).toBe(true)
+    expect(images.forceSelect?.filename).toBe(true)
+    expect(images.forceSelect?.focalX).toBe(true)
+    expect(images.defaultPopulate?.width).toBe(true) // populated docs carry the identity fields too
+    expect(images.defaultPopulate?.filename).toBe(true)
+  })
+
   it('registers nothing when enabled is false', () => {
     const off = run({ enabled: false })
     expect(off.collections ?? []).toHaveLength(0)

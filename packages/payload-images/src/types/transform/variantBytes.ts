@@ -43,4 +43,7 @@ export interface GetVariantBytesArgs {
   /** Default true: persist the variant row via Next `after()` (post-response). Pass false in
    *  job/CLI contexts, where there is no request to defer behind — the persist is awaited. */
   deferPersist?: boolean
+  /** Pre-read original bytes, to avoid re-reading the source per variant (the prewarm job reads
+   *  once and passes them through). Omit and the engine reads (coalescing concurrent reads). */
+  originalBytes?: Buffer
 }

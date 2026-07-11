@@ -9,6 +9,8 @@ import type { CollectionSlug, Payload } from 'payload'
 
 import { getServerSideURL } from '../getServerSideURL'
 import { getOrCreateVariantBytes } from '../transform/getVariantBytes'
+import { readBytes } from '../transform/source'
+import { resolveStaticDir } from '../transform/staticDir'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { computePrewarmTargets } from './computeTargets'
 import type {
@@ -80,6 +82,10 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   })
 
   const base = payload.config.serverURL || getServerSideURL()
+  // Read the original ONCE for the whole job (default up to 24 variants) instead of per target.
+  const originalBytes = targets.length
+    ? ((await readBytes(source, resolveStaticDir(payload, sourceSlug), base, { payload, slug: deps.sourceSlug })) ?? undefined)
+    : undefined
   let generated = 0
   let failed = 0
   for (const target of targets) {
@@ -94,6 +100,7 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
         base,
         maxInputPixels: deps.constraints.maxInputPixels,
         deferPersist: false,
+        originalBytes,
       })
       if (res.ok) generated++
       else failed++

@@ -2,7 +2,7 @@
  * Read the raw bytes of an upload doc — local disk, the storage adapter's handlers, or a URL
  * fetch — with a path-traversal guard on the local read and an SSRF guard on the remote fetch.
  */
-import fs from 'node:fs'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { createLocalReq, type Payload } from 'payload'
 
@@ -70,7 +70,15 @@ export const readBytes = async (
   if (doc.filename) {
     const base = path.resolve(staticDir)
     const filePath = path.resolve(base, doc.filename)
-    if ((filePath === base || filePath.startsWith(base + path.sep)) && fs.existsSync(filePath)) return fs.readFileSync(filePath)
+    // Async read — a sync read of a multi-MB original blocks the event loop on the serving path.
+    // ENOENT falls through to the storage-adapter / URL branches (the original miss behavior).
+    if (filePath === base || filePath.startsWith(base + path.sep)) {
+      try {
+        return await fs.readFile(filePath)
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+      }
+    }
   }
 
   if (via) {

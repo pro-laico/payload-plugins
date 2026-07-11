@@ -88,9 +88,25 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   let w = wRaw != null ? cap(Math.round(wRaw)) : undefined
   let h = hRaw != null ? cap(Math.round(hRaw)) : undefined
 
+  // Derive the missing dimension from the ratio. If the derived value would exceed maxDimension,
+  // clamp IT and rescale the given dimension too, so the aspect ratio is preserved rather than
+  // silently squashed (a tall/wide crop of a huge source must stay the requested shape).
   if (ar) {
-    if (w != null && h == null) h = cap(Math.round(w / ar))
-    else if (h != null && w == null) w = cap(Math.round(h * ar))
+    if (w != null && h == null) {
+      let dh = Math.round(w / ar)
+      if (dh > c.maxDimension) {
+        dh = c.maxDimension
+        w = cap(Math.round(dh * ar))
+      }
+      h = cap(dh)
+    } else if (h != null && w == null) {
+      let dw = Math.round(h * ar)
+      if (dw > c.maxDimension) {
+        dw = c.maxDimension
+        h = cap(Math.round(dw / ar))
+      }
+      w = cap(dw)
+    }
   }
 
   if (w == null && h == null) return { ok: false, error: 'width or height required' }

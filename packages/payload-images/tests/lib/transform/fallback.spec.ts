@@ -101,3 +101,28 @@ describe('pickFallbackVariant — anchors and null cases', () => {
     expect(pick(req({}), [cand({ width: null, height: null })])).toBeNull()
   })
 })
+
+describe('pickFallbackVariant — focal-mismatch rejection (stale-crop guard)', () => {
+  it('rejects a candidate whose baked focal differs from the source current focal', () => {
+    // Source now at focal (70,60); a variant persisted with the old (30,40) is a stale crop.
+    const src = { ...source, focalX: 70, focalY: 60 }
+    const stale = cand({ width: 1600, height: 900, focalX: 30, focalY: 40 })
+    const fresh = cand({ id: 'fresh', width: 1600, height: 900, focalX: 70, focalY: 60 })
+    expect(pickFallbackVariant(req({ w: 1600, h: 900 }), 'webp', src, [stale], constraints)).toBeNull()
+    expect(pickFallbackVariant(req({ w: 1600, h: 900 }), 'webp', src, [fresh], constraints)?.id).toBe('fresh')
+  })
+
+  it('tolerates ≤1pp focal rounding (saliency 96.9 stored as 97) but rejects a real edit', () => {
+    const src = { ...source, focalX: 96.9, focalY: 52.8 }
+    const rounded = cand({ width: 1600, height: 900, focalX: 97, focalY: 53 })
+    const edited = cand({ id: 'edited', width: 1600, height: 900, focalX: 80, focalY: 53 })
+    expect(pickFallbackVariant(req({ w: 1600, h: 900 }), 'webp', src, [rounded], constraints)).toBeTruthy()
+    expect(pickFallbackVariant(req({ w: 1600, h: 900 }), 'webp', src, [edited], constraints)).toBeNull()
+  })
+
+  it('treats null focal on either side as the 50/50 default (no false rejection for legacy rows)', () => {
+    // Source default focal (null → 50/50); a variant stored with null focal must still match.
+    const legacy = cand({ width: 1600, height: 900, focalX: null, focalY: null })
+    expect(pick(req({ w: 1600, h: 900 }), [legacy])).toBeTruthy()
+  })
+})
