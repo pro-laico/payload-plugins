@@ -9,7 +9,9 @@ const groupBy = (edges: ReferenceEdge[], key: 'from' | 'to'): Map<string, Refere
   const out = new Map<string, ReferenceEdge[]>()
   for (const edge of edges) {
     const k = edge[key]
-    ;(out.get(k) ?? out.set(k, []).get(k)!).push(edge)
+    const bucket = out.get(k)
+    if (bucket) bucket.push(edge)
+    else out.set(k, [edge])
   }
   return out
 }

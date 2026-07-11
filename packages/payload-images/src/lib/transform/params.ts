@@ -1,5 +1,5 @@
 /** Pure parsing / validation for the on-demand transform endpoint — no Sharp, no Node APIs. */
-import type { Fit, Format, OutputFormat, ParsedParams, ParseResult, QuerySource, TransformConstraints } from '../../types'
+import type { Fit, Format, OutputFormat, ParseResult, QuerySource, TransformConstraints } from '../../types'
 
 export const FITS: Fit[] = ['cover', 'contain', 'inside', 'outside', 'fill']
 export const FORMATS: Format[] = ['auto', 'avif', 'webp', 'jpeg', 'png']

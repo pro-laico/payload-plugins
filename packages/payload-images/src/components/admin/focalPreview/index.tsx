@@ -5,7 +5,6 @@ import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BlurhashTile, WebpTile } from './tiles'
-import { coverCropWindow } from '../../../lib/placeholders/window'
 import { chipStyle, handleStyle, note, selectStyle, tileLabelStyle } from './styles'
 import { clamp, windowCss } from '../../../lib/transform/geometry'
 import { encodeBlurhashFromImageSource } from '../../../lib/placeholders/encodeFromCanvas'

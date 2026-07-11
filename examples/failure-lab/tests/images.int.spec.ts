@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { imagesPlugin } from '@pro-laico/payload-images'
 import type { Payload, PayloadRequest } from 'payload'

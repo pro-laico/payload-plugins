@@ -4,7 +4,7 @@
  * Passive and sync: fetches nothing, never touches Payload, server- and client-tree safe.
  */
 import type { CSSProperties, ReactElement } from 'react'
-import type { Fit, ImageProps, ResponsiveImageProps } from '../types'
+import type { Fit, ResponsiveImageProps } from '../types'
 
 export type { ImageProps, ResponsiveImageProps } from '../types'
 
