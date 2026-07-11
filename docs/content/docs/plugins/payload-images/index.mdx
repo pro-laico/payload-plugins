@@ -1,0 +1,155 @@
+---
+title: "payload-images"
+description: "On-demand image optimization for Payload CMS, perfectly sized and focal-cropped at any screen size."
+---
+
+`@pro-laico/payload-images` brings a **[Sanity-style image pipeline](https://www.sanity.io/docs/image-urls)
+to Payload**: upload a picture once and ask for any size, crop, or format with a URL. The plugin
+renders it on the fly the first time it's requested, then caches it forever. Think of it as the
+image-optimization layer `next/image` should give you but doesn't: art-directed focal cropping,
+AVIF/WebP negotiation, instant placeholders, and a durable cache, all driven from your CMS.
+
+```bash
+pnpm add @pro-laico/payload-images
+```
+
+## What's included
+
+- **Never bigger than it needs to be:** every layout requests the exact size, crop, and format it needs; [the endpoint](/docs/plugins/payload-images/image-urls) renders it once on demand, then caches it forever.
+- **Focal-point cropping, subject-aware by default:** every upload gets a saliency-detected focal point automatically; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
+- **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
+- **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
+- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); every read gets a finished placeholder focal-cropped to the exact ratio being rendered.
+- **Self-busting cache, smart prewarming, instant fallbacks:** content-addressed URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/caching#smart-prewarm) generates what your site actually serves before anyone asks, and the residual cold path serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
+
+![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)
+
+## Quickstart
+
+<Callout type="info">
+  **Built for Next.js.** The transform endpoint persists variants with Next's `after()` and the cache
+  story leans on Next's caching, so this plugin targets Payload running in a Next.js app (the default
+  Payload setup). It isn't framework-agnostic.
+</Callout>
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+```ts
+import { buildConfig } from 'payload'
+import sharp from 'sharp'
+import { imagesPlugin } from '@pro-laico/payload-images'
+
+const serverURL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+
+export default buildConfig({
+  sharp, // required: the endpoint resizes/crops with Sharp
+  serverURL, // used to read originals from cloud/relative storage
+  plugins: [imagesPlugin()],
+})
+```
+
+<Callout type="info">
+  **Already have a `media`/`images` collection?** Pass `imagesPlugin({ extendCollection: 'media' })`
+  to add the pipeline to your existing upload collection instead of creating a second one. See
+  [Extending a collection](/docs/plugins/payload-images/configuration#extending-a-collection).
+</Callout>
+</Step>
+
+<Step>
+**Keep Sharp out of the bundle**
+
+Sharp ships a native binary that breaks when bundled, so tell Next not to (Turbopack and webpack
+both need this):
+
+```ts
+// next.config.ts
+const nextConfig = { serverExternalPackages: ['sharp'] }
+export default nextConfig
+```
+</Step>
+
+<Step>
+**Generate the admin import map**
+
+The plugin registers custom admin components (the focal-point picker and **Purge variants**
+button), so regenerate the import map:
+
+```bash
+pnpm payload generate:importmap
+```
+</Step>
+
+<Step>
+**Render your first image**
+
+```tsx
+// src/lib/imageFor.ts — seed the getter once
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createImageFor } from '@pro-laico/payload-images'
+
+export const imageFor = createImageFor(getPayload({ config }))
+```
+
+```tsx
+// any server component
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { imageFor } from '@/lib/imageFor'
+
+const img = await imageFor(id).aspectRatio('16:9').fetch()
+return img && <ResponsiveImage {...img} sizes="(max-width: 768px) 100vw, 50vw" />
+```
+
+That's a focal-cropped, responsive, placeholder-backed `<img>`. [Rendering images](/docs/plugins/payload-images/rendering)
+covers everything it just did.
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+  <Card href="/docs/plugins/payload-images/rendering" title="Rendering images">
+    Fetch a render-ready doc with `imageFor` and paint it with `<ResponsiveImage>` — plus raw URLs for OG tags and email.
+  </Card>
+  <Card href="/docs/plugins/payload-images/image-urls" title="Image URLs">
+    The `/api/img` endpoint: URL anatomy, every transform parameter, and format negotiation.
+  </Card>
+  <Card href="/docs/plugins/payload-images/metadata" title="Image metadata">
+    What upload-time analysis stores on every doc: placeholder tiers, color palette, alpha flags, and the focal layers.
+  </Card>
+  <Card href="/docs/plugins/payload-images/caching" title="Caching & prewarming">
+    Content-addressed caching, self-revalidation, smart prewarming, and the nearby-quality fallback.
+  </Card>
+  <Card href="/docs/plugins/payload-images/configuration" title="Configuration">
+    Every plugin option, the collections it registers, extending your own collection, and seeding.
+  </Card>
+</Cards>
+
+## Exports
+
+| Export | From | What |
+| --- | --- | --- |
+| `imagesPlugin` | `@pro-laico/payload-images` | The Payload plugin; put `imagesPlugin()` in your config's `plugins`. |
+| `ResponsiveImage` | `@pro-laico/payload-images/components/image` | The passive responsive `<img>` component. |
+| `createImageFor` | `@pro-laico/payload-images` | Seed once with your Payload handle → `imageFor(id).aspectRatio('16:9').blur('md').fetch()` resolves the render-ready doc for `<ResponsiveImage>`. |
+| `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
+| `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
+| `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image id. |
+| `buildVariantUrl` | `@pro-laico/payload-images/utils/urls` | Build a single transform URL for an id at a given width. |
+| `deriveVersion` | `@pro-laico/payload-images/utils/urls` | Compute the cache-busting `v` token from a source doc (filename + focal point). |
+| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `focalUI` is on). |
+| `PurgeVariants` | `@pro-laico/payload-images/admin/purgeVariants` | Admin **Purge variants** button (wired via the import map when `focalUI` is on). |
+| `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
+| `IMAGE_RENDER_PROFILES_SLUG` / `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm registry collection slug (`image-render-profiles`) and jobs task slug (`imagesPrewarm`). |
+| `BLURHASH_QUALITIES` / `WEBP_QUALITIES` / `PlaceholderQuality` | `@pro-laico/payload-images` | The placeholder tier definitions (blurhash component counts, webp widths) and the tier union type. |
+| `cropBlurhashCoefficients` / `coverCropWindow` | `@pro-laico/payload-images` | Crop a blurhash to a target ratio + focal point in coefficient space (pure, µs). |
+| `blurhashToPngDataUri` | `@pro-laico/payload-images` | Render a blurhash string to an inline PNG `data:` URI (server-only). |
+
+The plugin also registers two Payload CLI commands: **`payload images:backfill`** stamps
+upload-time metadata onto images that predate the plugin ([Image metadata](/docs/plugins/payload-images/metadata#backfilling-an-existing-library)),
+and **`payload images:prewarm`** bulk-warms a library against the learned render profiles
+([Caching & prewarming](/docs/plugins/payload-images/caching#smart-prewarm)).

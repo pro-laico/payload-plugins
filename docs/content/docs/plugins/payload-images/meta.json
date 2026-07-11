@@ -1,0 +1,4 @@
+{
+  "title": "payload-images",
+  "pages": ["index", "rendering", "image-urls", "metadata", "caching", "configuration"]
+}

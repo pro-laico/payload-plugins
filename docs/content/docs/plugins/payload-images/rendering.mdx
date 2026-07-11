@@ -1,0 +1,240 @@
+---
+title: "Rendering images"
+description: "Fetch a render-ready image doc with imageFor and paint it with <ResponsiveImage> — srcset, placeholder, and focal crop included."
+---
+
+This page covers presenting images on your site: one helper fetches a **render-ready doc**, one
+passive component paints it. No client JS, no URL math, no layout shift.
+
+## Quick start
+
+Seed the getter once with your app's Payload handle, then fetch and render anywhere on the server:
+
+```ts title="src/lib/imageFor.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createImageFor } from '@pro-laico/payload-images'
+
+// The getPayload promise goes in as-is — only fetch() awaits it, so no top-level await.
+export const imageFor = createImageFor(getPayload({ config }))
+```
+
+```tsx
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { imageFor } from '@/lib/imageFor'
+
+export async function Hero({ id }: { id: string }) {
+  const img = await imageFor(id).aspectRatio('16:9').quality(80).blur('md').fetch()
+  if (!img) return null
+  return <ResponsiveImage {...img} sizes="(max-width: 768px) 100vw, 50vw" />
+}
+```
+
+The doc comes back as `{ id, alt, src, srcset, placeholder }` — a full responsive `srcset`, a
+focal-cropped placeholder data URI, everything built for exactly the render you declared — and
+spreads straight into the component.
+
+## The read contract
+
+Everything above is one `findByID` that **declares its render on the read**. The virtual fields
+compute `src`/`srcset`/`placeholder` for precisely that declaration, inside the field hooks:
+
+```ts
+const doc = await payload.findByID({
+  id,
+  collection: 'images',
+  depth: 0,
+  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
+  context: { image: { aspectRatio: '16:9', quality: 80 }, blur: { quality: 'md' } },
+})
+```
+
+`imageFor` is sugar over this contract — each chain setter maps onto it: `aspectRatio` /
+`quality` / `fit` / `format` → `context.image`, `blur(tier)` → `context.blur.quality`. Chains are
+immutable, so a partially-applied one (`imageFor(id).aspectRatio('1:1')`) can be shared and
+branched. A whole declared render can also seed the chain in one go — handy for a project-level
+wrapper:
+
+```tsx title="src/components/Image.tsx"
+import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { imageFor } from '@/lib/imageFor'
+
+export async function Image({ id, image, blur, ...rest }: ImageProps) {
+  const doc = await imageFor(id, { image, blur }).fetch()
+  return doc ? <ResponsiveImage {...doc} {...rest} /> : null
+}
+```
+
+`fetch()` resolves `null` for an empty source or a missing doc, and reads the source collection
+off the plugin config (`extendCollection` setups included).
+
+<Callout type="info">
+  `fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their
+  own access control or cache layer write the same `findByID` themselves and wrap it however they
+  like (`'use cache'`, [payload-revalidate](/docs/plugins/payload-revalidate), …). See
+  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) for the cached-getter pattern.
+</Callout>
+
+Populated relationships carry the same fields for free: a `page.heroImage` upload field arrives
+with `src`/`srcset`/`placeholder` already computed (the collection's `defaultPopulate`), so you
+can spread it into the component without a second fetch.
+
+## `<ResponsiveImage>`
+
+A **passive** `<img>`: it paints exactly what the read delivered — the doc's `src`/`srcset` and
+its `placeholder` as an inline background while pixels load. It fetches nothing, never touches
+Payload, and is safe in server and client trees alike. Not `next/image`: no loader, no client
+runtime, no proxy — the `srcset` already points at [the transform endpoint](/docs/plugins/payload-images/image-urls).
+
+<Tabs items={['Component', 'Rendered HTML']}>
+
+<Tab value="Component">
+
+```tsx
+<ResponsiveImage
+  {...img} // id, alt, src, srcset, placeholder — from imageFor / your getter
+  aspectRatio="16:9" // match what the read declared
+  sizes="(max-width: 768px) 100vw, 50vw"
+  className="rounded-xl" // Tailwind (or any className) → the <img>
+/>
+```
+
+</Tab>
+
+<Tab value="Rendered HTML">
+
+```html
+<!-- one element: your className + layout plumbing + the inline placeholder, all on the <img> -->
+<img
+  class="rounded-xl"
+  src="/api/img/64a…?w=1280&h=720&fit=cover&q=80&fmt=auto&v=1a2b3c"
+  srcset="/api/img/64a…?w=400&h=225&fit=cover&q=80&fmt=auto&v=1a2b3c   400w,
+          …                                                            (every 50px up to the source)
+          /api/img/64a…?w=2400&h=1350&fit=cover&q=80&fmt=auto&v=1a2b3c 2400w"
+  sizes="(max-width: 768px) 100vw, 50vw"
+  alt="…"
+  loading="lazy"
+  fetchpriority="auto"
+  decoding="async"
+  style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777778; object-fit:cover;
+         background-image:url(data:image/png;base64,iVBOR…); background-size:cover; background-position:center" />
+```
+
+</Tab>
+
+</Tabs>
+
+The component returns `null` when the doc has no `src`/`srcset` (deleted image, `virtualFields: false`),
+so a missing image renders nothing rather than a broken frame.
+
+<Callout type="warn">
+  **Set `sizes` to how big the image actually renders.** The default is `100vw`; leave it on an
+  image in a narrow column and the browser over-fetches (the classic `next/image` trap). Give it
+  the real size, e.g. `sizes="(max-width: 768px) 100vw, 33vw"`.
+  See [MDN: responsive images](https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Responsive_images).
+</Callout>
+
+For a full-bleed hero, or any element that sets its own height, pass `fill` — the `<img>`
+absolutely fills its positioned parent instead of acting as an aspect-ratio box:
+
+```tsx
+<div style={{ position: 'relative', height: '100vh' }}>
+  <ResponsiveImage {...img} fill sizes="100vw" />
+</div>
+```
+
+### Props
+
+export const imageProps = [
+  { name: 'id', type: 'string | number', required: true, description: `The image doc id — carried by the doc spread; the component itself renders nothing from it.` },
+  { name: 'alt', type: 'string | null', description: `Alt text, from the doc spread. Empty/null omits the attribute.` },
+  { name: 'src', type: 'string | null', description: `The default-width transform URL, from the doc spread. Missing → the component renders null.` },
+  { name: 'srcset', type: 'string | null', description: `The responsive srcset, from the doc spread. Missing → the component renders null.` },
+  { name: 'placeholder', type: 'string | null', description: `The doc's placeholder (a finished data URI, or a raw hash) — painted as the <img>'s background while it loads. The quality/crop were decided by the READ that fetched the doc.` },
+  { name: 'sizes', type: 'string', default: "'100vw'", description: `The img sizes attribute; set it to how big the image actually renders.` },
+  { name: 'aspectRatio', type: `number | "\${n}:\${n}"`, description: `CSS aspect-ratio for the box (16 / 9 | '16:9') — match what the read declared. Ignored with fill.` },
+  { name: 'fill', type: 'boolean', default: 'false', description: `Cover-fill a positioned parent that sets its own height (full-bleed hero, slide) instead of an aspect-ratio box.` },
+  { name: 'fit', type: 'Fit', default: "'cover'", description: `CSS object-fit. Pass the same fit the read declared so the CSS matches the crop.` },
+  { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", description: `Native <img> loading. Set 'eager' for an above-the-fold hero.` },
+  { name: 'fetchPriority', type: "'high' | 'low' | 'auto'", default: "'auto'", description: `Native <img> fetchpriority. Set 'high' for the LCP image.` },
+  { name: 'decoding', type: "'async' | 'auto' | 'sync'", default: "'async'", description: `Native <img> decoding hint.` },
+  { name: 'className', type: 'string', description: `Applied to the <img>; size / space / round it here.` },
+  { name: 'style', type: 'CSSProperties', description: `Merged onto the <img>'s style (wins over the built-in layout styles).` },
+  { name: 'dataAttributes', type: `Record<"data-\${string}", string>`, description: `Extra data-* attributes spread onto the rendered img element.` },
+]
+
+The first five props are the doc's own fields — you rarely write them by hand; spread the fetched
+doc. The rest are presentation:
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={imageProps} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```tsx
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
+// Doc fields spread in; every presentation prop at its default.
+<ResponsiveImage
+  {...img}
+  sizes="100vw"
+  fill={false}
+  fit="cover"
+  loading="lazy"
+  fetchPriority="auto"
+  decoding="async"
+  // optional, no default:
+  // aspectRatio="16:9"
+  // className="rounded-xl"
+  // style={{ borderRadius: 8 }}
+  // dataAttributes={{ 'data-test': 'hero' }}
+/>
+```
+
+</Tab>
+
+</Tabs>
+
+There is also an `ImageProps` type for the app-level wrapper shown above: `id` + the declared
+render (`image`, `blur`) + every presentation prop, with the doc fields omitted (the wrapper
+fetches those itself).
+
+## OG images & raw URLs
+
+A component can't go everywhere. For a **social/OG image, a CSS `background-image`, or an email**
+you need a plain URL string — that's `getImageUrl` (from `utils/urls`). The classic case is
+Next's `generateMetadata`:
+
+```tsx
+import type { Metadata } from 'next'
+import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
+
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const page = await getPage(params.slug) // your data fetch
+  const url = getImageUrl(page.heroImage, { width: 1200, aspectRatio: '1200:630' }) // string | null
+  return {
+    openGraph: { images: url ? [{ url, width: 1200, height: 630 }] : [] },
+  }
+}
+```
+
+`getImageUrl` defaults `baseUrl` to `NEXT_PUBLIC_SERVER_URL`, so the URL comes out **absolute**
+(social crawlers need that), focal-cropped and versioned like any transform URL. Pass an explicit
+`baseUrl` to override, or `baseUrl: ''` for a relative one.
+
+For *common* sizes you don't even need it: every doc read already carries virtual URL fields
+(`image.src`, `image.srcset`, `image.placeholderURL`, `image.thumbnailURL` — see
+[Image URLs](/docs/plugins/payload-images/image-urls#the-virtual-url-fields)). Reach for `getImageUrl` only
+for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `buildSrcset` /
+`buildVariantUrl` exist for a fully hand-rolled `<img>` / `<picture>`.
+
+## Next
+
+- [Image URLs](/docs/plugins/payload-images/image-urls) — what those `srcset` URLs actually say, parameter by parameter.
+- [Image metadata](/docs/plugins/payload-images/metadata) — where the placeholder, palette, and focal crop come from.
+- [Caching & prewarming](/docs/plugins/payload-images/caching) — why the second request is always fast, and how to make the first one fast too.

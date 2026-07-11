@@ -1,0 +1,133 @@
+---
+title: "Image metadata"
+description: "What upload-time analysis stores on every image: placeholder tiers, color palette, alpha flags, and the focal-point layers."
+---
+
+Every upload gets **one Sharp decode** that stamps everything a render might need onto the doc:
+a ladder of placeholder tiers, a color palette, alpha flags, and a saliency-detected focal point.
+This page walks each field and how reads consume it.
+
+## Placeholders
+
+No pop-in: a blurred preview paints from the first render, covered when the real image loads.
+
+The upload hook stores the image as a ladder of placeholder tiers — two formats, one knob. The
+low tiers are **[BlurHash](https://github.com/woltapp/blurhash)** strings (cosine **components**,
+not pixels, so a hash renders at any size); above 9×9 components blurhash spends bytes far less
+efficiently than a real image, so the top tiers store a **micro-webp**:
+
+| Tier | Stored as | Size | Looks like |
+| --- | --- | --- | --- |
+| `xs` | blurhash 2×2 | 12 chars | a corner-to-corner gradient |
+| `sm` | blurhash 4×3 | 28 chars | the classic blurhash (the default) |
+| `md` | blurhash 6×4 | 52 chars | soft composition blobs |
+| `lg` | blurhash 8×6 | 100 chars | clear composition |
+| `xl` | blurhash 9×9 | 166 chars | maximum blurhash detail — still very much a blur |
+| `xxl` | webp 32px | ~0.5–1 KB | shapes and light read clearly |
+| `x3` | webp 64px | ~1–3 KB | a heavily blurred thumbnail |
+
+### The `placeholder` virtual
+
+On read, the virtual `placeholder` field does **all the placeholder work in the field hook**,
+next to the data — consumers select one field and paint what they get back. Declare what the read
+is rendering and a **finished, focal-cropped data URI** comes back: blurhash tiers crop in
+coefficient space (pure string math, microseconds); webp tiers crop the stored micro-image (a
+~1 KB Sharp decode, milliseconds). The same crop the transform endpoint makes, applied to the
+placeholder — no files, no extra cache rows:
+
+```ts
+const image = await payload.findByID({
+  collection: 'images',
+  id,
+  depth: 0,
+  select: { alt: true, width: true, height: true, placeholder: true, variantVersion: true },
+  context: { image: { aspectRatio: '16:9' }, blur: { quality: 'sm' } }, // placeholder arrives as a finished data URI
+})
+```
+
+([`imageFor(...).blur('sm')`](/docs/plugins/payload-images/rendering) declares the same thing for you.)
+`<ResponsiveImage>` is passive here: it paints the string it was handed as its own
+`background-image` — zero network, zero client JS, native swap when the real pixels load. A read
+that declares nothing gets the raw `sm` tier hash (28 chars, so admin and API reads stay light),
+and a doc with no stored tiers simply renders without a placeholder.
+
+<Callout type="info">
+  **Non-React consumers** get the same placeholder: send `X-Blurhash: 16:9; q=md` on a REST read
+  and `placeholder` comes back as a data URI cropped to that ratio at that tier. Decoding
+  client-side with a stock blurhash library instead? Add `format=hash` and the cropped **raw hash
+  string** comes back (blurhash tiers only — webp tiers degrade to `xl`).
+</Callout>
+
+## Palette & alpha
+
+The same decode extracts a **Sanity-style color palette** and alpha flags, stored on the doc and
+riding through reads and relationship population:
+
+```jsonc
+{
+  "palette": {
+    "dominant":  { "background": "#8a6748", "foreground": "#ffffff", "title": "#ffffff", "population": 0.31 },
+    "vibrant":   { "background": "#d97a2b", "foreground": "#ffffff", "title": "#ffffff", "population": 0.08 },
+    "muted": {}, "darkVibrant": {}, "darkMuted": {},
+    "lightVibrant": {}, "lightMuted": {} // same shape; any may be null
+  },
+  "hasAlpha": false,  // the file carries an alpha channel
+  "isOpaque": true    // no sampled pixel is actually transparent
+}
+```
+
+Use `palette.dominant.background` as a solid-color placeholder behind tiny thumbs (cheaper than a
+blurhash PNG), `foreground`/`title` for contrast-safe text over the image, and the alpha flags for
+format decisions (e.g. don't JPEG-flatten a transparent logo).
+
+## Focal point, hotspot & crop
+
+Optimization is only half the job: a 16:9 hero and a 1:1 thumbnail of the same photo need
+different crops, and a naive center-crop lops off heads. Three stored, **non-destructive**
+layers (Sanity's model) shape every crop — the original file is never modified, unlike
+Payload's built-in destructive "Edit image" crop:
+
+| Layer | Stored as | Meaning |
+| --- | --- | --- |
+| Crop | `cropLeft/Top/Right/Bottom` (%) | "only this region may ever be used" — everything outside is trimmed at transform time |
+| Focal point | `focalX`/`focalY` (%) | crop windows center here |
+| Hotspot size | `focalSize` (%) | the circle's diameter: how much context must stay in frame — smaller = tighter zoom, 100 = the classic maximal window |
+
+- **Set automatically, refined once.** Every upload gets an initial focal point from Sharp's
+  saliency (attention) analysis. The **Focus & crop** component does the rest: click/drag sets
+  the focal point, the circle's edge handle sizes the hotspot, the corner handles draw the crop
+  (everything outside dims). Ratio tiles preview the real crop, the placeholder, or half & half —
+  live, with the exact geometry the endpoint uses.
+- **It rides along automatically.** The endpoint reads all three layers from the document on any
+  `fit=cover` request, so `<ResponsiveImage>`, the virtual URLs, raw endpoint calls, and the
+  `placeholder` virtual all honor them with nothing extra to pass. Non-cover fits honor the crop rect.
+- **No upscaling, even zoomed.** A tight hotspot crops a small pixel region; the endpoint serves
+  that region at its native resolution (CSS scales it up) rather than inventing pixels.
+- **Change any layer and stale renders refresh.** Edits purge that image's cached variants and
+  bump its `v` token, so anything already served refetches —
+  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) has the full story.
+
+![Custom focal point setter component](/screenshots/images-back-end.png)
+
+## Backfilling an existing library
+
+All of the above is stamped by the upload hook, so images uploaded **before** the plugin (or
+before a feature) carry none of it — reads degrade gracefully (no placeholder, no palette,
+nothing breaks) until you stamp them once with the bundled command:
+
+```sh
+payload images:backfill                    # only images missing metadata (idempotent)
+payload images:backfill --force            # regenerate every image
+payload images:backfill --focal            # also set the saliency focal on docs still at 50/50
+payload images:backfill --collection media # an extendCollection target
+```
+
+<Callout type="warn">
+  `--focal` is opt-in because it **changes crops on a live site** (busts caches, regenerates
+  variants); everything else is additive metadata that alters no rendered pixels.
+</Callout>
+
+## Next
+
+- [Rendering images](/docs/plugins/payload-images/rendering) — put the placeholder and crop to work.
+- [Configuration](/docs/plugins/payload-images/configuration#collections) — every field these features add to the collection.
