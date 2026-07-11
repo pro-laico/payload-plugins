@@ -1,39 +1,14 @@
-import type { CollectionAfterChangeHook, CollectionBeforeDeleteHook, CollectionSlug } from 'payload'
+import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
 
-import { refId } from '../lib/refs'
-import { readUploadBytes } from '../lib/uploadBytes'
-import { type Charset, detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from './optimizeFont'
-
-type Ref = string | number | { id?: string | number } | null | undefined
-
-/** True when a delete failed because the doc is already gone — the goal state, not a problem.
- *  Happens routinely when another path deleted it first (e.g. a seed run clears `fontOriginal`
- *  directly, then clearing `font` fires this cascade at the same ids). */
-const isNotFound = (err: unknown): boolean => (err as { status?: number })?.status === 404 || (err instanceof Error && err.name === 'NotFound')
+import { type Ref, originalIdsFromDoc } from '../../lib/fontDoc'
+import { isNotFound } from '../../lib/isNotFound'
+import { type Charset, detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from '../../lib/optimizeFont'
+import { refId } from '../../lib/refs'
+import { readUploadBytes } from '../../lib/uploadBytes'
 
 // Surface the bundled-subsetter load failure (see isSubsetterLoadError) as ONE loud, actionable
 // log instead of only the generic per-font warning.
 let warnedSubsetterLoad = false
-
-/**
- * Every `fontOriginal` id a typeface doc references across all of its slots. Each original
- * belongs to exactly one typeface — enforced by the create-only upload slots (UI) and the
- * `rejectSharedOriginals` guard (data layer) — so cleanup can delete a de-referenced or
- * deleted original outright, with no shared-original / concurrent-delete hazard.
- */
-export const originalIdsFromDoc = (data: Record<string, unknown>): Array<string | number> => {
-  const ids: Array<string | number> = []
-  const variable = (data.variable ?? {}) as { upright?: Ref; italic?: Ref }
-  for (const r of [variable.upright, variable.italic]) {
-    const id = refId(r)
-    if (id != null) ids.push(id)
-  }
-  for (const row of (Array.isArray(data.weights) ? data.weights : []) as Array<{ file?: Ref }>) {
-    const id = refId(row.file)
-    if (id != null) ids.push(id)
-  }
-  return ids
-}
 
 /** A weight/style file the typeface should have an optimized WOFF2 for. */
 interface Desired {
@@ -226,63 +201,5 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
       req.payload.logger.warn({ msg: 'Font optimize reconcile failed', err })
     }
     return doc
-  }
-}
-
-/**
- * `beforeDelete` for the `Font` typeface: cascade-delete its served `fontOptimized` files and
- * the `fontOriginal` files its slots referenced, so nothing orphans in storage. Best-effort.
- *
- * It runs `beforeDelete` (not after) on purpose: deleting the `font` doc triggers Payload's
- * dangling-reference cleanup, which nulls `fontOptimized.font` — so by `afterDelete` the served
- * files can no longer be found by their owning typeface. Here the relationship is still intact,
- * so we resolve them by `font` first (and read the originals off the doc's own upload slots).
- */
-export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSlug?: string } = {}): CollectionBeforeDeleteHook => {
-  const originalSlug = (opts.originalSlug || 'fontOriginal') as CollectionSlug
-  const optimizedSlug = (opts.optimizedSlug || 'fontOptimized') as CollectionSlug
-
-  return async ({ collection, id, req }) => {
-    // Load the doc so we can read its `fontOriginal` slot ids (the font's own upload fields).
-    let data: Record<string, unknown> | undefined
-    try {
-      data = (await req.payload.findByID({
-        collection: collection.slug as CollectionSlug,
-        id,
-        depth: 0,
-        overrideAccess: true,
-        req,
-      })) as unknown as Record<string, unknown>
-    } catch {
-      // gone already / not found — fall through, optimized cleanup below still runs by `font`
-    }
-
-    // Delete the served files, found by owning typeface while the relationship still exists.
-    try {
-      const optimized = await req.payload.find({
-        collection: optimizedSlug,
-        where: { font: { equals: id } },
-        depth: 0,
-        limit: 1000,
-        overrideAccess: true,
-        req,
-      })
-      for (const d of optimized.docs as Array<{ id: string | number }>) {
-        await req.payload.delete({ collection: optimizedSlug, id: d.id, overrideAccess: true, req })
-      }
-    } catch (err) {
-      req.payload.logger.warn({ msg: 'Could not delete optimized fonts', err })
-    }
-
-    // Delete the originals this typeface referenced (create-only slots → never shared).
-    if (data) {
-      for (const oid of originalIdsFromDoc(data)) {
-        try {
-          await req.payload.delete({ collection: originalSlug, id: oid, overrideAccess: true, req })
-        } catch (err) {
-          if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete font original', err })
-        }
-      }
-    }
   }
 }

@@ -1,10 +1,11 @@
 import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'payload'
 
-import { activeField, enforceSingleActive } from '../lib/activeField'
+import { enforceSingleActive } from '../hooks/collection/enforceSingleActive'
+import { kebabCaseName } from '../hooks/field/kebabCaseName'
+import { activeField } from '../lib/activeField'
 import { authd } from '../lib/authenticated'
 import { mergeHooks } from '../lib/mergeHooks'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
-import { toKebabCase } from '../lib/titleCase'
 
 /** The default slug for the icon-set collection. */
 export const ICON_SET_SLUG = 'iconSet'
@@ -111,7 +112,7 @@ export const createIconSetCollection = (
                         type: 'text',
                         required: true,
                         // Normalize to kebab-case so the typed name matches `<Icon name>`.
-                        hooks: { beforeValidate: [({ value }) => (typeof value === 'string' ? toKebabCase(value) : value)] },
+                        hooks: { beforeValidate: [kebabCaseName] },
                         admin: {
                           width: '25%',
                           description: 'The name the frontend looks the icon up by (auto kebab-cased).',

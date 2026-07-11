@@ -1,7 +1,7 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionBeforeChangeHook, CollectionSlug } from 'payload'
-import { delay } from '../lib/delay'
-import { getAssetMetadata } from '../lib/getAssetMetadata'
+import { delay } from '../../lib/delay'
+import { getAssetMetadata } from '../../lib/getAssetMetadata'
 
 /** Poll a freshly-uploaded asset for up to this long before handing off to the webhook. */
 const POLL_INTERVAL_MS = 1500

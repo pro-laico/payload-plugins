@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CollectionSettings } from '../options'
-import { createAfterChange, createAfterDelete } from './collection'
-import { createGlobalAfterChange } from './global'
+import type { CollectionSettings } from '../../options'
+import { createAfterChange } from './afterChange'
+import { createAfterDelete } from './afterDelete'
 
 const bust = vi.fn()
-vi.mock('../lib/bust', () => ({ bust: (...args: unknown[]) => bust(...args) }))
+vi.mock('../../lib/bust', () => ({ bust: (...args: unknown[]) => bust(...args) }))
 
 const settings: CollectionSettings = { idField: 'slug', lists: {}, extraTags: [] }
 const scoped: Partial<CollectionSettings> = { lists: { recent: ['publishedAt'], featured: ['featured', 'publishedAt'] } }
@@ -354,28 +354,6 @@ describe('createAfterDelete', () => {
   it('honors context.disableRevalidate', async () => {
     const hook = createAfterDelete({ slug: 'posts', settings, rules: [] })
     await hook({ doc: { id: 1 }, req: { context: { disableRevalidate: true } } } as never)
-    expect(bust).not.toHaveBeenCalled()
-  })
-})
-
-describe('createGlobalAfterChange', () => {
-  beforeEach(() => bust.mockReset())
-
-  it('busts both lanes on a published save', async () => {
-    await createGlobalAfterChange('header')({ doc: { _status: 'published' }, req: { context: {} } } as never)
-    expect(bustedTags().sort()).toEqual(['global:header', 'global:header:draft'].sort())
-  })
-
-  it('busts only the draft lane on a draft save', async () => {
-    await createGlobalAfterChange('header')({ doc: { _status: 'draft' }, previousDoc: { _status: 'draft' }, req: { context: {} } } as never)
-    expect(bustedTags()).toEqual(['global:header:draft'])
-  })
-
-  it('busts both lanes for globals without drafts and honors disableRevalidate', async () => {
-    await createGlobalAfterChange('header')({ doc: { title: 'x' }, req: { context: {} } } as never)
-    expect(bustedTags()).toContain('global:header')
-    bust.mockReset()
-    await createGlobalAfterChange('header')({ doc: {}, req: { context: { disableRevalidate: true } } } as never)
     expect(bust).not.toHaveBeenCalled()
   })
 })

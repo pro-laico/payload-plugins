@@ -1,13 +1,11 @@
-import type { CollectionAfterChangeHook, CollectionAfterDeleteHook } from 'payload'
+import type { CollectionAfterChangeHook } from 'payload'
 
-import { bust, type Bust } from '../lib/bust'
-import { anyChanged, type ChangeDetectionSchema, changedFields } from '../lib/changedFields'
-import { extractOnValues, type JoinMembership } from '../lib/joins'
-import { docRecord, isId } from '../lib/values'
-import type { RevalidateEvent } from '../observe/registry'
-import type { CollectionSettings } from '../options'
-import { tags } from '../tags'
-import type { DependencyRule } from '../types'
+import { bust, type Bust } from '../../lib/bust'
+import { anyChanged, changedFields } from '../../lib/changedFields'
+import { extractOnValues, type JoinMembership } from '../../lib/joins'
+import { docRecord, isId } from '../../lib/values'
+import type { RevalidateEvent } from '../../observe/registry'
+import { aliasOf, allListTags, type CollectionHookInput, docTags, extraTagBusts, joinTags, type Lanes, listTags, ruleTags } from './busts'
 
 /**
  * The write side: one afterChange + one afterDelete per collection, computing the blast
@@ -50,66 +48,6 @@ import type { DependencyRule } from '../types'
  * {@link joinMembershipBusts}/{@link deleteJoinBusts}, which bust only the affected
  * parent(s) on the `{child}:join:{on}:{parentId}` tag their entries carry.
  */
-export interface CollectionHookInput {
-  slug: string
-  settings: CollectionSettings
-  rules: DependencyRule[]
-  /** Diff normalization derived from the collection's schema — see {@link ChangeDetectionSchema}. */
-  diffSchema?: ChangeDetectionSchema
-  /** Joins for which THIS collection is the child (member) side — a write here moves the
-   *  parent's join membership. See {@link JoinMembership} and {@link joinMembershipBusts}. */
-  joinRules?: JoinMembership[]
-}
-
-const aliasOf = (doc: Record<string, unknown>, idField: string | false): string | number | undefined => {
-  if (!idField) return undefined
-  const value = doc[idField]
-  return isId(value) ? value : undefined
-}
-
-type Lanes = 'both' | 'draft'
-
-/** Doc-scoped tags for one identifier: published + draft lanes, or draft lane only. */
-const docTags = (slug: string, id: string | number, reason: Bust['reason'], lanes: Lanes): Bust[] => [
-  ...(lanes === 'both' ? [{ tag: tags.doc(slug, id), reason }] : []),
-  { tag: tags.doc(slug, id, { draft: true }), reason },
-]
-
-/** One list scope's tags (`scope: undefined` = the bare collection list tag), lane-aware. */
-const listTags = (slug: string, scope: string | undefined, lanes: Lanes): Bust[] => [
-  ...(lanes === 'both' ? [{ tag: tags.list(slug, { scope }), reason: 'list' as const }] : []),
-  { tag: tags.list(slug, { scope, draft: true }), reason: 'list' as const },
-]
-
-/** `extraTags`, lane-aware: published-surface writes bust the base tag (every carrying
- *  entry — draft reads included — has it); draft saves bust only the `:draft` variants. */
-const extraTagBusts = (extraTags: string[], lanes: Lanes): Bust[] =>
-  extraTags.map((tag) => ({ tag: lanes === 'both' ? tag : `${tag}:draft`, reason: 'extra' as const }))
-
-interface RuleGate {
-  changed: Set<string> | null
-  /** Membership events fire `whenFields` rules unconditionally: the publish-time diff can't
-   *  see edits that arrived through earlier draft saves (previousDoc IS the latest draft). */
-  membership: boolean
-  docs?: { doc: unknown; previousDoc: unknown }
-}
-
-const ruleTags = (slug: string, rules: DependencyRule[], gate: RuleGate): Bust[] =>
-  rules
-    .filter((rule) => rule.on === slug && (!rule.whenFields || gate.membership || anyChanged(gate.changed, rule.whenFields, gate.docs)))
-    .flatMap((rule) => rule.bust.map((tag) => ({ tag, reason: 'rule' as const })))
-
-/** Bare list + every declared scope — the membership-event and delete blast radius. */
-const allListTags = (slug: string, settings: CollectionSettings, lanes: Lanes): Bust[] => [
-  ...listTags(slug, undefined, lanes),
-  ...Object.keys(settings.lists).flatMap((scope) => listTags(slug, scope, lanes)),
-]
-
-/** One parent's join-membership tags (`{child}:join:{on}:{parentId}`), lane-aware. */
-const joinTags = (child: string, on: string, parent: string | number, lanes: Lanes): Bust[] => [
-  ...(lanes === 'both' ? [{ tag: tags.join(child, on, parent), reason: 'join' as const }] : []),
-  { tag: tags.join(child, on, parent, { draft: true }), reason: 'join' as const },
-]
 
 /**
  * A write to a CHILD collection moves its parents' join membership (a `category` renders
@@ -150,10 +88,6 @@ const joinMembershipBusts = (
   }
   return busts
 }
-
-/** Delete side: the parents a child *was* a member of lose it from every lane. */
-const deleteJoinBusts = (slug: string, joinRules: JoinMembership[], doc: Record<string, unknown>): Bust[] =>
-  joinRules.flatMap(({ on }) => extractOnValues(doc, on).flatMap((parent) => joinTags(slug, on, parent, 'both')))
 
 export const createAfterChange =
   ({ slug, settings, rules, diffSchema, joinRules = [] }: CollectionHookInput): CollectionAfterChangeHook =>
@@ -210,27 +144,5 @@ export const createAfterChange =
     if (lanes === 'both') busts.push(...ruleTags(slug, rules, { changed, membership, docs }))
 
     await bust(busts, { slug, id: isId(id) ? id : undefined, operation: operationName, lane: isDraftSave ? 'draft' : 'published' }, 'hook')
-    return doc
-  }
-
-export const createAfterDelete =
-  ({ slug, settings, rules, joinRules = [] }: CollectionHookInput): CollectionAfterDeleteHook =>
-  async ({ doc, req: { context } }) => {
-    if (context.disableRevalidate) return doc
-
-    const current = docRecord(doc)
-    const id = current.id
-    const alias = aliasOf(current, settings.idField)
-
-    const busts: Bust[] = [
-      ...(isId(id) ? docTags(slug, id, 'doc', 'both') : []),
-      ...(alias !== undefined ? docTags(slug, alias, 'alias', 'both') : []),
-      ...allListTags(slug, settings, 'both'),
-      ...deleteJoinBusts(slug, joinRules, current),
-      ...extraTagBusts(settings.extraTags, 'both'),
-      ...ruleTags(slug, rules, { changed: null, membership: true }),
-    ]
-
-    await bust(busts, { slug, id: isId(id) ? id : undefined, operation: 'delete', lane: 'published' }, 'hook')
     return doc
   }

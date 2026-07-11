@@ -1,8 +1,8 @@
 import type { GlobalAfterChangeHook } from 'payload'
 
-import { bust, type Bust } from '../lib/bust'
-import { docRecord } from '../lib/values'
-import { tags } from '../tags'
+import { bust, type Bust } from '../../lib/bust'
+import { docRecord } from '../../lib/values'
+import { tags } from '../../tags'
 
 /**
  * The write side for a global: bust `global:{slug}` lane-aware. A plain draft save

@@ -1,8 +1,9 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionConfig, Field } from 'payload'
-import { getAfterDeleteHook } from '../hooks/afterDelete'
-import { getBeforeChangeHook } from '../hooks/beforeChange'
-import { getBeforeValidateHook } from '../hooks/beforeValidate'
+import { getAfterDeleteHook } from '../hooks/collection/afterDelete'
+import { getBeforeChangeHook } from '../hooks/collection/beforeChange'
+import { getBeforeValidateHook } from '../hooks/collection/beforeValidate'
+import { signableUrlAfterRead } from '../hooks/field/afterRead'
 import { isAllowed } from '../lib/isAllowed'
 import type { MuxVideoPluginOptions } from '../types'
 
@@ -15,24 +16,7 @@ const thumbnailCell = (mode: MuxVideoPluginOptions['adminThumbnail']): string | 
   return `${C}/MuxVideoGifCell#MuxVideoGifCell`
 }
 
-/** Sign a playback id for a given media `type` when the policy is `signed`, and append the
- *  token to `url`. A no-op for public playback. */
-const signIfNeeded = async (
-  mux: Mux,
-  options: MuxVideoPluginOptions,
-  url: URL,
-  playbackId: string,
-  policy: unknown,
-  type: 'video' | 'thumbnail' | 'gif',
-  posterTimestamp?: number,
-): Promise<void> => {
-  if (policy !== 'signed') return
-  const params = typeof posterTimestamp === 'number' ? { time: posterTimestamp.toString() } : undefined
-  const token = await mux.jwt.signPlaybackId(playbackId, { expiration: options.signedUrlOptions?.expiration ?? '1d', type, params })
-  url.searchParams.set('token', token)
-}
-
-/** Build one virtual, read-only URL field (`playbackUrl` / `posterUrl` / `gifUrl`). On read it
+/** Build one virtual, read-only URL field (`playbackUrl` / `posterUrl` / `gifUrl`). Its afterRead
  *  builds the Mux URL from the sibling `playbackId`, stamps the poster `time` for thumbnail/gif,
  *  and signs it when the policy is `signed`. Returns null until a playback id exists. */
 const signableUrlField = (
@@ -48,19 +32,7 @@ const signableUrlField = (
   type: 'text',
   virtual: true,
   admin: { hidden: true },
-  hooks: {
-    afterRead: [
-      async ({ data, siblingData }) => {
-        const playbackId = siblingData?.playbackId
-        if (!playbackId) return null
-        const posterTimestamp = type !== 'video' && typeof data?.posterTimestamp === 'number' ? data.posterTimestamp : undefined
-        const url = buildUrl(playbackId)
-        if (posterTimestamp !== undefined) url.searchParams.set('time', posterTimestamp.toString())
-        await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, type, posterTimestamp)
-        return url.toString()
-      },
-    ],
-  },
+  hooks: { afterRead: [signableUrlAfterRead(mux, options, type, buildUrl)] },
 })
 
 /** The Videos collection: an uploader field, identifying metadata Mux fills in, and a

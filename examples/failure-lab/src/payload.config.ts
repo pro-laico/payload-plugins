@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type GlobalConfig } from 'payload'
-import { flags } from './flags'
+import { lockMediaDeletesBeforeDelete } from './hooks/collection/mediaBeforeDelete'
+import { failThingUpdatesBeforeChange } from './hooks/collection/thingsBeforeChange'
 import { captureDestination } from './logCapture'
 
 // A config DESIGNED TO FAIL. Every collection here exists to trigger one seed failure path on
@@ -23,12 +24,7 @@ const Things: CollectionConfig = {
   slug: 'things',
   admin: { useAsTitle: 'title' },
   hooks: {
-    beforeChange: [
-      ({ operation, data }) => {
-        if (flags.failThingUpdates && operation === 'update') throw new Error('simulated: things are locked after create')
-        return data
-      },
-    ],
+    beforeChange: [failThingUpdatesBeforeChange],
   },
   fields: [
     { name: 'title', type: 'text', required: true },
@@ -65,11 +61,7 @@ const Media: CollectionConfig = {
   slug: 'media',
   upload: { staticDir: resolve(currentDir, '../media') },
   hooks: {
-    beforeDelete: [
-      () => {
-        if (flags.lockMediaDeletes) throw new Error('simulated storage outage: delete rejected')
-      },
-    ],
+    beforeDelete: [lockMediaDeletesBeforeDelete],
   },
   fields: [{ name: 'alt', type: 'text' }],
 }

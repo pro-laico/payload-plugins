@@ -30,20 +30,17 @@ export const VIRTUAL_URL_INPUTS = [
   'cropBottom',
 ] as const
 
-/** The echoed render ratio: the declared `context.image.aspectRatio`, else the natural ratio. */
-const aspectRatioField = (): Field => ({
-  name: 'aspectRatio',
-  type: 'number',
-  virtual: true,
-  admin: {
-    hidden: true,
-    description: 'The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one.',
-  },
-  hooks: { afterRead: [aspectRatioAfterRead] },
-})
-
 export const virtualUrlFields = (): Field[] => [
-  aspectRatioField(),
+  {
+    name: 'aspectRatio',
+    type: 'number',
+    virtual: true,
+    admin: {
+      hidden: true,
+      description: 'The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one.',
+    },
+    hooks: { afterRead: [aspectRatioAfterRead] },
+  },
   virtualUrl(
     'variantVersion',
     'Cache-busting version token for transform URLs (changes on file replace / focal / hotspot edits).',

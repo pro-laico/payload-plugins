@@ -5,7 +5,7 @@ import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collection
 import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
 import { exportFontsEndpoint } from './endpoints/exportFonts'
 import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
-import { type Charset, probeSubsetter } from './hooks/optimizeFont'
+import { type Charset, probeSubsetter } from './lib/optimizeFont'
 import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
 import { type FontFamilyConfig, resolveFontFamilies } from './lib/families'
 

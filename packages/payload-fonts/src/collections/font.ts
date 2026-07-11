@@ -1,17 +1,14 @@
-import {
-  APIError,
-  type ArrayField,
-  type CollectionAfterReadHook,
-  type CollectionBeforeValidateHook,
-  type CollectionConfig,
-  type CollectionSlug,
-  type Field,
-} from 'payload'
+import type { ArrayField, CollectionConfig, CollectionSlug, Field } from 'payload'
 
 import { authd } from '../access/authd'
-import { cleanupFontAssetsHook, optimizeFromOriginalsHook, originalIdsFromDoc } from '../hooks/optimizeFromOriginals'
-import type { Charset } from '../hooks/optimizeFont'
+import { cleanupFontAssetsHook } from '../hooks/collection/cleanupFontAssets'
+import { optimizeFromOriginalsHook } from '../hooks/collection/optimizeFromOriginals'
+import { makeRejectSharedOriginals } from '../hooks/collection/rejectSharedOriginals'
+import { requireFontFiles } from '../hooks/collection/requireFontFiles'
+import { servedFilesHook } from '../hooks/collection/servedFiles'
+import { hasVariable, hasWeights } from '../lib/fontDoc'
 import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
+import type { Charset } from '../lib/optimizeFont'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
@@ -38,97 +35,6 @@ export interface CreateFontCollectionOptions {
   /** The options offered by the `family` field. Default sans/serif/mono/display. */
   families?: FontFamilyConfig[]
 }
-
-type VariableGroup = { upright?: unknown; italic?: unknown }
-const hasVariable = (data: Record<string, unknown> | undefined): boolean => {
-  const v = (data?.variable ?? {}) as VariableGroup
-  return Boolean(v.upright || v.italic)
-}
-const hasWeights = (data: Record<string, unknown> | undefined): boolean =>
-  Array.isArray(data?.weights) && (data.weights as Array<{ file?: unknown }>).some((w) => w?.file)
-
-/**
- * `afterRead`: report how many served `fontOptimized` files this typeface produced, so an editor can
- * see at a glance whether optimization succeeded — `0` means nothing was served (a swap/re-save is
- * due, or the upload failed to subset). Skipped on list reads (`findMany`) so it's one count query
- * on the edit view, not one per row. Populates the virtual `servedFiles` sidebar field.
- */
-const servedFilesHook =
-  (optimizedSlug: string): CollectionAfterReadHook =>
-  async ({ doc, findMany, req }) => {
-    if (findMany || !req?.payload) return doc
-    const id = (doc as { id?: string | number }).id
-    if (id == null) return doc
-    try {
-      const { totalDocs } = await req.payload.count({
-        collection: optimizedSlug as CollectionSlug,
-        where: { font: { equals: id } },
-        overrideAccess: true,
-        req,
-      })
-      ;(doc as Record<string, unknown>).servedFiles = totalDocs
-    } catch (err) {
-      // A count failure shouldn't break the read — leave servedFiles unset, but say so: silence
-      // here made a broken optimized collection indistinguishable from "nothing served yet".
-      req.payload.logger.warn({ msg: `[payload-fonts] could not count served files for typeface ${id}`, err })
-    }
-    return doc
-  }
-
-/**
- * `beforeValidate`: a typeface needs at least one file, and can't mix a variable font with
- * specific weights (you compose from one or the other). Runs on create and on any update that
- * touches these fields, so an unrelated partial edit is left alone.
- */
-const requireFontFiles: CollectionBeforeValidateHook = ({ data, operation }) => {
-  const touches = operation === 'create' || (data != null && ('variable' in data || 'weights' in data))
-  if (!touches) return data
-  if (hasVariable(data) && hasWeights(data)) {
-    throw new APIError('Use either a variable font or specific weight files, not both.', 400, null, true)
-  }
-  if (!hasVariable(data) && !hasWeights(data)) {
-    throw new APIError('Add at least one font file before saving.', 400, null, true)
-  }
-  return data
-}
-
-/**
- * `beforeValidate`: enforce one `fontOriginal` per typeface — reject a save that references an
- * original already used by ANOTHER typeface. The create-only upload slots make sharing
- * impossible from the admin UI, but this is the data-layer guarantee (covers the REST API,
- * imports, seeds, and a future Payload upgrade that might un-hide "Choose from existing"). It's
- * what makes the direct asset cleanup in {@link cleanupFontAssetsHook} /
- * {@link optimizeFromOriginalsHook} safe: a de-referenced or deleted original is never still in
- * use elsewhere.
- */
-const makeRejectSharedOriginals =
-  (fontSlug: string): CollectionBeforeValidateHook =>
-  async ({ data, originalDoc, req }) => {
-    if (!data || !req?.payload) return data
-    const ids = originalIdsFromDoc(data as Record<string, unknown>)
-    if (ids.length === 0) return data
-    const selfId = (originalDoc as { id?: string | number } | undefined)?.id ?? (data as { id?: string | number }).id
-    const refs = [{ 'variable.upright': { in: ids } }, { 'variable.italic': { in: ids } }, { 'weights.file': { in: ids } }]
-    const where = selfId != null ? { and: [{ id: { not_equals: selfId } }, { or: refs }] } : { or: refs }
-    const res = await req.payload.find({
-      collection: fontSlug as CollectionSlug,
-      where: where as never,
-      depth: 0,
-      limit: 1,
-      overrideAccess: true,
-      req,
-    })
-    if (res.totalDocs > 0) {
-      const other = (res.docs[0] as { title?: string }).title || 'another typeface'
-      throw new APIError(
-        `That font file is already used by ${other}. Each typeface needs its own upload — add a fresh copy for this slot.`,
-        400,
-        null,
-        true,
-      )
-    }
-    return data
-  }
 
 /**
  * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four family slots
