@@ -266,13 +266,13 @@ describe('payload-images wiring', () => {
     const render = { id: doc.id, alt: doc.alt ?? '', src: doc.src, srcset: doc.srcset }
     const el = ResponsiveImage({ ...render, placeholder: doc.croppedBlurHash, aspectRatio: '16:9' }) as unknown as {
       type: string
-      props: { srcSet?: string; loading?: string; style?: { objectFit?: string; aspectRatio?: string; backgroundImage?: string } }
+      props: { srcSet?: string; loading?: string; style?: { objectFit?: string; aspectRatio?: number; backgroundImage?: string } }
     }
     expect(el.type).toBe('img') // Shape B: one element, no wrapper
     expect(el.props.srcSet).toContain('/api/img/')
     expect(el.props.loading).toBe('lazy')
     expect(el.props.style?.objectFit).toBe('cover')
-    expect(el.props.style?.aspectRatio).toBe('16 / 9') // "16:9" prop normalized to the CSS form
+    expect(el.props.style?.aspectRatio).toBeCloseTo(16 / 9) // "16:9" prop parsed to a numeric ratio
     // The placeholder is the finished PNG data URI, painted as-is at the render's ratio.
     expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/png;base64,/)
     const b64 = (el.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]

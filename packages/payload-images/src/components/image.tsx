@@ -4,6 +4,8 @@
  * Passive and sync: fetches nothing, never touches Payload, server- and client-tree safe.
  */
 import type { CSSProperties, ReactElement } from 'react'
+
+import { parseAspectRatio } from '../lib/transform/params'
 import type { Fit, ResponsiveImageProps } from '../types'
 
 export type { ImageProps, ResponsiveImageProps } from '../types'
@@ -36,8 +38,7 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
 
   if (!src || !srcset) return null
 
-  // CSS needs `16 / 9`, not the `16:9` string form the prop accepts — normalize it.
-  const cssAr = typeof aspectRatio === 'string' ? aspectRatio.replace(':', ' / ') : aspectRatio
+  const cssAr = parseAspectRatio(aspectRatio)
   const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
 
   return (
