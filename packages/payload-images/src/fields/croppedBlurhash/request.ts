@@ -7,7 +7,7 @@ import { readBlurIntent, readImageIntent } from '../../lib/renderIntent'
 import { isPlaceholderFormat, isPlaceholderQuality } from '../../lib/placeholders/qualities'
 import type { BlurhashRequest } from '../../types'
 
-/** Parse an `X-Blurhash` header: a bare ratio (`16/9`) or a `;`-list (`ar=16/9; q=md; format=hash`). */
+/** Parse an `X-Blurhash` header: a bare ratio (`16:9`) or a `;`-list (`ar=16:9; q=md; format=hash`). */
 const parseHeader = (h: string): BlurhashRequest => {
   const out: BlurhashRequest = {}
   for (const part of h.split(';')) {

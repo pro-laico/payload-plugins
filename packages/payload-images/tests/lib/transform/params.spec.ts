@@ -14,13 +14,13 @@ import type { TransformConstraints } from '../../../src/types'
 const C: TransformConstraints = DEFAULT_CONSTRAINTS
 
 describe('parseAspectRatio', () => {
-  it('parses colon, slash, and decimal forms', () => {
+  it('parses the colon and decimal forms', () => {
     expect(parseAspectRatio('16:9')).toBeCloseTo(16 / 9)
-    expect(parseAspectRatio('16/9')).toBeCloseTo(16 / 9)
     expect(parseAspectRatio('1.5')).toBe(1.5)
     expect(parseAspectRatio(1.5)).toBe(1.5)
   })
-  it('rejects invalid / non-positive', () => {
+  it('rejects the slash form, invalid, and non-positive', () => {
+    expect(parseAspectRatio('16/9')).toBeUndefined() // `:` is the one canonical separator
     expect(parseAspectRatio('0:1')).toBeUndefined()
     expect(parseAspectRatio('abc')).toBeUndefined()
     expect(parseAspectRatio(undefined)).toBeUndefined()

@@ -9,7 +9,7 @@ export interface ResponsiveImageProps {
   alt: string
   /** The `sizes` attribute. Default `100vw`. */
   sizes?: string
-  /** CSS aspect-ratio for the box (`16/9` | `"16/9"` | `"16:9"`) — match what the read declared.
+  /** CSS aspect-ratio for the box (`16 / 9` | `"16:9"`) — match what the read declared.
    *  Ignored when `fill` is set. */
   aspectRatio?: AspectRatio
   /** Cover-fill a height-driven, positioned parent instead of acting as an aspect-ratio box

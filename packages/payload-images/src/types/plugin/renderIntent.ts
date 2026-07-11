@@ -5,8 +5,8 @@
 import type { Fit, Format } from '../transform/format'
 import type { PlaceholderFormat, PlaceholderQuality } from '../../lib/placeholders/qualities'
 
-/** A render aspect ratio: `16/9`, `"16/9"`, or `"16:9"`. */
-export type AspectRatio = number | `${number}/${number}` | `${number}:${number}`
+/** A render aspect ratio: a number (`16 / 9`) or the `"16:9"` string form. */
+export type AspectRatio = number | `${number}:${number}`
 
 /** What a read declares about the render it's fetching for — pass as `context.image`. */
 export interface ImageRenderIntent {

@@ -178,7 +178,7 @@ describe('payload-images wiring', () => {
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { image: { aspectRatio: '16/9' } },
+      context: { image: { aspectRatio: '16:9' } },
     })) as { croppedBlurHash?: string | null }
     expect(cropped.croppedBlurHash).toMatch(/^data:image\/png;base64,/)
     expect(await countVariants(payload, sourceId)).toBe(before) // read-side crop touches no files
@@ -188,7 +188,7 @@ describe('payload-images wiring', () => {
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { image: { aspectRatio: '16/9' }, blur: { quality: 'xxl' } },
+      context: { image: { aspectRatio: '16:9' }, blur: { quality: 'xxl' } },
     })) as { croppedBlurHash?: string | null }
     expect(webp.croppedBlurHash).toMatch(/^data:image\/webp;base64,/)
     expect(webp.croppedBlurHash).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
@@ -199,7 +199,7 @@ describe('payload-images wiring', () => {
       collection: 'images',
       id: sourceId,
       overrideAccess: true,
-      context: { image: { aspectRatio: '16/9' }, blur: { format: 'hash' } },
+      context: { image: { aspectRatio: '16:9' }, blur: { format: 'hash' } },
     })) as { croppedBlurHash?: string | null }
     expect((rawHash.croppedBlurHash as string).length).toBe((doc.blurHashSm as string).length)
     expect(rawHash.croppedBlurHash).not.toBe(doc.blurHashSm)
@@ -253,7 +253,7 @@ describe('payload-images wiring', () => {
       depth: 0,
       overrideAccess: true,
       select: RESPONSIVE_IMAGE_SELECT,
-      context: { image: { aspectRatio: '16/9', quality: 80 } },
+      context: { image: { aspectRatio: '16:9', quality: 80 } },
     })) as { id: string | number; alt?: string; src?: string; srcset?: string; croppedBlurHash?: string }
 
     // The doc arrives render-ready: srcset for THIS render, v= baked in, placeholder finished.
@@ -264,7 +264,7 @@ describe('payload-images wiring', () => {
 
     // The component is a plain sync function → call it and inspect the returned element.
     const render = { id: doc.id, alt: doc.alt ?? '', src: doc.src, srcset: doc.srcset }
-    const el = ResponsiveImage({ ...render, placeholder: doc.croppedBlurHash, aspectRatio: '16/9' }) as unknown as {
+    const el = ResponsiveImage({ ...render, placeholder: doc.croppedBlurHash, aspectRatio: '16:9' }) as unknown as {
       type: string
       props: { srcSet?: string; loading?: string; style?: { objectFit?: string; aspectRatio?: string; backgroundImage?: string } }
     }
@@ -272,7 +272,7 @@ describe('payload-images wiring', () => {
     expect(el.props.srcSet).toContain('/api/img/')
     expect(el.props.loading).toBe('lazy')
     expect(el.props.style?.objectFit).toBe('cover')
-    expect(el.props.style?.aspectRatio).toBe('16/9')
+    expect(el.props.style?.aspectRatio).toBe('16 / 9') // "16:9" prop normalized to the CSS form
     // The placeholder is the finished PNG data URI, painted as-is at the render's ratio.
     expect(el.props.style?.backgroundImage).toMatch(/^url\(data:image\/png;base64,/)
     const b64 = (el.props.style?.backgroundImage ?? '').match(/base64,([^)]+)\)/)?.[1]
@@ -294,7 +294,7 @@ describe('payload-images wiring', () => {
     const doc = await payload.findByID({ collection: 'images', id: sourceId, depth: 0, overrideAccess: true })
 
     // What you'd drop into `openGraph.images[].url` in a Next generateMetadata.
-    const ogUrl = getImageUrl(doc, { width: 1200, aspectRatio: '1200/630', baseUrl: 'https://cdn.example.com' }) as string
+    const ogUrl = getImageUrl(doc, { width: 1200, aspectRatio: '1200:630', baseUrl: 'https://cdn.example.com' }) as string
     expect(ogUrl.startsWith('https://cdn.example.com/api/img/')).toBe(true) // absolute — social crawlers need it
     expect(ogUrl).toContain('w=1200')
     expect(ogUrl).toContain('h=630')

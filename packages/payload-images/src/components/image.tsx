@@ -36,7 +36,7 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
 
   if (!src || !srcset) return null
 
-  // CSS accepts `16 / 9` but not the `16:9` form — normalize so both prop shapes render.
+  // CSS needs `16 / 9`, not the `16:9` string form the prop accepts — normalize it.
   const cssAr = typeof aspectRatio === 'string' ? aspectRatio.replace(':', ' / ') : aspectRatio
   const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
 

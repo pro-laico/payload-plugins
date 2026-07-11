@@ -1,12 +1,13 @@
 /** Shared options for the isomorphic transform-URL builders. */
 import type { Fit, Format } from '../transform/format'
+import type { AspectRatio } from '../plugin/renderIntent'
 
 export interface BuildUrlOptions {
   fit?: Fit
   quality?: number
   format?: Format
-  /** Render aspect ratio (`16/9` | `"16:9"`); derives `h` from each width. */
-  aspectRatio?: number | string
+  /** Render aspect ratio (`16 / 9` | `"16:9"`); derives `h` from each width. */
+  aspectRatio?: AspectRatio
   /** Prefix for absolute URLs (e.g. `https://site.com`). Default '' (same-origin). */
   baseUrl?: string
   /** Endpoint base. Default {@link DEFAULT_TRANSFORM_API_PATH}. */

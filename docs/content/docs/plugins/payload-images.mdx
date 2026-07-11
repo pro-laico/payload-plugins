@@ -326,7 +326,7 @@ this endpoint: it turns its props into one URL per `srcset` width, deriving each
 | Param | Meaning |
 | --- | --- |
 | `w` / `h` | Target width / height in px (at least one required). Snapped to the `dimensionStep` grid and clamped to `maxDimension`. |
-| `ar` | Aspect ratio (`16:9`, `16/9`, `1.78`); derives the missing dimension. |
+| `ar` | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator); derives the missing dimension. |
 | `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
 | `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
 | `fmt` | `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
@@ -474,7 +474,7 @@ export const imageProps = [
   { name: 'image', type: 'string | number | doc', required: true, description: `A bare id, or a populated doc (for natural dims, alt, and the cache-bust version).` },
   { name: 'alt', type: 'string', description: `Alt text. Falls back to the doc's alt, then empty.` },
   { name: 'sizes', type: 'string', default: "'100vw'", description: `The img sizes attribute; set it to how big the image actually renders.` },
-  { name: 'aspectRatio', type: 'number | string', description: `Render ratio (16/9 | '16:9'); derives each srcset height. Falls back to the doc's natural ratio. Ignored with fill.` },
+  { name: 'aspectRatio', type: `number | "\${n}:\${n}"`, description: `Render ratio (16 / 9 | '16:9'); derives each srcset height. Falls back to the doc's natural ratio. Ignored with fill.` },
   { name: 'fill', type: 'boolean', default: 'false', description: `Cover-fill a positioned parent that sets its own height (full-bleed hero, slide) instead of an aspect-ratio box.` },
   { name: 'quality', type: 'number', default: '75', description: `Encode quality baked into each URL.` },
   { name: 'fit', type: 'Fit', default: "'cover'", description: `Resize fit. cover focal-crops.` },
@@ -635,7 +635,7 @@ import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 export async function generateMetadata({ params }): Promise<Metadata> {
   const page = await getPage(params.slug) // your data fetch
   const image = page.heroImage            // a populated `images` doc
-  const url = getImageUrl(image, { width: 1200, aspectRatio: '1200/630' }) // string | null (null without an id)
+  const url = getImageUrl(image, { width: 1200, aspectRatio: '1200:630' }) // string | null (null without an id)
   return {
     openGraph: {
       images: url ? [{ url, width: 1200, height: 630 }] : [],

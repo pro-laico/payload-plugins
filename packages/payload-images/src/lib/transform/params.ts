@@ -25,12 +25,13 @@ export const clampInt = (n: number, lo: number, hi: number): number => Math.max(
  *  a single (source, size, format) can spawn. */
 export const bucketQuality = (q: number, [lo, hi]: [number, number]): number => clampInt(Math.round(q / 5) * 5, lo, hi)
 
-/** Parse "16:9" | "16/9" | "1.78" → a number, or undefined when unparseable / non-positive. */
+/** Parse "16:9" | "1.78" → a number, or undefined when unparseable / non-positive.
+ *  The `:` separator is the one canonical string form — `16/9` is rejected, not silently accepted. */
 export const parseAspectRatio = (ar: number | string | null | undefined): number | undefined => {
   if (ar == null) return undefined
   if (typeof ar === 'number') return Number.isFinite(ar) && ar > 0 ? ar : undefined
   const s = ar.trim()
-  const m = s.match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/)
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/)
   if (m) {
     const a = Number(m[1])
     const b = Number(m[2])

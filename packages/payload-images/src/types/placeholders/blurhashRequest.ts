@@ -2,7 +2,7 @@
 import type { PlaceholderFormat, PlaceholderQuality } from '../../lib/placeholders/qualities'
 
 export interface BlurhashRequest {
-  /** Target aspect ratio (`16/9`, `"16:9"`, `1.78`) — crops the placeholder to match. */
+  /** Target aspect ratio (`"16:9"` or `1.78`) — crops the placeholder to match. */
   ar?: number
   /** Placeholder tier: `xs`…`xl` (blurhash) or `xxl`/`x3` (micro-webp). Default `sm`. */
   quality?: PlaceholderQuality

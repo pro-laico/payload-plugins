@@ -41,12 +41,12 @@ describe('virtualUrlFields', () => {
   })
 
   it('honors the declared render intent (context.image): srcset geometry + params, and aspectRatio echoes it', () => {
-    const srcset = read('srcset', doc, { intent: { aspectRatio: '16/9', quality: 80, fit: 'contain', format: 'webp' } }) as string
-    expect(srcset).toContain('w=800&h=450') // 16/9 h derived per width, not the natural 4/3
+    const srcset = read('srcset', doc, { intent: { aspectRatio: '16:9', quality: 80, fit: 'contain', format: 'webp' } }) as string
+    expect(srcset).toContain('w=800&h=450') // 16:9 h derived per width, not the natural 4/3
     expect(srcset).toContain('q=80')
     expect(srcset).toContain('fit=contain')
     expect(srcset).toContain('fmt=webp')
-    expect(read('aspectRatio', doc, { intent: { aspectRatio: '16/9' } })).toBeCloseTo(16 / 9)
+    expect(read('aspectRatio', doc, { intent: { aspectRatio: '16:9' } })).toBeCloseTo(16 / 9)
     expect(read('aspectRatio', doc)).toBeCloseTo(800 / 600) // undeclared → natural
     // Garbage intent values are ignored, not trusted.
     expect(read('srcset', doc, { intent: { fit: 'zoom', format: 'gif' } })).toContain('fit=cover')
