@@ -12,4 +12,8 @@ export interface TransformEndpointConfig extends Partial<TransformConstraints> {
   maxConcurrency?: number
   /** Per-image libvips thread cap (default 1 for serverless safety; `0` = CPU cores, or `IMAGES_SHARP_CONCURRENCY`). */
   sharpConcurrency?: number
+  /** On a cache miss with a NEARBY variant ready (same fit + aspect ratio, any quality/width/
+   *  format), serve it immediately with `Cache-Control: no-store` while the exact variant
+   *  generates in the background — the next request gets the exact one. Default true. */
+  fallback?: boolean
 }

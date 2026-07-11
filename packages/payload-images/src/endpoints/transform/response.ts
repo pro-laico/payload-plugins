@@ -20,3 +20,16 @@ export const buildHeaders = (mime: string, key: string, isAuto: boolean, cdn: bo
   if (isAuto) h.Vary = 'Accept'
   return h
 }
+
+/** Headers for a nearby-fallback stand-in: NOTHING may cache it — browser, CDN, or proxy — so the
+ *  exact variant (generating in the background) takes over on the very next request. No ETag: the
+ *  bytes are not the resource this URL names. */
+export const buildFallbackHeaders = (mime: string, isAuto: boolean, cdn: boolean): Record<string, string> => {
+  const h: Record<string, string> = { 'Content-Type': mime, 'Cache-Control': 'no-store' }
+  if (cdn) {
+    h['CDN-Cache-Control'] = 'no-store'
+    h['Vercel-CDN-Cache-Control'] = 'no-store'
+  }
+  if (isAuto) h.Vary = 'Accept'
+  return h
+}

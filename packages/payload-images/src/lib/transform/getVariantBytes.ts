@@ -27,8 +27,10 @@ export const SHARP_INSTALL_HINT = "install it (`pnpm add sharp`) and externalize
 
 let warnedCacheLookup = false
 
-export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> => {
-  const { payload, source: src, params: p, format, sourceSlug, variantSlug, base, maxInputPixels, genFlight } = args
+/** The cache-hit half of the engine: exact-key lookup + stored bytes, or null on any miss —
+ *  including a failed lookup (warned once per process), which degrades to regeneration. */
+export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes | null> => {
+  const { payload, source: src, params: p, format, variantSlug, base } = args
   const key = variantCacheKey(src, p, format)
 
   try {
@@ -53,6 +55,13 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
       })
     }
   }
+  return null
+}
+
+/** The generation half: Sharp once (coalesced per key via `genFlight`), persist per `deferPersist`. */
+export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> => {
+  const { payload, source: src, params: p, format, sourceSlug, variantSlug, base, maxInputPixels, genFlight } = args
+  const key = variantCacheKey(src, p, format)
 
   const generate = async (): Promise<GenBytes> => {
     const original = await readBytes(src, resolveStaticDir(payload, sourceSlug), base, { payload, slug: sourceSlug })
@@ -133,3 +142,6 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
     ? { ok: true, data: result.data, mimeType: result.mimeType, key }
     : { ok: false, status: result.status, msg: result.msg, key }
 }
+
+export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> =>
+  (await getCachedVariantBytes(args)) ?? generateVariantBytes(args)

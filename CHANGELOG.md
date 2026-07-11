@@ -9,6 +9,15 @@ packages share one lockstep version.
 
 ### Added
 
+- `@pro-laico/payload-images` — nearby-quality fallback (default on): a transform cache miss
+  with a same-geometry variant already generated (same fit + aspect ratio — identical crop —
+  any quality/width/format) serves those bytes instantly instead of blocking on Sharp, while
+  the exact variant generates in the background. The stand-in is served with
+  `Cache-Control: no-store` (browser and CDN alike never cache it, and it is never persisted
+  under the exact key), so the accurate image takes over on the very next request. Disable
+  with `transform: { fallback: false }`. Pairs with prewarming: prewarm makes misses rare,
+  the fallback makes the residual ones instant.
+
 - `@pro-laico/payload-images` — smart prewarming (`prewarm: true | {...}`, default off): the
   transform endpoint learns which renders the site actually serves (browser-chosen widths,
   real fit/quality/format — recorded off the serving path into a hidden

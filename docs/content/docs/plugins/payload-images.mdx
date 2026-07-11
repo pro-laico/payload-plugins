@@ -120,6 +120,7 @@ export const options = [
       { name: 'maxInputPixels', type: 'number', default: '100000000', description: `Max source pixels Sharp will decode: a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).` },
       { name: 'maxConcurrency', type: 'number', default: 'cpus - 1', description: `Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY).` },
       { name: 'sharpConcurrency', type: 'number', default: '1', description: `Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.` },
+      { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
     ],
   },
   { name: 'focalUI', type: 'boolean', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button.` },
@@ -359,6 +360,12 @@ The transform endpoint is public-facing, so it's bounded on several fronts:
 - **Browser/CDN cache.** Transform responses are immutable and each URL carries a `v` token from
   the source's filename + focal point, so replacing the file or moving the focal makes already-cached
   responses refetch; a metadata-only edit (`alt`) doesn't.
+- **Nearby-quality fallback (default on).** A cache miss with a same-geometry variant already
+  generated (same fit + aspect ratio; any quality/width/format) serves those bytes instantly with
+  `Cache-Control: no-store` — browser, CDN, nothing may keep the stand-in — while the exact
+  variant generates in the background (coalesced with organic requests). The next request gets the
+  accurate image with the normal immutable headers. Stand-ins are never persisted under the exact
+  key. Disable with `transform: { fallback: false }`.
 - **Access control.** Source reads run with the collection's access rules. A source you can't
   read returns `404`; a non-public source is served `private` with no shared CDN caching. The
   purge endpoint requires a logged-in user who can read that source.
@@ -720,6 +727,10 @@ content-addressed, replacing the file or moving the focal point changes the URL,
 fetch the updated image automatically (no manual purge) while the stale variants are dropped by the
 hooks.
 
+The same discipline holds for the [nearby-quality fallback](#caching--abuse-limits): a stand-in is
+served with `Cache-Control: no-store`, so it is never cached anywhere — browser or CDN — and the
+accurate image takes over on the very next request once its background generation lands.
+
 The one thing the plugin *doesn't* touch is your **Next.js page cache**, but that isn't
 image-specific. A page that cached an image doc keeps serving the old URL until you revalidate that
 route, exactly as it would for any Payload content.
@@ -929,6 +940,10 @@ A few things to keep in mind:
 - **Image URLs self-bust; your page cache doesn't.** Replacing a file or moving a focal point changes
   the `v` token and purges stale variants, but a cached page keeps serving the old URL until you
   revalidate that route — exactly as for any other Payload content.
+- **A fallback stand-in upgrades on the NEXT load, not live.** `<ResponsiveImage>` is a passive
+  `<img>`: a page that received a nearby stand-in keeps showing it until the image is requested
+  again (navigation, reload). The stand-in is never cached (`no-store`), so that next request is
+  guaranteed to hit the exact variant.
 - **A bare id degrades `<ResponsiveImage>`.** Dimensions are guessed from the ratio, `alt` is empty,
   there's no `v` token or placeholder, and the srcset climbs to the 4096 ceiling. Pass the populated
   doc; you usually have one.

@@ -1,5 +1,6 @@
 /** Barrel: the on-demand transform endpoint, Sharp pipeline, variant cache, and crop geometry types. */
 export type * from './cropWindow'
+export type * from './fallback'
 export type * from './format'
 export type * from './geometry'
 export type * from './purge'
