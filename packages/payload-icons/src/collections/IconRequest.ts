@@ -1,22 +1,10 @@
-import type { CollectionConfig, Field } from 'payload'
+import type { CollectionConfig } from 'payload'
 
-import { authd } from '../lib/authenticated'
+import { authd } from '../access/authenticated'
+import type { IconRequestCollectionOverrides } from '../types'
 
 /** Slug of the runtime icon-request diagnostic collection. */
 export const ICON_REQUEST_SLUG = 'iconRequest'
-
-/**
- * Overrides for {@link createIconRequestCollection}. All additive on top of the
- * built-in `name` / `count` / `firstRequestedAt` / `lastRequestedAt` fields.
- */
-export interface IconRequestCollectionOverrides {
-  /** Override the `admin.group` sidebar label. @default 'Sets' */
-  group?: string
-  /** Extra fields appended after the built-ins. */
-  fields?: Field[]
-  /** Additional Payload hooks merged onto the collection. */
-  hooks?: CollectionConfig['hooks']
-}
 
 /**
  * Diagnostic collection that records icon names requested at runtime which did

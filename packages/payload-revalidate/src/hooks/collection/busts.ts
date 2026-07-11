@@ -1,32 +1,16 @@
-import type { Bust } from '../../lib/bust'
-import { anyChanged, type ChangeDetectionSchema } from '../../lib/changedFields'
-import type { JoinMembership } from '../../lib/joins'
+import { anyChanged } from '../../lib/changedFields'
 import { isId } from '../../lib/values'
-import type { CollectionSettings } from '../../options'
 import { tags } from '../../tags'
-import type { DependencyRule } from '../../types'
+import type { Bust, CollectionSettings, DependencyRule, Lanes, RuleGate } from '../../types'
 
 /** Shared bust-builders for the collection write side — the leaf both {@link createAfterChange}
  *  and {@link createAfterDelete} import (never the reverse), keeping the graph acyclic. */
-
-export interface CollectionHookInput {
-  slug: string
-  settings: CollectionSettings
-  rules: DependencyRule[]
-  /** Diff normalization derived from the collection's schema — see {@link ChangeDetectionSchema}. */
-  diffSchema?: ChangeDetectionSchema
-  /** Joins for which THIS collection is the child (member) side — a write here moves the
-   *  parent's join membership. See {@link JoinMembership} and {@link joinMembershipBusts}. */
-  joinRules?: JoinMembership[]
-}
 
 export const aliasOf = (doc: Record<string, unknown>, idField: string | false): string | number | undefined => {
   if (!idField) return undefined
   const value = doc[idField]
   return isId(value) ? value : undefined
 }
-
-export type Lanes = 'both' | 'draft'
 
 /** Doc-scoped tags for one identifier: published + draft lanes, or draft lane only. */
 export const docTags = (slug: string, id: string | number, reason: Bust['reason'], lanes: Lanes): Bust[] => [
@@ -44,14 +28,6 @@ export const listTags = (slug: string, scope: string | undefined, lanes: Lanes):
  *  entry — draft reads included — has it); draft saves bust only the `:draft` variants. */
 export const extraTagBusts = (extraTags: string[], lanes: Lanes): Bust[] =>
   extraTags.map((tag) => ({ tag: lanes === 'both' ? tag : `${tag}:draft`, reason: 'extra' as const }))
-
-export interface RuleGate {
-  changed: Set<string> | null
-  /** Membership events fire `whenFields` rules unconditionally: the publish-time diff can't
-   *  see edits that arrived through earlier draft saves (previousDoc IS the latest draft). */
-  membership: boolean
-  docs?: { doc: unknown; previousDoc: unknown }
-}
 
 export const ruleTags = (slug: string, rules: DependencyRule[], gate: RuleGate): Bust[] =>
   rules

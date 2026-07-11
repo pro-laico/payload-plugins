@@ -1,5 +1,6 @@
 import { DEFAULT_PIXEL_STEP } from '../transform/params'
-import { type BuildUrlOptions, buildVariantUrl } from './variantUrl'
+import { buildVariantUrl } from './variantUrl'
+import type { BuildSrcsetOptions, BuildSrcsetResult } from '../../types'
 
 /**
  * The widths for a srcset. A numeric `pixelStep` yields every multiple up to the source's
@@ -31,22 +32,6 @@ export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = 
   for (let w = step; w < top; w += step) widths.push(w)
   widths.push(top)
   return widths
-}
-
-export interface BuildSrcsetOptions extends BuildUrlOptions {
-  /** A number = the step increment (default 50); an array = an explicit curated width ladder. */
-  pixelStep?: number | number[]
-  /** The source image's intrinsic width — caps the srcset (no upscaling). */
-  sourceWidth?: number
-  /** Hard ceiling. Default 4096. */
-  maxWidth?: number
-  /** Width used for the plain `src` fallback. Defaults to min(top, 1280). */
-  defaultWidth?: number
-}
-
-export interface BuildSrcsetResult {
-  srcset: string
-  src: string
 }
 
 /** Build a responsive `srcset` (widths up to the source width) + a default `src`. */

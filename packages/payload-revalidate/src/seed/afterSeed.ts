@@ -1,20 +1,11 @@
-import { bust, type Bust } from '../lib/bust'
+import { bust } from '../lib/bust'
 import { getState, tags } from '../tags'
+import type { Bust, SeedResultLike } from '../types'
 
 /** The keyed after-seed listener slot `@pro-laico/payload-seed` invokes at the end of
  *  `runSeed`. Shared via `Symbol.for` — no import in either direction, same contract
  *  style as `custom.seedAsset` / `custom.seedDisabled`, just for functions. */
 const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')
-
-/** The slice of payload-seed's `SeedResult` this listener reads (structural — no import). */
-export interface SeedResultLike {
-  /** Docs created per collection slug. */
-  created: Record<string, number>
-  /** Collection slugs the run touched (cleared even when zero records were created). */
-  collections?: string[]
-  /** Global slugs the run seeded. */
-  globals?: string[]
-}
 
 /**
  * The post-seed flush: the seed engine writes with `context.disableRevalidate` (per-write

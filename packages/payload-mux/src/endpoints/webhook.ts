@@ -1,7 +1,7 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, PayloadHandler } from 'payload'
-import { type AssetLike, getAssetMetadata } from '../lib/getAssetMetadata'
-import type { MuxVideoPluginOptions } from '../types'
+import { getAssetMetadata } from '../lib/getAssetMetadata'
+import type { AssetLike, MuxVideoPluginOptions } from '../types'
 
 const ok = () => new Response('Success!', { status: 200 })
 const fail = () => new Response('Error', { status: 500 })

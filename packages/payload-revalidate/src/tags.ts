@@ -18,27 +18,12 @@
  * stashed at config-build time so `./cache` resolves it without importing the app config.
  */
 
+import type { RevalidateState, TagLaneOptions, TagListOptions } from './types'
+
 /** The globalThis slot the plugin factory fills when the config is built. `Symbol.for` →
  *  one shared registry entry, so `./cache` and the hooks read the same stash in any
  *  process that loaded the config. */
 const STATE_SLOT = Symbol.for('pro-laico.payload-revalidate.state')
-
-interface RevalidateState {
-  prefix: string
-  /** Whether the dev observer records reads/events — the resolved `observe` option. */
-  observe: boolean
-  /** Per-collection declared list scopes (from `options.collections[slug].lists`) — read by
-   *  `cacheIds` (undeclared-scope dev warning) and the after-seed flush (bust every scope). */
-  lists?: Record<string, string[]>
-  /** Per-collection static extra tags (markers + options merged) — the after-seed flush busts
-   *  them for touched slugs, since entries carrying ONLY an extra tag (e.g. a scope inlining
-   *  icons tagged `payload-icons`) don't carry `all` and would otherwise survive a reseed. */
-  extraTags?: Record<string, string[]>
-  /** The resolved dependency rules — the after-seed flush busts their targets for touched
-   *  slugs (same rationale as `extraTags`: rule targets live outside `./cache`, carry no
-   *  `all`, and would otherwise survive a reseed). Structural to avoid an import cycle. */
-  rules?: { on: string; bust: string[]; whenFields?: string[] }[]
-}
 
 /** Called from the plugin factory (config-build time): remember the resolved tag prefix. */
 export const stashState = (state: RevalidateState): void => {
@@ -58,17 +43,6 @@ const p = (): string => {
 }
 
 const lane = (tag: string, draft?: boolean): string => (draft ? `${tag}:draft` : tag)
-
-export interface TagLaneOptions {
-  /** Build the draft-lane variant (`…:draft`). @default false */
-  draft?: boolean
-}
-
-export interface TagListOptions extends TagLaneOptions {
-  /** A declared list scope (`posts:list:recent`) — busted on membership events and when
-   *  the scope's declared fields change. Omit for the bare collection list tag. */
-  scope?: string
-}
 
 /**
  * The tag builders. Everything the plugin busts or applies is constructed here — never

@@ -1,13 +1,10 @@
 import config from '@payload-config'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
-import type { MuxVideo } from '@/payload-types'
+import type { VideoDoc } from '@/types'
 
-// The slugs the seed definitions in src/seed/ create. The generated MuxVideo type predates the
-// plugin's `status` field, so it's widened locally.
+// The slugs the seed definitions in src/seed/ create.
 const SEEDED_SLUGS = ['mux-video', 'pages']
-
-type VideoDoc = MuxVideo & { status?: 'preparing' | 'ready' | 'errored' | null }
 
 const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
 

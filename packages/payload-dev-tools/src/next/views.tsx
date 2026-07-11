@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
-import type { DevSnapshot } from '../lib/snapshot'
+import type { DevSnapshot, OptimizedFace, RevalidateInspection } from '../types'
 import { FontSpecimen, IconSetSwitcher } from './client'
-import { RevalidatePanel, type RevalidateInspection } from './revalidatePanel'
-import { facesToStyles, type OptimizedFace } from './specimen'
+import { RevalidatePanel } from './revalidatePanel'
+import { facesToStyles } from './specimen'
 
 /** `/dev/icons` — every set as a switcher button (activating one re-skins the site), the active
  *  set's glyphs as a grid, and any runtime misses. */

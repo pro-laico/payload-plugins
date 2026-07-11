@@ -4,16 +4,8 @@
  */
 import { parseAspectRatio } from '../../lib/transform/params'
 import { readBlurIntent, readImageIntent } from '../../lib/renderIntent'
-import { isPlaceholderFormat, isPlaceholderQuality, type PlaceholderFormat, type PlaceholderQuality } from '../../lib/placeholders/qualities'
-
-export interface BlurhashRequest {
-  /** Target aspect ratio (`16/9`, `"16:9"`, `1.78`) — crops the placeholder to match. */
-  ar?: number
-  /** Placeholder tier: `xs`…`xl` (blurhash) or `xxl`/`x3` (micro-webp). Default `sm`. */
-  quality?: PlaceholderQuality
-  /** `uri` (default): a finished data URI. `hash`: the cropped raw hash string. */
-  format?: PlaceholderFormat
-}
+import { isPlaceholderFormat, isPlaceholderQuality } from '../../lib/placeholders/qualities'
+import type { BlurhashRequest } from '../../types'
 
 /** Parse an `X-Blurhash` header: a bare ratio (`16/9`) or a `;`-list (`ar=16/9; q=md; format=hash`). */
 const parseHeader = (h: string): BlurhashRequest => {

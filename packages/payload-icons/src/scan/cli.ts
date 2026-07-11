@@ -12,16 +12,7 @@
  */
 
 import { DEFAULT_ROOTS, resolveManifestPath, scanIconUsages, writeIconUsageManifest } from './index.js'
-
-interface ParsedArgs {
-  roots: string[]
-  out?: string
-  components: string[]
-  extensions: string[]
-  ignore: string[]
-  help: boolean
-  invalid: boolean
-}
+import type { ParsedArgs } from '../types/index.js'
 
 const HELP = `payload-icons-scan — scan source for literal <Icon name="…"> usages
 

@@ -1,6 +1,6 @@
 import type { CollectionSlug, Payload } from 'payload'
 
-export type SeedStatus = { seeded: boolean; counts: Record<string, number> }
+import type { SeedStatus } from './types'
 
 /** Counts docs per slug — feed the app's seeded collection slugs, hand the result to <SeedPanel>. */
 export async function getSeedStatus(payload: Payload, slugs: string[]): Promise<SeedStatus> {

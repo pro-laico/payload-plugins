@@ -3,13 +3,7 @@ import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 import { routeId } from '../routeId'
 import { purgeVariantsForSource } from '../../hooks/collection/purgeVariantsForSource'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
-
-export interface PurgeEndpointConfig {
-  /** Generated-images collection slug. Default `generated-images`. */
-  variantSlug?: string
-  /** Source image collection slug (purge is authorized against read access to it). Default `images`. */
-  sourceSlug?: string
-}
+import type { PurgeEndpointConfig } from '../../types'
 
 /**
  * POST `/img/purge/:id` — delete all generated variants of a source image. Requires a logged-in

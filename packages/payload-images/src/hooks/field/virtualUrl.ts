@@ -6,7 +6,7 @@ import type { FieldHook } from 'payload'
 
 import { readPluginMarker } from '../../lib/pluginMarker'
 import { readImageIntent } from '../../lib/renderIntent'
-import type { ComputeContext, ImageDocLike } from '../../fields/virtualUrls/doc'
+import type { ComputeContext, ImageDocLike } from '../../types'
 
 /** Build a virtual URL field's afterRead from its `(doc, ctx) => url` computer. */
 export const virtualUrlAfterRead =

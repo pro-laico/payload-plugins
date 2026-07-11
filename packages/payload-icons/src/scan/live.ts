@@ -2,7 +2,7 @@ import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { extractIconUsages } from './extract'
-import type { IconUsage, IconUsageManifest } from './types'
+import type { IconUsage, IconUsageManifest, LiveScanOptions } from '../types'
 
 /**
  * In-process icon-usage scan — the bundler-safe counterpart of the CLI's
@@ -20,19 +20,6 @@ import type { IconUsage, IconUsageManifest } from './types'
 const DEFAULT_EXTENSIONS = ['tsx', 'jsx', 'ts', 'js', 'mdx']
 const DEFAULT_IGNORE = ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
 const DEFAULT_ROOTS = ['src', 'app']
-
-export interface LiveScanOptions {
-  /** Directories/files to scan, relative to {@link cwd} or absolute. @default ['src', 'app'] */
-  roots?: string[]
-  /** Working directory. @default process.cwd() */
-  cwd?: string
-  /** JSX tag names treated as icon usages. @default ['Icon'] */
-  components?: string[]
-  /** File extensions (without the dot) to read. @default ['tsx', 'jsx', 'ts', 'js', 'mdx'] */
-  extensions?: string[]
-  /** Directory names to skip. @default ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo'] */
-  ignore?: string[]
-}
 
 const toPosix = (p: string): string => p.split(sep).join('/')
 

@@ -12,11 +12,10 @@ import { type Dirent, readdirSync, readFileSync, statSync, writeFileSync } from 
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { extractIconUsages } from './extract.js'
-import type { IconUsage, IconUsageManifest } from './types.js'
+import type { IconUsage, IconUsageManifest, ScanOptions, ScanResult } from '../types/index.js'
 
 export { extractIconUsages } from './extract.js'
-export type { ExtractedUsage, ExtractOptions } from './extract.js'
-export type { IconUsage, IconUsageManifest } from './types.js'
+export type { ExtractedUsage, ExtractOptions, IconUsage, IconUsageManifest } from '../types/index.js'
 // Manifest path resolution + reading live in ./load (a bundler-safe leaf with no
 // runtime relative imports) so the admin panel can import them without pulling
 // in this CLI/parser module. Re-exported here to keep the `./scan` API in one place.
@@ -30,41 +29,6 @@ export const DEFAULT_EXTENSIONS = ['tsx', 'jsx', 'ts', 'js', 'mdx']
 
 /** Directory names never descended into. */
 export const DEFAULT_IGNORE = ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
-
-export interface ScanOptions {
-  /**
-   * Directories (or individual files) to scan, relative to {@link cwd} or
-   * absolute. Each directory is walked recursively.
-   *
-   * @default ['src', 'app']
-   */
-  roots?: string[]
-  /**
-   * Working directory the scan resolves {@link roots} and reports file paths
-   * relative to.
-   *
-   * @default process.cwd()
-   */
-  cwd?: string
-  /**
-   * JSX tag names treated as icon usages. Forwarded to {@link extractIconUsages}.
-   *
-   * @default ['Icon']
-   */
-  components?: string[]
-  /**
-   * File extensions (without the dot) to read.
-   *
-   * @default ['tsx', 'jsx', 'ts', 'js', 'mdx']
-   */
-  extensions?: string[]
-  /**
-   * Directory names to skip while walking.
-   *
-   * @default ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
-   */
-  ignore?: string[]
-}
 
 const toPosix = (p: string): string => p.split(sep).join('/')
 
@@ -85,16 +49,6 @@ const walk = (dir: string, exts: Set<string>, ignore: Set<string>, out: string[]
       if (dot !== -1 && exts.has(entry.name.slice(dot + 1))) out.push(full)
     }
   }
-}
-
-/** The result of a {@link scanIconUsages} run. */
-export interface ScanResult {
-  /** The assembled manifest, ready to write. */
-  manifest: IconUsageManifest
-  /** Number of files read during the scan. */
-  filesScanned: number
-  /** Number of scan roots that actually existed — `0` means every root was missing (wrong cwd?). */
-  rootsScanned: number
 }
 
 /**

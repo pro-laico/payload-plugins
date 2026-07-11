@@ -1,23 +1,15 @@
 import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
 
-import { type Ref, originalIdsFromDoc } from '../../lib/fontDoc'
+import type { Desired, OptimizeFromOriginalsOptions, Ref } from '../../types'
+import { originalIdsFromDoc } from '../../lib/fontDoc'
 import { isNotFound } from '../../lib/isNotFound'
-import { type Charset, detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from '../../lib/optimizeFont'
+import { detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from '../../lib/optimizeFont'
 import { refId } from '../../lib/refs'
 import { readUploadBytes } from '../../lib/uploadBytes'
 
 // Surface the bundled-subsetter load failure (see isSubsetterLoadError) as ONE loud, actionable
 // log instead of only the generic per-font warning.
 let warnedSubsetterLoad = false
-
-/** A weight/style file the typeface should have an optimized WOFF2 for. */
-interface Desired {
-  originalId: string | number
-  style: 'normal' | 'italic'
-  isVariable: boolean
-  /** Static rows carry an explicit weight; variable files derive a range from the binary. */
-  weight?: string
-}
 
 /** Read the font doc's slots into the set of originals to optimize. */
 const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
@@ -38,15 +30,6 @@ const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
     }
   }
   return desired
-}
-
-export interface OptimizeFromOriginalsOptions {
-  /** Characters to keep, or a preset name ('latin' | 'latin-ext'). Default 'latin'. */
-  charset?: Charset
-  /** Slug of the archival original collection. Default 'fontOriginal'. */
-  originalSlug?: string
-  /** Slug of the optimized (served) collection. Default 'fontOptimized'. */
-  optimizedSlug?: string
 }
 
 /**

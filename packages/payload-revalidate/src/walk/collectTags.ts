@@ -2,6 +2,7 @@ import type { Field } from 'payload'
 
 import { isId, isPlainObject } from '../lib/values'
 import { tags } from '../tags'
+import type { BakedEmbed, IndexSource, SchemaIndex, WalkOptions, WalkResult } from '../types'
 
 /**
  * The runtime bake-in walk: given a value a getter just fetched and the field schema it
@@ -21,50 +22,6 @@ import { tags } from '../tags'
  *
  * Pure and in-memory — no queries, no Payload boot; unit-testable with fixture schemas.
  */
-export interface WalkOptions {
-  /** Populated-doc recursion depth (the consumer's `depth` arg already bounds population). @default 6 */
-  maxDepth?: number
-  /** Embed cap per walk — Next allows 128 tags per cache entry, and the static tags need
-   *  room too. When hit, the walk stops and reports `capped`. @default 64 */
-  maxTags?: number
-}
-
-/** One baked-in document: the dep tag the entry must carry, and where the content sits. */
-export interface BakedEmbed {
-  tag: string
-  /** Dotted field path from the document root (block slugs included): `layout.hero.image`. */
-  via: string
-  kind: 'relationship' | 'upload' | 'join' | 'richText'
-}
-
-export interface WalkResult {
-  /** The dep tags this entry must carry (one per baked-in doc, deduped). */
-  tags: string[]
-  /** Every bake-in with its provenance — the dev map's refactor-candidate list. */
-  embeds: BakedEmbed[]
-  /** True when `maxTags` cut the walk short — surface this in dev, it means stale-risk. */
-  capped: boolean
-}
-
-type WithFields = { slug: string; fields: Field[] }
-
-/** Schema lookup the walk resolves collections/globals/blocks through — see {@link indexSchema}. */
-export interface SchemaIndex {
-  collection(slug: string): WithFields | undefined
-  global(slug: string): WithFields | undefined
-  block(slug: string): WithFields | undefined
-  /** Configured locale codes — lets the walk recognize a `locale: 'all'` map on a localized
-   *  GROUP or named tab (whose single-locale value is an arbitrary object, indistinguishable
-   *  from a locale map by shape alone). Empty/absent when the app isn't localized. */
-  locales?: string[]
-}
-
-type IndexSource = {
-  collections?: WithFields[]
-  globals?: WithFields[]
-  blocks?: WithFields[]
-  localization?: false | { locales?: (string | { code: string })[] }
-}
 
 /** Index a (sanitized or raw) config's collections, globals, config-level blocks registry, and locale codes. */
 export const indexSchema = (config: IndexSource): SchemaIndex => {

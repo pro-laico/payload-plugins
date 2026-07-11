@@ -5,8 +5,8 @@
  */
 import type { Sharp } from 'sharp'
 
-import type { CropWindow } from './window'
 import { loadSharp } from '../transform/sharpInstance'
+import type { CropWindow } from '../../types'
 
 const WEBP_DATA_URI_PREFIX = 'data:image/webp;base64,'
 

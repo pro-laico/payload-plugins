@@ -1,11 +1,11 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
-import { bust, type Bust } from '../../lib/bust'
+import { bust } from '../../lib/bust'
 import { anyChanged, changedFields } from '../../lib/changedFields'
-import { extractOnValues, type JoinMembership } from '../../lib/joins'
+import { extractOnValues } from '../../lib/joins'
 import { docRecord, isId } from '../../lib/values'
-import type { RevalidateEvent } from '../../observe/registry'
-import { aliasOf, allListTags, type CollectionHookInput, docTags, extraTagBusts, joinTags, type Lanes, listTags, ruleTags } from './busts'
+import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent } from '../../types'
+import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, listTags, ruleTags } from './busts'
 
 /**
  * The write side: one afterChange + one afterDelete per collection, computing the blast

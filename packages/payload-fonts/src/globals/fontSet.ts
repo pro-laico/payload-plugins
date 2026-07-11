@@ -1,8 +1,8 @@
 import type { GlobalConfig } from 'payload'
 
-import { authd } from '../access/authd'
+import type { FontFamilyConfig } from '../types'
+import { authd } from '../access'
 import { fontUploadFields } from '../fields/font'
-import type { FontFamilyConfig } from '../lib/families'
 
 /** Slug of the standalone font-selection global. */
 export const FONT_SET_SLUG = 'fontSet'

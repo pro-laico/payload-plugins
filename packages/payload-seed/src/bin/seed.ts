@@ -1,7 +1,7 @@
 import { getPayload, type SanitizedConfig } from 'payload'
 import { seed } from '../engine/run'
 import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
-import type { SeedPluginOptions } from '../options'
+import type { SeedPluginOptions } from '../types'
 
 /**
  * Payload custom-bin entry. `seedPlugin` registers this under `config.bin` as the `seed`

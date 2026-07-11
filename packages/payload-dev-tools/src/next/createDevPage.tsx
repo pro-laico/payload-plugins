@@ -2,23 +2,13 @@ import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { STAGE_COOKIE } from '../cookies'
-import { parseStage, type Test } from '../harness'
+import { parseStage } from '../harness'
 import { getPayloadClient } from '../lib/getPayloadClient'
-import { buildDevSnapshot, type DevSnapshot } from '../lib/snapshot'
+import { buildDevSnapshot } from '../lib/snapshot'
+import type { CreateDevPageOptions, DevPageProps, DevSnapshot, Test } from '../types'
 import { SeedCard } from './client'
 import { PDTP_CSS } from './pageStyles'
 import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './views'
-
-export type CreateDevPageOptions = {
-  /** Component tests (from `defineTest`) — each gets ONE page at `/dev/tests/<key>`; which
-   *  version it shows is controlled from the dev toolbar (via the selection cookie). Pass the
-   *  same array to `<DevToolbar tests>`. */
-  tests?: Test[]
-  /** Force the pages on/off. Defaults to `NODE_ENV === 'development'` (404 otherwise). */
-  enabled?: boolean
-}
-
-type DevPageProps = { params: Promise<{ view?: string[] }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }
 
 /**
  * The `/dev` pages — real routes inside your app, one drop-in file:

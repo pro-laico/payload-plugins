@@ -1,0 +1,139 @@
+import { describe, expect, it } from 'vitest'
+import { file, ref } from '../../src/refs'
+import type { BuiltModel } from '../../src/types'
+import { SeedValidationError, validateModel } from '../../src/engine/validate'
+
+const slugs = new Set(['services', 'posts', 'media'])
+const globalSlugs = new Set(['site-settings'])
+const fileCollections = new Set(['media'])
+
+const run = (model: BuiltModel) => validateModel({ model, collectionSlugs: slugs, globalSlugs, fileCollections })
+
+describe('validateModel', () => {
+  it('passes when every ref resolves', () => {
+    expect(() =>
+      run({
+        collections: [
+          { slug: 'services', records: [{ key: 'a', data: {} }] },
+          { slug: 'posts', records: [{ key: 'p', data: { service: ref('services', 'a') } }] },
+        ],
+        globals: [],
+      }),
+    ).not.toThrow()
+  })
+
+  it('flags a ref to a non-existent _key (dangling reference)', () => {
+    expect(() =>
+      run({
+        collections: [{ slug: 'posts', records: [{ key: 'p', data: { service: ref('services', 'ghost') } }] }],
+        globals: [],
+      }),
+    ).toThrow(/no seeded 'services' doc has _key 'ghost'/)
+  })
+
+  it('flags a ref to an unknown collection', () => {
+    expect(() =>
+      run({
+        collections: [{ slug: 'posts', records: [{ key: 'p', data: { x: ref('widgets' as never, 'a') } }] }],
+        globals: [],
+      }),
+    ).toThrow(/unknown collection 'widgets'/)
+  })
+
+  it('allows a _file on an upload/asset collection', () => {
+    expect(() =>
+      run({
+        collections: [{ slug: 'media', records: [{ key: 'hero', file: file('hero.jpg'), data: { alt: 'Hero' } }] }],
+        globals: [],
+      }),
+    ).not.toThrow()
+  })
+
+  it('flags a _file on a collection that is neither upload nor a custom.seedAsset collection', () => {
+    expect(() =>
+      run({
+        collections: [{ slug: 'services', records: [{ key: 'a', file: file('x.jpg'), data: {} }] }],
+        globals: [],
+      }),
+    ).toThrow(/not an upload collection or a custom\.seedAsset collection/)
+  })
+
+  it('flags a definition whose own collection slug is not in the config', () => {
+    expect(() => run({ collections: [{ slug: 'widgets', records: [{ key: 'a', data: {} }] }], globals: [] })).toThrow(
+      /defineSeed\('widgets'\): no collection 'widgets' in the Payload config/,
+    )
+  })
+
+  it('flags a definition whose own global slug is not in the config', () => {
+    expect(() => run({ collections: [], globals: [{ slug: 'footer', data: {} }] })).toThrow(
+      /defineSeed\('footer'\): no global 'footer' in the Payload config/,
+    )
+  })
+
+  it('flags duplicate _keys across two definitions of the same slug', () => {
+    expect(() =>
+      run({
+        collections: [
+          { slug: 'media', records: [{ key: 'dup', data: {} }] },
+          { slug: 'media', records: [{ key: 'dup', data: {} }] },
+        ],
+        globals: [],
+      }),
+    ).toThrow(/media: duplicate _key 'dup'/)
+  })
+
+  it('flags duplicate _keys within a collection', () => {
+    expect(() =>
+      run({
+        collections: [
+          {
+            slug: 'services',
+            records: [
+              { key: 'dup', data: {} },
+              { key: 'dup', data: {} },
+            ],
+          },
+        ],
+        globals: [],
+      }),
+    ).toThrow(/duplicate _key 'dup'/)
+  })
+
+  it('flags unknown record fields when fieldNames is supplied', () => {
+    const fieldNames = new Map([['services', new Set(['title', 'slug'])]])
+    expect(() =>
+      validateModel({
+        model: { collections: [{ slug: 'services', records: [{ key: 'a', data: { title: 'X', bogus: 'Y' } }] }], globals: [] },
+        collectionSlugs: slugs,
+        globalSlugs,
+        fileCollections,
+        fieldNames,
+      }),
+    ).toThrow(/unknown field 'bogus'/)
+  })
+
+  it('allows `_status` and known fields; skips the check without fieldNames', () => {
+    const model: BuiltModel = {
+      collections: [{ slug: 'services', records: [{ key: 'a', data: { title: 'X', _status: 'draft' } }] }],
+      globals: [],
+    }
+    expect(() =>
+      validateModel({ model, collectionSlugs: slugs, globalSlugs, fileCollections, fieldNames: new Map([['services', new Set(['title'])]]) }),
+    ).not.toThrow()
+    expect(() => run(model)).not.toThrow() // no fieldNames → field check skipped
+  })
+
+  it('aggregates multiple issues into one SeedValidationError', () => {
+    try {
+      run({
+        collections: [{ slug: 'posts', records: [{ key: 'p', file: file('x.jpg'), data: { a: ref('services', 'ghost') } }] }],
+        globals: [],
+      })
+      expect.unreachable('should have thrown')
+    } catch (e) {
+      expect(e).toBeInstanceOf(SeedValidationError)
+      // a dangling ref + a _file on a non-file collection
+      expect((e as SeedValidationError).issues.length).toBe(2)
+    }
+  })
+})

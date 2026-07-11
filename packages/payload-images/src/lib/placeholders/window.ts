@@ -1,12 +1,5 @@
-import { type HotspotOpts, hotspotWindowFractions } from '../transform/geometry'
-
-/** A crop window on the unit square (fractions of the source, not pixels). */
-export interface CropWindow {
-  x0: number
-  y0: number
-  w: number
-  h: number
-}
+import { hotspotWindowFractions } from '../transform/geometry'
+import type { CropWindow, HotspotOpts } from '../../types'
 
 /**
  * The cover-crop window for a target aspect ratio — the blurhash-space twin of the endpoint's

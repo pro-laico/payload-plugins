@@ -3,11 +3,7 @@
 import { Pill, RowLabel, useRowLabel } from '@payloadcms/ui'
 
 import { toTitleCase } from '../../lib/titleCase'
-
-interface IconRowData {
-  name?: string
-  icon?: string | number | { id: string | number }
-}
+import type { IconRowData } from '../../types'
 
 /** RowLabel for each `iconsArray` entry — shows the row number and the icon's
  *  Title-cased name (or an "Add Name" prompt for an empty row). */

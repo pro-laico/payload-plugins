@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { formatSVGHook } from '../hooks/collection/formatSVG'
-import { defaultAdminAccess, defaultReadAccess } from '../lib/defaultAccess'
+import { defaultAdminAccess, defaultReadAccess } from '../access/defaultAccess'
 import { mergeHooks } from '../lib/mergeHooks'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 import type { IconCollectionOverrides } from '../types'

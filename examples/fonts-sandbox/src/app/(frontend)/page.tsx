@@ -2,6 +2,7 @@ import config from '@payload-config'
 import { type ActiveFace, getActiveFontFaces } from '@pro-laico/payload-fonts'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload, type Payload } from 'payload'
+import type { ActiveEntry } from '@/types'
 
 // The slugs src/seed/ fills (the seed also sets the `fontSet` global, but getSeedStatus counts
 // collections — the global's effect shows up as the specimens themselves).
@@ -10,8 +11,6 @@ const SEEDED_SLUGS = ['fontOriginal', 'font']
 const FAMILY_LABEL: Record<string, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const familyVar = (family: string) => `var(--font-set${cap(family)})`
-
-type ActiveEntry = { family: string; title: string; faces: ActiveFace[] }
 
 /** The active typefaces (family, title, served faces) — the fonts the layout makes available as
  *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */

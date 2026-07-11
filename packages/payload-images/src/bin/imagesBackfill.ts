@@ -17,7 +17,8 @@ import { analyzeImageMetadata } from '../lib/metadata/analyze'
 import { resolveStaticDir } from '../lib/transform/staticDir'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
-import { readBytes, type UploadDocLike } from '../lib/transform/source'
+import { readBytes } from '../lib/transform/source'
+import type { UploadDocLike } from '../types'
 
 export const script = async (config: SanitizedConfig): Promise<void> => {
   const argv = process.argv.slice(2)

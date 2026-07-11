@@ -16,7 +16,7 @@ import {
   getTestimonial,
   getTestimonialIds,
 } from '@/lib/data'
-import { firstPlayback } from '@/lib/types'
+import { firstPlayback } from '@/lib/mux'
 
 // Cache Components: the page composes at request time from the atomic cache entries the getters
 // materialize — a seed or an admin edit busts exactly the entries it touches, and the next

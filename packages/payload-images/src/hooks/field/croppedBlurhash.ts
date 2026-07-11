@@ -12,7 +12,8 @@ import { cropWebpDataUri } from '../../lib/placeholders/webpPlaceholder'
 import { cropBlurhashCoefficients } from '../../lib/placeholders/cropCoefficients'
 import { DEFAULT_BLURHASH_QUALITY, isBlurhashQuality, isWebpQuality } from '../../lib/placeholders/qualities'
 import { readRequest } from '../../fields/croppedBlurhash/request'
-import { cropWindow, type ImageDocLike, storedHash, storedWebp } from '../../fields/croppedBlurhash/stored'
+import { cropWindow, storedHash, storedWebp } from '../../fields/croppedBlurhash/stored'
+import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 
 export const croppedBlurhashAfterRead: FieldHook = async ({ data, req }) => {
   const doc = (data ?? {}) as ImageDocLike //EXCUSE: hook data is untyped; every field is duck-checked before use

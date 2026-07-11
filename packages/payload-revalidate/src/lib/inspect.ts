@@ -1,7 +1,4 @@
-import type { ReferenceGraph } from '../graph/referenceGraph'
-import type { ObservedRead, RevalidateEvent } from '../observe/registry'
-import type { ScannedGetter } from '../scan/live'
-import type { DependencyRule } from '../types'
+import type { RevalidateInspection } from '../types'
 
 /**
  * The live inspection handoff for decoupled tooling (the map endpoint and
@@ -10,28 +7,6 @@ import type { DependencyRule } from '../types'
  * belong there. The plugin factory stashes it; readers call {@link getInspection} (or
  * read the symbol directly to stay import-free).
  */
-/** One collection's resolved revalidation shape, for the dev map's per-field blast-radius view. */
-export interface InspectedCollection {
-  idField: string | false
-  /** Declared list scopes → their determinant fields. */
-  lists: Record<string, string[]>
-  extraTags: string[]
-  /** Every top-level data field — the rows of the blast-radius table. */
-  fields: string[]
-}
-
-export interface RevalidateInspection {
-  graph: ReferenceGraph
-  prefix: string
-  observing: boolean
-  rules: DependencyRule[]
-  /** Per-collection resolved settings (opted-out collections absent). */
-  settings: Record<string, InspectedCollection>
-  /** Getter call sites found by the live source scan (dev-only; [] in prod). */
-  getters: ScannedGetter[]
-  reads: ObservedRead[]
-  events: RevalidateEvent[]
-}
 
 const INSPECT_SLOT = Symbol.for('pro-laico.payload-revalidate.inspect')
 

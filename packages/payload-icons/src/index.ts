@@ -2,10 +2,7 @@
 export { iconsPlugin, default } from './plugin'
 
 // Public types, re-exported so consumers can type options/helpers without deep imports.
-export type { IconsPluginOptions } from './plugin'
-export type { IconCollectionOverrides, IconDoc } from './types'
-export type { IconSetCollectionOverrides } from './collections/IconSet'
-export type { IconRequestCollectionOverrides } from './collections/IconRequest'
+export type { IconCollectionOverrides, IconDoc, IconRequestCollectionOverrides, IconSetCollectionOverrides, IconsPluginOptions } from './types'
 
 // SVG string helpers — inline an icon's `svgString` as a real `<svg>` when rendering it yourself
 // (e.g. with `getIconSvg` from the `./cache` subpath):

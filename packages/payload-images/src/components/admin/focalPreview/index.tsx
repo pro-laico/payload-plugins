@@ -6,10 +6,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BlurhashTile, WebpTile } from './tiles'
 import { coverCropWindow } from '../../../lib/placeholders/window'
-import type { ParsedBlurhash } from '../../../lib/placeholders/codec'
 import { chipStyle, handleStyle, note, selectStyle, tileLabelStyle } from './styles'
-import { clamp, type HotspotOpts, windowCss } from '../../../lib/transform/geometry'
+import { clamp, windowCss } from '../../../lib/transform/geometry'
 import { encodeBlurhashFromImageSource } from '../../../lib/placeholders/encodeFromCanvas'
+import type { DisplayMode, DragMode, FocalPreviewProps, HotspotOpts, ParsedBlurhash } from '../../../types'
 import {
   BLURHASH_QUALITIES,
   BLURHASH_TIERS,
@@ -36,7 +36,6 @@ const TIER_OPTIONS: PlaceholderQuality[] = [...BLURHASH_TIERS, ...WEBP_TIERS]
 const tierLabel = (q: PlaceholderQuality): string =>
   isWebpQuality(q) ? `${q} · webp ${WEBP_QUALITIES[q]}px` : `${q} · ${BLURHASH_QUALITIES[q][0]}×${BLURHASH_QUALITIES[q][1]}`
 
-type DisplayMode = 'normal' | 'half' | 'blurhash'
 const DISPLAY_MODES: DisplayMode[] = ['normal', 'half', 'blurhash']
 const MODE_LABELS: Record<DisplayMode, string> = { normal: 'Normal', half: 'Half & half', blurhash: 'Placeholder' }
 const isDisplayMode = (v: string): v is DisplayMode => v in MODE_LABELS
@@ -45,13 +44,6 @@ const parseRatio = (r: string): number => {
   const [rw, rh] = r.split(/[:/]/).map(Number)
   return rw && rh ? rw / rh : 1
 }
-
-interface FocalPreviewProps {
-  previewRatios?: string[]
-  readOnly?: boolean
-}
-
-type DragMode = 'focal' | 'size' | 'crop-nw' | 'crop-se' | null
 
 export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFAULT_RATIOS, readOnly }) => {
   const { data } = useDocumentInfo()

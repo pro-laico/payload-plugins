@@ -1,19 +1,8 @@
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
-import { CHROME_COOKIES, type ChromeSlot } from '../cookies'
-import { parseStage, type Test } from '../harness'
-
-export type ResolveDevChromeOptions = {
-  /** The same test array the `<DevToolbar>` receives — only `header`/`footer`-kind tests apply. */
-  tests: Test[]
-  /** The host's REAL `<SiteHeader />` — rendered whenever no header override is selected. */
-  header: ReactNode
-  /** The host's REAL `<SiteFooter />`. */
-  footer: ReactNode
-  /** Force on/off. Defaults to `NODE_ENV === 'development'` — in production the real chrome is
-   *  returned untouched, cookies never read. */
-  enabled?: boolean
-}
+import { CHROME_COOKIES } from '../cookies'
+import { parseStage } from '../harness'
+import type { ChromeSlot, ResolveDevChromeOptions, Test } from '../types'
 
 /** Resolve one slot: its cookie must name a test of the MATCHING kind (a stale or cross-slot
  *  cookie falls back to the real chrome). Exported for the toolbar client to mirror the rule. */

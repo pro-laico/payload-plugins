@@ -4,10 +4,10 @@ import type React from 'react'
 import { useEffect, useRef } from 'react'
 
 import { coverCropWindow } from '../../../lib/placeholders/window'
-import type { HotspotOpts } from '../../../lib/transform/geometry'
 import { projectCoefficients } from '../../../lib/placeholders/cropCoefficients'
-import { decodeToLinearGrid, linearToSrgb, type ParsedBlurhash } from '../../../lib/placeholders/codec'
+import { decodeToLinearGrid, linearToSrgb } from '../../../lib/placeholders/codec'
 import { BLURHASH_QUALITIES, type BlurhashQuality, WEBP_QUALITIES, type WebpQuality } from '../../../lib/placeholders/qualities'
+import type { HotspotOpts, ParsedBlurhash } from '../../../types'
 
 const canvasStyle: React.CSSProperties = { display: 'block', width: '100%', height: '100%' }
 

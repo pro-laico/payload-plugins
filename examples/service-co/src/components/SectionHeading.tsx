@@ -1,13 +1,5 @@
-import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
-
-type Props = {
-  eyebrow?: string
-  title: ReactNode
-  description?: ReactNode
-  align?: 'left' | 'center'
-  className?: string
-}
+import type { Props } from '@/types/props/section-heading'
 
 /** A consistent section header — a mono eyebrow, a serif display title, and an optional lead. */
 export function SectionHeading({ eyebrow, title, description, align = 'left', className }: Props) {

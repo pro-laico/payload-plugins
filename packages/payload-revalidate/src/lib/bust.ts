@@ -1,11 +1,6 @@
-import { recordEvent, type RevalidateEvent } from '../observe/registry'
+import { recordEvent } from '../observe/registry'
+import type { Bust, RevalidateEvent } from '../types'
 import { createOnce } from './once'
-
-/** One tag to bust plus WHY — the reason is what makes the dev map's event log legible. */
-export interface Bust {
-  tag: string
-  reason: RevalidateEvent['busted'][number]['reason']
-}
 
 /** Warned-once guard so a non-request context doesn't spam the console. */
 const warnOutsideRequestOnce = createOnce()

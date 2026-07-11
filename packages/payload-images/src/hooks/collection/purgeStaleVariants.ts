@@ -6,7 +6,8 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
-import { type PurgeOptions, purgeVariantsForSource } from './purgeVariantsForSource'
+import { purgeVariantsForSource } from './purgeVariantsForSource'
+import type { PurgeOptions } from '../../types'
 
 export const purgeStaleVariantsAfterChange = (opts: PurgeOptions = {}): CollectionAfterChangeHook => {
   const variantSlug = opts.variantSlug || GENERATED_IMAGES_SLUG

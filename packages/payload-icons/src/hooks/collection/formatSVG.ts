@@ -1,8 +1,7 @@
 import type { CollectionBeforeChangeHook, Payload } from 'payload'
 import type { PluginConfig } from 'svgo'
 
-/** The subset of an icon doc this hook writes. */
-type IconData = Record<string, unknown> & { filesize?: number; optimized?: string; svgString?: string }
+import type { IconData } from '../../types'
 
 // Strip executable content from untrusted SVG uploads before they're stored and later inlined
 // via dangerouslySetInnerHTML: <script> elements (svgo 4's `removeScripts`, renamed from 3.x's

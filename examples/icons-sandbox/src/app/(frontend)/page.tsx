@@ -6,7 +6,7 @@ import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/s
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
 import { CmsIcon } from '@/components/ui/CmsIcon'
-import type { IconSize, IconTone, IconVariant } from '@/components/ui/Icon'
+import type { IconSize, IconTone, IconVariant } from '@/types'
 
 // The slugs the seed definitions in src/seed/*.ts fill.
 const SEEDED_SLUGS = ['icon', 'iconSet', 'pages']

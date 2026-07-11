@@ -1,3 +1,5 @@
+import type { Charset, FontFileMetadata, FontkitFont, SubsetFontFn } from '../types'
+
 /**
  * Built-in charset presets, expressed as inclusive Unicode code-point ranges. Each
  * preset is expanded to a string of characters that the subsetter keeps; everything
@@ -31,9 +33,6 @@ const CHARSET_PRESETS: Record<string, Array<[number, number]>> = {
   ],
 }
 
-/** The subsetter charset: a built-in preset name, or an explicit string of characters to keep. */
-export type Charset = 'latin' | 'latin-ext' | (string & {})
-
 const rangesToText = (ranges: Array<[number, number]>): string => {
   let text = ''
   for (const [start, end] of ranges) for (let cp = start; cp <= end; cp++) text += String.fromCodePoint(cp)
@@ -50,36 +49,10 @@ export const resolveCharsetText = (charset: Charset = 'latin'): string => {
   return preset ? rangesToText(preset) : charset
 }
 
-/** The slice of fontkit's `Font` we read for weight/style/family detection. */
-type FontkitFont = {
-  familyName?: string | null
-  subfamilyName?: string | null
-  italicAngle?: number
-  /** Variation axes by tag (variable fonts only); we read `wght` for the weight range. */
-  variationAxes?: Record<string, { min: number; default: number; max: number }> | null
-  'OS/2'?: { usWeightClass?: number; fsSelection?: number } | null
-}
-
-/** subset-font's default export: subset + convert in one call. */
-type SubsetFontFn = (buffer: Buffer, text: string, options: { targetFormat: 'woff2' | 'woff' | 'sfnt' }) => Promise<Buffer>
-
 /** Clamp an arbitrary OS/2 weight class to the nearest standard 100–900 step. */
 const normalizeWeight = (weight?: number): string | undefined => {
   if (!weight || Number.isNaN(weight)) return undefined
   return String(Math.min(900, Math.max(100, Math.round(weight / 100) * 100)))
-}
-
-/** What {@link detectMetadata} reads out of a font binary. */
-export interface FontFileMetadata {
-  familyName?: string
-  weight?: string
-  style?: 'normal' | 'italic'
-  isVariable: boolean
-  /** The file ALSO carries italics through a variation axis (an `ital` axis reaching 1, or a
-   *  negative `slnt` range) while its default instance is upright — one file, both styles. */
-  italCapable?: boolean
-  /** For `slnt`-based italics: the positive CSS oblique angle (deg) matching the axis extreme. */
-  obliqueAngle?: number
 }
 
 /**

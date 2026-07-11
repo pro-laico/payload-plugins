@@ -4,7 +4,7 @@ import { createDevEndpoint } from './endpoints/dev'
 import { createDraftEndpoint } from './endpoints/draft'
 import { createStageEndpoint } from './endpoints/stage'
 import { stashConfig } from './lib/getPayloadClient'
-import type { DevToolsPluginOptions } from './options'
+import type { DevToolsPluginOptions } from './types'
 
 /**
  * The dev-tools plugin. Registers dev-only endpoints (all 404 outside dev):

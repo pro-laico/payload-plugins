@@ -4,10 +4,7 @@ import type React from 'react'
 import { useState } from 'react'
 import { toast, useConfig, useDocumentInfo } from '@payloadcms/ui'
 
-interface PurgeVariantsProps {
-  /** Purge route under the API base. Default `/img/purge`. */
-  purgePath?: string
-}
+import type { PurgeVariantsProps } from '../../types'
 
 const button: React.CSSProperties = {
   cursor: 'pointer',

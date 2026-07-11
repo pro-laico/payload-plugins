@@ -1,7 +1,7 @@
 import 'server-only'
 import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
 import { cacheDoc, cacheGlobal, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
-import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, TeamMember, Testimonial } from './types'
+import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, TeamMember, Testimonial } from '@/types'
 
 // The read side of @pro-laico/payload-revalidate — the atomic model:
 //   • lists fetch IDS ONLY (`cacheIds`, `select: {}`) — their entries change on membership/order

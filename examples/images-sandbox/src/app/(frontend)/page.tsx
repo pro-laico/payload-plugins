@@ -5,23 +5,11 @@ import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/s
 import { getPayload } from 'payload'
 import type { CSSProperties } from 'react'
 import { Image } from '../../components/Image'
+import type { ImageListItem, PageDoc } from '../../types'
 import { shellProps } from './shell'
 
 // The slugs the seed definitions in src/seed/ fill.
 const SEEDED_SLUGS = ['images', 'pages']
-
-// The page-level list read is a light projection for the card headers; the pixels + placeholder
-// are each tile's own concern — <Image id> self-fetches exactly what it renders.
-type ImageListItem = {
-  id: string | number
-  alt?: string | null
-  width?: number | null
-  height?: number | null
-  focalX?: number | null
-  focalY?: number | null
-}
-
-type PageDoc = { id: string | number; title?: string | null; heroImage?: { id: string | number } | string | number | null }
 
 // The crops the demo renders for each source — all cut to the image's focal point, so an
 // off-center subject stays in frame whether the box is wide, square, or tall.

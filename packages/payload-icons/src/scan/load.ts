@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 
-import type { IconUsageManifest } from './types'
+import type { IconUsageManifest } from '../types'
 
 /** Default manifest filename, resolved relative to the scan's working directory. */
 export const DEFAULT_MANIFEST_FILENAME = 'icon-usage-manifest.json'

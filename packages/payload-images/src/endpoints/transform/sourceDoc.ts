@@ -1,18 +1,6 @@
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
 
-import type { UploadDocLike } from '../../lib/transform/source'
-
-/** A source image doc as the transform handler consumes it — upload fields plus focal/crop. */
-export type SourceDoc = UploadDocLike & {
-  id: string | number
-  focalX?: number | null
-  focalY?: number | null
-  focalSize?: number | null
-  cropLeft?: number | null
-  cropTop?: number | null
-  cropRight?: number | null
-  cropBottom?: number | null
-}
+import type { SourceDoc } from '../../types'
 
 /** Read a source doc by id, honoring the given user's access (null on any miss/error). */
 export const readSourceDoc = async (

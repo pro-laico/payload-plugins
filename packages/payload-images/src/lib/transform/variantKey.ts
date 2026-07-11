@@ -6,19 +6,7 @@
  */
 import { createHash } from 'node:crypto'
 
-import type { ParsedParams } from './params'
-
-export interface CacheKeyDoc {
-  id: string | number
-  filename?: string | null
-  focalX?: number | null
-  focalY?: number | null
-  focalSize?: number | null
-  cropLeft?: number | null
-  cropTop?: number | null
-  cropRight?: number | null
-  cropBottom?: number | null
-}
+import type { CacheKeyDoc, ParsedParams } from '../../types'
 
 export const variantCacheKey = (doc: CacheKeyDoc, p: ParsedParams, resolvedFormat: string): string => {
   const q = resolvedFormat === 'png' ? 0 : p.q

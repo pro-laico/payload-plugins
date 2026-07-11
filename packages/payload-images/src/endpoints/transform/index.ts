@@ -12,15 +12,16 @@ import { getServerSideURL } from '../../lib/getServerSideURL'
 import { setTransformConcurrency } from '../../lib/transform/limit'
 import { setSharpConcurrency } from '../../lib/transform/sharpInstance'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
-import { type GenBytes, getOrCreateVariantBytes } from '../../lib/transform/getVariantBytes'
-import { negotiateFormat, type OutputFormat, parseTransformParams } from '../../lib/transform/params'
+import { getOrCreateVariantBytes } from '../../lib/transform/getVariantBytes'
+import { negotiateFormat, parseTransformParams } from '../../lib/transform/params'
+import type { GenBytes, OutputFormat, SourceDoc, TransformEndpointConfig } from '../../types'
 
 import { createSingleFlight } from './coalesce'
 import { buildHeaders, toBody } from './response'
-import { resolveConstraints, type TransformEndpointConfig } from './config'
-import { readSourceDoc, type SourceDoc } from './sourceDoc'
+import { resolveConstraints } from './config'
+import { readSourceDoc } from './sourceDoc'
 
-export type { TransformEndpointConfig } from './config'
+export type { TransformEndpointConfig } from '../../types'
 
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
 export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endpoint => {

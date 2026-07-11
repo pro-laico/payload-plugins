@@ -5,19 +5,8 @@
  * function name. Regex-based like payload-icons' scanner: it reads LITERALS only; a slug
  * passed as a variable is invisible to the scan (the runtime observer still sees it).
  */
-export interface ScannedCall {
-  helper: 'cacheDoc' | 'cacheIds' | 'cacheGlobal'
-  /** The collection (or global) slug — the helper's second argument, when literal. */
-  slug: string
-  /** `list: '<scope>'` when present (cacheIds). */
-  list?: string
-  /** `label: '<name>'` when present. */
-  label?: string
-  /** The nearest enclosing function/const declaration above the call — the getter's name. */
-  getter?: string
-  /** 1-indexed line of the call. */
-  line: number
-}
+
+import type { ScannedCall } from '../types'
 
 const CALL_RE = /\bcache(Doc|Ids|Global)\s*\(/g
 // Slug must start with a letter/underscore: an inline first argument can contain quoted

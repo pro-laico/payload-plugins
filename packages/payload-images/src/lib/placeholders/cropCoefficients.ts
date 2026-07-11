@@ -5,9 +5,8 @@
  * integrals `I[k][i] = ∫₀¹ cos(πi·(a + w·u))·cos(πk·u) du` and true orthogonality norms.
  * No sampling anywhere — exact up to the truncation + quantization every blurhash pays.
  */
-import type { CropWindow } from './window'
-import type { Coefficient, ParsedBlurhash } from './codec'
 import { encodeCoefficients, parseBlurhash } from './codec'
+import type { Coefficient, CropCoefficientsOptions, CropWindow, ParsedBlurhash } from '../../types'
 
 /** ∫₀¹ cos(α + δ·u) du — the degenerate δ→0 limit is cos(α). */
 const cosIntegral = (alpha: number, delta: number): number =>
@@ -24,12 +23,6 @@ const overlapMatrix = (outN: number, inN: number, a: number, w: number): number[
       return (k === 0 ? 1 : 2) * integral
     }),
   )
-
-export interface CropCoefficientsOptions {
-  /** Output components. Default: same as the source hash. */
-  cx?: number
-  cy?: number
-}
 
 /** Crop in coefficient space (parse → project → serialize). */
 export const cropBlurhashCoefficients = (hash: string, window: CropWindow, opts: CropCoefficientsOptions = {}): string =>

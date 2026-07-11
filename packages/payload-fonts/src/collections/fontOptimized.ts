@@ -1,17 +1,11 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
-import { authd } from '../access/authd'
+import type { CreateFontOptimizedCollectionOptions } from '../types'
+import { authd } from '../access'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
 /** Slug of the optimized (served) weight-file upload collection. */
 export const FONT_OPTIMIZED_SLUG = 'fontOptimized'
-
-export interface CreateFontOptimizedCollectionOptions {
-  /** Slug of the `Font` typeface collection these belong to. Default 'font'. */
-  fontSlug?: string
-  /** Slug of the archival original collection each is derived from. Default 'fontOriginal'. */
-  originalSlug?: string
-}
 
 /**
  * The optimized, subsetted WOFF2 files the site actually serves — one upload document per

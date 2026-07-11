@@ -1,6 +1,6 @@
 import { getPayload, type Payload, type SanitizedConfig } from 'payload'
 
-type Awaitable<T> = T | Promise<T>
+import type { Awaitable } from '../types'
 
 /** The globalThis slot the plugin's `onInit` fills with the app's sanitized config.
  *  `Symbol.for` → one shared registry entry, so every pro-laico package reads the same

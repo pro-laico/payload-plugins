@@ -1,14 +1,14 @@
 import type { ArrayField, CollectionConfig, CollectionSlug, Field } from 'payload'
 
-import { authd } from '../access/authd'
+import { authd } from '../access'
 import { cleanupFontAssetsHook } from '../hooks/collection/cleanupFontAssets'
 import { optimizeFromOriginalsHook } from '../hooks/collection/optimizeFromOriginals'
 import { makeRejectSharedOriginals } from '../hooks/collection/rejectSharedOriginals'
 import { requireFontFiles } from '../hooks/collection/requireFontFiles'
 import { servedFilesHook } from '../hooks/collection/servedFiles'
+import type { CreateFontCollectionOptions } from '../types'
 import { hasVariable, hasWeights } from '../lib/fontDoc'
-import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
-import type { Charset } from '../lib/optimizeFont'
+import { resolveFontFamilies } from '../lib/families'
 import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
 
@@ -24,17 +24,6 @@ export const FontOriginalUploadPath = '@pro-laico/payload-fonts/admin/FontOrigin
  * sanitization; sharing one reference across slots corrupts it.
  */
 const createOnlyUpload = () => ({ components: { Field: { path: FontOriginalUploadPath } } })
-
-export interface CreateFontCollectionOptions {
-  /** Characters the subsetter keeps, or a preset ('latin' | 'latin-ext'). Default 'latin'. */
-  charset?: Charset
-  /** Slug of the archival original upload collection. Default 'fontOriginal'. */
-  originalSlug?: string
-  /** Slug of the optimized (served) upload collection. Default 'fontOptimized'. */
-  optimizedSlug?: string
-  /** The options offered by the `family` field. Default sans/serif/mono/display. */
-  families?: FontFamilyConfig[]
-}
 
 /**
  * The `Font` collection — ONE document per **typeface** (e.g. "Inter"). The four family slots

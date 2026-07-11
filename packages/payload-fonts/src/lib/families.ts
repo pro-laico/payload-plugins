@@ -6,25 +6,7 @@
  * (`font<Key>`), and a CSS family variable (`--font-set<Key>`). Centralised here so every consumer
  * resolves the SAME list and naming.
  */
-
-/** A family as the consumer declares it. Only `key` is required; the rest default by convention. */
-export interface FontFamilyConfig {
-  /** Stable identifier. Used as the `family` value, the `fontSet` slot name, the export JSON key,
-   *  and (capitalised) the generated `font<Key>` export + `--font-set<Key>` CSS variable. */
-  key: string
-  /** Admin label for the `family` radio option and the `fontSet` slot. @default capitalised `key` */
-  label?: string
-  /** CSS fallback stack appended after the served family in the family variable (dev preview /
-   *  custom serving). @default `'ui-sans-serif, system-ui, sans-serif'` */
-  fallback?: string
-}
-
-/** A family with every field resolved — what the internals actually consume. */
-export interface ResolvedFontFamily {
-  key: string
-  label: string
-  fallback: string
-}
+import type { FontFamilyConfig, ResolvedFontFamily } from '../types'
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 

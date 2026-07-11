@@ -6,7 +6,8 @@ import { createOnce } from '../lib/once'
 import { isId } from '../lib/values'
 import { recordRead } from '../observe/registry'
 import { getState, riskyAliasReason, tags } from '../tags'
-import { type BakedEmbed, collectDepTags, indexSchema, type SchemaIndex, type WalkOptions } from '../walk/collectTags'
+import type { BakedEmbed, CacheDocOptions, CacheIdsOptions, FinishInput, SchemaIndex, WalkOptions } from '../types'
+import { collectDepTags, indexSchema } from '../walk/collectTags'
 
 /**
  * The read side — atomic by design. Two rules shape every getter:
@@ -40,30 +41,6 @@ import { type BakedEmbed, collectDepTags, indexSchema, type SchemaIndex, type Wa
  * }
  * ```
  */
-interface BaseOptions {
-  /** This read is draft-scoped (key `draft` as a getter argument!) — draft-lane tag
-   *  variants are added so draft saves purge it. @default false */
-  draft?: boolean
-  /** Extra static tags for this entry (e.g. `'sitemap'`). */
-  tags?: string[]
-  /** Name for this read in the dev map (defaults to its shape). */
-  label?: string
-}
-
-export interface CacheDocOptions extends BaseOptions {
-  /** The identifier the read is keyed by — an alias (slug) or id. Tagged even when the
-   *  doc is `null`, so a cached miss purges the moment the doc is created. */
-  as?: string | number
-  /** Tune ({@link WalkOptions}) or disable (`false`) the bake-in walk. */
-  walk?: false | WalkOptions
-}
-
-export interface CacheIdsOptions extends BaseOptions {
-  /** The declared list scope this read renders (`lists.recent` in the plugin options) —
-   *  the entry carries `{slug}:list:{scope}` so reorders bust it precisely. Omit for the
-   *  bare collection list tag (membership events only). */
-  list?: string
-}
 
 const docId = (doc: unknown): string | number | undefined =>
   typeof doc === 'object' && doc !== null && isId((doc as { id?: unknown }).id) ? (doc as { id: string | number }).id : undefined
@@ -132,17 +109,6 @@ const withDraftVariants = (base: string[], draft: boolean | undefined): string[]
   if (!draft) return base
   const all = tags.all()
   return [...base, ...base.filter((tag) => tag !== all).map((tag) => `${tag}:draft`)]
-}
-
-interface FinishInput {
-  kind: 'doc' | 'global'
-  collection?: string
-  global?: string
-  as?: string | number
-  staticTags: string[]
-  value: unknown
-  slug: string
-  options: CacheDocOptions
 }
 
 /** Shared tail for doc/global reads: walk for bake-ins, advise, record, cacheTag. */

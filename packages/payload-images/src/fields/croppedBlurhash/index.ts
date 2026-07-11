@@ -8,7 +8,7 @@ import { PLACEHOLDER_FIELD_NAMES } from '../../lib/placeholders/qualities'
 import { croppedBlurhashAfterRead } from '../../hooks/field/croppedBlurhash'
 
 export type { PlaceholderFormat } from '../../lib/placeholders/qualities'
-export type { BlurhashRequest } from './request'
+export type { BlurhashRequest } from '../../types'
 
 const d = {
   croppedBlurHash:

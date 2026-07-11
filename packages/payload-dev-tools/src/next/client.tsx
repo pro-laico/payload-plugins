@@ -2,10 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import type { SeedSnapshot } from '../lib/snapshot'
-import type { SpecimenStyle } from './specimen'
-
-type SeedError = { error: string; issues?: string[] }
+import type { SeedError, SeedSnapshot, SpecimenStyle } from '../types'
 
 /** The `/dev` index's seed controls — same flow as the toolbar's Seed view: POST the seed
  *  plugin's own endpoint, two-click confirm when destructive, surface `{ error, issues }`. */

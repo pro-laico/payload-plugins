@@ -1,25 +1,8 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionBeforeValidateHook } from 'payload'
 import { getAssetMetadata } from '../../lib/getAssetMetadata'
-import { ingestMuxAsset, type MuxSource } from '../../lib/ingest'
-import type { MuxVideoPluginOptions } from '../../types'
-
-/** The transient `source` a caller sets to ingest server-side: a string path/URL, or an
- *  object carrying the path/URL plus per-video options. Never persisted. */
-interface MuxSourceInput {
-  file?: string
-  url?: string
-  playbackPolicy?: 'public' | 'signed'
-  posterTimestamp?: number
-  corsOrigin?: string
-}
-
-interface NormalizedSource {
-  ref: MuxSource
-  playbackPolicy?: 'public' | 'signed'
-  corsOrigin?: string
-  posterTimestamp?: number
-}
+import { ingestMuxAsset } from '../../lib/ingest'
+import type { MuxSourceInput, MuxVideoPluginOptions, NormalizedSource } from '../../types'
 
 /** Normalize a `source` value (string or object) to a ref + options, or null if unusable. */
 function normalizeSource(source: unknown): NormalizedSource | null {

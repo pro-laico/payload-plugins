@@ -1,25 +1,8 @@
 import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
 
+import type { ActiveFace, ActiveTypeface, BuildFontFaceCssOptions, FontFamily, GetActiveFontFacesOptions, RawFace } from '../types'
 import { refId } from './refs'
 import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
-
-/** A family key. `sans`/`serif`/`mono`/`display` by default, but any string when customised. */
-export type FontFamily = string
-
-/** One served face. Usually one per `fontOptimized` doc — but an upright variable file whose
- *  axes also cover italics (`italCapable`) expands into a second, italic face over the SAME file. */
-export interface ActiveFace {
-  filename: string
-  /** A single CSS weight ('400') or a variable range ('100 900'). */
-  weight: string
-  style: 'normal' | 'italic'
-  /** For slnt-based italics: the positive CSS `oblique` angle (deg). Absent = a true italic
-   *  (explicit file, or an `ital` axis that `font-style: italic` activates). */
-  obliqueAngle?: number
-}
-
-/** A raw `fontOptimized` doc's face fields, before ital-capability expansion. */
-type RawFace = ActiveFace & { italCapable?: boolean }
 
 /**
  * Expand one typeface's raw faces into the served set: an upright, ital-capable variable face
@@ -37,22 +20,6 @@ export function expandItalCapableFaces(faces: RawFace[]): ActiveFace[] {
     }
     return [face.style === 'normal' ? upright : face]
   })
-}
-
-/** The typeface active for a family, plus its served faces. */
-export interface ActiveTypeface {
-  family: FontFamily
-  id: string | number
-  faces: ActiveFace[]
-}
-
-export interface GetActiveFontFacesOptions {
-  /** Slug of the standalone font-selection global. @default 'fontSet' */
-  fontSetSlug?: string
-  /** Slug of the optimized (served) upload collection. @default 'fontOptimized' */
-  optimizedSlug?: string
-  /** Family keys to read. Omit to auto-discover them from the `fontSet` global's own slots. */
-  families?: FontFamily[]
 }
 
 /** Payload global meta keys that aren't family slots — filtered out when auto-discovering. */
@@ -128,17 +95,6 @@ const DEFAULT_FALLBACK = 'ui-sans-serif, system-ui, sans-serif'
 
 /** Payload serves an upload file at `/api/<slug>/file/<filename>` (public read on `fontOptimized`). */
 const faceUrl = (filename: string, slug: string) => `/api/${slug}/file/${encodeURIComponent(filename)}`
-
-export interface BuildFontFaceCssOptions {
-  /** Prefix for the emitted CSS family variables; the capitalised family is appended (`--font-setSans`).
-   *  Must match the download CLI's `cssVariablePrefix`. @default '--font-set' */
-  cssVarPrefix?: string
-  /** Slug used to build the served file URL. @default 'fontOptimized' */
-  optimizedSlug?: string
-  /** Per-family CSS fallback stack override (`{ brand: 'Georgia, serif' }`). Falls back to the
-   *  built-in family defaults, then a generic sans stack. */
-  fallbacks?: Record<string, string>
-}
 
 /**
  * Build the `@font-face` rules + the `:root` family-variable mapping for a set of active typefaces.

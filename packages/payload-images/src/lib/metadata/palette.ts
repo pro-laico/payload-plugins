@@ -3,38 +3,8 @@
  * encoder samples, so it costs no extra decode. Coarse histogram → the seven Vibrant-style
  * swatches, each carrying a contrast-safe text color.
  */
-import { type LinearGrid, linearToSrgb } from '../placeholders/codec'
-
-export interface PaletteSwatch {
-  /** The swatch color, `#rrggbb`. */
-  background: string
-  /** Contrast-safe text color over `background` (`#000000` or `#ffffff`). */
-  foreground: string
-  /** Suggested title/heading color over `background` (same contrast pick). */
-  title: string
-  /** Share of sampled pixels this swatch represents, 0–1. */
-  population: number
-}
-
-/** The seven swatches. Any may be null when the image has no color in that class. */
-export interface ImagePalette {
-  dominant: PaletteSwatch | null
-  vibrant: PaletteSwatch | null
-  darkVibrant: PaletteSwatch | null
-  lightVibrant: PaletteSwatch | null
-  muted: PaletteSwatch | null
-  darkMuted: PaletteSwatch | null
-  lightMuted: PaletteSwatch | null
-}
-
-interface Candidate {
-  r: number
-  g: number
-  b: number
-  count: number
-  s: number
-  l: number
-}
+import { linearToSrgb } from '../placeholders/codec'
+import type { Candidate, ImagePalette, LinearGrid, PaletteSwatch } from '../../types'
 
 const hex = (n: number): string => n.toString(16).padStart(2, '0')
 

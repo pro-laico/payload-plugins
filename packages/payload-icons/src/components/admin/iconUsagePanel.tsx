@@ -6,8 +6,8 @@ import { ICON_REQUEST_SLUG } from '../../collections/IconRequest'
 import { getPayloadClient } from '../../lib/getPayloadClient'
 import { loadIconUsageManifest } from '../../scan/load'
 import { scanIconUsagesLive } from '../../scan/live'
-import type { IconUsageManifest } from '../../scan/types'
-import { IconUsagePanelClient, type LiveRequest } from './iconUsagePanel.client'
+import type { IconUsageManifest, LiveRequest } from '../../types'
+import { IconUsagePanelClient } from './iconUsagePanel.client'
 
 /** Default scan command surfaced in the panel's empty state (production, no manifest). */
 const DEFAULT_SCAN_COMMAND = 'npx payload-icons-scan'

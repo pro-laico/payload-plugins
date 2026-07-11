@@ -5,6 +5,7 @@
 import { deflateSync } from 'node:zlib'
 
 import { decodeToLinearGrid, linearToSrgb, parseBlurhash } from './codec'
+import type { BlurhashPngOptions } from '../../types'
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
@@ -45,15 +46,6 @@ const rgbPng = (pixels: Uint8Array, width: number, height: number): Buffer => {
 
   const signature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])
   return Buffer.concat([signature, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array(0))])
-}
-
-export interface BlurhashPngOptions {
-  /** Rendered width in px. Default 32. */
-  width?: number
-  /** Rendered height. Default: derived from `aspectRatio` (else square). */
-  height?: number
-  /** Target aspect ratio — derives `height` from the resolved width. */
-  aspectRatio?: number
 }
 
 /** Render a blurhash string to a `data:image/png;base64,…` URI. */

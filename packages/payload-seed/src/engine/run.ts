@@ -1,9 +1,22 @@
 import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
 import { notifyAfterSeed } from '../listeners'
-import { resolveOptions, type ResolvedSeedOptions, type SeedPluginOptions } from '../options'
+import { resolveOptions } from '../options'
 import { file, isFileToken, isRef, ref } from '../refs'
-import type { SeedAssetMarker, SeedDefinition, SeedDisabledMarker } from '../types'
-import { type BuiltCollection, type BuiltGlobal, type BuiltModel, type BuiltRecord, buildGraph, type DeferredField } from './graph'
+import type {
+  AssetCollection,
+  BuiltCollection,
+  BuiltGlobal,
+  BuiltModel,
+  BuiltRecord,
+  RunSeedArgs,
+  SeedAssetMarker,
+  SeedDefinition,
+  SeedDisabledMarker,
+  SeedPluginOptions,
+  SeedResult,
+  SkippedDefinition,
+} from '../types'
+import { buildGraph } from './graph'
 import { resolveFilePath, readFileAsUpload, searchedDirs } from './files'
 import { collectTokens, docNodeId, resolveTokens } from './tokens'
 import { SeedRunError, SeedValidationError, validateModel } from './validate'
@@ -52,42 +65,7 @@ async function describeFailedDoc(
   return `[${id}]`
 }
 
-export interface SeedResult {
-  /** Created doc counts keyed by collection slug. */
-  created: Record<string, number>
-  /** Collection slugs the run touched — cleared and reseeded, even when zero records were created. */
-  collections: string[]
-  /** Global slugs the run seeded. */
-  globals: string[]
-  /** The computed topological create order (doc node ids, `collection:_key`). */
-  order: string[]
-  /** Fields deferred to break a `ref` cycle: created null, then set in a second pass. */
-  deferred: DeferredField[]
-  /** Definitions skipped this run (their own `disabled`, or the collection's `custom.seedDisabled`). */
-  skipped: SkippedDefinition[]
-}
-
-export interface SkippedDefinition {
-  slug: string
-  reason: string
-}
-
-export interface RunSeedArgs {
-  payload: Payload
-  req: PayloadRequest
-  options: ResolvedSeedOptions
-  /** Seed definitions. Falls back to `options.definitions` when omitted. */
-  definitions?: SeedDefinition[]
-}
-
 const tokens = { ref, file }
-
-/** A `custom.seedAsset` collection, resolved to its effective source field (subdir defaults are
- *  applied at lookup, alongside `assetSubDirs`, so they match native uploads). */
-interface AssetCollection {
-  sourceField: string
-  subdir?: string
-}
 
 /** Discover asset collections from the live config: any collection whose `custom.seedAsset` is set.
  *  A `_file` on one of these is handed to the collection's ingest hook via `sourceField` instead of

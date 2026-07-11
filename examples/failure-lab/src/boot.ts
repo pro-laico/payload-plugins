@@ -3,13 +3,11 @@ import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
-import { buildConfig, getPayload, type CollectionConfig, type Config, type GlobalConfig, type Payload, type Plugin } from 'payload'
+import { buildConfig, getPayload, type CollectionConfig, type Config, type GlobalConfig, type Plugin } from 'payload'
 import { captureDestination } from './logCapture'
+import type { LabBoot } from './types'
 
-export interface LabBoot {
-  payload: Payload
-  cleanup: () => Promise<void>
-}
+export type { LabBoot } from './types'
 
 /** Boot an isolated Payload instance for one plugin's failure scenarios: a UNIQUE throwaway SQLite
  *  file (`:memory:` is shared per-process by libsql — a second boot's schema push would wipe the

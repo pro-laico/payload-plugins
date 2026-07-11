@@ -6,29 +6,9 @@ import type { Sharp } from 'sharp'
 
 import { loadSharp } from './sharpInstance'
 import { withTransformLimit } from './limit'
-import { type Fit, mimeForFormat, type OutputFormat } from './params'
-import { coverCropGeometry, cropRegion, fitWithinSource, type HotspotOpts, hotspotWindow } from './geometry'
-
-export interface TransformInput {
-  w?: number
-  h?: number
-  fit: Fit
-  quality: number
-  format: OutputFormat
-  focalX?: number | null
-  focalY?: number | null
-  hotspot?: HotspotOpts
-  /** Max source pixels Sharp will decode (decompression-bomb + memory guard). Default ~100MP. */
-  maxInputPixels?: number
-}
-
-export interface TransformOutput {
-  data: Buffer
-  format: OutputFormat
-  width: number
-  height: number
-  mimeType: string
-}
+import { mimeForFormat } from './params'
+import { coverCropGeometry, cropRegion, fitWithinSource, hotspotWindow } from './geometry'
+import type { HotspotOpts, OutputFormat, TransformInput, TransformOutput } from '../../types'
 
 const MAX_INPUT_PIXELS = 100_000_000
 

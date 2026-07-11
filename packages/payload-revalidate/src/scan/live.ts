@@ -1,7 +1,8 @@
 import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-import { extractGetterCalls, type ScannedCall } from './extract'
+import type { LiveScanOptions, ScannedGetter } from '../types'
+import { extractGetterCalls } from './extract'
 
 /**
  * In-process getter scan (the payload-icons live-scan pattern): walk the app's source
@@ -11,22 +12,11 @@ import { extractGetterCalls, type ScannedCall } from './extract'
  * `observe` is on; production has no source on disk), and TTL-cached because the
  * toolbar polls the snapshot.
  */
-export interface ScannedGetter extends ScannedCall {
-  /** Repo-relative posix path of the file the call sits in. */
-  file: string
-}
 
 const DEFAULT_EXTENSIONS = ['tsx', 'ts', 'jsx', 'js']
 const DEFAULT_IGNORE = ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
 const DEFAULT_ROOTS = ['src', 'app']
 const TTL_MS = 5_000
-
-export interface LiveScanOptions {
-  /** Directories/files to scan, relative to {@link cwd} or absolute. @default ['src', 'app'] */
-  roots?: string[]
-  /** Working directory. @default process.cwd() */
-  cwd?: string
-}
 
 const toPosix = (p: string): string => p.split(sep).join('/')
 

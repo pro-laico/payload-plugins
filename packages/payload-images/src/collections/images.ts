@@ -1,8 +1,9 @@
 import type { CollectionConfig, GetAdminThumbnail } from 'payload'
 
-import { anyone, authd } from './access'
+import { anyone, authd } from '../access'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
-import { type CreateImagesOptions, imageEnhancements } from './imageEnhancements'
+import { imageEnhancements } from './imageEnhancements'
+import type { CreateImagesOptions } from '../types'
 
 const d = { alt: 'Describe the image for screen readers and SEO.' }
 

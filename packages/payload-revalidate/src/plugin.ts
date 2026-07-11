@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { CollectionConfig, Config, GlobalConfig, Plugin } from 'payload'
 
 import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
-import { buildReferenceGraph, type ReferenceGraph } from './graph/referenceGraph'
+import { buildReferenceGraph } from './graph/referenceGraph'
 import { createAfterChange } from './hooks/collection/afterChange'
 import { createAfterDelete } from './hooks/collection/afterDelete'
 import { createGlobalAfterChange } from './hooks/global/afterChange'
@@ -12,11 +12,11 @@ import { peekConfig, stashConfig } from './lib/getPayloadClient'
 import { collectJoinMembership } from './lib/joins'
 import { stashInspect } from './lib/inspect'
 import { getObservations } from './observe/registry'
-import { globalEnabled, resolveCollectionSettings, resolveOptions, type RevalidatePluginOptions } from './options'
+import { globalEnabled, resolveCollectionSettings, resolveOptions } from './options'
 import { scanGettersLive } from './scan/live'
 import { registerSeedListener } from './seed/afterSeed'
 import { stashState } from './tags'
-import type { PayloadRevalidateMarker } from './types'
+import type { PayloadRevalidateMarker, ReferenceGraph, RevalidatePluginOptions } from './types'
 
 /** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
  *  own location (so `payload <key>` works both in-workspace and when published). */

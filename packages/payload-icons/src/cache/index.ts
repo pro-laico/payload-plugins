@@ -5,9 +5,7 @@ import type { CollectionSlug, Payload, Where } from 'payload'
 
 import { getConfig, getIconSetSlug, getPayloadClient } from '../lib/getPayloadClient'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
-
-/** A `name → svgString` map for the active set's icons. */
-type IconSetMap = Record<string, string>
+import type { IconSetMap } from '../types'
 
 /** The lane-correct active-set filter: published-lane reads also require `_status: 'published'`,
  *  but only when the collection actually has drafts (safe if `drafts: false`). */

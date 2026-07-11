@@ -2,7 +2,7 @@
  * Reading the stored placeholder data off an image doc: the best tier at or below the requested
  * one (so docs predating a tier still get a placeholder), plus the focal/hotspot crop window.
  */
-import { coverCropWindow, type CropWindow } from '../../lib/placeholders/window'
+import { coverCropWindow } from '../../lib/placeholders/window'
 import {
   BLURHASH_TIERS,
   type BlurhashQuality,
@@ -11,19 +11,8 @@ import {
   type WebpQuality,
   webpFieldName,
 } from '../../lib/placeholders/qualities'
-
-export interface ImageDocLike {
-  width?: number | null
-  height?: number | null
-  focalX?: number | null
-  focalY?: number | null
-  focalSize?: number | null
-  cropLeft?: number | null
-  cropTop?: number | null
-  cropRight?: number | null
-  cropBottom?: number | null
-  [key: string]: unknown
-}
+import type { CropWindow } from '../../types'
+import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 
 const storedString = (doc: ImageDocLike, field: string): string | undefined => {
   const v = doc[field]

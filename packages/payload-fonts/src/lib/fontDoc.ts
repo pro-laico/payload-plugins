@@ -3,11 +3,8 @@
  * small leaf shared by the collection's field conditions and its validate/optimize/cleanup hooks,
  * so the slot-reading rules live in exactly one place (collection → hooks → this leaf, never back).
  */
+import type { Ref, VariableGroup } from '../types'
 import { refId } from './refs'
-
-export type Ref = string | number | { id?: string | number } | null | undefined
-
-type VariableGroup = { upright?: unknown; italic?: unknown }
 
 /** True when the `variable` group carries at least one file (upright or italic). */
 export const hasVariable = (data: Record<string, unknown> | undefined): boolean => {

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-type Hooks = NonNullable<CollectionConfig['hooks']>
+import type { Hooks } from '../types'
 
 /** Append the user's collection hooks AFTER the built-ins, per phase. The built-ins always run
  *  first, so a user `beforeChange` hook sees the already-optimized SVG. Phases with no built-in

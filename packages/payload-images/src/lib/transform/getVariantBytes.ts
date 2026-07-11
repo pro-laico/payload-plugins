@@ -4,50 +4,14 @@
  * format) variant is only ever generated once.
  */
 import { after } from 'next/server'
-import type { CollectionSlug, Payload } from 'payload'
+import type { CollectionSlug } from 'payload'
 
 import { variantCacheKey } from './variantKey'
 import { resolveStaticDir } from './staticDir'
-import { transformImage, type TransformOutput } from './sharp'
-import { readBytes, type UploadDocLike } from './source'
-import { extForFormat, mimeForFormat, type OutputFormat, type ParsedParams } from './params'
-
-/** A resolved source doc: id + where-the-bytes-live + focal/hotspot layers. */
-export type VariantSourceDoc = UploadDocLike & {
-  id: string | number
-  focalX?: number | null
-  focalY?: number | null
-  focalSize?: number | null
-  cropLeft?: number | null
-  cropTop?: number | null
-  cropRight?: number | null
-  cropBottom?: number | null
-}
-
-/** Generation outcome (bytes or a typed failure). */
-export type GenBytes = { ok: true; data: Buffer; mimeType: string } | { ok: false; status: number; msg: string }
-
-/** Optional generation coalescer (the endpoint passes its per-process single-flight). */
-type GenFlight = (key: string, fn: () => Promise<GenBytes>) => Promise<GenBytes>
-
-/** Result of {@link getOrCreateVariantBytes} — bytes + the cache key (for ETag), or a typed failure. */
-export type VariantBytes = { ok: true; data: Buffer; mimeType: string; key: string } | { ok: false; status: number; msg: string; key: string }
-
-export interface GetVariantBytesArgs {
-  payload: Payload
-  source: VariantSourceDoc
-  /** Parsed + snapped transform params. */
-  params: ParsedParams
-  /** Concrete output format (never `auto`). */
-  format: OutputFormat
-  sourceSlug: string
-  variantSlug: string
-  /** Origin used to read originals/variants served from a relative/cloud URL. */
-  base: string
-  /** Decompression-bomb / memory guard passed to Sharp. */
-  maxInputPixels: number
-  genFlight?: GenFlight
-}
+import { transformImage } from './sharp'
+import { readBytes } from './source'
+import { extForFormat, mimeForFormat } from './params'
+import type { GenBytes, GetVariantBytesArgs, TransformOutput, UploadDocLike, VariantBytes } from '../../types'
 
 const errorCode = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'code' in e ? e.code : undefined)
 const errorCause = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'cause' in e ? e.cause : undefined)

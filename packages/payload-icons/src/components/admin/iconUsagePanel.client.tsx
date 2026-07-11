@@ -4,28 +4,12 @@ import type React from 'react'
 import { useMemo, useState } from 'react'
 import { Button, Pill, toast, useAllFormFields } from '@payloadcms/ui'
 
-import type { IconUsage, IconUsageManifest } from '../../scan/types'
+import type { IconUsage, IconUsagePanelClientProps, LiveRequest } from '../../types'
 import { clearIconRequests } from './clearIconRequests'
 
 /** Matches the live `name` field of each `iconsArray` row so we can read the
  *  set's current names straight from form state (updates as you edit). */
 const ICON_NAME_PATH = /^iconsArray\.\d+\.name$/
-
-/** A name requested at runtime that didn't resolve (from the `iconRequest` collection). */
-export interface LiveRequest {
-  name: string
-  count: number
-  lastRequestedAt: string | null
-}
-
-export interface IconUsagePanelClientProps {
-  /** The build-time manifest, or `null` when it hasn't been generated yet. */
-  manifest: IconUsageManifest | null
-  /** CLI command shown in the empty state so the editor knows how to populate it. */
-  scanCommand: string
-  /** Runtime misses recorded in production (empty unless `trackRequests` is on). */
-  liveRequests: LiveRequest[]
-}
 
 const panelStyle: React.CSSProperties = {
   border: '1px solid var(--theme-elevation-150)',

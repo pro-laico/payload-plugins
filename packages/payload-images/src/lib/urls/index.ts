@@ -4,11 +4,11 @@
  * bundle into client components.
  */
 export { deriveVersion } from './version'
-export type { VersionSource } from './version'
+export type { VersionSource } from '../../types'
 export { buildVariantUrl, DEFAULT_TRANSFORM_API_PATH } from './variantUrl'
-export type { BuildUrlOptions } from './variantUrl'
+export type { BuildUrlOptions } from '../../types'
 export { buildSrcset, stepWidths } from './srcset'
-export type { BuildSrcsetOptions, BuildSrcsetResult } from './srcset'
+export type { BuildSrcsetOptions, BuildSrcsetResult } from '../../types'
 export { getImageUrl } from './getImageUrl'
-export type { GetImageUrlOptions, ImageResource } from './getImageUrl'
-export type { Fit, Format } from '../transform/params'
+export type { GetImageUrlOptions, ImageResource } from '../../types'
+export type { Fit, Format } from '../../types'

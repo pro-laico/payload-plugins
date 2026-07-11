@@ -1,6 +1,7 @@
 import type { CollectionSlug, Field } from 'payload'
 
-import { type FontFamilyConfig, resolveFontFamilies } from '../lib/families'
+import type { FontFamilyConfig } from '../types'
+import { resolveFontFamilies } from '../lib/families'
 
 /**
  * The per-family relationship fields for the `fontSet` global — one slot per configured family

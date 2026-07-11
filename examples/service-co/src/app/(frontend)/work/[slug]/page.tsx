@@ -6,7 +6,7 @@ import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ButtonLink } from '@/components/ui/Button'
 import { getMuxVideo, getProjectBySlug, getService } from '@/lib/data'
-import { firstPlayback } from '@/lib/types'
+import { firstPlayback } from '@/lib/mux'
 
 // Atomic composition: the project is fetched depth 0, so the cover, gallery photos, video, and
 // related services are IDS — each renders through its own id-keyed cached entry. Editing a

@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { authd } from '../access/authd'
+import { authd } from '../access'
 
 /** Default slug for the archival font-original upload collection. */
 export const FONT_ORIGINAL_SLUG = 'fontOriginal'

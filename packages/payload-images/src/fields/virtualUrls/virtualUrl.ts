@@ -2,7 +2,7 @@
 import type { Field } from 'payload'
 
 import { virtualUrlAfterRead } from '../../hooks/field/virtualUrl'
-import type { ComputeContext, ImageDocLike } from './doc'
+import type { ComputeContext, ImageDocLike } from '../../types'
 
 export const virtualUrl = (name: string, description: string, compute: (doc: ImageDocLike, ctx: ComputeContext) => string | null): Field => ({
   name,

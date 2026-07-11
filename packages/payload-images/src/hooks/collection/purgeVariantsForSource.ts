@@ -6,11 +6,6 @@
  */
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
 
-export interface PurgeOptions {
-  /** Slug of the generated-images collection. Default `generated-images`. */
-  variantSlug?: string
-}
-
 /** Delete every generated variant of a source image; returns the count removed. Pass the calling
  *  hook's `req` so the bulk delete joins that operation's transaction. */
 export const purgeVariantsForSource = async (

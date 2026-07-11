@@ -1,6 +1,6 @@
 'use client'
 import MuxPlayer from '@mux/mux-player-react'
-import type { MuxPlayback } from '@/lib/types'
+import type { MuxPlayback } from '@/types'
 
 /** The payload-mux frontend: play a video from its virtual playback fields. The plugin ships no
  *  player (by design) — this is the few lines an app writes over `@mux/mux-player-react`, fed the

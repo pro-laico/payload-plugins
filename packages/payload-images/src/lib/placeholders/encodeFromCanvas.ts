@@ -4,7 +4,8 @@
  * server round trip. DOM-only — never import from server code.
  */
 import { BLURHASH_QUALITIES } from './qualities'
-import { encodeLinearGrid, type LinearGrid, type ParsedBlurhash, srgbToLinear } from './codec'
+import { encodeLinearGrid, srgbToLinear } from './codec'
+import type { LinearGrid, ParsedBlurhash } from '../../types'
 
 const SAMPLE_EDGE = 64
 

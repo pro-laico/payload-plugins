@@ -1,10 +1,9 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
 import { buildReferenceGraph } from '../graph/referenceGraph'
-import type { RevalidateInspection } from '../lib/inspect'
 import { topLevelFieldNames } from '../lib/fields'
-import { resolveCollectionSettings, resolveOptions, type RevalidatePluginOptions } from '../options'
-import type { PayloadRevalidateMarker } from '../types'
+import { resolveCollectionSettings, resolveOptions } from '../options'
+import type { PayloadRevalidateMarker, RevalidateInspection, RevalidatePluginOptions } from '../types'
 
 /** The config shape {@link buildStaticInspection} needs — a SanitizedConfig satisfies it,
  *  but so does any `{ collections, globals }` subset (for tests). */

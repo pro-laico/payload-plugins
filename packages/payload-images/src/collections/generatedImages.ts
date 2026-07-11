@@ -1,16 +1,10 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
-import { authd } from './access'
+import { authd } from '../access'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
+import type { CreateGeneratedImagesOptions } from '../types'
 
 export const GENERATED_IMAGES_SLUG = 'generated-images'
-
-export interface CreateGeneratedImagesOptions {
-  /** Slug for this collection. Default `generated-images`. */
-  slug?: string
-  /** Slug of the source image collection the variants point back to. Default `images`. */
-  sourceSlug?: string
-}
 
 /**
  * The hidden, durable cache of on-demand image variants — one upload doc per (source, settings,

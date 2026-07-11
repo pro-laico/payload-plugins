@@ -4,6 +4,8 @@
  * encode/decode and cropping in hash space needs the raw DCT coefficients. A parsed hash is
  * `{ cx, cy, coeffs }` where `coeffs[j][i]` is the linear-RGB coefficient of `cos(πi·x)·cos(πj·y)`.
  */
+import type { Coefficient, EncodeGridOptions, LinearGrid, ParsedBlurhash } from '../../types'
+
 const B83 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
 const B83_INDEX = new Map([...B83].map((c, i) => [c, i]))
 
@@ -34,16 +36,6 @@ export const linearToSrgb = (v: number): number => {
 }
 
 const signPow = (v: number, exp: number): number => Math.sign(v) * Math.abs(v) ** exp
-
-/** One RGB coefficient (linear space). */
-export type Coefficient = [number, number, number]
-
-export interface ParsedBlurhash {
-  cx: number
-  cy: number
-  /** Row-major `coeffs[j][i]`, `[0][0]` is DC. Linear RGB. */
-  coeffs: Coefficient[][]
-}
 
 export const parseBlurhash = (hash: string): ParsedBlurhash => {
   if (hash.length < 6) throw new Error('[blurhash] hash too short')
@@ -100,9 +92,6 @@ export const encodeCoefficients = ({ cx, cy, coeffs }: ParsedBlurhash): string =
   return out
 }
 
-/** A linear-RGB pixel grid: `pixels[t][s]` = [r,g,b], row-major. */
-export type LinearGrid = Coefficient[][]
-
 /**
  * Evaluate the hash's cosine series over a window of the unit square (midpoint sampling).
  * `window` defaults to the full image; this IS the exact restricted blur, so it doubles as
@@ -149,15 +138,6 @@ export const decodeToLinearGrid = (
     grid.push(row)
   }
   return grid
-}
-
-export interface EncodeGridOptions {
-  /**
-   * Use true orthogonal norms (1 / 2 / 4) instead of wolt's flat 2-for-every-AC. Wolt's norm
-   * halves the both-axes AC terms on any decode→re-encode round trip — set this when the input
-   * grid is itself a decoded blurhash, so the round trip is lossless. Default false (stock).
-   */
-  orthonormal?: boolean
 }
 
 /** Blurhash encode from a linear pixel grid, midpoint basis sampling to match {@link decodeToLinearGrid}. */

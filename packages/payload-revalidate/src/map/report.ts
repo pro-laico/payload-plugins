@@ -1,21 +1,5 @@
-import type { ReferenceEdge } from '../graph/referenceGraph'
-import type { RevalidateInspection } from '../lib/inspect'
 import { stashState, tags } from '../tags'
-
-/**
- * Render a {@link RevalidateInspection} — the exact shape the plugin stashes and the
- * `GET /api/revalidate-map` endpoint returns — as a self-contained Markdown document: the
- * "what revalidates what" map an AI or developer can read to understand a project's cache
- * dependency structure without booting the app or opening the dev-tools view.
- *
- * Works on both the static inspection {@link buildStaticInspection} derives from a config
- * AND a live inspection with observed reads/events (pipe `curl …/api/revalidate-map` in) —
- * the live-only sections just render when present.
- */
-export interface RenderMapOptions {
-  /** Emit the observed-reads / bust-events sections when the inspection carries them. @default true */
-  live?: boolean
-}
+import type { ReferenceEdge, RenderMapOptions, RevalidateInspection } from '../types'
 
 const code = (s: string): string => `\`${s}\``
 const list = (xs: string[]): string => (xs.length ? xs.map(code).join(', ') : '—')
@@ -39,6 +23,16 @@ const edgePhrase = (edges: ReferenceEdge[], nameKey: 'from' | 'to'): string[] =>
         `${code(name)} via ${es.map((e) => code(e.via === '' ? '(root)' : e.via)).join(', ')} (${[...new Set(es.map((e) => e.kind))].join('/')})`,
     )
 
+/**
+ * Render a {@link RevalidateInspection} — the exact shape the plugin stashes and the
+ * `GET /api/revalidate-map` endpoint returns — as a self-contained Markdown document: the
+ * "what revalidates what" map an AI or developer can read to understand a project's cache
+ * dependency structure without booting the app or opening the dev-tools view.
+ *
+ * Works on both the static inspection {@link buildStaticInspection} derives from a config
+ * AND a live inspection with observed reads/events (pipe `curl …/api/revalidate-map` in) —
+ * the live-only sections just render when present.
+ */
 export function renderRevalidateMap(inspection: RevalidateInspection, opts: RenderMapOptions = {}): string {
   const { graph, prefix, observing, rules, settings, reads, events } = inspection
   // The tag builders read the prefix from the globalThis state slot — seed it so examples

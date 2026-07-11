@@ -6,7 +6,8 @@
 import type { CollectionBeforeDeleteHook } from 'payload'
 
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
-import { type PurgeOptions, purgeVariantsForSource } from './purgeVariantsForSource'
+import { purgeVariantsForSource } from './purgeVariantsForSource'
+import type { PurgeOptions } from '../../types'
 
 export const purgeVariantsBeforeDelete = (opts: PurgeOptions = {}): CollectionBeforeDeleteHook => {
   const variantSlug = opts.variantSlug || GENERATED_IMAGES_SLUG

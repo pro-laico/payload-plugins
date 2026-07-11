@@ -6,7 +6,7 @@ export { MuxVideo } from './collections/MuxVideo'
 
 // Server-side ingest — create a mux-video from a local file / URL (seeding, imports, migrations)
 export { ingestMuxVideo } from './lib/ingest'
-export type { IngestMuxVideoOptions } from './lib/ingest'
+export type { IngestMuxVideoOptions } from './types'
 
 // Types
 export type {

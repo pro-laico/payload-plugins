@@ -3,18 +3,8 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CHROME_COOKIES, type ChromeSlot, STAGE_COOKIE } from '../cookies'
-import type { TestMeta } from '../harness'
-import type { DevSnapshot } from '../lib/snapshot'
-
-export type DevLink = { href: string; title: string }
-
-type Corner = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-type Size = 'sm' | 'md' | 'lg'
-type Settings = { corner: Corner; size: Size }
-type View = 'main' | 'info' | 'seed' | 'pages' | 'tests' | 'settings'
-type SeedError = { error: string; issues?: string[] }
-type StageSelection = { testKey: string; versionId: string }
+import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
+import type { ChromeSlot, Corner, DevLink, DevSnapshot, SeedError, Settings, Size, StageSelection, TestMeta, View } from '../types'
 
 const STORE_KEY = 'pdt-settings'
 const HIDE_KEY = 'pdt-hidden'

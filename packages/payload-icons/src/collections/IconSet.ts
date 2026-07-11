@@ -1,11 +1,12 @@
-import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 
 import { enforceSingleActive } from '../hooks/collection/enforceSingleActive'
 import { kebabCaseName } from '../hooks/field/kebabCaseName'
 import { activeField } from '../lib/activeField'
-import { authd } from '../lib/authenticated'
+import { authd } from '../access/authenticated'
 import { mergeHooks } from '../lib/mergeHooks'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
+import type { IconSetCollectionOverrides } from '../types'
 
 /** The default slug for the icon-set collection. */
 export const ICON_SET_SLUG = 'iconSet'
@@ -18,31 +19,6 @@ const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
 
 /** Inline title field so the collection has no template dependency. */
 const titleField = (defaultValue = 'New Icon Set'): Field => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
-
-/**
- * Overrides for the `iconSet` collection — a named, ordered `name → icon` mapping
- * into the shared `icon` pool. One set is `active` at a time; the frontend renders
- * it (see {@link enforceSingleActive}).
- */
-export interface IconSetCollectionOverrides {
-  /** Slug for the icon-set collection. @default 'iconSet' */
-  slug?: string
-  /**
-   * Live-preview URL generator. When provided, wires both `admin.preview`
-   * (legacy iframe) and `admin.livePreview.url`. Omitted by default.
-   */
-  livePreviewUrl?: (args: { data: Record<string, unknown>; req: PayloadRequest }) => string | Promise<string>
-  /** Override the `admin.group` sidebar label. @default 'Sets' */
-  group?: string
-  /** Additional collection hooks. */
-  hooks?: CollectionConfig['hooks']
-  /** Extra set-level fields appended to the Settings tab, below the title. */
-  fields?: Field[]
-  /** Extra fields appended to each `iconsArray` row, after the built-in `name` + `icon`. */
-  iconRowFields?: Field[]
-  /** Enable drafts/versions on the collection (per-set draft → publish). @default true */
-  drafts?: boolean
-}
 
 /**
  * Builds the `iconSet` collection — a named `name → icon` mapping with a

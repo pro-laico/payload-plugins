@@ -3,19 +3,10 @@ import { buildSrcset, deriveVersion } from '@pro-laico/payload-images/utils/urls
 import { Image } from '../../../components/Image'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
+import type { ImageDoc } from '../../../types'
 import { shellProps } from '../shell'
 
 export const dynamic = 'force-dynamic'
-
-type ImageDoc = {
-  id: string | number
-  alt?: string | null
-  width?: number | null
-  height?: number | null
-  focalX?: number | null
-  focalY?: number | null
-  filename?: string | null
-}
 
 export default async function ResponsivePage() {
   const payload = await getPayload({ config })

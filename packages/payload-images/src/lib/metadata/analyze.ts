@@ -6,25 +6,15 @@
  */
 import type { Sharp } from 'sharp'
 
-import { buildPalette, type ImagePalette } from './palette'
+import { buildPalette } from './palette'
 import { loadSharp } from '../transform/sharpInstance'
 import { encodeWebpPlaceholder } from '../placeholders/webpPlaceholder'
-import { encodeCoefficients, encodeLinearGrid, type LinearGrid, srgbToLinear } from '../placeholders/codec'
+import { encodeCoefficients, encodeLinearGrid, srgbToLinear } from '../placeholders/codec'
 import { BLURHASH_QUALITIES, BLURHASH_TIERS, blurhashFieldName, WEBP_QUALITIES, WEBP_TIERS, webpFieldName } from '../placeholders/qualities'
+import type { ImageMetadataAnalysis, LinearGrid } from '../../types'
 
 /** Longest sampling edge for the raw grid — out-resolves the largest hash tier's 9 components. */
 const SAMPLE_EDGE = 64
-
-export interface ImageMetadataAnalysis {
-  /** Every stored placeholder tier, keyed by stored field name. */
-  placeholderFields: Record<string, string>
-  palette: ImagePalette
-  hasAlpha: boolean
-  /** No sampled pixel is actually transparent (approximate — from the 64px sample). */
-  isOpaque: boolean
-  /** Saliency-based focal suggestion (percentages), when Sharp's attention crop reports one. */
-  attention?: { x: number; y: number }
-}
 
 export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataAnalysis> => {
   const sharp = await loadSharp()

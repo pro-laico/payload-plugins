@@ -1,6 +1,4 @@
-/** The shape `next/font/local` produces for each declared font — only the generated
- *  `variable` (its CSS-variable class) is read here. */
-type FontDefinitions = Record<string, { variable?: string } | undefined>
+import type { FontDefinitions } from './types'
 
 /**
  * Collect the `next/font/local` CSS-variable classes from a generated `definition.ts` default

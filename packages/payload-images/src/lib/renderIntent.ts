@@ -4,52 +4,9 @@
  * built for exactly that render, `croppedBlurHash` a finished placeholder for the same box.
  * `context` is an untyped bag, so everything is validated structurally.
  */
-import { FITS, type Fit, FORMATS, type Format, parseAspectRatio } from './transform/params'
-import { isPlaceholderFormat, isPlaceholderQuality, type PlaceholderFormat, type PlaceholderQuality } from './placeholders/qualities'
-
-/** A render aspect ratio: `16/9`, `"16/9"`, or `"16:9"`. */
-export type AspectRatio = number | `${number}/${number}` | `${number}:${number}`
-
-/** What a read declares about the render it's fetching for — pass as `context.image`. */
-export interface ImageRenderIntent {
-  /** Shapes the srcset/src `h` and the placeholder crop. Omit for the natural ratio. */
-  aspectRatio?: AspectRatio
-  /** Transform quality (1–100). Default 75. */
-  quality?: number
-  /** Transform fit. Default `cover`. */
-  fit?: Fit
-  /** Output format. Default `auto` (negotiated per browser). */
-  format?: Format
-}
-
-/** What a read declares about the placeholder it wants — pass as `context.blur`.
- *  The crop ratio comes from `context.image.aspectRatio`. */
-export interface BlurRenderIntent {
-  /** Placeholder tier: `xs`…`xl` (blurhash) or `xxl`/`x3` (micro-webp). Default `sm`. */
-  quality?: PlaceholderQuality
-  /** `uri` (default): a finished data URI. `hash`: the cropped raw hash string. */
-  format?: PlaceholderFormat
-}
-
-/** The full declared render — the `context` a getter passes to `payload.findByID`. */
-export interface ImageRenderContext {
-  image?: ImageRenderIntent
-  blur?: BlurRenderIntent
-}
-
-/** The doc shape a render-declared read returns ({@link RESPONSIVE_IMAGE_SELECT}). */
-export interface ResponsiveImageDoc {
-  id: string | number
-  alt?: string | null
-  src?: string | null
-  srcset?: string | null
-  croppedBlurHash?: string | null
-}
-
-/** The getter a project writes around `payload.findByID` (its own caching/access — the plugin
- *  never fetches). Select {@link RESPONSIVE_IMAGE_SELECT}, pass the render as `context`, hand
- *  the result's fields straight to `<ResponsiveImage>`. */
-export type ImageGetter = (id: string | number, render?: ImageRenderContext) => Promise<ResponsiveImageDoc | null>
+import { FITS, FORMATS, parseAspectRatio } from './transform/params'
+import { isPlaceholderFormat, isPlaceholderQuality } from './placeholders/qualities'
+import type { ParsedBlurIntent, ParsedRenderIntent } from '../types'
 
 /** The lean select for a read that feeds `<ResponsiveImage>`. */
 export const RESPONSIVE_IMAGE_SELECT = {
@@ -58,24 +15,6 @@ export const RESPONSIVE_IMAGE_SELECT = {
   srcset: true,
   croppedBlurHash: true,
 } as const
-
-/** {@link ImageRenderIntent} after validation, ready for the field hooks. */
-export interface ParsedRenderIntent {
-  /** True when the read declared `context.image` at all (even empty). */
-  declared: boolean
-  aspectRatio?: number
-  quality?: number
-  fit?: Fit
-  format?: Format
-}
-
-/** {@link BlurRenderIntent} after validation. */
-export interface ParsedBlurIntent {
-  /** True when the read declared `context.blur` at all (even empty). */
-  declared: boolean
-  quality?: PlaceholderQuality
-  format?: PlaceholderFormat
-}
 
 /** Read + validate `context.image` off the operation. Absent → `declared: false`. */
 export const readImageIntent = (req: { context?: Record<string, unknown> } | undefined): ParsedRenderIntent => {

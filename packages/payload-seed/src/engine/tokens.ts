@@ -1,4 +1,5 @@
 import { type AnyRef, isAnyToken, isRef, type Ref } from '../refs'
+import type { ResolveContext } from '../types'
 
 /** The map key for a seeded doc node: `collection:_key`. */
 export const docNodeId = (collection: string, key: string): string => `${collection}:${key}`
@@ -15,13 +16,6 @@ export function collectTokens(value: unknown, out: AnyRef[] = []): AnyRef[] {
     for (const v of Object.values(value)) collectTokens(v, out)
   }
   return out
-}
-
-export interface ResolveContext {
-  /** `collection:_key` → created doc id. */
-  docs: Map<string, string | number>
-  /** For error messages. */
-  where: string
 }
 
 /** Deep-clone a seed-data value, replacing every ref token with its resolved id. Throws a

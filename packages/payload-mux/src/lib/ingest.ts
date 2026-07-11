@@ -2,11 +2,8 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, Payload } from 'payload'
-import type { MuxVideoNewAssetSettings } from '../types'
+import type { IngestMuxAssetOptions, IngestMuxVideoOptions, MuxSource, MuxVideoNewAssetSettings } from '../types'
 import { delay } from './delay'
-
-/** A server-side video source: a local file path or an `http(s)` URL. */
-export type MuxSource = string
 
 /** Poll `fetch` until `done(value)` is true or the deadline passes; returns the last value. */
 async function pollUntil<T>(fetch: () => Promise<T>, done: (value: T) => boolean, intervalMs: number, timeoutMs = 120_000): Promise<T> {
@@ -33,17 +30,6 @@ async function buildUploadBody(source: MuxSource): Promise<{ body: BodyInit; hea
     throw new Error(`[payload-mux] source file not found: ${source}`)
   })
   return { body: createReadStream(source) as unknown as BodyInit, headers: { 'Content-Length': String(size) } }
-}
-
-export interface IngestMuxAssetOptions {
-  /** Base new-asset settings — normally the plugin's `uploadSettings.new_asset_settings`, so a
-   *  server-side ingest produces the same asset config as the admin direct-upload path. */
-  newAssetSettings?: MuxVideoNewAssetSettings
-  /** Playback policy override for this asset. When set, wins over `newAssetSettings`'s policy;
-   *  otherwise the configured policy applies (falling back to `'public'`). */
-  playbackPolicy?: 'public' | 'signed'
-  /** CORS origin for the direct upload. @default '*' */
-  corsOrigin?: string
 }
 
 /**
@@ -104,19 +90,6 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
   }
 
   return asset
-}
-
-export interface IngestMuxVideoOptions {
-  /** Local file path or `http(s)` URL of the video to ingest. */
-  source: MuxSource
-  /** Title for the created `mux-video` doc (must be unique within the collection). */
-  title: string
-  /** Playback policy override for the uploaded asset. @default the plugin's configured policy */
-  playbackPolicy?: 'public' | 'signed'
-  /** Optional poster timestamp (seconds). */
-  posterTimestamp?: number
-  /** The `mux-video` collection slug. @default 'mux-video' */
-  collection?: string
 }
 
 /**

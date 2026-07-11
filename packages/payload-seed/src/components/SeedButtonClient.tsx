@@ -3,6 +3,9 @@
 import { toast, useConfig } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useState } from 'react'
+import type { SeedButtonProps, SeedResponseBody } from '../types'
+
+export type { SeedButtonProps }
 
 const SuccessMessage: React.FC = () => (
   <div>
@@ -19,17 +22,6 @@ const summarizeIssues = (issues: string[]): string => {
   const shown = issues.slice(0, MAX_SHOWN_ISSUES)
   const more = issues.length - shown.length
   return shown.join('\n') + (more > 0 ? `\n…and ${more} more` : '')
-}
-
-interface SeedResponseBody {
-  error?: string
-  issues?: string[]
-  message?: string
-}
-
-export interface SeedButtonProps {
-  /** Endpoint URL the button POSTs to. Defaults to `<routes.api>/seed` from the admin config. */
-  endpoint?: string
 }
 
 /** The client half of the seed button — assumes seeding is enabled (the `SeedButton` server
