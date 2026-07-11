@@ -1,6 +1,7 @@
 /** The plugin's top-level options object. */
 import type { CollectionConfig } from 'payload'
 
+import type { PrewarmOptions } from '../prewarm/options'
 import type { TransformEndpointConfig } from '../transform/transformEndpoint'
 
 export interface ImagesPluginOptions {
@@ -55,4 +56,12 @@ export interface ImagesPluginOptions {
   /** Cap the *stored* original's longest edge in px (applied once on upload). Off by default —
    *  the original stays untouched. Ignored with `extendCollection`. */
   maxOriginalSize?: number
+  /**
+   * Smart prewarming: learn which variants the site actually serves (recorded off the transform
+   * endpoint — ground truth) and pre-generate them for new/replaced/re-focused images via a
+   * deferred Payload Job. Adds the hidden `image-render-profiles` collection, the `imagesPrewarm`
+   * jobs task, and the `images:prewarm` CLI. Default false — enabling is a schema change
+   * (new collection). `true` = zero-config defaults.
+   */
+  prewarm?: boolean | PrewarmOptions
 }

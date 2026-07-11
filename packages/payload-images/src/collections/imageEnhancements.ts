@@ -10,6 +10,7 @@ import { blurhashStorageFields, placeholderField } from '../fields/placeholder'
 import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/mediaMetadata'
 import { purgeStaleVariantsAfterChange } from '../hooks/collection/purgeStaleVariants'
 import { purgeVariantsBeforeDelete } from '../hooks/collection/purgeVariantsOnDelete'
+import { enqueuePrewarmAfterChange } from '../hooks/collection/enqueuePrewarm'
 import type { CreateImagesOptions } from '../types'
 
 /** Admin component subpaths (referenced by the Payload import map). */
@@ -95,7 +96,8 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
     ],
     hooks: {
       beforeChange: [generateImageMetadataBeforeChange()],
-      afterChange: [purgeStaleVariantsAfterChange({ variantSlug })],
+      // Prewarm enqueues AFTER the purge hook; its 30s waitUntil guarantees purge-before-warm.
+      afterChange: [purgeStaleVariantsAfterChange({ variantSlug }), ...(opts.prewarm ? [enqueuePrewarmAfterChange(opts.prewarm)] : [])],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
     defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'], //EXCUSE: the generated per-collection select type doesn't exist inside the plugin

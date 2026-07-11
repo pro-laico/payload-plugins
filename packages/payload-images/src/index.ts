@@ -2,6 +2,11 @@
 export { default, imagesPlugin } from './plugin'
 export type { ImagesPluginOptions, TransformEndpointConfig } from './types'
 
+// Smart prewarm: learn served render profiles, warm new/changed images via a deferred Payload Job.
+export { IMAGE_RENDER_PROFILES_SLUG } from './collections/renderProfiles'
+export { PREWARM_TASK_SLUG } from './lib/prewarm/resolveOptions'
+export type { PrewarmOptions, PrewarmReason, RenderProfileSeed } from './types'
+
 // The read-side render contract: declare the render on the fetch (`context: { image, blur }`),
 // select RESPONSIVE_IMAGE_SELECT, hand the doc's fields to <ResponsiveImage>.
 export { RESPONSIVE_IMAGE_SELECT } from './lib/renderIntent'

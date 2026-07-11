@@ -40,4 +40,7 @@ export interface GetVariantBytesArgs {
   /** Decompression-bomb / memory guard passed to Sharp. */
   maxInputPixels: number
   genFlight?: GenFlight
+  /** Default true: persist the variant row via Next `after()` (post-response). Pass false in
+   *  job/CLI contexts, where there is no request to defer behind — the persist is awaited. */
+  deferPersist?: boolean
 }

@@ -14,6 +14,8 @@ import { setSharpConcurrency } from '../../lib/transform/sharpInstance'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 import { getOrCreateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { negotiateFormat, parseTransformParams } from '../../lib/transform/params'
+import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
+import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import type { GenBytes, OutputFormat, SourceDoc, TransformEndpointConfig } from '../../types'
 
 import { createSingleFlight } from './coalesce'
@@ -23,8 +25,14 @@ import { readSourceDoc } from './sourceDoc'
 
 export type { TransformEndpointConfig } from '../../types'
 
+/** Prewarm's observation wiring — present only when the plugin's `prewarm` option is on. */
+export interface PrewarmObserveConfig {
+  profilesSlug: string
+  seedCandidates: RatioCandidate[]
+}
+
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
-export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endpoint => {
+export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewarmObserve?: PrewarmObserveConfig): Endpoint => {
   const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
   const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //EXCUSE: same as sourceSlug above
   const cdn = cfg.cdnCacheControl !== false
@@ -34,6 +42,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
 
   const sourceFlight = createSingleFlight<string, SourceDoc | null>()
   const genFlight = createSingleFlight<string, GenBytes>()
+  let recorder: ObservationRecorder | undefined
 
   return {
     path: '/img/:id',
@@ -72,6 +81,26 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}): Endp
       })
 
       if (!result.ok) return new Response(result.msg, { status: result.status })
+
+      // Prewarm observation — ground truth of what the site actually serves. Synchronous O(1)
+      // buffer work (the recorder flushes on its own timer); the response never waits on it.
+      if (prewarmObserve) {
+        recorder ??= createObservationRecorder({
+          payload,
+          profilesSlug: prewarmObserve.profilesSlug,
+          seedCandidates: prewarmObserve.seedCandidates,
+        })
+        const ratio = classifyRatio({
+          w: p.w,
+          h: p.h,
+          sourceW: src.width,
+          sourceH: src.height,
+          candidates: recorder.knownRatios(),
+          constraints,
+        })
+        recorder.observe({ parts: { ratio, fit: p.fit, quality: p.q, format: p.fmt }, width: p.w })
+      }
+
       return new Response(toBody(result.data), { headers: buildHeaders(result.mimeType, result.key, isAuto, cdn, isPublic) })
     },
   }

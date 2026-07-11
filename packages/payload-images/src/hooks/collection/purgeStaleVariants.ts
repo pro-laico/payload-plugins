@@ -7,18 +7,14 @@ import type { CollectionAfterChangeHook } from 'payload'
 
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 import { purgeVariantsForSource } from './purgeVariantsForSource'
+import { detectVariantIdentityChange } from './variantIdentity'
 import type { PurgeOptions } from '../../types'
 
 export const purgeStaleVariantsAfterChange = (opts: PurgeOptions = {}): CollectionAfterChangeHook => {
   const variantSlug = opts.variantSlug || GENERATED_IMAGES_SLUG
   return async ({ doc, previousDoc, operation, req }) => {
     if (operation !== 'update') return doc
-    const fileChanged = previousDoc?.filename !== doc?.filename
-    const focalChanged = previousDoc?.focalX !== doc?.focalX || previousDoc?.focalY !== doc?.focalY
-    const hotspotChanged = (['focalSize', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom'] as const).some(
-      (f) => (previousDoc?.[f] ?? null) !== (doc?.[f] ?? null),
-    )
-    if (fileChanged || focalChanged || hotspotChanged) {
+    if (detectVariantIdentityChange(previousDoc, doc).any) {
       try {
         await purgeVariantsForSource(req.payload, variantSlug, doc.id, req)
       } catch (err) {

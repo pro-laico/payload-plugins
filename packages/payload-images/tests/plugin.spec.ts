@@ -86,6 +86,51 @@ describe('imagesPlugin — default (creates the images collection)', () => {
   })
 })
 
+describe('imagesPlugin — prewarm (default off, opt-in registers the whole surface)', () => {
+  it('registers nothing prewarm-related by default', () => {
+    const out = run()
+    expect(slugs(out)).not.toContain('image-render-profiles')
+    expect(out.jobs).toBeUndefined()
+    expect((out.bin ?? []).map((b) => b.key)).not.toContain('images:prewarm')
+    const marker = (out.custom as { payloadImages?: { prewarm?: unknown } }).payloadImages
+    expect(marker?.prewarm).toBeUndefined()
+  })
+
+  it('prewarm: true registers the registry collection, jobs task, bin script, hook, and marker', () => {
+    const out = run({ prewarm: true })
+    expect(slugs(out)).toContain('image-render-profiles')
+    expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
+    expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
+    const images = (out.collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect(images.hooks?.afterChange).toHaveLength(2) // purge + prewarm enqueue, in that order
+    const marker = (
+      out.custom as { payloadImages?: { prewarm?: { taskSlug?: string; formats?: string[]; constraints?: { dimensionStep?: number } } } }
+    ).payloadImages
+    expect(marker?.prewarm?.taskSlug).toBe('imagesPrewarm')
+    expect(marker?.prewarm?.formats).toEqual(['webp'])
+    expect(marker?.prewarm?.constraints?.dimensionStep).toBe(50)
+    expect(out.jobs?.autoRun).toBeUndefined() // no forced background work
+  })
+
+  it('derives avif from transform.preferAvif and composes autoRun over existing shapes', async () => {
+    const marker = (c: Config) => (c.custom as { payloadImages: { prewarm: { formats: string[] } } }).payloadImages
+    expect(marker(run({ prewarm: true, transform: { preferAvif: true } })).prewarm.formats).toEqual(['webp', 'avif'])
+
+    const cron = { autoRun: '0 * * * *' }
+    const fresh = run({ prewarm: cron })
+    expect(fresh.jobs?.autoRun).toEqual([{ cron: '0 * * * *', queue: 'default', limit: 10 }])
+
+    const withArray = imagesPlugin({ prewarm: cron })({ ...baseConfig(), jobs: { autoRun: [{ cron: '* * * * *' }] } } as Config) as Config
+    expect(withArray.jobs?.autoRun).toHaveLength(2)
+
+    const fn = async () => [{ cron: '* * * * *' }]
+    const withFn = imagesPlugin({ prewarm: cron })({ ...baseConfig(), jobs: { autoRun: fn } } as Config) as Config
+    expect(typeof withFn.jobs?.autoRun).toBe('function')
+    const composed = await (withFn.jobs?.autoRun as (p: unknown) => Promise<unknown[]>)({})
+    expect(composed).toHaveLength(2)
+  })
+})
+
 describe('imagesPlugin — extendCollection (enhances an existing upload collection)', () => {
   const media: CollectionConfig = { slug: 'media', upload: true, fields: [{ name: 'alt', type: 'text' }] }
   const out = run({ extendCollection: 'media' }, [media])

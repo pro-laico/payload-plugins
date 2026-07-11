@@ -27,4 +27,6 @@ export interface CreateImagesOptions {
   folders?: boolean
   /** Cap the *stored* original's longest edge (px) via `upload.resizeOptions`. Off by default. */
   maxOriginalSize?: number
+  /** Wire the prewarm-enqueue afterChange hook (task slug + queue). Default off. */
+  prewarm?: { taskSlug: string; queue: string } | false
 }

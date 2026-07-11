@@ -9,10 +9,25 @@ import { createImagesCollection } from './collections/images'
 import { imageEnhancements } from './collections/imageEnhancements'
 import { mergeCollection } from './collections/mergeCollection'
 import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
-import { DEFAULT_CONSTRAINTS, DEFAULT_PIXEL_STEP } from './lib/transform/params'
-import { createTransformEndpoint } from './endpoints/transform'
+import { DEFAULT_PIXEL_STEP, parseAspectRatio } from './lib/transform/params'
+import { createTransformEndpoint, type PrewarmObserveConfig } from './endpoints/transform'
+import { resolveConstraints } from './endpoints/transform/config'
 import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
+import { createRenderProfilesCollection } from './collections/renderProfiles'
+import { resolvePrewarmOptions } from './lib/prewarm/resolveOptions'
+import { type RatioCandidate, ratioToken } from './lib/prewarm/profileKey'
+import { createPrewarmTask } from './jobs/prewarmTask'
 import type { ImagesPluginOptions, TransformEndpointConfig } from './types'
+
+type JobsCfg = NonNullable<Config['jobs']>
+
+/** Compose the prewarm autorun cron onto whatever `config.jobs.autoRun` shape the app already has. */
+const withAutoRun = (existing: JobsCfg['autoRun'], cron: string, queue: string): JobsCfg['autoRun'] => {
+  const entry = { cron, queue, limit: 10 }
+  if (!existing) return [entry]
+  if (Array.isArray(existing)) return [...existing, entry]
+  return async (payload) => [...(await existing(payload)), entry]
+}
 
 /** Absolute path to a bundled bin script, resolving the src→dist swap from this module's own
  *  location so `payload <key>` works both in-workspace and when published. */
@@ -58,6 +73,32 @@ export const imagesPlugin =
     const endpointsEnabled = transform !== false
     const virtualFields = opts.virtualFields ?? endpointsEnabled
 
+    // Resolved exactly like the endpoint resolves them (spread order matters: an explicit
+    // transform.dimensionStep wins over the pixelStep-derived default) so prewarm's replayed
+    // params — and therefore its cache keys — match organic traffic byte for byte.
+    const constraints = resolveConstraints({ dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep, ...transformCfg })
+    const prewarm = resolvePrewarmOptions(opts)
+    const prewarmDeps = prewarm
+      ? {
+          sourceSlug,
+          variantSlug,
+          profilesSlug: prewarm.profilesSlug,
+          seeds: prewarm.seeds,
+          formats: prewarm.formats,
+          maxVariantsPerImage: prewarm.maxVariantsPerImage,
+          constraints,
+        }
+      : undefined
+    const prewarmObserve: PrewarmObserveConfig | undefined = prewarm
+      ? {
+          profilesSlug: prewarm.profilesSlug,
+          seedCandidates: prewarm.seeds.flatMap((s): RatioCandidate[] => {
+            const ratio = s.aspectRatio != null ? parseAspectRatio(s.aspectRatio) : undefined
+            return ratio ? [{ token: ratioToken(ratio), ratio }] : []
+          }),
+        }
+      : undefined
+
     const generated = mergeCollection(createGeneratedImagesCollection({ slug: variantSlug, sourceSlug }), generatedImagesOverrides)
 
     let collections: CollectionConfig[]
@@ -78,6 +119,7 @@ export const imagesPlugin =
         apiRoute,
         endpointsEnabled,
         adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
+        prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
       })
       // Re-merge the target's own populate/select on top so the enhancements never clobber them.
       const parity: Partial<CollectionConfig> = {
@@ -112,11 +154,13 @@ export const imagesPlugin =
           apiRoute,
           endpointsEnabled,
           adminThumbnail: endpointsEnabled ? undefined : false,
+          prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
         }),
         imagesOverrides,
       )
       collections = [...(config.collections ?? []), images, generated]
     }
+    if (prewarm) collections.push(createRenderProfilesCollection())
 
     if (!extendCollection && transformCfg.sourceSlug) {
       const src = collections.find((c) => c.slug === transformCfg.sourceSlug)
@@ -131,12 +175,15 @@ export const imagesPlugin =
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
-            createTransformEndpoint({
-              dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep,
-              ...transformCfg,
-              variantSlug,
-              sourceSlug,
-            }),
+            createTransformEndpoint(
+              {
+                dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep,
+                ...transformCfg,
+                variantSlug,
+                sourceSlug,
+              },
+              prewarmObserve,
+            ),
           ]
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]
@@ -148,8 +195,21 @@ export const imagesPlugin =
     return {
       ...config,
       collections,
-      bin: [...(config.bin ?? []), { key: 'images:backfill', scriptPath: binScriptPath('imagesBackfill') }],
+      bin: [
+        ...(config.bin ?? []),
+        { key: 'images:backfill', scriptPath: binScriptPath('imagesBackfill') },
+        ...(prewarm ? [{ key: 'images:prewarm', scriptPath: binScriptPath('imagesPrewarm') }] : []),
+      ],
       endpoints,
+      ...(prewarm && prewarmDeps
+        ? {
+            jobs: {
+              ...config.jobs,
+              tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never], //EXCUSE: TypedJobs task slugs are app-generated; the plugin can't name its own slug in that union
+              ...(prewarm.autoRun ? { autoRun: withAutoRun(config.jobs?.autoRun, prewarm.autoRun, prewarm.queue) } : {}),
+            },
+          }
+        : {}),
       custom: {
         ...config.custom,
         payloadImages: {
@@ -158,7 +218,20 @@ export const imagesPlugin =
           variantSlug,
           basePath,
           pixelStep,
-          maxInputPixels: transformCfg.maxInputPixels ?? DEFAULT_CONSTRAINTS.maxInputPixels,
+          maxInputPixels: constraints.maxInputPixels,
+          ...(prewarm
+            ? {
+                prewarm: {
+                  profilesSlug: prewarm.profilesSlug,
+                  taskSlug: prewarm.taskSlug,
+                  queue: prewarm.queue,
+                  formats: prewarm.formats,
+                  maxVariantsPerImage: prewarm.maxVariantsPerImage,
+                  seeds: prewarm.seeds,
+                  constraints,
+                },
+              }
+            : {}),
         },
       },
       onInit: async (payload) => {
@@ -175,6 +248,10 @@ export const imagesPlugin =
         if (!endpointsEnabled && opts.virtualFields === true)
           payload.logger.warn(
             '[payload-images] virtualFields: true with transform: false — the virtual src/srcset/placeholderURL/thumbnailURL fields point at the unregistered transform endpoint and will 404.',
+          )
+        if (prewarm && !endpointsEnabled)
+          payload.logger.warn(
+            '[payload-images] prewarm with transform: false — nothing serves (or observes) variants, so only seeded profiles are meaningful and warmed bytes are unreachable. Enable the transform endpoint or drop prewarm.',
           )
         try {
           await loadSharp()

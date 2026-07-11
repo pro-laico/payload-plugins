@@ -3,6 +3,8 @@ import type { UploadDocLike } from './uploadDoc'
 
 export type SourceDoc = UploadDocLike & {
   id: string | number
+  width?: number | null
+  height?: number | null
   focalX?: number | null
   focalY?: number | null
   focalSize?: number | null

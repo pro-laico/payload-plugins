@@ -11,44 +11,10 @@ import { resolveStaticDir } from './staticDir'
 import { transformImage } from './sharp'
 import { readBytes } from './source'
 import { extForFormat, mimeForFormat } from './params'
+import { isDuplicateKeyError, isForeignKeyError } from '../errors'
 import type { GenBytes, GetVariantBytesArgs, TransformOutput, UploadDocLike, VariantBytes } from '../../types'
 
 const errorCode = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'code' in e ? e.code : undefined)
-const errorCause = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'cause' in e ? e.cause : undefined)
-
-/** Unique-constraint violation on the variant create: two requests raced the same cache miss and
- *  the loser is expected, not noise. Arrives as a raw driver error, a wrapper whose `cause`
- *  carries the code, or Payload's ValidationError on `cacheKey` — walk all three. */
-const isDuplicateKeyError = (err: unknown): boolean => {
-  let e: unknown = err
-  for (let depth = 0; depth < 4 && e; depth++) {
-    const msg = e instanceof Error ? e.message : String(e)
-    const code = errorCode(e)
-    if (/duplicate|unique/i.test(`${msg} ${typeof code === 'string' ? code : ''}`)) return true
-    e = errorCause(e)
-  }
-  const data = typeof err === 'object' && err !== null && 'data' in err ? err.data : undefined
-  const fieldErrors = typeof data === 'object' && data !== null && 'errors' in data ? data.errors : undefined
-  if (!Array.isArray(fieldErrors)) return false
-  return fieldErrors.some((f: unknown) => {
-    if (typeof f !== 'object' || f === null) return false
-    if ('path' in f && f.path === 'cacheKey') return true
-    return 'message' in f && typeof f.message === 'string' && /unique/i.test(f.message)
-  })
-}
-
-/** Foreign-key violation on the variant create: the SOURCE was deleted while this post-response
- *  persist was in flight. The bytes were already served; dropping the cache row is correct. */
-const isForeignKeyError = (err: unknown): boolean => {
-  let e: unknown = err
-  for (let depth = 0; depth < 4 && e; depth++) {
-    const msg = e instanceof Error ? e.message : String(e)
-    const code = errorCode(e)
-    if (/foreign key/i.test(msg) || /FOREIGNKEY|23503|ER_NO_REFERENCED_ROW/.test(`${typeof code === 'string' ? code : ''}`)) return true
-    e = errorCause(e)
-  }
-  return false
-}
 
 /** Sharp itself failed to load — the fix is the install, not this image. */
 const isSharpLoadError = (err: unknown): boolean => {
@@ -147,10 +113,16 @@ export const getOrCreateVariantBytes = async (args: GetVariantBytesArgs): Promis
         }
       }
     }
-    try {
-      after(persist)
-    } catch {
-      void persist()
+    // A request context defers the row write until after the response flushes; a job/CLI context
+    // has no after() and must not fire-and-forget (the process may exit mid-persist).
+    if (args.deferPersist === false) {
+      await persist()
+    } else {
+      try {
+        after(persist)
+      } catch {
+        void persist()
+      }
     }
 
     return { ok: true, data: out.data, mimeType: out.mimeType }

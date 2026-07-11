@@ -71,7 +71,9 @@ export interface Config {
     pages: Page;
     images: Image;
     'generated-images': GeneratedImage;
+    'image-render-profiles': ImageRenderProfile;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -86,7 +88,9 @@ export interface Config {
     pages: PagesSelect<false> | PagesSelect<true>;
     images: ImagesSelect<false> | ImagesSelect<true>;
     'generated-images': GeneratedImagesSelect<false> | GeneratedImagesSelect<true>;
+    'image-render-profiles': ImageRenderProfilesSelect<false> | ImageRenderProfilesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -103,7 +107,13 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      imagesPrewarm: TaskImagesPrewarm;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -289,6 +299,40 @@ export interface GeneratedImage {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles".
+ */
+export interface ImageRenderProfile {
+  id: number;
+  /**
+   * Canonical render shape: ratio|fit|quality|format. One doc per distinct shape the transform endpoint has served.
+   */
+  profileKey: string;
+  ratio: string;
+  fit: string;
+  quality: number;
+  format: string;
+  /**
+   * Approximate total serves (flushed from per-process buffers, throttled).
+   */
+  hitCount?: number | null;
+  lastSeenAt?: string | null;
+  /**
+   * Per-width observation histogram: { "640": { n, last } }. Capped; the least-requested widths are evicted.
+   */
+  widths?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -303,6 +347,98 @@ export interface PayloadKv {
     | number
     | boolean
     | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: number;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug: 'inline' | 'imagesPrewarm';
+        taskID: string;
+        input?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?: ('inline' | 'imagesPrewarm') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processing?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -326,6 +462,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'generated-images';
         value: number | GeneratedImage;
+      } | null)
+    | ({
+        relationTo: 'image-render-profiles';
+        value: number | ImageRenderProfile;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -465,11 +605,58 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles_select".
+ */
+export interface ImageRenderProfilesSelect<T extends boolean = true> {
+  profileKey?: T;
+  ratio?: T;
+  fit?: T;
+  quality?: T;
+  format?: T;
+  hitCount?: T;
+  lastSeenAt?: T;
+  widths?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  input?: T;
+  taskStatus?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processing?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -512,6 +699,22 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskImagesPrewarm".
+ */
+export interface TaskImagesPrewarm {
+  input: {
+    sourceId: string;
+    reason: 'create' | 'replace' | 'focal' | 'manual';
+  };
+  output: {
+    targets?: number | null;
+    generated?: number | null;
+    failed?: number | null;
+    skipped?: string | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

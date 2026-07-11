@@ -17,6 +17,10 @@ const img = await imageFor(post.hero).aspectRatio('16:9').blur('md').fetch()
 if (img) return <ResponsiveImage {...img} alt={img.alt ?? ''} sizes="50vw" />
 ```
 
+Opt into **smart prewarming** (`prewarm: true`) and the endpoint learns which renders the site
+actually serves, pre-generating exactly those variants for new/replaced images via a deferred
+Payload Job — the first visitor never pays the transform.
+
 Placeholders are a **quality-tier ladder** stored on the doc at upload time: five BlurHash
 strings (`xs`…`xl`) plus two micro-webp data URIs (`xxl`/`x3`). A read that declares what it's
 rendering (`context: { image, blur }`) gets a **finished, focal-cropped data URI** back from the
