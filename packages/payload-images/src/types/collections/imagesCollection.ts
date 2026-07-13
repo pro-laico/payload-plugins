@@ -32,7 +32,7 @@ export interface CreateImagesOptions {
   /** Default value for the per-image `variantLimit` field (the cap override). */
   variantLimit?: number
   /** Preset template names surface in the presetManager admin component. */
-  presetTemplates?: Record<string, import('../presets/preset').PresetTemplate>
+  presetTemplates?: Record<string, import('../presets/preset').PresetSpec>
   /** Fully-resolved options for the eager preset-generation afterChange hook. Default off. */
   presetGen?: import('../../hooks/collection/generatePresets').GeneratePresetsOptions | false
 }

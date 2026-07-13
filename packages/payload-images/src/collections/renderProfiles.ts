@@ -21,7 +21,13 @@ export const createRenderProfilesCollection = (opts: { slug?: string } = {}): Co
   slug: opts.slug || IMAGE_RENDER_PROFILES_SLUG,
   access: { create: authd, delete: authd, read: authd, update: authd },
   custom: { revalidate: false },
-  admin: { hidden: true, group: 'Assets', useAsTitle: 'profileKey', defaultColumns: ['profileKey', 'hitCount', 'lastSeenAt'] },
+  admin: {
+    hidden: true,
+    group: 'Assets',
+    enableListViewSelectAPI: true,
+    useAsTitle: 'profileKey',
+    defaultColumns: ['profileKey', 'hitCount', 'lastSeenAt'],
+  },
   fields: [
     { name: 'profileKey', type: 'text', required: true, unique: true, admin: { description: d.profileKey } },
     { name: 'ratio', type: 'text', required: true },

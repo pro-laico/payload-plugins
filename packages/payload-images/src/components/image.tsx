@@ -40,6 +40,9 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
 
   const cssAr = parseAspectRatio(aspectRatio)
   const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
+  // A raw blurhash (an undeclared read's placeholder) is not paintable — url(<hash>) would fire
+  // a garbage request. Paint only actual URIs.
+  const bg = placeholder && /^(data:|https?:|\/)/.test(placeholder) ? placeholder : undefined
 
   return (
     // biome-ignore lint/performance/noImgElement: intentional plain <img> — a hand-built srcset + inline LQIP that next/image would defeat
@@ -59,14 +62,10 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
         ...(cssAr ? { aspectRatio: cssAr } : null),
         objectFit: CSS_OBJECT_FIT[fit],
         ...(fill ? { position: 'absolute', inset: 0 } : null),
-        ...(placeholder
-          ? { backgroundImage: `url(${placeholder})`, backgroundSize: bgSize, backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }
-          : null),
+        ...(bg ? { backgroundImage: `url(${bg})`, backgroundSize: bgSize, backgroundPosition: 'center', backgroundRepeat: 'no-repeat' } : null),
         ...style,
       }}
       {...dataAttributes}
     />
   )
 }
-
-export default ResponsiveImage

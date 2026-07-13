@@ -30,7 +30,13 @@ export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectio
     // auto-attached hooks. Served fonts are consumed at BUILD time (the next/font export
     // endpoint), so runtime cache tags can't refresh them; a rebuild is the invalidation path.
     custom: { revalidate: false },
-    admin: { group: 'Assets', hidden: true, useAsTitle: 'filename', defaultColumns: ['filename', 'weight', 'style', 'isVariable'] },
+    admin: {
+      group: 'Assets',
+      hidden: true,
+      enableListViewSelectAPI: true,
+      useAsTitle: 'filename',
+      defaultColumns: ['filename', 'weight', 'style', 'isVariable'],
+    },
     upload: { mimeTypes: ['font/woff2'] },
     fields: [
       // The owning typeface — the export endpoint and the reconcile hook query by it.

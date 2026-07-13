@@ -1,10 +1,12 @@
 import type { Field, FieldHook } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { VIRTUAL_URL_FIELDS, virtualUrlFields } from '../../../src/fields/virtualUrls/index'
+import { createImagesCollection } from '../../../src/collections/images'
+
+const VIRTUAL_URL_FIELDS = ['src', 'srcset', 'aspectRatio', 'placeholderURL', 'thumbnailURL', 'variantVersion'] as const
 
 const fieldByName = (name: string): Field & { hooks?: { afterRead?: FieldHook[] }; virtual?: boolean; admin?: { hidden?: boolean } } =>
-  virtualUrlFields().find((f) => 'name' in f && f.name === name) as never
+  createImagesCollection().fields.find((f) => 'name' in f && f.name === name) as never
 
 const read = (name: string, doc: Record<string, unknown>, opts: { serverURL?: string; intent?: Record<string, unknown> } = {}): unknown => {
   const hook = fieldByName(name).hooks?.afterRead?.[0] as FieldHook
@@ -17,9 +19,8 @@ const read = (name: string, doc: Record<string, unknown>, opts: { serverURL?: st
 
 const doc = { id: 'abc', width: 800, height: 600, filename: 'a.png', focalX: 50, focalY: 50 }
 
-describe('virtualUrlFields', () => {
+describe('virtual URL fields', () => {
   it('exposes the virtual fields (URLs + ratio + version token), all virtual + hidden from the admin', () => {
-    expect(VIRTUAL_URL_FIELDS).toEqual(['src', 'srcset', 'aspectRatio', 'placeholderURL', 'thumbnailURL', 'variantVersion'])
     for (const name of VIRTUAL_URL_FIELDS) {
       const f = fieldByName(name)
       expect(f.virtual).toBe(true)

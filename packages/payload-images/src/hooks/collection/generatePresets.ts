@@ -14,12 +14,12 @@ import { parseTransformParams } from '../../lib/transform/params'
 import { resolveConstraints } from '../../endpoints/transform/config'
 import { presetEntryName, presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { detectVariantIdentityChange } from './variantIdentity'
-import type { PresetEntry, PresetTemplate, SourceDoc, TransformConstraints, VariantSourceDoc } from '../../types'
+import type { PresetEntry, PresetSpec, SourceDoc, TransformConstraints, VariantSourceDoc } from '../../types'
 
 export interface GeneratePresetsOptions {
   sourceSlug: string
   variantSlug: string
-  templates: Record<string, PresetTemplate>
+  templates: Record<string, PresetSpec>
   constraints: TransformConstraints
 }
 

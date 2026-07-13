@@ -1,5 +1,5 @@
 import config from '@payload-config'
-import { buildSrcset, deriveVersion } from '@pro-laico/payload-images/utils/urls'
+import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
 import { Image } from '../../../components/Image'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
@@ -30,7 +30,7 @@ export default async function ResponsivePage() {
   // The same srcset <ResponsiveImage> emits below, shown so you know which candidate URLs to
   // look for in the Network tab.
   const ar = img.width && img.height ? img.width / img.height : undefined
-  const { srcset } = buildSrcset(String(img.id), { sourceWidth: img.width ?? undefined, aspectRatio: ar, version: deriveVersion(img) })
+  const srcset = buildSrcset(img, { aspectRatio: ar })?.srcset ?? ''
 
   return (
     <SandboxShell {...shellProps}>

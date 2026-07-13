@@ -327,135 +327,148 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
       </p>
 
       <div>
-        <div
-          ref={stageRef}
-          onPointerDown={(e) => {
-            if (readOnly) return
-            dragMode.current = 'focal'
-            e.currentTarget.setPointerCapture(e.pointerId)
-            applyFromEvent(e.clientX, e.clientY)
-          }}
-          onPointerMove={(e) => {
-            if (dragMode.current) applyFromEvent(e.clientX, e.clientY)
-          }}
-          onPointerUp={(e) => {
-            dragMode.current = null
-            e.currentTarget.releasePointerCapture?.(e.pointerId)
-          }}
-          style={{
-            position: 'relative',
-            borderRadius: 'var(--style-radius-m, 4px)',
-            overflow: 'hidden',
-            border: '1px solid var(--theme-elevation-150)',
-            cursor: readOnly ? 'default' : 'crosshair',
-            touchAction: 'none',
-          }}
-        >
-          {/* biome-ignore lint/performance/noImgElement: intentional plain <img> — admin preview that mirrors the frontend's crop */}
-          <img
-            src={src}
-            alt=""
-            onLoad={(e) => setSrcDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            style={{ display: 'block', width: '100%', height: 'auto' }}
-            draggable={false}
-          />
-
+        {/* Center the stage so a tall (1:1 / portrait) image capped by max-height isn't left-anchored. */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
           <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              left: `${cropLeft}%`,
-              top: `${cropTop}%`,
-              right: `${cropRight}%`,
-              bottom: `${cropBottom}%`,
-              boxShadow: '0 0 0 100000px rgba(0, 0, 0, 0.55)',
-              border: hasCrop ? '1px dashed rgba(255,255,255,0.85)' : 'none',
-              pointerEvents: 'none',
-              zIndex: 1,
+            ref={stageRef}
+            onPointerDown={(e) => {
+              if (readOnly) return
+              dragMode.current = 'focal'
+              e.currentTarget.setPointerCapture(e.pointerId)
+              applyFromEvent(e.clientX, e.clientY)
             }}
-          />
+            onPointerMove={(e) => {
+              if (dragMode.current) applyFromEvent(e.clientX, e.clientY)
+            }}
+            onPointerUp={(e) => {
+              dragMode.current = null
+              e.currentTarget.releasePointerCapture?.(e.pointerId)
+            }}
+            style={{
+              position: 'relative',
+              // Shrink-to-fit the (height-capped) image, but never past the panel width — minWidth:0
+              // defeats the flex min-content floor that would otherwise let a wide image overflow.
+              maxWidth: '100%',
+              minWidth: 0,
+              borderRadius: 'var(--style-radius-m, 4px)',
+              overflow: 'hidden',
+              border: '1px solid var(--theme-elevation-150)',
+              cursor: readOnly ? 'default' : 'crosshair',
+              touchAction: 'none',
+            }}
+          >
+            {/* biome-ignore lint/performance/noImgElement: intentional plain <img> — admin preview that mirrors the frontend's crop */}
+            <img
+              src={src}
+              alt=""
+              onLoad={(e) => setSrcDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+              style={{ display: 'block', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: 'min(60vh, 560px)' }}
+              draggable={false}
+            />
 
-          <span
-            aria-hidden
-            style={{
-              position: 'absolute',
-              left: `${focalX}%`,
-              top: `${focalY}%`,
-              width: `${circleDiaPctOfWidth}%`,
-              aspectRatio: '1',
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              border: '2px solid var(--theme-success-500, #22c55e)',
-              boxShadow: '0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.35)',
-              pointerEvents: 'none',
-              zIndex: 2,
-            }}
-          />
-          <span
-            aria-hidden
-            style={{
-              position: 'absolute',
-              left: `${focalX}%`,
-              top: `${focalY}%`,
-              width: 8,
-              height: 8,
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              background: 'var(--theme-success-500, #22c55e)',
-              boxShadow: '0 0 0 2px rgba(0,0,0,0.5)',
-              pointerEvents: 'none',
-              zIndex: 2,
-            }}
-          />
-          {!readOnly && (
-            <>
-              <span
-                role="slider"
-                tabIndex={0}
-                aria-label="Hotspot size"
-                aria-valuemin={5}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(focalSize)}
-                onPointerDown={startDrag('size')}
-                style={{
-                  ...handleStyle,
-                  width: 24,
-                  height: 24,
-                  left: `calc(${focalX}% + ${(circleDiaPctOfWidth / 2) * Math.cos(handleAngle)}%)`,
-                  top: `calc(${focalY}% + ${(circleDiaPctOfWidth / 2) * stageAr * Math.sin(handleAngle)}%)`,
-                  transform: 'translate(-50%, -50%)',
-                  borderRadius: '50%',
-                  cursor: 'grab',
-                }}
-              />
-              <span
-                role="slider"
-                tabIndex={0}
-                aria-label="Crop top-left"
-                aria-valuemin={0}
-                aria-valuemax={90}
-                aria-valuenow={Math.round(Math.max(cropLeft, cropTop))}
-                onPointerDown={startDrag('crop-nw')}
-                style={{ ...handleStyle, left: `${cropLeft}%`, top: `${cropTop}%`, transform: 'translate(-50%, -50%)', cursor: 'nwse-resize' }}
-              />
-              <span
-                role="slider"
-                tabIndex={0}
-                aria-label="Crop bottom-right"
-                aria-valuemin={0}
-                aria-valuemax={90}
-                aria-valuenow={Math.round(Math.max(cropRight, cropBottom))}
-                onPointerDown={startDrag('crop-se')}
-                style={{
-                  ...handleStyle,
-                  left: `${100 - cropRight}%`,
-                  top: `${100 - cropBottom}%`,
-                  transform: 'translate(-50%, -50%)',
-                  cursor: 'nwse-resize',
-                }}
-              />
-            </>
-          )}
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: `${cropLeft}%`,
+                top: `${cropTop}%`,
+                right: `${cropRight}%`,
+                bottom: `${cropBottom}%`,
+                boxShadow: '0 0 0 100000px rgba(0, 0, 0, 0.55)',
+                border: hasCrop ? '1px dashed rgba(255,255,255,0.85)' : 'none',
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: `${focalX}%`,
+                top: `${focalY}%`,
+                width: `${circleDiaPctOfWidth}%`,
+                aspectRatio: '1',
+                transform: 'translate(-50%, -50%)',
+                borderRadius: '50%',
+                border: '2px solid var(--theme-success-500, #22c55e)',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.35)',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            />
+            <span
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: `${focalX}%`,
+                top: `${focalY}%`,
+                width: 8,
+                height: 8,
+                transform: 'translate(-50%, -50%)',
+                borderRadius: '50%',
+                background: 'var(--theme-success-500, #22c55e)',
+                boxShadow: '0 0 0 2px rgba(0,0,0,0.5)',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            />
+            {!readOnly && (
+              <>
+                <span
+                  role="slider"
+                  tabIndex={0}
+                  aria-label="Hotspot size"
+                  aria-valuemin={5}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(focalSize)}
+                  onPointerDown={startDrag('size')}
+                  style={{
+                    ...handleStyle,
+                    width: 24,
+                    height: 24,
+                    left: `calc(${focalX}% + ${(circleDiaPctOfWidth / 2) * Math.cos(handleAngle)}%)`,
+                    top: `calc(${focalY}% + ${(circleDiaPctOfWidth / 2) * stageAr * Math.sin(handleAngle)}%)`,
+                    transform: 'translate(-50%, -50%)',
+                    borderRadius: '50%',
+                    cursor: 'grab',
+                  }}
+                />
+                <span
+                  role="slider"
+                  tabIndex={0}
+                  aria-label="Crop top-left"
+                  aria-valuemin={0}
+                  aria-valuemax={90}
+                  aria-valuenow={Math.round(Math.max(cropLeft, cropTop))}
+                  onPointerDown={startDrag('crop-nw')}
+                  style={{
+                    ...handleStyle,
+                    left: `${cropLeft}%`,
+                    top: `${cropTop}%`,
+                    transform: 'translate(-50%, -50%)',
+                    cursor: 'nwse-resize',
+                  }}
+                />
+                <span
+                  role="slider"
+                  tabIndex={0}
+                  aria-label="Crop bottom-right"
+                  aria-valuemin={0}
+                  aria-valuemax={90}
+                  aria-valuenow={Math.round(Math.max(cropRight, cropBottom))}
+                  onPointerDown={startDrag('crop-se')}
+                  style={{
+                    ...handleStyle,
+                    left: `${100 - cropRight}%`,
+                    top: `${100 - cropBottom}%`,
+                    transform: 'translate(-50%, -50%)',
+                    cursor: 'nwse-resize',
+                  }}
+                />
+              </>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>

@@ -17,8 +17,12 @@ export interface TransformConstraints {
   preferAvif: boolean
   /** Snap requested `w`/`h` to a grid of this many px before transforming + caching, collapsing
    *  the continuous dimension space to a finite set — anti-DoS (a caller can't force unbounded
-   *  generation with `w=1,2,3,…`). Default 50. Set `<= 1` to honor exact dimensions. */
+   *  generation with `w=1,2,3,…`). Derived from a numeric `pixelStep` (default 50). Internal:
+   *  set `<= 1` to honor exact dimensions (presets). */
   dimensionStep: number
+  /** Extra exact snap candidates alongside the grid — an array `pixelStep` lands here so the
+   *  ladder's widths pass the snap unchanged whatever their values. Internal. */
+  widthLadder?: number[]
   /** Max source pixels (w×h) Sharp will decode — decompression-bomb / memory guard. Default ~100MP. */
   maxInputPixels: number
 }

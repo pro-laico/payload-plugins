@@ -32,7 +32,12 @@ export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig =>
       update: access?.update ?? defaultAdminAccess,
       delete: access?.delete ?? defaultAdminAccess,
     },
-    admin: { group: adminGroup, useAsTitle: 'filename', defaultColumns: ['filename', 'svgString', 'filesize', 'updatedAt'] },
+    admin: {
+      group: adminGroup,
+      enableListViewSelectAPI: true,
+      useAsTitle: 'filename',
+      defaultColumns: ['filename', 'svgString', 'filesize', 'updatedAt'],
+    },
     // Data-only marker for @pro-laico/payload-revalidate (no dependency): its hooks bust
     // the shared icons tag on every icon write, matching the tag `getIconSvg` applies.
     custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },

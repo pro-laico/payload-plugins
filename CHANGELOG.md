@@ -50,6 +50,62 @@ packages share one lockstep version.
 
 ### Changed
 
+- **BREAKING** `@pro-laico/payload-images` — the public surface is cut roughly in half so the
+  package is easier to hold in your head. What examples and docs actually teach is untouched
+  (`imagesPlugin`, `createImageFor`, `RESPONSIVE_IMAGE_SELECT`, `<ResponsiveImage>`,
+  `getImageUrl`, `buildSrcset`); everything else was internals leaking out:
+
+  - `transform` config loses its duplicate/dead knobs. `transform.presetTemplates` was silently
+    ignored (the top-level option always won — a misconfig trap, now impossible),
+    `transform.variantLimit` duplicated the top-level option, `transform.sourceSlug` was a
+    confusing near-alias of `extendCollection`, and `transform.variantSlug` renamed an internal
+    cache collection nobody needs to rename. Use the top-level `variantLimit` / `presetTemplates`
+    / `extendCollection`; the cache collection is always `generated-images`.
+  - An **array `pixelStep`'s widths now pass the endpoint's snap exactly** (the snap considers
+    the ladder alongside the 50px grid — the variant space stays finite). The "keep ladder widths
+    on multiples of 50" caveat and the `transform.dimensionStep` escape hatch are gone; a numeric
+    `pixelStep` still sets the grid directly.
+  - `focalUI` absorbs `previewRatios`: `focalUI: { previewRatios: [...] }` replaces the
+    top-level option.
+  - `buildSrcset` now takes an id **or a populated doc** (like `getImageUrl`) and derives the
+    width cap + cache-busting `v` token itself — `buildSrcset(doc, { aspectRatio: '16:9' })` is
+    the whole call (returns `null` for an empty resource). The `sourceWidth` option is gone, and
+    the lower-level pieces it made you thread (`buildVariantUrl`, `deriveVersion`, `stepWidths`,
+    `DEFAULT_TRANSFORM_API_PATH`, `VersionSource`) leave `/utils/urls`.
+  - The main entry stops exporting placeholder/preset internals nobody consumed:
+    `coverCropWindow`, `cropBlurhashCoefficients`, `blurhashToPngDataUri`, `BLURHASH_QUALITIES`,
+    `WEBP_QUALITIES`, `DEFAULT_BLURHASH_QUALITY`, `DEFAULT_PRESET_TEMPLATES`,
+    `DEFAULT_VARIANT_LIMIT`, `IMAGE_RENDER_PROFILES_SLUG`, and the types `CropWindow`,
+    `BlurhashRequest`, `BlurhashQuality`, `WebpQuality`, `PrewarmReason`, `ImageGetter`,
+    `PresetTemplate` (use `PresetSpec` — it was an alias). The virtual `placeholder` field
+    already serves every declared render, so hand-rolling with these was never needed.
+    `PREWARM_TASK_SLUG` stays (for queueing the job yourself), as do `PlaceholderQuality` /
+    `PlaceholderFormat` / `ImagePalette` / `PaletteSwatch` (the render contract + stored palette
+    types). `ResponsiveImage` is a named export only (the default export is gone).
+
+### Fixed
+
+- `@pro-laico/payload-images` — a read that declared an **empty** render (`context: { image: {} }`,
+  or a natural-ratio render with no `blur`) got the raw `sm` blurhash as its `placeholder`
+  instead of a finished data URI; `<ResponsiveImage>` then painted the hash as a CSS `url()`,
+  firing a garbage request per image (`GET /LJJtSD~p…` → 404). Any declared render now always
+  answers with a paintable data URI (the raw hash stays for truly undeclared reads and
+  `blur: { format: 'hash' }`), and `<ResponsiveImage>` refuses to paint a non-URI placeholder.
+
+- `@pro-laico/payload-images` — the admin Presets panel read the `presets` array through
+  `useField(path)`, whose value on a loaded doc is the row *count*, not the rows: saved presets
+  were invisible after reload (impossible to remove, easy to double-add). The panel now reads
+  and mutates rows through the form's rows API (`useAllFormFields` + `addFieldRow` /
+  `removeFieldRow`), so the add → save → reload → remove loop round-trips.
+
+- All packages — every editor-facing collection (Images, Icons, Icon sets, Fonts, Mux videos) and
+  the internal asset caches (`generated-images`, `image-render-profiles`, optimized/original fonts,
+  icon-request telemetry) now set `admin.enableListViewSelectAPI: true`, so the list view queries
+  only the columns it renders instead of whole documents — a real win on the large variant-cache
+  tables. Custom thumbnail cells that read non-column fields keep working via `forceSelect`
+  (`@pro-laico/payload-mux` force-selects `playbackOptions`; upload thumbnails are handled by
+  Payload automatically).
+
 - **BREAKING** `@pro-laico/payload-images` — the virtual `croppedBlurHash` field is now
   `placeholder` (the old name matched neither what it returns — a finished data URI for
   declared renders — nor the `<ResponsiveImage>` prop it feeds; the read-contract doc now

@@ -1,9 +1,10 @@
 /** Count the cached variants for one source — the per-image cap check on the generate path. */
-import type { CollectionSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
+import { asSlug } from '../asSlug'
 
 export const countVariantsForSource = async (payload: Payload, variantSlug: string, sourceId: string | number): Promise<number> => {
   const res = await payload.find({
-    collection: variantSlug as CollectionSlug, //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+    collection: asSlug(variantSlug),
     where: { source: { equals: sourceId } },
     limit: 0, // count only — the indexed `source` field makes this cheap
     depth: 0,

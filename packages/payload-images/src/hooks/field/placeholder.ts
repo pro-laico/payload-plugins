@@ -11,15 +11,18 @@ import { blurhashToPngDataUri } from '../../lib/placeholders/png'
 import { cropWebpDataUri } from '../../lib/placeholders/webpPlaceholder'
 import { cropBlurhashCoefficients } from '../../lib/placeholders/cropCoefficients'
 import { DEFAULT_BLURHASH_QUALITY, isBlurhashQuality, isWebpQuality } from '../../lib/placeholders/qualities'
-import { readRequest } from '../../fields/placeholder/request'
-import { cropWindow, storedHash, storedWebp } from '../../fields/placeholder/stored'
+import { readRequest } from '../../lib/placeholders/request'
+import { cropWindow, storedHash, storedWebp } from '../../lib/placeholders/stored'
 import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 
 export const placeholderAfterRead: FieldHook = async ({ data, req }) => {
   const doc = (data ?? {}) as ImageDocLike //EXCUSE: hook data is untyped; every field is duck-checked before use
   const wanted = readRequest(req)
 
-  if (wanted.ar === undefined && wanted.quality === undefined && wanted.format === undefined)
+  // Only a read that declared NOTHING gets the raw hash (light for admin/API reads). A declared
+  // render — even an empty one (e.g. the natural ratio) — pairs with <ResponsiveImage>, which
+  // paints the placeholder as a CSS url(), so it must always get a finished data URI.
+  if (!wanted.declared && wanted.ar === undefined && wanted.quality === undefined && wanted.format === undefined)
     return storedHash(doc, DEFAULT_BLURHASH_QUALITY) ?? null
 
   const quality = wanted.quality ?? DEFAULT_BLURHASH_QUALITY

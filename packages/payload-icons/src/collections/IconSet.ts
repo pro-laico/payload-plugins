@@ -58,6 +58,7 @@ export const createIconSetCollection = (
     custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },
     admin: {
       group,
+      enableListViewSelectAPI: true,
       useAsTitle: 'title',
       defaultColumns: ['title', 'active', '_status'],
       ...(livePreviewUrl && {

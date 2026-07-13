@@ -14,15 +14,13 @@ export const options = [
   { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection (you own its upload config).` },
   { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key, not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
   { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
-  { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths. A number is the step (bigger = fewer widths and cached variants); an array is an explicit ladder, e.g. [200, 450, 750, 1200, 2000], best kept on multiples of 50, since the endpoint rounds requested sizes to a 50px grid. maxDimension caps the top.` },
+  { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths. A number is the step (bigger = fewer widths and cached variants) and doubles as the endpoint's snap grid; an array is an explicit ladder, e.g. [200, 450, 750, 1200, 2000] — its widths always pass the endpoint's snap unchanged. maxDimension caps the top.` },
   {
     name: 'transform',
     type: 'TransformEndpointConfig | false',
     default: '{}',
     description: `Config for the on-demand transform + purge endpoints. Pass false to register neither.`,
     options: [
-      { name: 'sourceSlug', type: 'string', default: "'images'", description: `Slug of the source upload collection to transform.` },
-      { name: 'variantSlug', type: 'string', default: "'generated-images'", description: `Slug of the collection that caches generated variants.` },
       { name: 'cdnCacheControl', type: 'boolean', default: 'true', description: `Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).` },
       { name: 'maxDimension', type: 'number', default: '4096', description: `Hard ceiling on either output dimension.` },
       { name: 'defaultQuality', type: 'number', default: '75', description: `Encode quality used when a request omits q.` },
@@ -36,8 +34,7 @@ export const options = [
       { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
     ],
   },
-  { name: 'focalUI', type: 'boolean', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button.` },
-  { name: 'previewRatios', type: 'string[]', default: "['16:9','9:16','1:1','4:3','3:2','21:9']", description: `Aspect ratios shown as preview tiles in the focal-point field.` },
+  { name: 'focalUI', type: 'boolean | { previewRatios?: string[] }', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button. The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']).` },
   { name: 'virtualFields', type: 'boolean', default: 'true (false when transform: false)', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population. Defaults off when the transform endpoint is disabled (the URLs would 404); pass true explicitly to force them anyway.` },
   { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
@@ -72,8 +69,6 @@ imagesPlugin({
   // generatedImagesOverrides: { /* … */ }, // optional, no default: merged onto the variant-cache collection
   pixelStep: 50,
   transform: {
-    sourceSlug: 'images',
-    variantSlug: 'generated-images',
     cdnCacheControl: true,
     maxDimension: 4096,
     defaultQuality: 75,
@@ -86,8 +81,7 @@ imagesPlugin({
     sharpConcurrency: 1,
     fallback: true,
   },
-  focalUI: true,
-  previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'],
+  focalUI: true, // or { previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'] }
   virtualFields: true,
   localizeAlt: false,
   mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],

@@ -2,15 +2,8 @@
  * Reading the stored placeholder data off an image doc: the best tier at or below the requested
  * one (so docs predating a tier still get a placeholder), plus the focal/hotspot crop window.
  */
-import { coverCropWindow } from '../../lib/placeholders/window'
-import {
-  BLURHASH_TIERS,
-  type BlurhashQuality,
-  blurhashFieldName,
-  WEBP_TIERS,
-  type WebpQuality,
-  webpFieldName,
-} from '../../lib/placeholders/qualities'
+import { coverCropWindow } from './window'
+import { BLURHASH_TIERS, type BlurhashQuality, blurhashFieldName, WEBP_TIERS, type WebpQuality, webpFieldName } from './qualities'
 import type { CropWindow } from '../../types'
 import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 

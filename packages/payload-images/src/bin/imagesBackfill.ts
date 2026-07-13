@@ -10,7 +10,8 @@
  * `--focal` is opt-in because it CHANGES CROPS on a live site (busts caches, regenerates
  * variants); everything else is additive metadata that alters no rendered pixels.
  */
-import { type CollectionSlug, getPayload, type SanitizedConfig } from 'payload'
+import { getPayload, type SanitizedConfig } from 'payload'
+import { asSlug } from '../lib/asSlug'
 
 import { readPluginMarker } from '../lib/pluginMarker'
 import { analyzeImageMetadata } from '../lib/metadata/analyze'
@@ -26,7 +27,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const focal = argv.includes('--focal')
   const collectionIdx = argv.indexOf('--collection')
   const marker = readPluginMarker(config)
-  const slug = ((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker.sourceSlug ?? 'images') as CollectionSlug //EXCUSE: runtime-chosen slug can't satisfy the consuming app's generated CollectionSlug union
+  const slug = asSlug((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker.sourceSlug ?? 'images')
 
   const payload = await getPayload({ config })
   try {

@@ -1,24 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
-/** Append each per-phase hook array in `extra` after the corresponding `base` array. */
-const mergeHooks = <T>(base: T, extra?: T): T => {
-  if (!extra) return base
-  const b = base as unknown as Record<string, unknown[] | undefined> //EXCUSE: Payload's hooks object is iterated generically; arrays are recombined per key
-  const e = extra as unknown as Record<string, unknown[] | undefined> //EXCUSE: same as above
-  const out: Record<string, unknown[] | undefined> = { ...b }
-  for (const key of Object.keys(e)) out[key] = [...(b[key] ?? []), ...(e[key] ?? [])]
-  return out as unknown as T //EXCUSE: reverse of the generic widening above
-}
-
-/** Shallow key-merge for the select-shaped configs, so an override adds keys without dropping the
- *  plugin's required ones. Returns undefined only when neither side has any. */
-const mergeSelect = (
-  base: CollectionConfig['defaultPopulate'],
-  override: CollectionConfig['defaultPopulate'],
-): CollectionConfig['defaultPopulate'] =>
-  base || override
-    ? ({ ...(base as Record<string, unknown>), ...(override as Record<string, unknown> | undefined) } as CollectionConfig['defaultPopulate']) //EXCUSE: the generated per-collection select type doesn't exist inside the plugin
-    : undefined
+import { mergeHooks } from './mergeHooks'
+import { mergeSelect } from './mergeSelect'
 
 /**
  * Deep-merge a partial override onto a base `CollectionConfig`. Top-level keys replace, but

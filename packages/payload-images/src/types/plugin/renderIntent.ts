@@ -44,11 +44,6 @@ export interface ResponsiveImageDoc {
   placeholder?: string | null
 }
 
-/** The getter a project writes around `payload.findByID` (its own caching/access — the plugin
- *  never fetches). Select {@link RESPONSIVE_IMAGE_SELECT}, pass the render as `context`, hand
- *  the result's fields straight to `<ResponsiveImage>`. */
-export type ImageGetter = (id: string | number, render?: ImageRenderContext) => Promise<ResponsiveImageDoc | null>
-
 /** {@link ImageRenderIntent} after validation, ready for the field hooks. */
 export interface ParsedRenderIntent {
   /** True when the read declared `context.image` at all (even empty). */

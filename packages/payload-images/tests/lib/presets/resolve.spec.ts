@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { presetEntryName, presetQuery, resolvePreset } from '../../../src/lib/presets/resolve'
-import type { PresetEntry, PresetTemplate } from '../../../src/types'
+import type { PresetEntry, PresetSpec } from '../../../src/types'
 
-const templates: Record<string, PresetTemplate> = {
+const templates: Record<string, PresetSpec> = {
   og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
   square: { width: 600, aspectRatio: '1:1', fit: 'cover' },
 }

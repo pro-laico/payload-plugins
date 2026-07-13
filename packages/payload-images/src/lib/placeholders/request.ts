@@ -2,9 +2,9 @@
  * What the read asked the placeholder for: the declared render (Local API `context.image`/
  * `context.blur`), else an `X-Blurhash` header (REST). Absent → the raw `sm`-tier hash.
  */
-import { parseAspectRatio } from '../../lib/transform/params'
-import { readBlurIntent, readImageIntent } from '../../lib/renderIntent'
-import { isPlaceholderFormat, isPlaceholderQuality } from '../../lib/placeholders/qualities'
+import { parseAspectRatio } from '../transform/params'
+import { readBlurIntent, readImageIntent } from '../renderIntent'
+import { isPlaceholderFormat, isPlaceholderQuality } from './qualities'
 import type { BlurhashRequest } from '../../types'
 
 /** Parse an `X-Blurhash` header: a bare ratio (`16:9`) or a `;`-list (`ar=16:9; q=md; format=hash`). */
@@ -35,7 +35,7 @@ export const readRequest = (
 ): BlurhashRequest => {
   const image = readImageIntent(req)
   const blur = readBlurIntent(req)
-  if (image.declared || blur.declared) return { ar: image.aspectRatio, quality: blur.quality, format: blur.format }
+  if (image.declared || blur.declared) return { declared: true, ar: image.aspectRatio, quality: blur.quality, format: blur.format }
   const header = req?.headers?.get?.('x-blurhash')
-  return header ? parseHeader(header) : {}
+  return header ? { declared: true, ...parseHeader(header) } : {}
 }

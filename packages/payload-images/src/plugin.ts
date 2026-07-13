@@ -6,8 +6,8 @@ import { stashConfig } from './lib/configStash'
 import { loadSharp } from './lib/transform/sharpInstance'
 import { createPurgeEndpoint } from './endpoints/purge'
 import { createImagesCollection } from './collections/images'
-import { imageEnhancements } from './collections/imageEnhancements'
-import { mergeCollection } from './collections/mergeCollection'
+import { imageEnhancements } from './collections/images/imageEnhancements'
+import { mergeCollection } from './lib/mergeCollection'
 import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
 import { DEFAULT_PIXEL_STEP, parseAspectRatio } from './lib/transform/params'
 import { createTransformEndpoint, type PrewarmObserveConfig } from './endpoints/transform'
@@ -56,8 +56,7 @@ export const imagesPlugin =
       generatedImagesOverrides,
       pixelStep = DEFAULT_PIXEL_STEP,
       transform = {},
-      focalUI = true,
-      previewRatios,
+      focalUI: focalUIOpt = true,
       localizeAlt = false,
       mimeTypes,
       folders,
@@ -65,22 +64,25 @@ export const imagesPlugin =
     } = opts
     if (!enabled) return config
 
+    const focalUI = focalUIOpt !== false
+    const previewRatios = typeof focalUIOpt === 'object' ? focalUIOpt.previewRatios : undefined
     const transformCfg: TransformEndpointConfig = transform === false ? {} : transform
-    const variantSlug = transformCfg.variantSlug || GENERATED_IMAGES_SLUG
-    const sourceSlug = extendCollection || transformCfg.sourceSlug || 'images'
+    const variantSlug = GENERATED_IMAGES_SLUG
+    const sourceSlug = extendCollection || 'images'
     const basePath = '/img'
     const purgePath = `${basePath}/purge`
     const apiRoute = config.routes?.api ?? '/api'
     const endpointsEnabled = transform !== false
     const virtualFields = opts.virtualFields ?? endpointsEnabled
 
-    // Resolved exactly like the endpoint resolves them (spread order matters: an explicit
-    // transform.dimensionStep wins over the pixelStep-derived default) so prewarm's replayed
-    // params — and therefore its cache keys — match organic traffic byte for byte.
-    const constraints = resolveConstraints({ dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep, ...transformCfg })
+    // A numeric pixelStep IS the snap grid; an array becomes the snap's width ladder. Resolved
+    // exactly like the endpoint resolves them, so prewarm's replayed params — and therefore its
+    // cache keys — match organic traffic byte for byte.
+    const snapping = Array.isArray(pixelStep) ? { widthLadder: pixelStep } : { dimensionStep: pixelStep }
+    const constraints = resolveConstraints({ ...transformCfg, ...snapping })
     // Presets: default `og` merged under any user templates; the cap + eager-gen hook + endpoint all share these.
     const presetTemplates = resolvePresetTemplates(opts.presetTemplates)
-    const variantLimit = opts.variantLimit ?? transformCfg.variantLimit ?? DEFAULT_VARIANT_LIMIT
+    const variantLimit = opts.variantLimit ?? DEFAULT_VARIANT_LIMIT
     const presetGen: import('./hooks/collection/generatePresets').GeneratePresetsOptions | false = endpointsEnabled
       ? { sourceSlug, variantSlug, templates: presetTemplates, constraints }
       : false
@@ -172,30 +174,13 @@ export const imagesPlugin =
     }
     if (prewarm) collections.push(createRenderProfilesCollection())
 
-    if (!extendCollection && transformCfg.sourceSlug) {
-      const src = collections.find((c) => c.slug === transformCfg.sourceSlug)
-      if (!src) throw new Error(`[payload-images] transform.sourceSlug: collection '${transformCfg.sourceSlug}' not found`)
-      if (!src.upload)
-        throw new Error(`[payload-images] transform.sourceSlug: collection '${transformCfg.sourceSlug}' is not an upload collection`)
-    }
-
     const endpoints =
       transform === false
         ? config.endpoints
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
-            createTransformEndpoint(
-              {
-                dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep,
-                ...transformCfg,
-                variantSlug,
-                sourceSlug,
-                variantLimit,
-                presetTemplates,
-              },
-              prewarmObserve,
-            ),
+            createTransformEndpoint({ ...transformCfg, ...snapping, variantSlug, sourceSlug, variantLimit, presetTemplates }, prewarmObserve),
           ]
 
     const baseSegment = basePath.replace(/^\//, '').split('/')[0]

@@ -112,8 +112,17 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   if (w == null && h == null) return { ok: false, error: 'width or height required' }
 
   if (c.dimensionStep > 1) {
-    const snap = (n: number | undefined): number | undefined =>
-      n == null ? n : clampInt(Math.round(n / c.dimensionStep) * c.dimensionStep, Math.min(c.dimensionStep, c.maxDimension), c.maxDimension)
+    // Snap to the grid — or to a ladder width when that's closer, so an explicit `pixelStep`
+    // ladder's widths pass through exactly whatever their values. Either way the continuous
+    // dimension space collapses to a finite set (anti-DoS).
+    const ladder = c.widthLadder
+    const snap = (n: number | undefined): number | undefined => {
+      if (n == null) return n
+      const grid = clampInt(Math.round(n / c.dimensionStep) * c.dimensionStep, Math.min(c.dimensionStep, c.maxDimension), c.maxDimension)
+      if (!ladder?.length) return grid
+      const rung = ladder.reduce((best, v) => (Math.abs(v - n) < Math.abs(best - n) ? v : best))
+      return Math.abs(rung - n) < Math.abs(grid - n) ? rung : grid
+    }
     w = snap(w)
     h = snap(h)
   }

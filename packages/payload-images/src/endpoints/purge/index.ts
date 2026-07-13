@@ -1,4 +1,5 @@
-import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
+import type { Endpoint, PayloadRequest } from 'payload'
+import { asSlug } from '../../lib/asSlug'
 
 import { routeId } from '../routeId'
 import { purgeVariantsForSource } from '../../hooks/collection/purgeVariantsForSource'
@@ -12,7 +13,7 @@ import type { PurgeEndpointConfig } from '../../types'
  */
 export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => {
   const variantSlug = cfg.variantSlug || GENERATED_IMAGES_SLUG
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+  const sourceSlug = asSlug(cfg.sourceSlug || 'images')
 
   return {
     path: '/img/purge/:id',

@@ -5,7 +5,8 @@
  * Steady-state hit counting is throttled (≤4 writes/hour/profile/process); NEW information — a
  * profile or width not yet persisted — flushes within one interval.
  */
-import type { CollectionSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
+import { asSlug } from '../asSlug'
 
 import { isDuplicateKeyError } from '../errors'
 import { canonicalProfileKey, type RatioCandidate, ratioToken } from './profileKey'
@@ -42,7 +43,7 @@ export const createObservationRecorder = (deps: {
   seedCandidates: RatioCandidate[]
 }): ObservationRecorder => {
   const { payload, seedCandidates } = deps
-  const slug = deps.profilesSlug as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+  const slug = asSlug(deps.profilesSlug)
   const buffer = new Map<string, BufferEntry>()
   let timer: ReturnType<typeof setTimeout> | undefined
   let warnedBufferCap = false
@@ -55,7 +56,8 @@ export const createObservationRecorder = (deps: {
     if (dbRatiosLoading || Date.now() - dbRatiosLoadedAt < RATIO_REFRESH_MS) return
     dbRatiosLoading = true
     void payload
-      .find({ collection: slug, limit: 100, depth: 0, overrideAccess: true, select: { ratio: true } })
+      //EXCUSE: the select targets a runtime-configured collection an app's generated types may not know
+      .find({ collection: slug, limit: 100, depth: 0, overrideAccess: true, select: { ratio: true } as never })
       .then((res) => {
         dbRatios = res.docs.flatMap((doc) => {
           const ratio = Number((doc as { ratio?: string }).ratio) //EXCUSE: docs of a runtime-configured collection are untyped; NaN-guarded below
@@ -95,7 +97,7 @@ export const createObservationRecorder = (deps: {
 
     const update = async (): Promise<boolean> => {
       const found = await payload.find({ collection: slug, where: { profileKey: { equals: key } }, limit: 1, depth: 0, overrideAccess: true })
-      const existing = found.docs[0] as RenderProfileDoc | undefined //EXCUSE: docs of a runtime-configured collection are untyped; fields are null-guarded
+      const existing = found.docs[0] as unknown as RenderProfileDoc | undefined //EXCUSE: docs of a runtime-configured collection are untyped; fields are null-guarded
       if (!existing) return false
       await payload.update({
         collection: slug,

@@ -4,7 +4,8 @@
  * hooks, so purging is just a delete by `source` — adapter-agnostic. Used by the source-collection
  * purge hooks (auto) and the purge endpoint (manual).
  */
-import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
+import { asSlug } from '../../lib/asSlug'
 
 /** Delete every generated variant of a source image; returns the count removed. Pass the calling
  *  hook's `req` so the bulk delete joins that operation's transaction. */
@@ -15,7 +16,7 @@ export const purgeVariantsForSource = async (
   req?: PayloadRequest,
 ): Promise<number> => {
   const res = await payload.delete({
-    collection: variantSlug as CollectionSlug, //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+    collection: asSlug(variantSlug),
     where: { source: { equals: sourceId } },
     overrideAccess: true,
     req,

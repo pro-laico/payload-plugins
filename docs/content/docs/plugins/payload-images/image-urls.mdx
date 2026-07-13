@@ -36,7 +36,7 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 
 | Param | Meaning |
 | --- | --- |
-| `w` / `h` | Target width / height in px (at least one required). Snapped to the `dimensionStep` grid (default 50) and clamped to `maxDimension` (default 4096). |
+| `w` / `h` | Target width / height in px (at least one required). Snapped to the `pixelStep` grid (default 50; an array `pixelStep`'s exact widths also pass) and clamped to `maxDimension` (default 4096). |
 | `ar` | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator); derives the missing dimension. |
 | `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
 | `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange` (default 40–95; 75 when omitted). |
@@ -50,7 +50,7 @@ Output never upscales past the source.
 
 <Callout type="info">
   **The endpoint is public and unsigned.** Generation is gated by the bounds above rather than a
-  shared secret. For fully untrusted traffic, lower `dimensionStep` / `maxDimension` /
+  shared secret. For fully untrusted traffic, raise `pixelStep` or lower `maxDimension` /
   `maxInputPixels` and put a rate limiter or CDN in front —
   [Configuration](/docs/plugins/payload-images/configuration) has every knob.
 </Callout>

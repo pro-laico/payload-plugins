@@ -183,6 +183,10 @@ export interface Image {
    * Describe the image for screen readers and SEO.
    */
   alt: string;
+  /**
+   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
+   */
+  variantLimit?: number | null;
   variants?: {
     docs?: (number | GeneratedImage)[];
     hasNextPage?: boolean;
@@ -284,10 +288,6 @@ export interface Image {
         id?: string | null;
       }[]
     | null;
-  /**
-   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
-   */
-  variantLimit?: number | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -576,6 +576,7 @@ export interface PagesSelect<T extends boolean = true> {
  */
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
+  variantLimit?: T;
   variants?: T;
   aspectRatio?: T;
   variantVersion?: T;
@@ -611,7 +612,6 @@ export interface ImagesSelect<T extends boolean = true> {
         format?: T;
         id?: T;
       };
-  variantLimit?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

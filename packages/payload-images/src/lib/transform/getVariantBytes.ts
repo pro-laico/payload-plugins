@@ -4,7 +4,7 @@
  * format) variant is only ever generated once.
  */
 import { after } from 'next/server'
-import type { CollectionSlug } from 'payload'
+import { asSlug } from '../asSlug'
 
 import { variantCacheKey } from './variantKey'
 import { resolveStaticDir } from './staticDir'
@@ -53,7 +53,7 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
 
   try {
     const hit = await payload.find({
-      collection: variantSlug as CollectionSlug, //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+      collection: asSlug(variantSlug),
       where: { cacheKey: { equals: key } },
       limit: 1,
       depth: 0,
@@ -120,7 +120,7 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
     const persist = async (): Promise<void> => {
       try {
         await payload.create({
-          collection: variantSlug as CollectionSlug, //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+          collection: asSlug(variantSlug),
           file: { data: out.data, mimetype: out.mimeType, name: `${key}.${extForFormat(format)}`, size: out.data.byteLength },
           data: {
             source: src.id as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type

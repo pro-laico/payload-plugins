@@ -49,9 +49,13 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
   // collection the plugin merely extends.
   admin: {
     ...(options.extendCollection ? {} : { group: 'Assets' }),
+    enableListViewSelectAPI: true,
     useAsTitle: 'title',
     defaultColumns: ['title', 'muxUploader', 'duration'],
   },
+  // The list thumbnail Cell reads `playbackOptions[0].posterUrl/gifUrl` (+ title), none of which are
+  // columns — force-select them so the Select API keeps the preview alive.
+  forceSelect: { playbackOptions: true, title: true },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
     beforeValidate: [getBeforeValidateHook(mux, options)],

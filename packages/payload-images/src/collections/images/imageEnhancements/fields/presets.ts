@@ -1,26 +1,21 @@
 /**
- * The per-image `presets` (guaranteed, cap-exempt, eagerly generated variants) and `variantLimit`
- * (per-image cap override) fields. `presets` is a hidden array edited by the presetManager admin
- * component; each entry is a config-template reference (`template`) or a custom inline spec.
+ * The per-image `presets` array — guaranteed, cap-exempt, eagerly generated variants. Hidden:
+ * the presetManager admin component IS its UI. Each entry is a config-template reference
+ * (`template`) or a custom inline spec (`name` + dimensions/fit/quality/format).
  */
-import type { Field } from 'payload'
+import type { ArrayField } from 'payload'
 
-import { FITS, FORMATS } from '../../lib/transform/params'
-
-export const PRESETS_FIELD_NAME = 'presets'
-export const VARIANT_LIMIT_FIELD_NAME = 'variantLimit'
+import { FITS, FORMATS } from '../../../../lib/transform/params'
 
 const d = {
   presets:
     'Guaranteed public variants for this image (OG, social, fixed sizes). Always generatable and pre-generated on upload; served via /api/img/:id?preset=<name>. Managed by the Presets panel.',
   template: 'Name of a plugin preset template to apply (leave blank for a custom preset).',
   name: 'Name for a custom preset (used when no template is chosen).',
-  variantLimit:
-    'Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.',
 }
 
-export const presetsField = (): Field => ({
-  name: PRESETS_FIELD_NAME,
+export const presetsField = (): ArrayField => ({
+  name: 'presets',
   type: 'array',
   admin: { hidden: true, description: d.presets },
   fields: [
@@ -48,13 +43,4 @@ export const presetsField = (): Field => ({
       ],
     },
   ],
-})
-
-/** The per-image cap override; `defaultValue` seeds new docs with the project default. */
-export const variantLimitField = (projectDefault?: number): Field => ({
-  name: VARIANT_LIMIT_FIELD_NAME,
-  type: 'number',
-  min: 0,
-  ...(projectDefault != null ? { defaultValue: projectDefault } : {}),
-  admin: { description: d.variantLimit, position: 'sidebar' },
 })

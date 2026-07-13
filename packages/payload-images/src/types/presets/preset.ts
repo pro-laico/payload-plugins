@@ -2,7 +2,8 @@
 import type { AspectRatio } from '../plugin/renderIntent'
 import type { Fit, OutputFormat } from '../transform/format'
 
-/** The concrete shape of a preset variant. Partial — omitted axes take the endpoint defaults. */
+/** The concrete shape of a preset variant — reusable via config `presetTemplates` (toggled onto
+ *  images by name) or inline on an image. Partial — omitted axes take the endpoint defaults. */
 export interface PresetSpec {
   width?: number
   height?: number
@@ -11,9 +12,6 @@ export interface PresetSpec {
   quality?: number
   format?: OutputFormat
 }
-
-/** A reusable preset defined once in plugin config and toggled onto images by name. */
-export type PresetTemplate = PresetSpec
 
 /** One entry on an image's `presets` array: a template reference (`template` set) OR a custom
  *  inline preset (`name` + spec). Resolved by {@link resolvePreset}. */

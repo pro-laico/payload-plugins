@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { buildSrcset, buildVariantUrl, deriveVersion, getImageUrl, stepWidths } from '../../../src/lib/urls/index'
+// buildVariantUrl / deriveVersion / stepWidths are internal helpers behind the two published
+// builders — tested here directly from their modules.
+import { buildSrcset, getImageUrl } from '../../../src/lib/urls/index'
+import { buildVariantUrl } from '../../../src/lib/urls/variantUrl'
+import { deriveVersion } from '../../../src/lib/urls/version'
+import { stepWidths } from '../../../src/lib/urls/srcset'
 
 describe('buildVariantUrl', () => {
   it('bakes settings into a same-origin query URL', () => {
@@ -57,7 +62,7 @@ describe('stepWidths', () => {
   it('falls back to stepping up to maxWidth when no source width is given', () => {
     const w = stepWidths(undefined, 50, 200)
     expect(w[w.length - 1]).toBe(200)
-    expect(w.every((x) => x % 50 === 0)).toBe(true)
+    expect(w.every((x: number) => x % 50 === 0)).toBe(true)
   })
 
   describe('explicit width ladder (array pixelStep)', () => {
@@ -107,14 +112,24 @@ describe('getImageUrl', () => {
 })
 
 describe('buildSrcset', () => {
-  it('builds a srcset capped at the source width with a default src', () => {
-    const { srcset, src } = buildSrcset('abc', { aspectRatio: '1:1', sourceWidth: 100, pixelStep: 50 })
-    expect(srcset).toBe('/api/img/abc?w=50&h=50&fit=cover&q=75&fmt=auto 50w, /api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto 100w')
-    expect(src).toBe('/api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto')
+  it('returns null for an empty resource', () => {
+    expect(buildSrcset(null)).toBeNull()
+    expect(buildSrcset(undefined)).toBeNull()
   })
-  it('threads a custom endpoint path into every generated URL', () => {
-    const { srcset, src } = buildSrcset('abc', { sourceWidth: 100, pixelStep: 50, path: '/api/image' })
-    expect(src.startsWith('/api/image/abc?')).toBe(true)
-    for (const entry of srcset.split(', ')) expect(entry.startsWith('/api/image/abc?')).toBe(true)
+  it('builds a srcset from a populated doc, capped at its intrinsic width, with a default src', () => {
+    const result = buildSrcset({ id: 'abc', width: 100 }, { aspectRatio: '1:1', pixelStep: 50 })
+    expect(result?.srcset).toBe('/api/img/abc?w=50&h=50&fit=cover&q=75&fmt=auto 50w, /api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto 100w')
+    expect(result?.src).toBe('/api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto')
+  })
+  it('auto-derives the version token from a populated doc and appends it to every URL', () => {
+    const v = deriveVersion({ filename: 'a.png', focalX: 50, focalY: 50 })
+    const result = buildSrcset({ id: 'abc', width: 100, filename: 'a.png', focalX: 50, focalY: 50 }, { pixelStep: 50 })
+    for (const entry of (result?.srcset ?? '').split(', ')) expect(entry).toContain(`v=${v}`)
+    expect(result?.src).toContain(`v=${v}`)
+  })
+  it('accepts a bare id (no width cap, no version) and threads a custom endpoint path into every URL', () => {
+    const result = buildSrcset('abc', { pixelStep: 50, maxWidth: 100, path: '/api/image' })
+    expect(result?.src.startsWith('/api/image/abc?')).toBe(true)
+    for (const entry of (result?.srcset ?? '').split(', ')) expect(entry.startsWith('/api/image/abc?')).toBe(true)
   })
 })

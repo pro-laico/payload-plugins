@@ -4,7 +4,7 @@
  * A template entry (`{ template }`) resolves against the plugin's config templates so a config
  * edit propagates to every image; a custom entry (`{ name, ...spec }`) carries its own spec.
  */
-import type { PresetEntry, PresetSpec, PresetTemplate, QuerySource } from '../../types'
+import type { PresetEntry, PresetSpec, QuerySource } from '../../types'
 
 /** The public name of an entry — the template it references, else its custom name. */
 export const presetEntryName = (entry: PresetEntry): string | undefined => entry.template || entry.name || undefined
@@ -21,7 +21,7 @@ const inlineSpec = (entry: PresetEntry): PresetSpec => ({
 /** The spec for `name` among an image's entries, or null when no active preset matches. */
 export const resolvePreset = (
   entries: PresetEntry[] | null | undefined,
-  templates: Record<string, PresetTemplate> | undefined,
+  templates: Record<string, PresetSpec> | undefined,
   name: string,
 ): PresetSpec | null => {
   if (!name || !Array.isArray(entries)) return null

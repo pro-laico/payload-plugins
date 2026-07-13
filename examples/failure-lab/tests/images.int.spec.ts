@@ -84,12 +84,6 @@ describe('boot-time config guards (thrown from buildConfig)', () => {
     expect(e.message).toContain("[payload-images] extendCollection: collection 'posts' is not an upload collection")
     record('extendCollection → non-upload collection', e.message)
   })
-
-  it('transform.sourceSlug pointing at an unknown collection throws a named error', async () => {
-    const e = await expectBootError([imagesPlugin({ transform: { sourceSlug: 'typo' } })])
-    expect(e.message).toContain("[payload-images] transform.sourceSlug: collection 'typo' not found")
-    record('transform.sourceSlug → unknown collection', e.message)
-  })
 })
 
 describe('boot-time warnings (logged, not thrown)', () => {

@@ -109,12 +109,29 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(byName(forced.fields, 'src')).toBeTruthy()
   })
 
-  it('validates transform.sourceSlug like extendCollection (existence + upload)', () => {
-    const pages: CollectionConfig = { slug: 'pages', fields: [] }
-    expect(() => run({ transform: { sourceSlug: 'nope' } })).toThrow(/not found/)
-    expect(() => run({ transform: { sourceSlug: 'pages' } }, [pages])).toThrow(/not an upload/)
-    const media: CollectionConfig = { slug: 'media', upload: true, fields: [] }
-    expect(slugs(run({ transform: { sourceSlug: 'media' } }, [media]))).toContain('images') // registration unchanged
+  it('folds an array pixelStep into the snap width ladder (sanitized) instead of the grid', () => {
+    const marker = (out: Config) =>
+      (out.custom as { payloadImages?: { prewarm?: { constraints?: { dimensionStep?: number; widthLadder?: number[] } } } }).payloadImages
+    const ladder = marker(run({ prewarm: true, pixelStep: [750, 220, 220, -5, 9999] }))
+    expect(ladder?.prewarm?.constraints?.widthLadder).toEqual([220, 750]) // sorted, deduped, bounds-checked
+    expect(ladder?.prewarm?.constraints?.dimensionStep).toBe(50) // the grid stays at the default
+    const grid = marker(run({ prewarm: true, pixelStep: 100 }))
+    expect(grid?.prewarm?.constraints?.dimensionStep).toBe(100)
+    expect(grid?.prewarm?.constraints?.widthLadder).toBeUndefined()
+  })
+
+  it('focalUI accepts an object form carrying the preview ratios', () => {
+    const focalPreviewOf = (c: Config) => {
+      const images = (c.collections ?? []).find((col) => col.slug === 'images') as CollectionConfig
+      return byName(images.fields, 'focalPreview') as
+        | { admin?: { components?: { Field?: { clientProps?: { previewRatios?: string[] } } } } }
+        | undefined
+    }
+    expect(focalPreviewOf(run({ focalUI: { previewRatios: ['21:9'] } }))?.admin?.components?.Field?.clientProps?.previewRatios).toEqual([
+      '21:9',
+    ])
+    const images = (run({ focalUI: false }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect(byName(images.fields, 'focalPreview')).toBeUndefined()
   })
 })
 

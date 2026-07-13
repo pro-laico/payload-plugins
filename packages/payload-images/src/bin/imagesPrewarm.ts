@@ -8,7 +8,8 @@
  *   payload images:prewarm --limit 200          # cap sources processed this run
  *   payload images:prewarm --queue prewarm      # enqueue onto a specific queue
  */
-import { type CollectionSlug, getPayload, type SanitizedConfig } from 'payload'
+import { getPayload, type SanitizedConfig } from 'payload'
+import { asSlug } from '../lib/asSlug'
 
 import { readPluginMarker } from '../lib/pluginMarker'
 import { enqueuePrewarmJob } from '../lib/prewarm/enqueue'
@@ -28,7 +29,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     process.exit(1)
     return
   }
-  const slug = (flag('--collection') ?? marker.sourceSlug ?? 'images') as CollectionSlug //EXCUSE: runtime-chosen slug can't satisfy the consuming app's generated CollectionSlug union
+  const slug = asSlug(flag('--collection') ?? marker.sourceSlug ?? 'images')
   const queue = flag('--queue') ?? prewarm.queue
   const max = Number(flag('--limit')) || Number.POSITIVE_INFINITY
 

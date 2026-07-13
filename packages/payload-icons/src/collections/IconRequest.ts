@@ -30,6 +30,7 @@ export const createIconRequestCollection = (opts: IconRequestCollectionOverrides
     custom: { revalidate: false },
     admin: {
       group,
+      enableListViewSelectAPI: true,
       useAsTitle: 'name',
       defaultColumns: ['name', 'count', 'lastRequestedAt'],
       // Hidden from the sidebar nav — it's a diagnostic feed surfaced through the

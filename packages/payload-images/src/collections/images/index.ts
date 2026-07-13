@@ -1,9 +1,9 @@
-import type { CollectionConfig, GetAdminThumbnail } from 'payload'
+import type { CollectionConfig } from 'payload'
 
-import { anyone, authd } from '../access'
-import { IMAGE_MIME_TYPES } from '../lib/transform/params'
-import { imageEnhancements } from './imageEnhancements'
-import type { CreateImagesOptions } from '../types'
+import { anyone, authd } from '../../access'
+import { IMAGE_MIME_TYPES } from '../../lib/transform/params'
+import { imageEnhancements, resolveAdminThumbnail } from './imageEnhancements'
+import type { CreateImagesOptions } from '../../types'
 
 const d = { alt: 'Describe the image for screen readers and SEO.' }
 
@@ -16,7 +16,7 @@ const d = { alt: 'Describe the image for screen readers and SEO.' }
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
   const { localizeAlt = false, folders, maxOriginalSize } = opts
   const enh = imageEnhancements(opts)
-  const adminThumbnail = (enh.upload as { adminThumbnail?: GetAdminThumbnail }).adminThumbnail //EXCUSE: narrows Payload's upload union to the object shape imageEnhancements just built
+  const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
   return {
     slug: 'images',

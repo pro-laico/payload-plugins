@@ -1,4 +1,5 @@
-import type { CollectionConfig, CollectionSlug } from 'payload'
+import type { CollectionConfig } from 'payload'
+import { asSlug } from '../lib/asSlug'
 
 import { authd } from '../access'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
@@ -15,13 +16,19 @@ export const GENERATED_IMAGES_SLUG = 'generated-images'
  */
 export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptions = {}): CollectionConfig => {
   const slug = opts.slug || GENERATED_IMAGES_SLUG
-  const sourceSlug = (opts.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+  const sourceSlug = asSlug(opts.sourceSlug || 'images')
 
   return {
     slug,
     access: { create: authd, delete: authd, read: authd, update: authd },
     custom: { revalidate: false },
-    admin: { hidden: true, group: 'Assets', useAsTitle: 'cacheKey', defaultColumns: ['cacheKey', 'width', 'height', 'format'] },
+    admin: {
+      hidden: true,
+      group: 'Assets',
+      enableListViewSelectAPI: true,
+      useAsTitle: 'cacheKey',
+      defaultColumns: ['cacheKey', 'width', 'height', 'format'],
+    },
     fields: [
       { name: 'source', type: 'relationship', relationTo: sourceSlug, required: true, index: true },
       { name: 'cacheKey', type: 'text', required: true, unique: true },

@@ -14,7 +14,8 @@
  * `<ResponsiveImage>`. Local API defaults apply (access is not scoped); reads that need their own
  * access/caching keep writing the same `findByID` themselves and wrap it however they like.
  */
-import type { CollectionSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
+import { asSlug } from './asSlug'
 
 import { readPluginMarker } from './pluginMarker'
 import { RESPONSIVE_IMAGE_SELECT } from './renderIntent'
@@ -52,7 +53,7 @@ export const createImageFor = (payload: Payload | Promise<Payload>): ImageFor =>
       const id = sourceId(state.source)
       if (id == null) return null
       const p = await payload
-      const collection = (readPluginMarker(p.config).sourceSlug ?? 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
+      const collection = asSlug(readPluginMarker(p.config).sourceSlug ?? 'images')
       // Typed by the contract, widened to payload's indexed RequestContext at the call.
       const context: Record<string, unknown> = {
         ...(state.image ? { image: state.image } : {}),

@@ -32,9 +32,10 @@ The endpoint is public-facing, so it's bounded on several fronts:
 - **Access control.** Source reads run with the collection's access rules. A source you can't
   read returns `404`; a non-public source is served `private` with no shared CDN caching. The
   purge endpoint requires a logged-in user who can read that source.
-- **Bounded variant space (DoS).** Requested dimensions snap to the `dimensionStep` grid and
-  quality buckets to a small set, both clamped to `maxDimension`, so a caller can't spin up
-  unbounded variants with `w=1,2,3,…`. Output never upscales past the source.
+- **Bounded variant space (DoS).** Requested dimensions snap to the `pixelStep` grid (or, for an
+  array `pixelStep`, to the grid + the ladder's exact widths) and quality buckets to a small set,
+  both clamped to `maxDimension`, so a caller can't spin up unbounded variants with `w=1,2,3,…`.
+  Output never upscales past the source.
 - **Per-image variant cap.** Each image stores at most `variantLimit` cached variants (default
   **200**, a per-image field). Past the cap a new freeform size is served — from a nearby existing
   variant, or generated correctly but **not stored** — so a public URL can never accumulate

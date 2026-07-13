@@ -102,6 +102,16 @@ describe('parseTransformParams', () => {
     expect(r.ok && r.params.h).toBe(750) // 730 → nearest 50
   })
 
+  it('lets a width-ladder rung win over the grid when it is closer (array pixelStep passes unchanged)', () => {
+    const L = { ...C, widthLadder: [220, 470, 730] }
+    const exact = parseTransformParams({ w: '730' }, L)
+    expect(exact.ok && exact.params.w).toBe(730) // a ladder width passes the snap exactly (grid would give 750)
+    const near = parseTransformParams({ w: '468' }, L)
+    expect(near.ok && near.params.w).toBe(470) // 2 from the rung beats 18 from grid 450
+    const far = parseTransformParams({ w: '600' }, L)
+    expect(far.ok && far.params.w).toBe(600) // on-grid and far from every rung → grid wins
+  })
+
   it('honors exact dimensions when snapping is disabled (dimensionStep <= 1)', () => {
     const r = parseTransformParams({ w: '730', h: '411' }, { ...C, dimensionStep: 1 })
     expect(r.ok && r.params.w).toBe(730)

@@ -1,7 +1,7 @@
 /** The plugin's top-level options object. */
 import type { CollectionConfig } from 'payload'
 
-import type { PresetTemplate } from '../presets/preset'
+import type { PresetSpec } from '../presets/preset'
 import type { PrewarmOptions } from '../prewarm/options'
 import type { TransformEndpointConfig } from '../transform/transformEndpoint'
 
@@ -29,16 +29,15 @@ export interface ImagesPluginOptions {
   /**
    * The project-wide srcset widths. A **number** (default 50) is the width increment AND the
    * endpoint's anti-DoS snap grid; an **array** is an explicit non-linear width ladder for the
-   * srcset (use multiples of 50, or set `transform.dimensionStep`, so ladder widths pass the
-   * snap unchanged). `transform.maxDimension` caps either form.
+   * srcset — its widths always pass the endpoint's snap unchanged. `transform.maxDimension`
+   * caps either form.
    */
   pixelStep?: number | number[]
   /** On-demand transform endpoint config. Pass `false` to not register the endpoints. */
   transform?: TransformEndpointConfig | false
-  /** Render the focal + ratio-preview field and purge-variants button. Default true. */
-  focalUI?: boolean
-  /** Aspect ratios shown in the focal preview tiles. */
-  previewRatios?: string[]
+  /** Render the focal + ratio-preview field and purge-variants button. Default true. Pass an
+   *  object to customize the aspect ratios shown in the preview tiles. */
+  focalUI?: boolean | { previewRatios?: string[] }
   /**
    * Add virtual `src` / `srcset` / `placeholderURL` / `thumbnailURL` fields, computed on read,
    * so optimized URLs ride along in every response and through relationship population.
@@ -76,5 +75,5 @@ export interface ImagesPluginOptions {
    * toggle onto images by name and serve via `/api/img/:id?preset=<name>`. A default `og`
    * (1200×630) ships unless overridden.
    */
-  presetTemplates?: Record<string, PresetTemplate>
+  presetTemplates?: Record<string, PresetSpec>
 }

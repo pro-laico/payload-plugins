@@ -6,7 +6,8 @@
  * `/img` is safe as long as no collection is named `img` (the plugin warns at boot).
  */
 import { after } from 'next/server'
-import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
+import type { Endpoint, PayloadRequest } from 'payload'
+import { asSlug } from '../../lib/asSlug'
 
 import { routeId } from '../routeId'
 import { getServerSideURL } from '../../lib/getServerSideURL'
@@ -17,13 +18,12 @@ import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
 import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
 import { countVariantsForSource } from '../../lib/transform/variantCount'
-import { DEFAULT_VARIANT_LIMIT } from '../../lib/presets/defaults'
 import { presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { resolveStaticDir } from '../../lib/transform/staticDir'
 import { readBytes } from '../../lib/transform/source'
 import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
 import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
-import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointConfig } from '../../types'
+import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
 
 import { createSingleFlight } from './coalesce'
 import { buildFallbackHeaders, buildHeaders, toBody } from './response'
@@ -39,9 +39,9 @@ export interface PrewarmObserveConfig {
 }
 
 /** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
-export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewarmObserve?: PrewarmObserveConfig): Endpoint => {
-  const sourceSlug = (cfg.sourceSlug || 'images') as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
-  const variantSlug = (cfg.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //EXCUSE: same as sourceSlug above
+export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObserve?: PrewarmObserveConfig): Endpoint => {
+  const sourceSlug = asSlug(cfg.sourceSlug || 'images')
+  const variantSlug = asSlug(cfg.variantSlug || GENERATED_IMAGES_SLUG)
   const cdn = cfg.cdnCacheControl !== false
   const fallback = cfg.fallback !== false
   const constraints = resolveConstraints(cfg)
@@ -163,7 +163,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
       if (!result && !standIn) {
         // Per-image variant cap: past the limit, generate the (correct) variant but DON'T persist —
         // bounds stored variants without breaking the image. Presets are exempt (guaranteed set).
-        const limit = src.variantLimit ?? cfg.variantLimit ?? DEFAULT_VARIANT_LIMIT
+        const limit = src.variantLimit ?? cfg.variantLimit
         const overCap = !isPreset && limit >= 0 && (await countVariantsForSource(payload, variantSlug, src.id)) >= limit
         result = await generateVariantBytes(overCap ? { ...engineArgs, deferPersist: 'never' } : engineArgs)
       }

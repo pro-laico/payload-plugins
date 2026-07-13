@@ -6,6 +6,7 @@
  * redoes what's still missing.
  */
 import type { CollectionSlug, Payload } from 'payload'
+import { asSlug } from '../asSlug'
 
 import { getServerSideURL } from '../getServerSideURL'
 import { getOrCreateVariantBytes } from '../transform/getVariantBytes'
@@ -58,9 +59,9 @@ const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, 
 }
 
 export const prewarmSource = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmSourceResult> => {
-  const sourceSlug = deps.sourceSlug as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
-  const variantSlug = deps.variantSlug as CollectionSlug //EXCUSE: same as sourceSlug above
-  const profilesSlug = deps.profilesSlug as CollectionSlug //EXCUSE: same as sourceSlug above
+  const sourceSlug = asSlug(deps.sourceSlug)
+  const variantSlug = asSlug(deps.variantSlug)
+  const profilesSlug = asSlug(deps.profilesSlug)
 
   const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, overrideAccess: true, disableErrors: true })
   const source = (raw ?? null) as SourceRow | null //EXCUSE: a doc of a runtime-configured collection is untyped; fields are null-guarded

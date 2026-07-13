@@ -1,6 +1,7 @@
 import { DEFAULT_PIXEL_STEP } from '../transform/params'
+import { deriveVersion } from './version'
 import { buildVariantUrl } from './variantUrl'
-import type { BuildSrcsetOptions, BuildSrcsetResult } from '../../types'
+import type { BuildSrcsetOptions, BuildSrcsetResult, ImageResource } from '../../types'
 
 /**
  * The widths for a srcset. A numeric `pixelStep` yields every multiple up to the source's
@@ -34,11 +35,20 @@ export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = 
   return widths
 }
 
-/** Build a responsive `srcset` (widths up to the source width) + a default `src`. */
-export const buildSrcset = (id: string, o: BuildSrcsetOptions = {}): BuildSrcsetResult => {
-  const widths = stepWidths(o.sourceWidth, o.pixelStep, o.maxWidth)
-  const srcset = widths.map((w) => `${buildVariantUrl(id, w, o)} ${w}w`).join(', ')
+/**
+ * A responsive `srcset` (widths up to the source's intrinsic width) + a default `src`, from an id
+ * OR a populated doc — a doc also supplies the width cap and the cache-busting version token, so
+ * `buildSrcset(doc, { aspectRatio: '16:9' })` is the whole call.
+ */
+export const buildSrcset = (resource: ImageResource, o: BuildSrcsetOptions = {}): BuildSrcsetResult | null => {
+  if (resource == null) return null
+  const doc = typeof resource === 'object' ? resource : undefined
+  const id = doc ? (doc.id == null ? '' : String(doc.id)) : String(resource)
+  if (!id) return null
+  const opts = { ...o, version: o.version ?? deriveVersion(doc) }
+  const widths = stepWidths(doc?.width ?? undefined, o.pixelStep, o.maxWidth)
+  const srcset = widths.map((w) => `${buildVariantUrl(id, w, opts)} ${w}w`).join(', ')
   const top = widths[widths.length - 1] ?? o.maxWidth ?? 4096
-  const src = buildVariantUrl(id, o.defaultWidth ?? Math.min(top, 1280), o)
+  const src = buildVariantUrl(id, o.defaultWidth ?? Math.min(top, 1280), opts)
   return { srcset, src }
 }

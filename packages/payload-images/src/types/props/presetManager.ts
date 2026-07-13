@@ -1,5 +1,7 @@
-/** Props for the presetManager admin field component (template names come from plugin config). */
+import type { PresetSpec } from '../presets/preset'
+
+/** Props for the presetManager admin field component (templates come from plugin config). */
 export interface PresetManagerProps {
-  /** Names of the plugin's preset templates, shown as toggle chips. */
-  templates?: string[]
+  /** The plugin's preset templates (name → spec), shown as toggle chips with their settings. */
+  templates?: Record<string, PresetSpec>
 }

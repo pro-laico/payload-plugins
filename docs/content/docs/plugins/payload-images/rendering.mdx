@@ -237,8 +237,9 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 For *common* sizes you don't even need it: every doc read already carries virtual URL fields
 (`image.src`, `image.srcset`, `image.placeholderURL`, `image.thumbnailURL` — see
 [Image URLs](/docs/plugins/payload-images/image-urls#the-virtual-url-fields)). Reach for `getImageUrl` only
-for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `buildSrcset` /
-`buildVariantUrl` exist for a fully hand-rolled `<img>` / `<picture>`.
+for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `buildSrcset`
+exists for a fully hand-rolled `<img>` / `<picture>` — pass it the populated doc and it derives
+the width cap and cache-busting token itself.
 
 ## Next
 

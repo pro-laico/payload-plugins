@@ -41,7 +41,7 @@ export const createFontOriginalCollection = ({ slug = FONT_ORIGINAL_SLUG }: { sl
   // Derived archive written by the Font save hook — opt out of @pro-laico/payload-revalidate's
   // auto-attached hooks (nothing on the frontend reads it, and derived writes would only add noise).
   custom: { revalidate: false },
-  admin: { group: 'Assets', hidden: true, useAsTitle: 'filename' },
+  admin: { group: 'Assets', hidden: true, enableListViewSelectAPI: true, useAsTitle: 'filename' },
   upload: { mimeTypes: FONT_MIME_TYPES },
   fields: [],
 })

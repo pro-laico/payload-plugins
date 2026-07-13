@@ -1,12 +1,8 @@
 /** Public config for the on-demand transform endpoint. */
-import type { PresetTemplate } from '../presets/preset'
+import type { PresetSpec } from '../presets/preset'
 import type { TransformConstraints } from './transformConstraints'
 
-export interface TransformEndpointConfig extends Partial<TransformConstraints> {
-  /** Source image collection slug. Default `images`. */
-  sourceSlug?: string
-  /** Generated-images collection slug. Default `generated-images`. */
-  variantSlug?: string
+export interface TransformEndpointConfig extends Partial<Omit<TransformConstraints, 'dimensionStep' | 'widthLadder'>> {
   /** Also emit `CDN-Cache-Control` / `Vercel-CDN-Cache-Control` (edge caching). Default true. */
   cdnCacheControl?: boolean
   /** Max concurrent Sharp transforms in this process (default `cpus - 1`, or `IMAGES_TRANSFORM_CONCURRENCY`). */
@@ -17,11 +13,15 @@ export interface TransformEndpointConfig extends Partial<TransformConstraints> {
    *  format), serve it immediately with `Cache-Control: no-store` while the exact variant
    *  generates in the background — the next request gets the exact one. Default true. */
   fallback?: boolean
-  /** Per-image cap on cached variants (an image's own `variantLimit` field overrides it). Past the
-   *  cap, a new freeform size is served from a nearby existing variant instead of generated + stored,
-   *  bounding storage. Presets are exempt. Default 200. */
-  variantLimit?: number
-  /** Named preset templates, referenced by name from each image's `presets`. A default `og`
-   *  (1200×630) ships unless overridden. */
-  presetTemplates?: Record<string, PresetTemplate>
+}
+
+/** Internal: the endpoint factory's full wiring — the public config plus everything the plugin
+ *  resolves itself (slugs, the cap, the merged templates, and the pixelStep-derived snapping). */
+export interface TransformEndpointArgs extends TransformEndpointConfig {
+  sourceSlug: string
+  variantSlug: string
+  variantLimit: number
+  presetTemplates: Record<string, PresetSpec>
+  dimensionStep?: number
+  widthLadder?: number[]
 }
