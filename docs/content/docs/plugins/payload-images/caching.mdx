@@ -35,6 +35,11 @@ The endpoint is public-facing, so it's bounded on several fronts:
 - **Bounded variant space (DoS).** Requested dimensions snap to the `dimensionStep` grid and
   quality buckets to a small set, both clamped to `maxDimension`, so a caller can't spin up
   unbounded variants with `w=1,2,3,…`. Output never upscales past the source.
+- **Per-image variant cap.** Each image stores at most `variantLimit` cached variants (default
+  **200**, a per-image field). Past the cap a new freeform size is served — from a nearby existing
+  variant, or generated correctly but **not stored** — so a public URL can never accumulate
+  unbounded files/rows on your storage. [Presets](#guaranteed-presets) are exempt. See the
+  [cap details](#the-variant-cap) below.
 - **Bounded work.** `maxInputPixels` caps how many pixels Sharp decodes (a decompression-bomb +
   memory guard), and a concurrency gate keeps a cold page that requests many sizes from
   saturating CPU.
@@ -61,6 +66,74 @@ every subsequent request serves the exact bytes with the normal immutable header
   reload). Because the stand-in was never cached, that next request is guaranteed to hit the exact
   variant.
 </Callout>
+
+## The variant cap
+
+The transform endpoint is public: any URL that hits it generates and **stores** a variant. Left
+unbounded, an attacker enumerating `?w=…&q=…&fmt=…` could accumulate huge numbers of files and DB
+rows on your storage. The cap fixes that at the door.
+
+Each image carries a `variantLimit` (default **200**, editable per image, project default via
+`imagesPlugin({ variantLimit })`). When a **freeform** cache miss would exceed the limit, the
+endpoint serves the request without adding storage:
+
+- if a [nearby variant](#nearby-quality-fallback) exists, that stand-in is served (`no-store`);
+- otherwise the exact size is generated and served correctly, but **not persisted** (so it stays
+  cacheable by a CDN, just not stored server-side).
+
+Either way the stored-variant count stops growing. A real image rarely approaches 200 (a handful
+of ratios × the srcset ladder × formats); raise a specific image's `variantLimit` in the admin if
+it's genuinely heavily art-directed, and put a CDN in front so repeat traffic never re-generates.
+
+<Callout type="info">
+  The cap bounds **storage** — the permanent cost. A concurrency gate bounds CPU (a burst past the
+  gate sheds with `503`), and [presets](#guaranteed-presets) guarantee your fixed public variants
+  regardless of the cap.
+</Callout>
+
+## Guaranteed presets
+
+Some variants must **always exist and always be servable** — an OG image a crawler hits cold, a
+fixed social card — independent of the cap or on-demand timing. Presets are those: named,
+cap-exempt, and eagerly pre-generated on upload.
+
+Define reusable **templates** in config (a default `og` at 1200×630 ships out of the box):
+
+```ts
+imagesPlugin({
+  presetTemplates: {
+    og:   { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
+    card: { width: 600, aspectRatio: '4:3', fit: 'cover' },
+  },
+})
+```
+
+Editors toggle templates onto an image (or add a custom one) in the **Presets** panel; the same
+data seeds as plain records:
+
+```ts
+defineSeed('images', ({ file }) => [
+  {
+    _key: 'hero',
+    _file: file('hero.jpg'),
+    alt: 'Hero',
+    presets: [{ template: 'og' }, { name: 'wide', width: 1920, aspectRatio: '21:9', quality: 70 }],
+  },
+])
+```
+
+Serve one by name — the URL is short and self-documenting, and (being a finite set) needs no cap:
+
+```tsx
+import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
+
+const ogUrl = getImageUrl(page.heroImage, { preset: 'og' }) // → /api/img/<id>?preset=og
+```
+
+Presets honor **exact** dimensions (no snap grid), so an `og` really is 1200×630. They're
+generated the moment an image is created, its file replaced, or its focal point moved — so the
+version a crawler needs is already there. A template is referenced by name (edit the config and
+every image using it updates); a custom preset carries its own inline spec.
 
 ## Smart prewarm
 

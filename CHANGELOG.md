@@ -9,6 +9,17 @@ packages share one lockstep version.
 
 ### Added
 
+- `@pro-laico/payload-images` — per-image variant cap + guaranteed presets, closing the public
+  endpoint's unbounded-storage vector. Each image has a `variantLimit` (default 200, project
+  default via `imagesPlugin({ variantLimit })`): past the cap a new freeform size is served from
+  a nearby existing variant, or generated correctly but not stored, so a public URL can't
+  accumulate unbounded files/rows. **Presets** are the exemption — named, cap-exempt variants
+  (`imagesPlugin({ presetTemplates })`, a default `og` 1200×630 ships) that editors toggle onto
+  images by name (or add custom ones) in a new admin panel, seed as plain data, and serve via
+  `/api/img/:id?preset=<name>` (or `getImageUrl(doc, { preset: 'og' })`). Presets honor exact
+  dimensions (no snap grid) and are eagerly pre-generated on upload / file / focal change, so a
+  cold social crawler never races generation. New `./admin/presetManager` export.
+
 - `@pro-laico/payload-images` — nearby-quality fallback (default on): a transform cache miss
   with a same-geometry variant already generated (same fit + aspect ratio — identical crop —
   any quality/width/format) serves those bytes instantly instead of blocking on Sharp, while

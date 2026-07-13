@@ -15,6 +15,7 @@ import { resolveConstraints } from './endpoints/transform/config'
 import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 import { createRenderProfilesCollection } from './collections/renderProfiles'
 import { resolvePrewarmOptions } from './lib/prewarm/resolveOptions'
+import { DEFAULT_VARIANT_LIMIT, resolvePresetTemplates } from './lib/presets/defaults'
 import { type RatioCandidate, ratioToken } from './lib/prewarm/profileKey'
 import { createPrewarmTask } from './jobs/prewarmTask'
 import type { ImagesPluginOptions, TransformEndpointConfig } from './types'
@@ -77,6 +78,13 @@ export const imagesPlugin =
     // transform.dimensionStep wins over the pixelStep-derived default) so prewarm's replayed
     // params — and therefore its cache keys — match organic traffic byte for byte.
     const constraints = resolveConstraints({ dimensionStep: Array.isArray(pixelStep) ? DEFAULT_PIXEL_STEP : pixelStep, ...transformCfg })
+    // Presets: default `og` merged under any user templates; the cap + eager-gen hook + endpoint all share these.
+    const presetTemplates = resolvePresetTemplates(opts.presetTemplates)
+    const variantLimit = opts.variantLimit ?? transformCfg.variantLimit ?? DEFAULT_VARIANT_LIMIT
+    const presetGen: import('./hooks/collection/generatePresets').GeneratePresetsOptions | false = endpointsEnabled
+      ? { sourceSlug, variantSlug, templates: presetTemplates, constraints }
+      : false
+    const imageOpts = { presetTemplates, variantLimit, presetGen }
     const prewarm = resolvePrewarmOptions(opts)
     const prewarmDeps = prewarm
       ? {
@@ -120,6 +128,7 @@ export const imagesPlugin =
         endpointsEnabled,
         adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
         prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
+        ...imageOpts,
       })
       // Re-merge the target's own populate/select on top so the enhancements never clobber them.
       const parity: Partial<CollectionConfig> = {
@@ -155,6 +164,7 @@ export const imagesPlugin =
           endpointsEnabled,
           adminThumbnail: endpointsEnabled ? undefined : false,
           prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
+          ...imageOpts,
         }),
         imagesOverrides,
       )
@@ -181,6 +191,8 @@ export const imagesPlugin =
                 ...transformCfg,
                 variantSlug,
                 sourceSlug,
+                variantLimit,
+                presetTemplates,
               },
               prewarmObserve,
             ),

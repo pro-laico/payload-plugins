@@ -7,6 +7,10 @@ export { IMAGE_RENDER_PROFILES_SLUG } from './collections/renderProfiles'
 export { PREWARM_TASK_SLUG } from './lib/prewarm/resolveOptions'
 export type { PrewarmOptions, PrewarmReason, RenderProfileSeed } from './types'
 
+// Guaranteed presets + the per-image variant cap.
+export { DEFAULT_PRESET_TEMPLATES, DEFAULT_VARIANT_LIMIT } from './lib/presets/defaults'
+export type { PresetEntry, PresetSpec, PresetTemplate } from './types'
+
 // The read-side render contract: declare the render on the fetch (`context: { image, blur }`),
 // select RESPONSIVE_IMAGE_SELECT, hand the doc's fields to <ResponsiveImage>.
 export { RESPONSIVE_IMAGE_SELECT } from './lib/renderIntent'

@@ -28,7 +28,7 @@ const fakePayload = () => {
   return { payload, create, wasPersisted: () => createResolved }
 }
 
-const args = (payload: Payload, deferPersist?: boolean) => ({
+const args = (payload: Payload, deferPersist?: boolean | 'never') => ({
   payload,
   source: { id: 'img1', filename: 'a.jpg' },
   params: { w: 640, h: 360, fit: 'cover' as const, q: 75, fmt: 'auto' as const },
@@ -57,5 +57,14 @@ describe('getOrCreateVariantBytes persist modes', () => {
     expect(wasPersisted()).toBe(false) // …but the bytes did not wait for it
     await new Promise((r) => setTimeout(r, 15))
     expect(wasPersisted()).toBe(true)
+  })
+
+  it("deferPersist: 'never' serves the bytes but never persists (the at-cap path)", async () => {
+    const { payload, create } = fakePayload()
+    const res = await getOrCreateVariantBytes(args(payload, 'never'))
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.data.toString()).toBe('variant')
+    await new Promise((r) => setTimeout(r, 15))
+    expect(create).not.toHaveBeenCalled()
   })
 })

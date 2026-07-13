@@ -142,9 +142,12 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
         }
       }
     }
-    // A request context defers the row write until after the response flushes; a job/CLI context
-    // has no after() and must not fire-and-forget (the process may exit mid-persist).
-    if (args.deferPersist === false) {
+    // 'never' → serve the bytes but add no storage (the at-cap path). A request context otherwise
+    // defers the row write until after the response flushes; a job/CLI context has no after() and
+    // must not fire-and-forget (the process may exit mid-persist), so it awaits inline.
+    if (args.deferPersist === 'never') {
+      // no persist
+    } else if (args.deferPersist === false) {
       await persist()
     } else {
       try {

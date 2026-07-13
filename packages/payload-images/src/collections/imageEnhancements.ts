@@ -4,6 +4,7 @@ import { RESPONSIVE_IMAGE_SELECT } from '../lib/renderIntent'
 import { GENERATED_IMAGES_SLUG } from './generatedImages'
 import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
 import { hotspotFields } from '../fields/hotspot'
+import { presetsField, variantLimitField } from '../fields/presets'
 import { VIRTUAL_URL_INPUTS, virtualUrlFields } from '../fields/virtualUrls'
 import { generateImageMetadataBeforeChange } from '../hooks/collection/generateImageMetadata'
 import { blurhashStorageFields, placeholderField } from '../fields/placeholder'
@@ -11,11 +12,14 @@ import { MEDIA_METADATA_FIELD_NAMES, mediaMetadataFields } from '../fields/media
 import { purgeStaleVariantsAfterChange } from '../hooks/collection/purgeStaleVariants'
 import { purgeVariantsBeforeDelete } from '../hooks/collection/purgeVariantsOnDelete'
 import { enqueuePrewarmAfterChange } from '../hooks/collection/enqueuePrewarm'
+import { generatePresetsAfterChange } from '../hooks/collection/generatePresets'
+import { PRESETS_FIELD_NAME } from '../fields/presets'
 import type { CreateImagesOptions } from '../types'
 
 /** Admin component subpaths (referenced by the Payload import map). */
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
 export const PurgeVariantsFieldPath = '@pro-laico/payload-images/admin/purgeVariants'
+export const PresetManagerFieldPath = '@pro-laico/payload-images/admin/presetManager'
 
 /** A focal-cropped admin thumbnail served by the transform endpoint; undefined when disabled. */
 const resolveAdminThumbnail = (adminThumbnail: number | false | undefined, apiRoute = '/api'): GetAdminThumbnail | undefined => {
@@ -32,6 +36,7 @@ const adminUIFields = (
   previewRatios?: string[],
   purgePath?: string,
   endpoints = true,
+  templateNames?: string[],
 ): Field[] =>
   focalUI
     ? [
@@ -42,6 +47,11 @@ const adminUIFields = (
         },
         ...(endpoints
           ? ([
+              {
+                name: 'presetManager',
+                type: 'ui',
+                admin: { components: { Field: { path: PresetManagerFieldPath, clientProps: { templates: templateNames ?? [] } } } },
+              },
               {
                 name: 'purgeVariants',
                 type: 'ui',
@@ -67,9 +77,10 @@ const adminUIFields = (
  * it's merged onto (`extendCollection`).
  */
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true, presetTemplates } = opts
   const variantSlug = (opts.variantSlug || GENERATED_IMAGES_SLUG) as CollectionSlug //EXCUSE: runtime-configured slug can't satisfy the consuming app's generated CollectionSlug union
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
+  const templateNames = presetTemplates ? Object.keys(presetTemplates) : []
 
   // With the virtuals on, a populated image carries exactly what <ResponsiveImage> renders;
   // without them the component builds URLs itself — so the identity fields buildSrcset /
@@ -84,21 +95,30 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       }
   // VIRTUAL_URL_INPUTS already includes the hotspot fields; always force the crop/version inputs so
   // the placeholder virtual and the build-URLs-yourself mode have their inputs regardless of virtualFields.
-  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES].map((f) => [f, true]))
+  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, PRESETS_FIELD_NAME].map((f) => [f, true]))
+
+  const presetGen = opts.presetGen && endpointsEnabled ? generatePresetsAfterChange(opts.presetGen) : null
 
   return {
     fields: [
-      ...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled),
+      ...adminUIFields(focalUI, variantSlug, previewRatios, purgePath, endpointsEnabled, templateNames),
       ...(virtualFields ? virtualUrlFields() : []),
       ...blurhashStorageFields(),
       placeholderField(),
       ...mediaMetadataFields(),
       ...hotspotFields(),
+      presetsField(),
+      variantLimitField(opts.variantLimit),
     ],
     hooks: {
       beforeChange: [generateImageMetadataBeforeChange()],
       // Prewarm enqueues AFTER the purge hook; its 30s waitUntil guarantees purge-before-warm.
-      afterChange: [purgeStaleVariantsAfterChange({ variantSlug }), ...(opts.prewarm ? [enqueuePrewarmAfterChange(opts.prewarm)] : [])],
+      // Preset generation runs after purge too, so file/focal edits regenerate presets with the new crop.
+      afterChange: [
+        purgeStaleVariantsAfterChange({ variantSlug }),
+        ...(opts.prewarm ? [enqueuePrewarmAfterChange(opts.prewarm)] : []),
+        ...(presetGen ? [presetGen] : []),
+      ],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
     defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'], //EXCUSE: the generated per-collection select type doesn't exist inside the plugin

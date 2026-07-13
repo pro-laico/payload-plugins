@@ -74,6 +74,18 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(images.defaultPopulate?.filename).toBe(true)
   })
 
+  it('adds the presets + variantLimit fields (default cap 200) and the preset-generation hook', () => {
+    const images = (out.collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    const variantLimit = byName(images.fields, 'variantLimit') as { defaultValue?: number } | undefined
+    expect(variantLimit?.defaultValue).toBe(200)
+    expect(byName(images.fields, 'presets')).toBeTruthy()
+    expect(byName(images.fields, 'presetManager')).toBeTruthy() // the admin ui field
+    expect(images.hooks?.afterChange).toHaveLength(2) // purge + preset generation (no prewarm)
+    // A custom cap default threads through:
+    const capped = (run({ variantLimit: 50 }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect((byName(capped.fields, 'variantLimit') as { defaultValue?: number }).defaultValue).toBe(50)
+  })
+
   it('registers nothing when enabled is false', () => {
     const off = run({ enabled: false })
     expect(off.collections ?? []).toHaveLength(0)
@@ -122,7 +134,7 @@ describe('imagesPlugin — prewarm (default off, opt-in registers the whole surf
     expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
     expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
     const images = (out.collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
-    expect(images.hooks?.afterChange).toHaveLength(2) // purge + prewarm enqueue, in that order
+    expect(images.hooks?.afterChange).toHaveLength(3) // purge + prewarm enqueue + preset generation
     const marker = (
       out.custom as { payloadImages?: { prewarm?: { taskSlug?: string; formats?: string[]; constraints?: { dimensionStep?: number } } } }
     ).payloadImages

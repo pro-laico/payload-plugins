@@ -259,6 +259,35 @@ export interface Image {
    * Non-destructive edge trim, % removed from the bottom.
    */
   cropBottom?: number | null;
+  /**
+   * Guaranteed public variants for this image (OG, social, fixed sizes). Always generatable and pre-generated on upload; served via /api/img/:id?preset=<name>. Managed by the Presets panel.
+   */
+  presets?:
+    | {
+        /**
+         * Name of a plugin preset template to apply (leave blank for a custom preset).
+         */
+        template?: string | null;
+        /**
+         * Name for a custom preset (used when no template is chosen).
+         */
+        name?: string | null;
+        width?: number | null;
+        height?: number | null;
+        /**
+         * e.g. 16:9
+         */
+        aspectRatio?: string | null;
+        fit?: ('cover' | 'contain' | 'inside' | 'outside' | 'fill') | null;
+        quality?: number | null;
+        format?: ('avif' | 'webp' | 'jpeg' | 'png') | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
+   */
+  variantLimit?: number | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -569,6 +598,20 @@ export interface ImagesSelect<T extends boolean = true> {
   cropTop?: T;
   cropRight?: T;
   cropBottom?: T;
+  presets?:
+    | T
+    | {
+        template?: T;
+        name?: T;
+        width?: T;
+        height?: T;
+        aspectRatio?: T;
+        fit?: T;
+        quality?: T;
+        format?: T;
+        id?: T;
+      };
+  variantLimit?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

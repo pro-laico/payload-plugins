@@ -23,6 +23,10 @@ describe('buildVariantUrl', () => {
     expect(buildVariantUrl('abc', 800, { version: 'xyz9' })).toBe('/api/img/abc?w=800&fit=cover&q=75&fmt=auto&v=xyz9')
     expect(buildVariantUrl('abc', 800)).not.toContain('v=')
   })
+  it('short-circuits to ?preset=name, ignoring the width + shape options', () => {
+    expect(buildVariantUrl('abc', 800, { preset: 'og', width: 1200, fit: 'contain', quality: 40 } as never)).toBe('/api/img/abc?preset=og')
+    expect(buildVariantUrl('abc', 800, { preset: 'og', version: 'v1' })).toBe('/api/img/abc?preset=og&v=v1')
+  })
 })
 
 describe('deriveVersion', () => {

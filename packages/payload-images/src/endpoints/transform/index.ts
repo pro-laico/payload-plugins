@@ -16,11 +16,14 @@ import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
 import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
+import { countVariantsForSource } from '../../lib/transform/variantCount'
+import { DEFAULT_VARIANT_LIMIT } from '../../lib/presets/defaults'
+import { presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { resolveStaticDir } from '../../lib/transform/staticDir'
 import { readBytes } from '../../lib/transform/source'
 import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
 import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
-import type { FallbackCandidate, GenBytes, OutputFormat, SourceDoc, TransformEndpointConfig } from '../../types'
+import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointConfig } from '../../types'
 
 import { createSingleFlight } from './coalesce'
 import { buildFallbackHeaders, buildHeaders, toBody } from './response'
@@ -59,15 +62,32 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
       const id = routeId(req)
       if (!id) return new Response('Missing target collections id', { status: 400 })
 
-      const parsed = parseTransformParams(req.searchParams ?? new URLSearchParams(), constraints)
-      if (!parsed.ok) return new Response(parsed.error, { status: 400 })
-      const p = parsed.params
+      const presetName = req.searchParams?.get('preset') ?? null
 
       let source = await sourceFlight(id, () => readSourceDoc(payload, sourceSlug, id, null))
       const isPublic = source != null
       if (!source && req.user) source = await readSourceDoc(payload, sourceSlug, id, req.user)
       if (!source || (!source.url && !source.filename)) return new Response('Not found', { status: 404 })
       const src = source
+
+      // Params come from a named preset (the guaranteed, cap-exempt set) or the freeform query.
+      let p: ParsedParams
+      let isPreset = false
+      if (presetName) {
+        const spec = resolvePreset(src.presets, cfg.presetTemplates, presetName)
+        const query = spec && presetQuery(spec)
+        if (!query) return new Response('Unknown preset', { status: 404 })
+        // Presets are a finite, guaranteed set — honor EXACT dimensions (the snap grid is an
+        // anti-DoS measure for freeform requests; an OG preset must stay exactly 1200×630).
+        const parsed = parseTransformParams(query, { ...constraints, dimensionStep: 1 })
+        if (!parsed.ok) return new Response(parsed.error, { status: 400 })
+        p = parsed.params
+        isPreset = true
+      } else {
+        const parsed = parseTransformParams(req.searchParams ?? new URLSearchParams(), constraints)
+        if (!parsed.ok) return new Response(parsed.error, { status: 400 })
+        p = parsed.params
+      }
 
       const isAuto = p.fmt === 'auto'
       const format: OutputFormat =
@@ -140,7 +160,13 @@ export const createTransformEndpoint = (cfg: TransformEndpointConfig = {}, prewa
           // a broken candidates query must never take down the serving path
         }
       }
-      if (!result && !standIn) result = await generateVariantBytes(engineArgs)
+      if (!result && !standIn) {
+        // Per-image variant cap: past the limit, generate the (correct) variant but DON'T persist —
+        // bounds stored variants without breaking the image. Presets are exempt (guaranteed set).
+        const limit = src.variantLimit ?? cfg.variantLimit ?? DEFAULT_VARIANT_LIMIT
+        const overCap = !isPreset && limit >= 0 && (await countVariantsForSource(payload, variantSlug, src.id)) >= limit
+        result = await generateVariantBytes(overCap ? { ...engineArgs, deferPersist: 'never' } : engineArgs)
+      }
 
       if (result && !result.ok) {
         // 503 = the transform queue shed load; ask the client to retry shortly.

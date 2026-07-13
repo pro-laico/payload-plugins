@@ -6,7 +6,7 @@
 
 ## Status
 
-🟢 fixed · 🟡 partially fixed · 🔵 tracked follow-up. As of the latest audit commits: **8 fixed, 2 partially fixed, 25 tracked.** Findings mirrored in the project-management app.
+🟢 fixed · 🟡 partially fixed · 🔵 tracked follow-up. As of the latest audit commits: **9 fixed, 1 partially fixed, 25 tracked.** Findings mirrored in the project-management app.
 
 ## Severity summary
 
@@ -33,7 +33,7 @@
 - **Problem:** An unauthenticated attacker can force unbounded work on /api/img/:id. Each distinct (w,h,fit,q,fmt) combination is a cache miss that runs a Sharp transform and PERSISTS a new file + DB row (overrideAccess:true). Parameters snap to a grid but the grid is huge (~82 widths x ~82 heights x 5 fits x 12 quality buckets x 4 formats ≈ 1.6M distinct persisted variants per single source image), and the FIFO concurrency queue that is supposed to protect the host is itself unbounded.
 - **Failure scenario:** An unauthenticated attacker scripts a loop against one public image id (default images collection is read: anyone) enumerating w=50,100,...,4096 x h x q(40..95 step5) x fmt(avif/webp/jpeg/png) x fit. Every request is a distinct cacheKey => a real Sharp encode behind the cpus-1 gate AND a new persisted stored file + generated-images row (overrideAccess:true, getVariantBytes.ts:102-116). Sustained requests (a) monopolize the transform gate so legitimate srcset/image requests queue and stall, and (b) accumulate toward ~1.6M variant files + DB rows for that one source, exhausting object storage, DB, and cloud egress/compute cost. Nothing (auth, rate limit, signature, or per-source variant cap) stops it.
 - **Fix:** Add a mitigation on the public endpoint. Best: require a signed URL (HMAC over the params using a server secret) so only URLs the app itself minted (via the srcset/variantUrl builders) are honored — reject unsigned/invalid on /img. Alternatively/additionally restrict allowed widths to a small configured srcset ladder rather than the full 1..maxDimension/step grid, and enforce a per-source variant ceiling in generateVariantBytes' persist() (count existing rows where source == src.id and skip persistence past a cap, still serving the bytes). Add rate limiting on /api/img and bound the concurrency queue depth in limit.ts (reject with 503 past a max), so a burst of misses can't park unbounded work behind the gate.
-- **Status:** 🟡 Partially fixed (b86971f) — bounded queue → 503 load-shed. Storage/cost vector (signed URLs / per-source cap / rate-limit) tracked as a posture decision.
+- **Status:** 🟢 Fixed. (1) CPU: bounded transform queue → 503 load-shed (b86971f). (2) Storage/cost: per-image `variantLimit` (default 200) — past the cap a freeform size serves from a nearby variant or generates-without-persist, so stored variants can't grow unbounded; guaranteed **presets** (`presetTemplates` + per-image toggles, cap-exempt, eagerly generated) keep OG/social variants always available. Chose bounding + presets over URL signing (keeps the client-safe isomorphic URL builders; matches how Sanity's public unsigned pipeline stays safe — evictable/bounded cache + a CDN). Recommended companion, documented: an edge rate-limit on `/api/img`.
 
 ## MEDIUM
 

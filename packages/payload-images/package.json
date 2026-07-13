@@ -51,6 +51,11 @@
         "types": "./dist/components/admin/purgeVariants.d.ts",
         "import": "./dist/components/admin/purgeVariants.js",
         "default": "./dist/components/admin/purgeVariants.js"
+      },
+      "./admin/presetManager": {
+        "types": "./dist/components/admin/presetManager.d.ts",
+        "import": "./dist/components/admin/presetManager.js",
+        "default": "./dist/components/admin/presetManager.js"
       }
     }
   },
@@ -81,6 +86,11 @@
       "import": "./src/components/admin/purgeVariants.tsx",
       "types": "./src/components/admin/purgeVariants.tsx",
       "default": "./src/components/admin/purgeVariants.tsx"
+    },
+    "./admin/presetManager": {
+      "import": "./src/components/admin/presetManager.tsx",
+      "types": "./src/components/admin/presetManager.tsx",
+      "default": "./src/components/admin/presetManager.tsx"
     }
   },
   "files": [

@@ -1,4 +1,5 @@
 /** Public config for the on-demand transform endpoint. */
+import type { PresetTemplate } from '../presets/preset'
 import type { TransformConstraints } from './transformConstraints'
 
 export interface TransformEndpointConfig extends Partial<TransformConstraints> {
@@ -16,4 +17,11 @@ export interface TransformEndpointConfig extends Partial<TransformConstraints> {
    *  format), serve it immediately with `Cache-Control: no-store` while the exact variant
    *  generates in the background — the next request gets the exact one. Default true. */
   fallback?: boolean
+  /** Per-image cap on cached variants (an image's own `variantLimit` field overrides it). Past the
+   *  cap, a new freeform size is served from a nearby existing variant instead of generated + stored,
+   *  bounding storage. Presets are exempt. Default 200. */
+  variantLimit?: number
+  /** Named preset templates, referenced by name from each image's `presets`. A default `og`
+   *  (1200×630) ships unless overridden. */
+  presetTemplates?: Record<string, PresetTemplate>
 }

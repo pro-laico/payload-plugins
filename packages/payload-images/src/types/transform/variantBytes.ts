@@ -40,9 +40,11 @@ export interface GetVariantBytesArgs {
   /** Decompression-bomb / memory guard passed to Sharp. */
   maxInputPixels: number
   genFlight?: GenFlight
-  /** Default true: persist the variant row via Next `after()` (post-response). Pass false in
-   *  job/CLI contexts, where there is no request to defer behind — the persist is awaited. */
-  deferPersist?: boolean
+  /** How the generated variant row is persisted:
+   *  - `true` (default): via Next `after()` (post-response) — the request path.
+   *  - `false`: awaited inline — job/CLI contexts with no request to defer behind.
+   *  - `'never'`: NOT persisted — serve the bytes but add no storage (the at-cap path). */
+  deferPersist?: boolean | 'never'
   /** Pre-read original bytes, to avoid re-reading the source per variant (the prewarm job reads
    *  once and passes them through). Omit and the engine reads (coalescing concurrent reads). */
   originalBytes?: Buffer

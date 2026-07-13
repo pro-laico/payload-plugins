@@ -1,6 +1,7 @@
 /** The plugin's top-level options object. */
 import type { CollectionConfig } from 'payload'
 
+import type { PresetTemplate } from '../presets/preset'
 import type { PrewarmOptions } from '../prewarm/options'
 import type { TransformEndpointConfig } from '../transform/transformEndpoint'
 
@@ -64,4 +65,16 @@ export interface ImagesPluginOptions {
    * (new collection). `true` = zero-config defaults.
    */
   prewarm?: boolean | PrewarmOptions
+  /**
+   * Per-image cap on cached variants (bounds storage from the public endpoint). Past the cap, a
+   * new freeform size is served from a nearby existing variant instead of generated + stored. Each
+   * image has a `variantLimit` field defaulting to this. Presets are exempt. Default 200.
+   */
+  variantLimit?: number
+  /**
+   * Named preset templates — guaranteed, cap-exempt, eagerly pre-generated variants that editors
+   * toggle onto images by name and serve via `/api/img/:id?preset=<name>`. A default `og`
+   * (1200×630) ships unless overridden.
+   */
+  presetTemplates?: Record<string, PresetTemplate>
 }

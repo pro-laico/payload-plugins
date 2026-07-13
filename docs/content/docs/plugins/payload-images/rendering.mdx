@@ -227,6 +227,13 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 (social crawlers need that), focal-cropped and versioned like any transform URL. Pass an explicit
 `baseUrl` to override, or `baseUrl: ''` for a relative one.
 
+<Callout type="info">
+  **For the OG image itself, prefer a [preset](/docs/plugins/payload-images/caching#guaranteed-presets):**
+  `getImageUrl(page.heroImage, { preset: 'og' })` → `/api/img/<id>?preset=og`. A preset is
+  guaranteed to exist (eagerly pre-generated, cap-exempt) and honors exact 1200×630 — so a cold
+  social crawler never races generation. A default `og` template ships out of the box.
+</Callout>
+
 For *common* sizes you don't even need it: every doc read already carries virtual URL fields
 (`image.src`, `image.srcset`, `image.placeholderURL`, `image.thumbnailURL` — see
 [Image URLs](/docs/plugins/payload-images/image-urls#the-virtual-url-fields)). Reach for `getImageUrl` only

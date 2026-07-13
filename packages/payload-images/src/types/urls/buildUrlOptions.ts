@@ -15,4 +15,7 @@ export interface BuildUrlOptions {
   /** Cache-busting token appended as `v=` — derive it with `deriveVersion` so a file replace or
    *  focal edit yields a new URL. The server ignores it; it only makes the immutable URL honest. */
   version?: string
+  /** Serve a named preset (`?preset=name`) — a guaranteed, cap-exempt variant. When set, the
+   *  width/fit/quality/format/ratio options are ignored (the preset defines them server-side). */
+  preset?: string
 }
