@@ -1,5 +1,5 @@
 import type { ChangeDetectionSchema } from './changeDetection'
-import type { CollectionSettings } from '../collection-config/collectionConfig'
+import type { CollectionSettings } from '../options/collectionConfig'
 import type { DependencyRule } from '../plugin/dependencyRule'
 import type { JoinMembership } from './joins'
 

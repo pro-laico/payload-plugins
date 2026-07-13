@@ -1,4 +1,4 @@
-import type { CollectionRevalidateConfig } from '../collection-config/collectionConfig'
+import type { CollectionRevalidateConfig } from '../options/collectionConfig'
 import type { DependencyRule } from './dependencyRule'
 
 /**

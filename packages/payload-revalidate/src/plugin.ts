@@ -3,19 +3,19 @@ import { fileURLToPath } from 'node:url'
 import type { CollectionConfig, Config, GlobalConfig, Plugin } from 'payload'
 
 import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
-import { buildReferenceGraph } from './graph/referenceGraph'
+import { buildReferenceGraph } from './lib/graph/referenceGraph'
 import { createAfterChange } from './hooks/collection/afterChange'
 import { createAfterDelete } from './hooks/collection/afterDelete'
 import { createGlobalAfterChange } from './hooks/global/afterChange'
 import { changeDetectionFields, topLevelFieldNames } from './lib/fields'
-import { peekConfig, stashConfig } from './lib/getPayloadClient'
-import { collectJoinMembership } from './lib/joins'
+import { peekConfig, stashConfig } from './lib/configStash'
+import { collectJoinMembership } from './lib/diff/joins'
 import { stashInspect } from './lib/inspect'
-import { getObservations } from './observe/registry'
-import { globalEnabled, resolveCollectionSettings, resolveOptions } from './options'
-import { scanGettersLive } from './scan/live'
-import { registerSeedListener } from './seed/afterSeed'
-import { stashState } from './tags'
+import { getObservations } from './lib/observe/registry'
+import { globalEnabled, resolveCollectionSettings, resolveOptions } from './lib/options'
+import { scanGettersLive } from './lib/scan/live'
+import { registerSeedListener } from './lib/seed/afterSeed'
+import { stashState } from './lib/state'
 import type { PayloadRevalidateMarker, ReferenceGraph, RevalidatePluginOptions } from './types'
 
 /** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
@@ -157,7 +157,7 @@ export const revalidatePlugin =
       globals,
       // `payload revalidate-map` — dump the dependency map as Markdown/JSON from the config,
       // no server booted (Payload's CLI loads the config and calls the script with it).
-      bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidate-map') }],
+      bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidateMap') }],
       endpoints: resolved.endpoint ? [...(config.endpoints ?? []), ...createMapEndpoints({ observe: resolved.observe })] : config.endpoints,
       // Data-only discovery marker for decoupled tooling (dev-tools) — see PayloadRevalidateMarker.
       custom: { ...config.custom, payloadRevalidate: marker },

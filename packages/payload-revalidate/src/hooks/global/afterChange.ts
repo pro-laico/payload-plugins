@@ -2,7 +2,7 @@ import type { GlobalAfterChangeHook } from 'payload'
 
 import { bust } from '../../lib/bust'
 import { docRecord } from '../../lib/values'
-import { tags } from '../../tags'
+import { tags } from '../../lib/tags'
 import type { Bust } from '../../types'
 
 /**

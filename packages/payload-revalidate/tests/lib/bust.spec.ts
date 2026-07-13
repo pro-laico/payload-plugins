@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getObservations, resetObservations } from '../../src/observe/registry'
-import { stashState } from '../../src/tags'
+import { getObservations, resetObservations } from '../../src/lib/observe/registry'
+import { stashState } from '../../src/lib/state'
 import { bust, safeRevalidate } from '../../src/lib/bust'
 
 const revalidateTag = vi.fn()

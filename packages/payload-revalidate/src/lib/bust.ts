@@ -1,4 +1,4 @@
-import { recordEvent } from '../observe/registry'
+import { recordEvent } from './observe/registry'
 import type { Bust, RevalidateEvent } from '../types'
 import { createOnce } from './once'
 

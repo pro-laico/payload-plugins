@@ -1,8 +1,8 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
 import { bust } from '../../lib/bust'
-import { anyChanged, changedFields } from '../../lib/changedFields'
-import { extractOnValues } from '../../lib/joins'
+import { anyChanged, changedFields } from '../../lib/diff/changedFields'
+import { extractOnValues } from '../../lib/diff/joins'
 import { docRecord, isId } from '../../lib/values'
 import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent } from '../../types'
 import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, listTags, ruleTags } from './busts'

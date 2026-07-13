@@ -1,6 +1,6 @@
-import { anyChanged } from '../../lib/changedFields'
+import { anyChanged } from '../../lib/diff/changedFields'
 import { isId } from '../../lib/values'
-import { tags } from '../../tags'
+import { tags } from '../../lib/tags'
 import type { Bust, CollectionSettings, DependencyRule, Lanes, RuleGate } from '../../types'
 
 /** Shared bust-builders for the collection write side — the leaf both {@link createAfterChange}

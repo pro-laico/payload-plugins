@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { stashConfig } from '../../src/lib/getPayloadClient'
-import { getObservations, resetObservations } from '../../src/observe/registry'
-import { stashState } from '../../src/tags'
+import { stashConfig } from '../../src/lib/configStash'
+import { getObservations, resetObservations } from '../../src/lib/observe/registry'
+import { stashState } from '../../src/lib/state'
 import { cacheDoc, cacheGlobal, cacheIds, revalidateAll, revalidateDoc, revalidateList } from '../../src/cache/index'
 
 const cacheTag = vi.fn()

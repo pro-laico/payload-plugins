@@ -2,7 +2,7 @@ import type { CollectionConfig, Config, Endpoint } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { getInspection } from '../src/lib/inspect'
 import { revalidatePlugin } from '../src/plugin'
-import { getState } from '../src/tags'
+import { getState } from '../src/lib/state'
 
 const posts: CollectionConfig = {
   slug: 'posts',
@@ -51,7 +51,7 @@ describe('revalidatePlugin', () => {
   it('registers the revalidate-map bin command and preserves existing bin entries', () => {
     const bin = apply({ bin: [{ key: 'mine', scriptPath: '/mine.js' }] }).bin ?? []
     expect(bin.map((b) => b.key)).toEqual(['mine', 'revalidate-map'])
-    expect(bin.find((b) => b.key === 'revalidate-map')?.scriptPath).toMatch(/bin[/\\]revalidate-map\.(ts|js)$/)
+    expect(bin.find((b) => b.key === 'revalidate-map')?.scriptPath).toMatch(/bin[/\\]revalidateMap\.(ts|js)$/)
   })
 
   it('writes the custom.payloadRevalidate marker and preserves existing custom entries', () => {
