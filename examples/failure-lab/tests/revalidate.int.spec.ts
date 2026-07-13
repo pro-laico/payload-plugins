@@ -1,5 +1,6 @@
 import { revalidatePlugin } from '@pro-laico/payload-revalidate'
-import { cacheDoc, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+import * as cacheModule from '@pro-laico/payload-revalidate/cache'
+import { type CacheHelpers, createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
 import type { CollectionConfig, Config, Payload, PayloadRequest } from 'payload'
 import { afterEach, beforeAll, afterAll, describe, expect, it, vi } from 'vitest'
 import { bootLab, type LabBoot } from '@/boot'
@@ -11,18 +12,19 @@ import { createReport } from './report'
 // diagnosis channels (both spies, not the log capture):
 //   • misuse ADVISORIES (bake-ins, content-carrying id-lists, undeclared scopes) —
 //     dev-only console.warn, naming the read, the offender, and the exact fix;
-//   • DEGRADATION alerts (cacheTag failed → untagged entry, config unreachable → walk
-//     skipped) — console.error in EVERY environment, once per process per failure kind,
-//     because silent prod degradation means permanently stale content. The no-op
-//     revalidateTag warning fires once per process in every env too (a prod jobs runner
-//     hitting it must be visible in logs).
-// The observation registry still records intent throughout.
+//   • DEGRADATION alerts (cacheTag failed → untagged entry, marker missing → unprefixed
+//     unbustable entries) — console.error in EVERY environment, once per process per
+//     failure kind, because silent prod degradation means permanently stale content. The
+//     no-op revalidateTag warning fires once per process in every env too (a prod jobs
+//     runner hitting it must be visible in logs).
+// The observation registry still records intent throughout. The helpers are seeded ONCE
+// with the lab's live handle (createCacheHelpers) — the doctrine: package code never
+// resolves Payload or config itself.
 
 const record = createReport('payload-revalidate')
 
-// The plugin's globalThis slots (Symbol.for — shared, import-free). Tests corrupt these
-// on purpose to simulate "other process" conditions, and always restore.
-const CONFIG_SLOT = Symbol.for('pro-laico.payload-config')
+// The one surviving globalThis slot (a FUNCTION contract, not a config stash) — corrupted
+// on purpose below to simulate "plugin never ran here", and always restored.
 const INSPECT_SLOT = Symbol.for('pro-laico.payload-revalidate.inspect')
 
 const Media: CollectionConfig = { slug: 'media', fields: [{ name: 'alt', type: 'text' }] }
@@ -40,6 +42,8 @@ const Posts: CollectionConfig = {
 
 let lab: LabBoot
 let payload: Payload
+let cacheDoc: CacheHelpers['cacheDoc']
+let cacheIds: CacheHelpers['cacheIds']
 
 const getHandler = (method: string, path: string) => {
   const ep = payload.config.endpoints.find((e) => e.method === method && e.path === path)
@@ -77,6 +81,8 @@ beforeAll(async () => {
     collections: [Posts, Media],
   })
   payload = lab.payload
+  // The app-side seam: seed the read helpers once with the lab's one live session.
+  ;({ cacheDoc, cacheIds } = createCacheHelpers(payload))
 }, 60_000)
 
 afterAll(async () => {
@@ -207,38 +213,29 @@ describe('read-side misuse (cache helpers) — dev advisories that name the read
   })
 })
 
-describe("config unreachable (fresh process, no boot, no '@payload-config' alias)", () => {
-  it('getPayloadClient throws the two-fix diagnosis; cacheDoc degrades to static tags + a warning', async () => {
-    // Simulate a process where Payload never booted: empty the onInit stash and make the
-    // alias unresolvable (its true state inside a published, untranspiled package).
-    const slot = globalThis as Record<symbol, unknown>
-    const stashed = slot[CONFIG_SLOT]
-    delete slot[CONFIG_SLOT]
-    vi.doMock('@payload-config', () => {
-      throw new Error("Cannot find module '@payload-config'")
-    })
-    try {
-      const err = await getPayloadClient().then(
-        () => undefined,
-        (e: Error) => e,
-      )
-      expect(err?.message).toContain("[payload-revalidate] could not resolve the app's Payload config")
-      expect(err?.message).toContain('transpilePackages') // fix 1
-      expect(err?.message).toContain('getPayload()') // fix 2
+describe('marker missing (helpers seeded with a handle whose config never saw revalidatePlugin)', () => {
+  it('cacheDoc degrades — doc returned, unprefixed tags, scope status unknowable — with an every-env alert naming the fix', async () => {
+    // A handle from a config built WITHOUT the plugin: real schema, no marker. This is the
+    // new failure mode replacing the old "config unreachable" stash/alias machinery — the
+    // handle always carries ITS config, so the only way to be under-wired is to have never
+    // applied the plugin to it.
+    const bare = { config: { collections: payload.config.collections, globals: payload.config.globals, custom: {} } } as unknown as Payload
+    const bareHelpers = createCacheHelpers(bare)
 
-      // The getter itself must survive: static tags apply, only the bake-in walk is lost —
-      // and the degradation is alerted in EVERY env (baked content now under-tags).
-      const { messages } = spyError()
-      const doc = { id: 4, title: 'Orphan', hero: { id: 7, alt: 'Hero' } }
-      await expect(cacheDoc(doc, 'posts', { label: 'orphanPost' })).resolves.toBe(doc)
-      const alert = messages().find((m) => m.includes('bake-in walk skipped'))
-      expect(alert).toContain('baked in WITHOUT dependency tags') // the stakes
-      expect(alert).toContain('transpilePackages') // the fix
-      record('config unreachable', err?.message, alert)
-    } finally {
-      slot[CONFIG_SLOT] = stashed
-      vi.doUnmock('@payload-config')
-    }
+    const { messages } = spyError()
+    const doc = { id: 4, title: 'Orphan', hero: { id: 7, alt: 'Hero' } }
+    await expect(bareHelpers.cacheDoc(doc, 'posts', { label: 'orphanPost' })).resolves.toBe(doc) // never throws
+    const alert = messages().find((m) => m.includes('payloadRevalidate marker'))
+    expect(alert).toContain('tags are UNPREFIXED') // the stakes...
+    expect(alert).toContain('silently unbustable') // ...no hooks exist to bust these entries
+    expect(alert).toContain('Add revalidatePlugin() to the plugins array') // the fix
+    record('marker missing (plugin never applied to this handle)', alert)
+  })
+
+  it('getPayloadClient is gone — the package no longer resolves Payload for anyone', () => {
+    // The doctrine made structural: the old self-resolving entry point does not exist.
+    expect('getPayloadClient' in cacheModule).toBe(false)
+    record('getPayloadClient removed', "'getPayloadClient' in the ./cache module: false")
   })
 })
 
@@ -295,8 +292,8 @@ describe('map endpoint failures', () => {
     }
   })
 
-  // LAST on purpose: applying the plugin re-stashes globalThis state as observe:false,
-  // which would silence the observation assertions above.
+  // LAST on purpose: applying the plugin swaps the inspect-slot closure to the observe:false
+  // config, which would starve the observation assertions above of their recorded data.
   it('with observe off (the production posture) both endpoints 404 — the map does not leak', async () => {
     const prodConfig = await revalidatePlugin({ observe: false })({ collections: [Posts, Media] } as Config)
     const endpoints = prodConfig.endpoints ?? []

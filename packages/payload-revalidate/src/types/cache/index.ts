@@ -1,5 +1,3 @@
-export type * from './awaitable'
 export type * from './cacheOptions'
-export type * from './revalidateState'
 export type * from './tagOptions'
 export type * from './walk'

@@ -46,7 +46,7 @@ export function createMapEndpoints({ observe }: { observe: boolean }): Endpoint[
         const body = req.json ? await req.json().catch(() => null) : null
         const tag = typeof (body as { tag?: unknown } | null)?.tag === 'string' ? (body as { tag: string }).tag : null
         if (!tag) return Response.json({ error: 'Body must be JSON: { "tag": "..." }' }, { status: 400 })
-        await bust([{ tag, reason: 'manual' }], { slug: tag, operation: 'manual', lane: 'published' }, 'manual')
+        await bust([{ tag, reason: 'manual' }], { slug: tag, operation: 'manual', lane: 'published' }, 'manual', observe)
         return Response.json({ busted: tag })
       },
     },

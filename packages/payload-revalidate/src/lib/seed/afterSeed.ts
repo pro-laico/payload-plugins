@@ -1,7 +1,5 @@
 import { bust } from '../bust'
-import { getState } from '../state'
-import { tags } from '../tags'
-import type { Bust, SeedResultLike } from '../../types'
+import type { Bust, SeedFlushState, SeedResultLike } from '../../types'
 
 /** The keyed after-seed listener slot `@pro-laico/payload-seed` invokes at the end of
  *  `runSeed`. Shared via `Symbol.for` — no import in either direction, same contract
@@ -19,21 +17,22 @@ const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')
  * so the event log shows what the run actually touched. `extraTags` must be explicit,
  * though: an entry tagged ONLY through one (a scope inlining icons, tagged `payload-icons`)
  * never went through `./cache`, carries no `all`, and would otherwise survive the reseed.
+ *
+ * Everything it needs ({@link SeedFlushState}) comes from the plugin factory's closure —
+ * no global state, no config resolution at flush time.
  */
-export const seedBusts = (result: SeedResultLike): Bust[] => {
+export const seedBusts = (state: SeedFlushState, result: SeedResultLike): Bust[] => {
   const slugs = new Set<string>([...Object.keys(result.created ?? {}), ...(result.collections ?? [])])
-  const declaredLists = getState().lists ?? {}
-  const declaredExtras = getState().extraTags ?? {}
-  const declaredRules = getState().rules ?? []
+  const { tags, lists, extraTags, rules } = state
   const busts: Bust[] = []
   for (const slug of slugs) {
-    for (const scope of [undefined, ...(declaredLists[slug] ?? [])]) {
+    for (const scope of [undefined, ...(lists[slug] ?? [])]) {
       busts.push({ tag: tags.list(slug, { scope }), reason: 'list' }, { tag: tags.list(slug, { scope, draft: true }), reason: 'list' })
     }
-    for (const tag of declaredExtras[slug] ?? []) busts.push({ tag, reason: 'extra' })
+    for (const tag of extraTags[slug] ?? []) busts.push({ tag, reason: 'extra' })
     // Rule targets, same rationale as extraTags: they tag surfaces outside `./cache`
     // (no `all` tag), and the reseed recreated every doc the rule watches.
-    for (const rule of declaredRules) if (rule.on === slug) busts.push(...rule.bust.map((tag) => ({ tag, reason: 'rule' as const })))
+    for (const rule of rules) if (rule.on === slug) busts.push(...rule.bust.map((tag) => ({ tag, reason: 'rule' as const })))
   }
   for (const slug of result.globals ?? []) {
     busts.push({ tag: tags.global(slug), reason: 'global' }, { tag: tags.global(slug, { draft: true }), reason: 'global' })
@@ -44,11 +43,11 @@ export const seedBusts = (result: SeedResultLike): Bust[] => {
 
 /** Called from the plugin factory: register (idempotently — keyed record, HMR-safe) the
  *  listener payload-seed invokes with the run's result. */
-export const registerSeedListener = (): void => {
+export const registerSeedListener = (state: SeedFlushState): void => {
   const slot = globalThis as Record<symbol, unknown>
   const listeners = (slot[AFTER_SEED_SLOT] as Record<string, unknown> | undefined) ?? {}
   listeners['pro-laico/payload-revalidate'] = async (result: SeedResultLike): Promise<void> => {
-    await bust(seedBusts(result), { slug: 'seed', operation: 'seed', lane: 'published' }, 'seed')
+    await bust(seedBusts(state, result), { slug: 'seed', operation: 'seed', lane: 'published' }, 'seed', state.observe)
   }
   slot[AFTER_SEED_SLOT] = listeners
 }

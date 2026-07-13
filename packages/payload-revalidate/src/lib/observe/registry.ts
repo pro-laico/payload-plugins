@@ -1,4 +1,3 @@
-import { getState } from '../state'
 import type { ObservedRead, Registry, RevalidateEvent } from '../../types'
 
 /**
@@ -25,12 +24,10 @@ const registry = (): Registry => {
   return slot[REGISTRY_SLOT] as Registry
 }
 
-/** Whether observation is on (the resolved `observe` option, stashed by the plugin factory). */
-export const observing = (): boolean => getState().observe
-
-/** Record a materialized cached read (called by the `./cache` helpers). No-op unless {@link observing}. */
-export const recordRead = (read: Omit<ObservedRead, 'firstAt' | 'lastAt' | 'count'>): void => {
-  if (!observing()) return
+/** Record a materialized cached read (called by the `./cache` helpers). No-op unless the
+ *  caller resolved `observe` on (from the config marker / the plugin factory's closure). */
+export const recordRead = (observe: boolean, read: Omit<ObservedRead, 'firstAt' | 'lastAt' | 'count'>): void => {
+  if (!observe) return
   const { reads } = registry()
   const key = [
     read.kind,
@@ -58,8 +55,8 @@ export const recordRead = (read: Omit<ObservedRead, 'firstAt' | 'lastAt' | 'coun
 
 /** Record a revalidation event (called by `lib/bust.ts` BEFORE the tags are busted, so
  *  the map shows intent even in contexts where `revalidateTag` no-ops). */
-export const recordEvent = (event: Omit<RevalidateEvent, 'at'>): void => {
-  if (!observing()) return
+export const recordEvent = (observe: boolean, event: Omit<RevalidateEvent, 'at'>): void => {
+  if (!observe) return
   const { events } = registry()
   events.push({ ...event, at: new Date().toISOString() })
   if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS)

@@ -1,9 +1,8 @@
 import 'server-only'
 
-import type { CollectionSlug, UIFieldServerComponent } from 'payload'
+import type { CollectionSlug, Payload, UIFieldServerComponent } from 'payload'
 
 import { ICON_REQUEST_SLUG } from '../../collections/IconRequest'
-import { getPayloadClient } from '../../lib/getPayloadClient'
 import { loadIconUsageManifest } from '../../scan/load'
 import { scanIconUsagesLive } from '../../scan/live'
 import type { IconUsageManifest, LiveRequest } from '../../types'
@@ -34,9 +33,8 @@ const getManifest = (manifestPath?: string): IconUsageManifest | null => {
  * when tracking isn't enabled (collection absent) or on any error — the panel
  * degrades to the static-only view.
  */
-const loadLiveRequests = async (): Promise<LiveRequest[]> => {
+const loadLiveRequests = async (payload: Payload): Promise<LiveRequest[]> => {
   try {
-    const payload = await getPayloadClient()
     if (!(payload.collections as Record<string, unknown>)?.[ICON_REQUEST_SLUG]) return []
     const res = await payload.find({
       collection: ICON_REQUEST_SLUG as CollectionSlug,
@@ -56,13 +54,14 @@ const loadLiveRequests = async (): Promise<LiveRequest[]> => {
 /**
  * Server `UIField` for the IconSet edit view. Gets the usage manifest (live scan
  * in dev, CLI-written file in prod — see {@link getManifest}) plus the runtime
- * misses from the `iconRequest` collection, and hands both to
+ * misses from the `iconRequest` collection — read through the `payload` instance
+ * Payload injects into admin server components — and hands both to
  * {@link IconUsagePanelClient}, which diffs them against the set's `iconsArray`.
  * Server-only, so no `fs` reaches the client bundle.
  */
-export const IconUsagePanel: UIFieldServerComponent = async () => {
+export const IconUsagePanel: UIFieldServerComponent = async ({ payload }) => {
   const manifest = getManifest()
-  const liveRequests = await loadLiveRequests()
+  const liveRequests = await loadLiveRequests(payload)
   return <IconUsagePanelClient manifest={manifest} scanCommand={DEFAULT_SCAN_COMMAND} liveRequests={liveRequests} />
 }
 

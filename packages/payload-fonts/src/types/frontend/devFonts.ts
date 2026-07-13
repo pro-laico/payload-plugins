@@ -1,4 +1,4 @@
-import type { getPayload } from 'payload'
+import type { Payload } from 'payload'
 
 import type { FontFamilyConfig } from '../families/families'
 
@@ -7,8 +7,9 @@ import type { FontFamilyConfig } from '../families/families'
 export type FontDefinitions = Record<string, { variable?: string } | undefined>
 
 export interface DevFontsProps {
-  /** Your Payload config — the same `@payload-config` import you pass to `getPayload`. */
-  config: Parameters<typeof getPayload>[0]['config']
+  /** Your app's live Payload session — instance or the `getPayload({ config })` promise
+   *  (passed as-is; only this component awaits it). Package code never resolves Payload. */
+  payload: Payload | Promise<Payload>
   /**
    * The generated `next/font/local` definition (`import definitionFonts from '@/app/definition'`).
    * When it already has fonts, this component renders nothing and lets `next/font` take over — so

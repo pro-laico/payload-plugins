@@ -2,7 +2,6 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
-import { stashConfig } from './lib/configStash'
 import { loadSharp } from './lib/transform/sharpInstance'
 import { createPurgeEndpoint } from './endpoints/purge'
 import { createImagesCollection } from './collections/images'
@@ -233,7 +232,6 @@ export const imagesPlugin =
       },
       onInit: async (payload) => {
         await config.onInit?.(payload)
-        stashConfig(payload.config)
         if (shadowed)
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,

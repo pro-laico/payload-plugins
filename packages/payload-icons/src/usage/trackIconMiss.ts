@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { after } from 'next/server'
+import type { Payload } from 'payload'
 
-import { getPayloadClient } from '../lib/getPayloadClient'
 import { recordIconMiss } from './recordMiss'
 
 /** Don't write the same name more than once per this window per process. */
@@ -12,8 +12,9 @@ const MAX_TRACKED = 500
 const lastRecorded = new Map<string, number>()
 
 /**
- * Fire-and-forget runtime recorder for an unresolved icon name. Called by the
- * `<Icon>` server component when a name doesn't resolve. NEVER blocks rendering
+ * Fire-and-forget runtime recorder for an unresolved icon name, writing through
+ * the caller's own handle (the `createIcon` factory's seeded session). Called by
+ * the icon server component when a name doesn't resolve. NEVER blocks rendering
  * or throws:
  *
  * - Throttled per name per process (so a hot page doesn't hammer the DB).
@@ -24,7 +25,7 @@ const lastRecorded = new Map<string, number>()
  *
  * Force-disable with `ICON_USAGE_TRACKING=false`.
  */
-export const trackIconMiss = (name: string): void => {
+export const trackIconMiss = (payload: Payload | Promise<Payload>, name: string): void => {
   if (!name || process.env.ICON_USAGE_TRACKING === 'false') return
 
   const now = Date.now()
@@ -38,8 +39,7 @@ export const trackIconMiss = (name: string): void => {
   try {
     after(async () => {
       try {
-        const payload = await getPayloadClient()
-        await recordIconMiss(payload, name)
+        await recordIconMiss(await payload, name)
       } catch {
         // Telemetry is best-effort — never surface its failures.
       }

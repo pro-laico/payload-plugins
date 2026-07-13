@@ -3,7 +3,7 @@ import 'server-only'
 import { cache } from 'react'
 import type { CollectionSlug, Payload, Where } from 'payload'
 
-import { getConfig, getIconSetSlug, getPayloadClient } from '../lib/getPayloadClient'
+import { iconSetSlugOf } from '../lib/marker'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 import type { IconSetMap } from '../types'
 
@@ -18,9 +18,12 @@ const activeWhere = (payload: Payload, slug: string, draft: boolean): Where => {
 
 /**
  * The active icon set's `name → svgString` map, resolved in a SINGLE query and
- * memoized per request via React `cache()`. Finds the set with `active: true`
- * and populates each row's icon `svgString` in one go (depth 1 + a scoped
- * `populate`), so a page with K icons costs one query, not K+1.
+ * memoized per request via React `cache()` — keyed by the HANDLE REFERENCE and
+ * lane, so seed the handle once at module scope (the `<Icon>` factory pattern);
+ * a fresh handle per call would defeat the memo and cost K queries for K icons.
+ * Finds the set with `active: true` and populates each row's icon `svgString`
+ * in one go (depth 1 + a scoped `populate`), so a page with K icons costs one
+ * query, not K+1.
  *
  * On the published frontend (`draft: false`) it filters `_status: 'published'`,
  * so it reads the published-lane active set — a set activated only in the draft
@@ -28,10 +31,9 @@ const activeWhere = (payload: Payload, slug: string, draft: boolean): Where => {
  * In draft mode it reads the draft-lane active set. The `_status` filter is only
  * applied when the collection actually has drafts (safe if `drafts: false`).
  */
-const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
-  const payload = await getPayloadClient()
-  // Read the slug AFTER getPayloadClient(): resolving the config applies the plugin, which stashes it.
-  const slug = getIconSetSlug()
+const getActiveIconSet = cache(async (handle: Payload | Promise<Payload>, draft: boolean): Promise<IconSetMap> => {
+  const payload = await handle
+  const slug = iconSetSlugOf(payload.config)
 
   const set = (await payload
     .find({
@@ -60,33 +62,34 @@ const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
 
 /**
  * When `@pro-laico/payload-revalidate` is installed (detected via its data-only
- * `custom.payloadRevalidate` config marker — no dependency) AND this read is running inside
- * a consumer's `'use cache'` scope, tag the entry with the shared icons tag, so pages that
- * bake rendered SVGs into their cache refresh when icons or the active set change (the
- * `icon`/`iconSet` collections carry the matching `extraTags` marker). Outside a cache
- * scope, or without the revalidate plugin, this is a silent no-op — the base plugin does
- * no tag revalidation on its own.
+ * `custom.payloadRevalidate` config marker on the handle — no dependency) AND this read is
+ * running inside a consumer's `'use cache'` scope, tag the entry with the shared icons tag,
+ * so pages that bake rendered SVGs into their cache refresh when icons or the active set
+ * change (the `icon`/`iconSet` collections carry the matching `extraTags` marker). Outside
+ * a cache scope, or without the revalidate plugin, this is a silent no-op — the base plugin
+ * does no tag revalidation on its own.
  *
  * Lives OUTSIDE the React-`cache()`-memoized set resolver on purpose: memoization is
  * per-request, so a second cached scope in the same request would never re-run the
  * resolver — the tag must be applied per read, not per query.
  */
-const tagIconRead = async (): Promise<void> => {
+const tagIconRead = async (handle: Payload | Promise<Payload>): Promise<void> => {
   try {
-    if (!(await getConfig()).custom?.payloadRevalidate) return
+    if (!(await handle).config.custom?.payloadRevalidate) return
     const { cacheTag } = (await import('next/cache')) as unknown as { cacheTag: (...tags: string[]) => void }
     cacheTag(ICONS_REVALIDATE_TAG)
   } catch {
-    // No resolvable config, no next/cache, or not inside 'use cache' — nothing to tag.
+    // No next/cache, or not inside 'use cache' — nothing to tag.
   }
 }
 
-/** The SVG string for an icon name, resolved through the active set. Returns
- *  `undefined` when the name isn't in the active set. The single seam for
- *  rendering an icon yourself (the `<Icon>` component is this plus `extractSvg*`). */
-export const getIconSvg = async (name: string, draft = false): Promise<string | undefined> => {
-  await tagIconRead()
-  return (await getActiveIconSet(draft))[name]
+/** The SVG string for an icon name, resolved through the active set on the app's own
+ *  handle (pass the same module-scoped handle every time — see {@link getActiveIconSet}).
+ *  Returns `undefined` when the name isn't in the active set. The single seam for
+ *  rendering an icon yourself (the `createIcon` component is this plus `extractSvg*`). */
+export const getIconSvg = async (payload: Payload | Promise<Payload>, name: string, draft = false): Promise<string | undefined> => {
+  await tagIconRead(payload)
+  return (await getActiveIconSet(payload, draft))[name]
 }
 
 /** Names already warned about, so each miss logs once per process. */
@@ -94,12 +97,12 @@ const warnedMisses = new Set<string>()
 
 /** Dev-only diagnosis for an unresolved icon name: one `console.warn` per name per process, naming
  *  the cause — no active set / active set only a draft / name not in the set — with the fix. */
-export const warnIconMissDev = async (name: string, draft = false): Promise<void> => {
+export const warnIconMissDev = async (handle: Payload | Promise<Payload>, name: string, draft = false): Promise<void> => {
   if (process.env.NODE_ENV === 'production' || warnedMisses.has(name)) return
   warnedMisses.add(name)
   try {
-    const payload = await getPayloadClient()
-    const slug = getIconSetSlug()
+    const payload = await handle
+    const slug = iconSetSlugOf(payload.config)
     const activeSetExists = async (d: boolean): Promise<boolean> => {
       const find = {
         collection: slug as CollectionSlug,

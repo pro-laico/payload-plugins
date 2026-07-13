@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { STAGE_COOKIE } from '../cookies'
 import { parseStage } from '../harness'
-import { getPayloadClient } from '../lib/getPayloadClient'
 import { buildDevSnapshot } from '../lib/snapshot'
 import type { CreateDevPageOptions, DevPageProps, DevSnapshot, Test } from '../types'
 import { SeedCard } from './client'
@@ -14,10 +13,12 @@ import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './vie
  * The `/dev` pages — real routes inside your app, one drop-in file:
  *
  *   // app/(frontend)/dev/[[...view]]/page.tsx
+ *   import config from '@payload-config'
+ *   import { getPayload } from 'payload'
  *   import { createDevPage } from '@pro-laico/payload-dev-tools/next'
  *   import { devTests } from '@/dev/tests'
  *   export const dynamic = 'force-dynamic'
- *   export default createDevPage({ tests: devTests })
+ *   export default createDevPage({ payload: getPayload({ config }), tests: devTests })
  *
  * Views: `/dev` (overview + seed controls), `/dev/icons` (grid + active-set switcher),
  * `/dev/fonts` (specimens in the real served fonts), `/dev/images`, `/dev/mux`, and
@@ -25,11 +26,11 @@ import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './vie
  * pages render content only — navigation lives in the `<DevToolbar>`, which stays open while you
  * browse between them. Because the file lives in your `(frontend)` group, everything inherits
  * your layout — header, fonts, globals — which is the point: visual confirmation happens in the
- * app, not a facsimile of it. The component resolves Payload itself (config stash → the
- * `@payload-config` alias), so it takes no config prop. Your own labs coexist: a static route
- * like `app/(frontend)/dev/blocks/page.tsx` always beats this catch-all.
+ * app, not a facsimile of it. The pages run on the `payload` handle you pass — your app's one
+ * live session; package code never resolves Payload itself. Your own labs coexist: a static
+ * route like `app/(frontend)/dev/blocks/page.tsx` always beats this catch-all.
  */
-export function createDevPage(options: CreateDevPageOptions = {}) {
+export function createDevPage(options: CreateDevPageOptions) {
   const { tests = [], enabled } = options
 
   return async function DevPage({ params, searchParams }: DevPageProps) {
@@ -37,7 +38,7 @@ export function createDevPage(options: CreateDevPageOptions = {}) {
 
     const { view = [] } = await params
     const query = (await searchParams) ?? {}
-    const payload = await getPayloadClient()
+    const payload = await options.payload
     const snapshot = await buildDevSnapshot(payload)
 
     const [section, ...rest] = view

@@ -3,7 +3,6 @@ import { createActivateIconSetEndpoint } from './endpoints/activateIconSet'
 import { createDevEndpoint } from './endpoints/dev'
 import { createDraftEndpoint } from './endpoints/draft'
 import { createStageEndpoint } from './endpoints/stage'
-import { stashConfig } from './lib/getPayloadClient'
 import type { DevToolsPluginOptions } from './types'
 
 /**
@@ -33,12 +32,6 @@ export function devToolsPlugin(options: DevToolsPluginOptions = {}): Plugin {
       createDraftEndpoint(options.enabled),
       createActivateIconSetEndpoint(options.enabled),
     ],
-    onInit: async (payload) => {
-      await config.onInit?.(payload)
-      // Remember the app's config so the dev pages resolve it from globalThis — no
-      // `@payload-config` alias (and thus no transpilePackages) required once Payload has booted.
-      stashConfig(payload.config)
-    },
   })
 }
 

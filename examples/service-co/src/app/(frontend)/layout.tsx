@@ -3,6 +3,7 @@ import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolb
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import type { Metadata } from 'next'
+import { getPayload } from 'payload'
 import { type ReactNode, Suspense } from 'react'
 import definitionFonts from '@/app/definition'
 import { SiteFooter } from '@/components/SiteFooter'
@@ -31,7 +32,7 @@ export default function FrontendLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={extractFonts(definitionFonts)}>
       <head>
         <Suspense fallback={null}>
-          <DevFonts config={config} definition={definitionFonts} />
+          <DevFonts payload={getPayload({ config })} definition={definitionFonts} />
         </Suspense>
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">

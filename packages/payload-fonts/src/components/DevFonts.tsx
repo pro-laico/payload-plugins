@@ -1,5 +1,3 @@
-import { getPayload } from 'payload'
-
 import type { DevFontsProps } from '../types'
 import { extractFonts } from '../extractFonts'
 import { buildFontFaceCss, getActiveFontFaces } from '../lib/activeFonts'
@@ -21,17 +19,18 @@ import { resolveFontFamilies } from '../lib/families'
  *
  * ```tsx
  * import config from '@payload-config'
+ * import { getPayload } from 'payload'
  * import definitionFonts from '@/app/definition'
  * import { extractFonts } from '@pro-laico/payload-fonts'
  * import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
  *
  * <html className={extractFonts(definitionFonts)}>
- *   <head><DevFonts config={config} definition={definitionFonts} /></head>
+ *   <head><DevFonts payload={getPayload({ config })} definition={definitionFonts} /></head>
  * </html>
  * ```
  */
 export async function DevFonts({
-  config,
+  payload,
   definition,
   cssVarPrefix,
   fontSetSlug,
@@ -50,8 +49,7 @@ export async function DevFonts({
     // getActiveFontFaces auto-discover the slots from the global and use the default fallbacks.
     const resolved = families ? resolveFontFamilies(families) : undefined
     const fallbacks = resolved ? Object.fromEntries(resolved.map((r) => [r.key, r.fallback])) : undefined
-    const payload = await getPayload({ config })
-    const typefaces = await getActiveFontFaces(payload, { fontSetSlug, optimizedSlug, families: resolved?.map((r) => r.key) })
+    const typefaces = await getActiveFontFaces(await payload, { fontSetSlug, optimizedSlug, families: resolved?.map((r) => r.key) })
     css = buildFontFaceCss(typefaces, { cssVarPrefix, optimizedSlug, fallbacks })
   } catch (err) {
     // No DB / not seeded yet — render nothing rather than throw in the layout, but say why

@@ -1,19 +1,26 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { stashState } from '../../../src/lib/state'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { getObservations, recordEvent, recordRead, resetObservations } from '../../../src/lib/observe/registry'
 
-const read = (as: string, extra: Partial<Parameters<typeof recordRead>[0]> = {}) =>
-  recordRead({ kind: 'doc', collection: 'posts', as, draft: false, staticTags: ['posts:1'], depTags: [], bakedIn: [], capped: false, ...extra })
+const read = (as: string, extra: Partial<Parameters<typeof recordRead>[1]> = {}) =>
+  recordRead(true, {
+    kind: 'doc',
+    collection: 'posts',
+    as,
+    draft: false,
+    staticTags: ['posts:1'],
+    depTags: [],
+    bakedIn: [],
+    capped: false,
+    ...extra,
+  })
 
 const event = (slug: string) =>
-  recordEvent({ source: 'hook', trigger: { slug, operation: 'update', lane: 'published' }, busted: [{ tag: slug, reason: 'list' }] })
+  recordEvent(true, { source: 'hook', trigger: { slug, operation: 'update', lane: 'published' }, busted: [{ tag: slug, reason: 'list' }] })
 
 describe('observe/registry', () => {
   beforeEach(() => {
-    stashState({ prefix: '', observe: true })
     resetObservations()
   })
-  afterEach(() => stashState({ prefix: '', observe: false }))
 
   it('records reads and dedupes repeat materializations by shape', () => {
     read('a')
@@ -32,10 +39,9 @@ describe('observe/registry', () => {
     expect(events.at(-1)?.trigger.slug).toBe('c5')
   })
 
-  it('is a no-op when observation is off', () => {
-    stashState({ prefix: '', observe: false })
-    read('a')
-    event('posts')
+  it('is a no-op when observe is false', () => {
+    recordRead(false, { kind: 'doc', collection: 'posts', as: 'a', draft: false, staticTags: [], depTags: [], bakedIn: [], capped: false })
+    recordEvent(false, { source: 'hook', trigger: { slug: 'posts', operation: 'update', lane: 'published' }, busted: [] })
     expect(getObservations()).toEqual({ reads: [], events: [] })
   })
 

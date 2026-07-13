@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getObservations, resetObservations } from '../../src/lib/observe/registry'
 import { stashInspect } from '../../src/lib/inspect'
-import { stashState } from '../../src/lib/state'
 import { createMapEndpoints } from '../../src/endpoints/map'
 
 const revalidateTag = vi.fn()
@@ -26,7 +25,6 @@ const call = async (endpoints: ReturnType<typeof createMapEndpoints>, method: 'g
 
 describe('map endpoints', () => {
   beforeEach(() => {
-    stashState({ prefix: '', observe: true })
     stashInspect(() => inspection)
     resetObservations()
     revalidateTag.mockReset()

@@ -69,9 +69,14 @@ export const safeRevalidate = async (tag: string): Promise<void> => {
  * unique tag. Recording happens FIRST so the map shows intent even where `revalidateTag`
  * can't reach a cache (tests, CLI).
  */
-export const bust = async (busts: Bust[], trigger: RevalidateEvent['trigger'], source: RevalidateEvent['source']): Promise<void> => {
+export const bust = async (
+  busts: Bust[],
+  trigger: RevalidateEvent['trigger'],
+  source: RevalidateEvent['source'],
+  observe: boolean,
+): Promise<void> => {
   const unique = [...new Map(busts.map((b) => [b.tag, b])).values()]
   if (unique.length === 0) return
-  recordEvent({ source, trigger, busted: unique })
+  recordEvent(observe, { source, trigger, busted: unique })
   for (const { tag } of unique) await safeRevalidate(tag)
 }

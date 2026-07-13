@@ -1,9 +1,7 @@
-import { getConfig } from '../lib/configStash'
 import { createOnce } from '../lib/once'
 import { recordRead } from '../lib/observe/registry'
-import { tags } from '../lib/tags'
 import { collectDepTags, indexSchema } from '../lib/walk/collectTags'
-import type { BakedEmbed, FinishInput, SchemaIndex } from '../types'
+import type { BakedEmbed, FinishInput, IndexSource } from '../types'
 
 /** The shared tail of every `./cache` read — bake-in walk, advisories, tag-limit
  *  enforcement, observation record, and the actual `cacheTag` application. */
@@ -20,7 +18,7 @@ export const warnOnce = (key: string, message: string): void => {
  *  materializing under-tagged (silently unbustable) — that must be visible in prod logs,
  *  where until now the plugin degraded with zero signal. */
 const alertedOnce = createOnce()
-const alertOnce = (key: string, message: string, cause?: unknown): void => {
+export const alertOnce = (key: string, message: string, cause?: unknown): void => {
   if (alertedOnce(key)) console.error(`[payload-revalidate] ${message}`, cause instanceof Error ? cause.message : (cause ?? ''))
 }
 
@@ -42,45 +40,34 @@ export const applyCacheTags = async (allTags: string[]): Promise<void> => {
   }
 }
 
-/** Resolve the app's config BEFORE any tag string is built: resolving it runs the plugin
- *  factory, which stashes the tag prefix and declared scopes — otherwise a helper that is
- *  the first plugin code in a cold process would build unprefixed (unbustable) tags. */
-export const ensureStash = async (): Promise<void> => {
-  try {
-    await getConfig()
-  } catch {
-    // Unresolvable config is reported by schemaIndex (cacheDoc/cacheGlobal) below.
-  }
-}
-
-/** Resolve the booted schema index; `null` (alerted) when the config isn't reachable — static tags still apply. */
-const schemaIndex = async (): Promise<SchemaIndex | null> => {
-  try {
-    const config = await getConfig()
-    return indexSchema(config as unknown as Parameters<typeof indexSchema>[0])
-  } catch (err) {
-    alertOnce(
-      'schema-index-failed',
-      'bake-in walk skipped — the Payload config is unreachable in this process, so populated content is baked in WITHOUT dependency tags (edits to embedded docs will not refresh these entries). Ensure Payload boots before reads, or add this package to transpilePackages.',
-      err,
-    )
-    return null
-  }
-}
-
-export const withDraftVariants = (base: string[], draft: boolean | undefined): string[] => {
+/** Add `:draft` variants for a draft-scoped read — every tag except the `all` tag (passed
+ *  in exactly, since its prefixed form comes from the caller's builders). */
+export const withDraftVariants = (base: string[], draft: boolean | undefined, allTag: string): string[] => {
   if (!draft) return base
-  const all = tags.all()
-  return [...base, ...base.filter((tag) => tag !== all).map((tag) => `${tag}:draft`)]
+  return [...base, ...base.filter((tag) => tag !== allTag).map((tag) => `${tag}:draft`)]
 }
 
-/** Shared tail for doc/global reads: walk for bake-ins, advise, record, cacheTag. */
-export const finish = async ({ kind, collection, global, as, staticTags, value, slug, options }: FinishInput): Promise<void> => {
-  const index = options.walk === false || value == null ? null : await schemaIndex()
+/** Shared tail for doc/global reads: walk for bake-ins, advise, record, cacheTag. The
+ *  schema comes off the handle's own config — a live handle always carries it, so the walk
+ *  can never be skipped for an unreachable config. */
+export const finish = async ({
+  payload,
+  tags,
+  observe,
+  kind,
+  collection,
+  global,
+  as,
+  staticTags,
+  value,
+  slug,
+  options,
+}: FinishInput): Promise<void> => {
+  const index = options.walk === false || value == null ? null : indexSchema(payload.config as unknown as IndexSource)
   const entity = index ? (kind === 'global' ? index.global(slug) : index.collection(slug)) : undefined
   const walked =
     index && entity
-      ? collectDepTags(value, entity.fields, index, options.walk === false ? undefined : options.walk)
+      ? collectDepTags(value, entity.fields, index, options.walk === false ? undefined : options.walk, tags)
       : { tags: [], embeds: [] as BakedEmbed[], capped: false }
 
   const name = options.label ?? `${kind}:${slug}${as !== undefined ? `:${as}` : ''}`
@@ -92,8 +79,8 @@ export const finish = async ({ kind, collection, global, as, staticTags, value, 
       `${name} bakes in ${walked.embeds.length} populated doc(s): ${walked.embeds.map((e) => `${e.via} → ${e.tag}`).join(', ')} — fetch shallow (depth: 0) and render references through id-keyed cacheDoc getters for surgical busts.`,
     )
 
-  const statics = withDraftVariants([...staticTags, ...(options.tags ?? [])], options.draft)
-  const deps = withDraftVariants(walked.tags, options.draft)
+  const statics = withDraftVariants([...staticTags, ...(options.tags ?? [])], options.draft, tags.all())
+  const deps = withDraftVariants(walked.tags, options.draft, tags.all())
 
   // Enforce Next's per-entry tag limit OURSELVES, statics first: past 128 Next silently
   // drops the tail, and draft reads double the dep tags — so a walk under `maxTags` can
@@ -108,7 +95,7 @@ export const finish = async ({ kind, collection, global, as, staticTags, value, 
       `${name} computed ${ordered.length} tags — Next's limit is ${NEXT_MAX_TAGS}/entry; ${ordered.length - NEXT_MAX_TAGS} dependency tag(s) were dropped and those embedded docs will NOT refresh this entry. Fetch shallower (depth: 0) or lower walk.maxTags${options.draft ? ' (draft reads double every dep tag)' : ''}.`,
     )
 
-  recordRead({
+  recordRead(observe, {
     kind,
     collection,
     global,

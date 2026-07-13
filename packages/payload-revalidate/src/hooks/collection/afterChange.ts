@@ -4,7 +4,7 @@ import { bust } from '../../lib/bust'
 import { anyChanged, changedFields } from '../../lib/diff/changedFields'
 import { extractOnValues } from '../../lib/diff/joins'
 import { docRecord, isId } from '../../lib/values'
-import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent } from '../../types'
+import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent, Tags } from '../../types'
 import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, listTags, ruleTags } from './busts'
 
 /**
@@ -65,6 +65,7 @@ import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, listTags, ruleT
  * Deletes go through {@link deleteJoinBusts} — the parents the child *was* in.
  */
 const joinMembershipBusts = (
+  tags: Tags,
   slug: string,
   joinRules: JoinMembership[],
   current: Record<string, unknown>,
@@ -84,13 +85,13 @@ const joinMembershipBusts = (
     for (const parent of newParents) if (!before.has(parent)) affected.add(parent)
     if (determinants.length && anyChanged(changed, determinants, docs))
       for (const parent of [...oldParents, ...newParents]) affected.add(parent)
-    for (const parent of affected) busts.push(...joinTags(slug, on, parent, lanes))
+    for (const parent of affected) busts.push(...joinTags(tags, slug, on, parent, lanes))
   }
   return busts
 }
 
 export const createAfterChange =
-  ({ slug, settings, rules, diffSchema, joinRules = [] }: CollectionHookInput): CollectionAfterChangeHook =>
+  ({ slug, settings, rules, tags, observe, diffSchema, joinRules = [] }: CollectionHookInput): CollectionAfterChangeHook =>
   async ({ doc, previousDoc, operation, req: { context } }) => {
     if (context.disableRevalidate) return doc
 
@@ -125,24 +126,29 @@ export const createAfterChange =
     const lanes: Lanes = isDraftSave && !publishedToDraft ? 'draft' : 'both'
 
     const busts: Bust[] = []
-    if (isId(id)) busts.push(...docTags(slug, id, 'doc', lanes))
-    if (alias !== undefined) busts.push(...docTags(slug, alias, 'alias', lanes))
-    if (aliasChanged && previousAlias !== undefined) busts.push(...docTags(slug, previousAlias, 'alias', lanes))
+    if (isId(id)) busts.push(...docTags(tags, slug, id, 'doc', lanes))
+    if (alias !== undefined) busts.push(...docTags(tags, slug, alias, 'alias', lanes))
+    if (aliasChanged && previousAlias !== undefined) busts.push(...docTags(tags, slug, previousAlias, 'alias', lanes))
 
     if (membership) {
-      busts.push(...allListTags(slug, settings, lanes))
+      busts.push(...allListTags(tags, slug, settings, lanes))
     } else {
       // Field-driven: only the scopes whose declared determinants actually changed.
       for (const [scope, fields] of Object.entries(settings.lists)) {
-        if (anyChanged(changed, fields, docs)) busts.push(...listTags(slug, scope, lanes))
+        if (anyChanged(changed, fields, docs)) busts.push(...listTags(tags, slug, scope, lanes))
       }
     }
 
-    if (joinRules.length) busts.push(...joinMembershipBusts(slug, joinRules, current, previous, changed, docs, lanes))
+    if (joinRules.length) busts.push(...joinMembershipBusts(tags, slug, joinRules, current, previous, changed, docs, lanes))
 
     busts.push(...extraTagBusts(settings.extraTags, lanes))
     if (lanes === 'both') busts.push(...ruleTags(slug, rules, { changed, membership, docs }))
 
-    await bust(busts, { slug, id: isId(id) ? id : undefined, operation: operationName, lane: isDraftSave ? 'draft' : 'published' }, 'hook')
+    await bust(
+      busts,
+      { slug, id: isId(id) ? id : undefined, operation: operationName, lane: isDraftSave ? 'draft' : 'published' },
+      'hook',
+      observe,
+    )
     return doc
   }

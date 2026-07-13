@@ -1,7 +1,14 @@
 import 'server-only'
+import config from '@payload-config'
 import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
-import { cacheDoc, cacheGlobal, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+import { getPayload } from 'payload'
 import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, TeamMember, Testimonial } from '@/types'
+
+// The ONE live Payload session (getPayload memoizes) — seeds the cache helpers and every
+// getter below, so the session that fetches a doc is the session that tags it.
+const db = getPayload({ config })
+const { cacheDoc, cacheGlobal, cacheIds } = createCacheHelpers(db)
 
 // The read side of @pro-laico/payload-revalidate — the atomic model:
 //   • lists fetch IDS ONLY (`cacheIds`, `select: {}`) — their entries change on membership/order
@@ -16,14 +23,14 @@ import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, 
 
 export const getSiteSettings = async (): Promise<SiteSettings> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as unknown as SiteSettings
   return cacheGlobal(settings, 'site-settings')
 }
 
 export const getServiceIds = async (): Promise<(string | number)[]> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({ collection: 'services', sort: 'order', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'services', { list: 'ordered', label: 'service-ids' })
   return res.docs.map((doc) => doc.id)
@@ -31,7 +38,7 @@ export const getServiceIds = async (): Promise<(string | number)[]> => {
 
 export const getService = async (id: string | number): Promise<Service | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true })) as Service | null
   return cacheDoc(doc, 'services', { label: 'service-by-id' })
 }
@@ -39,7 +46,7 @@ export const getService = async (id: string | number): Promise<Service | null> =
 // Featured first, then newest — both determinants are declared on the `work` scope.
 export const getProjectIds = async (): Promise<(string | number)[]> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({
     collection: 'projects',
     sort: ['-featured', '-year'],
@@ -53,7 +60,7 @@ export const getProjectIds = async (): Promise<(string | number)[]> => {
 
 export const getFeaturedProjectId = async (): Promise<string | number | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({
     collection: 'projects',
     where: { featured: { equals: true } },
@@ -67,7 +74,7 @@ export const getFeaturedProjectId = async (): Promise<string | number | null> =>
 
 export const getProject = async (id: string | number): Promise<Project | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({ collection: 'projects', id, depth: 0, disableErrors: true })) as Project | null
   return cacheDoc(doc, 'projects', { label: 'project-by-id' })
 }
@@ -75,14 +82,14 @@ export const getProject = async (id: string | number): Promise<Project | null> =
 // `as: slug` tags even a null miss, so the cached 404 purges the moment that slug is created.
 export const getProjectBySlug = async (slug: string): Promise<Project | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({ collection: 'projects', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
   return cacheDoc((res.docs[0] as unknown as Project | undefined) ?? null, 'projects', { as: slug, label: 'project-by-slug' })
 }
 
 export const getTeamIds = async (): Promise<(string | number)[]> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({ collection: 'team', sort: 'order', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'team', { list: 'ordered', label: 'team-ids' })
   return res.docs.map((doc) => doc.id)
@@ -90,14 +97,14 @@ export const getTeamIds = async (): Promise<(string | number)[]> => {
 
 export const getTeamMember = async (id: string | number): Promise<TeamMember | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({ collection: 'team', id, depth: 0, disableErrors: true })) as TeamMember | null
   return cacheDoc(doc, 'team', { label: 'team-member-by-id' })
 }
 
 export const getTestimonialIds = async (): Promise<(string | number)[]> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const res = await payload.find({ collection: 'testimonials', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'testimonials', { label: 'testimonial-ids' })
   return res.docs.map((doc) => doc.id)
@@ -105,7 +112,7 @@ export const getTestimonialIds = async (): Promise<(string | number)[]> => {
 
 export const getTestimonial = async (id: string | number): Promise<Testimonial | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({
     collection: 'testimonials',
     id,
@@ -123,7 +130,7 @@ export const getTestimonial = async (id: string | number): Promise<Testimonial |
  *  giving each (id, render) its own entry — all tagged `images:{id}`, busted together. */
 export const getImage = async (id: string | number, render?: ImageRenderContext): Promise<MediaImage | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({
     collection: 'images',
     id,
@@ -139,7 +146,7 @@ export const getImage = async (id: string | number, render?: ImageRenderContext)
  *  entry, so re-uploading a glyph busts `icon:{id}` and every card using it refreshes. */
 export const getIcon = async (id: string | number): Promise<IconDoc | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({ collection: 'icon', id, depth: 0, disableErrors: true })) as IconDoc | null
   return cacheDoc(doc, 'icon', { label: 'icon-by-id' })
 }
@@ -148,7 +155,7 @@ export const getIcon = async (id: string | number): Promise<IconDoc | null> => {
  *  showreel/project video heals itself the moment the asset goes ready. */
 export const getMuxVideo = async (id: string | number): Promise<MuxVideoDoc | null> => {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await db
   const doc = (await payload.findByID({
     collection: 'mux-video',
     id,

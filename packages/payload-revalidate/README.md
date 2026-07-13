@@ -28,16 +28,31 @@ plugins: [seedPlugin(), revalidatePlugin()]
 ```
 
 ```ts
+// lib/cache.ts — seed the read helpers ONCE with your app's live Payload session
+import config from '@payload-config'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+import { getPayload } from 'payload'
+
+export const { cacheDoc, cacheIds, cacheGlobal } = createCacheHelpers(getPayload({ config }))
+```
+
+```ts
 // a getter
-import { cacheDoc, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { cacheDoc } from '@/lib/cache'
 
 export async function getPost(slug: string) {
   'use cache'
-  const payload = await getPayloadClient()
+  const payload = await getPayload({ config })
   const res = await payload.find({ collection: 'posts', where: { slug: { equals: slug } }, limit: 1, depth: 2 })
   return cacheDoc(res.docs[0] ?? null, 'posts', { as: slug })
 }
 ```
+
+The package never resolves Payload or your config itself — no globalThis stashes, no
+`@payload-config` alias tricks, no `transpilePackages` requirement. The handle you seed is
+the session that tags every read.
 
 Requires `next >= 16` with `cacheComponents: true`.
 

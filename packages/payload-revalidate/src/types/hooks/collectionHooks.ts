@@ -1,4 +1,5 @@
 import type { ChangeDetectionSchema } from './changeDetection'
+import type { Tags } from '../cache/tagOptions'
 import type { CollectionSettings } from '../options/collectionConfig'
 import type { DependencyRule } from '../plugin/dependencyRule'
 import type { JoinMembership } from './joins'
@@ -7,6 +8,10 @@ export interface CollectionHookInput {
   slug: string
   settings: CollectionSettings
   rules: DependencyRule[]
+  /** The factory's prefix-bound tag builders — hooks never resolve tag state globally. */
+  tags: Tags
+  /** The resolved `observe` option, from the factory's closure — gates the dev recorder. */
+  observe: boolean
   /** Diff normalization derived from the collection's schema — see {@link ChangeDetectionSchema}. */
   diffSchema?: ChangeDetectionSchema
   /** Joins for which THIS collection is the child (member) side — a write here moves the

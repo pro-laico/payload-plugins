@@ -2,7 +2,7 @@ import type { CollectionConfig, Config, Endpoint } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { getInspection } from '../src/lib/inspect'
 import { revalidatePlugin } from '../src/plugin'
-import { getState } from '../src/lib/state'
+import type { PayloadRevalidateMarker } from '../src/types'
 
 const posts: CollectionConfig = {
   slug: 'posts',
@@ -98,17 +98,19 @@ describe('revalidatePlugin', () => {
     }
   })
 
-  it('stashes the tag prefix + declared scopes and exposes the inspection getter with graph + settings', () => {
-    // Clear any booted-config stash a previous test left, so the graph builds from the raw config.
-    ;(globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-config')] = undefined
-    apply(
+  it('publishes prefix + declared scopes on the config marker and exposes the inspection getter with graph + settings', () => {
+    const config = apply(
       // `media` is registered too: edges into UNREGISTERED nodes are dropped (they'd
       // dangle in the dev-tools graph — see the payload-folders test below).
       { collections: [posts, { slug: 'media', fields: [] }], globals: [] },
       { prefix: 'shop', rules: [{ on: 'posts', bust: ['x'] }], collections: { posts: { lists: { recent: { fields: ['title'] } } } } },
     )
-    expect(getState().prefix).toBe('shop')
-    expect(getState().lists).toEqual({ posts: ['recent'], media: [] })
+    const marker = (config.custom as { payloadRevalidate: PayloadRevalidateMarker }).payloadRevalidate
+    expect(marker.prefix).toBe('shop')
+    expect(marker.observe).toBe(false)
+    expect(marker.lists).toEqual({ posts: ['recent'], media: [] })
+    expect(marker.extraTags).toEqual({ posts: [], media: [] })
+    expect(marker.rules).toEqual([{ on: 'posts', bust: ['x'] }])
     const inspection = getInspection()
     expect(inspection?.prefix).toBe('shop')
     expect(inspection?.rules).toHaveLength(1)
@@ -116,8 +118,15 @@ describe('revalidatePlugin', () => {
     expect(inspection?.settings.posts).toEqual({ idField: 'slug', lists: { recent: ['title'] }, extraTags: [], fields: ['slug', 'hero'] })
   })
 
+  it('leaves no config/state stash on globalThis — the banned slots stay empty after apply + onInit', async () => {
+    const config = apply({ collections: [posts] })
+    await config.onInit?.({ config: { collections: [], globals: [] } } as never)
+    for (const name of ['pro-laico.payload-config', 'pro-laico.payload-revalidate.state']) {
+      expect((globalThis as Record<symbol, unknown>)[Symbol.for(name)]).toBeUndefined()
+    }
+  })
+
   it('drops graph edges into filtered-out nodes (the injected payload-folders relationship)', () => {
-    ;(globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-config')] = undefined
     apply({
       collections: [
         { slug: 'images', fields: [{ name: 'folder', type: 'relationship', relationTo: 'payload-folders' }] },

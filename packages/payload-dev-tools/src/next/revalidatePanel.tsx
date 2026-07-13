@@ -546,7 +546,8 @@ function ReadsTab({ data }: { data: RevalidateInspection }) {
           {data.reads.map((read) => {
             const all = [...read.staticTags, ...read.depTags]
             return (
-              <tr key={readName(read)}>
+              // Keyed by the full observed shape: a label like `icon-by-id` repeats across ids (`as`).
+              <tr key={`${readName(read)}|${String(read.as ?? '')}|${read.list ?? ''}|${read.draft ? 'd' : 'p'}`}>
                 <td className="pdtp-code">{readName(read)}</td>
                 <td className="pdtp-mono" title={all.join('\n')}>
                   {all.length}

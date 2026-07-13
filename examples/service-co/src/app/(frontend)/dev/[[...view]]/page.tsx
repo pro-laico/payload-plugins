@@ -1,4 +1,6 @@
+import config from '@payload-config'
 import { createDevPage } from '@pro-laico/payload-dev-tools/next'
+import { getPayload } from 'payload'
 import { Suspense } from 'react'
 import { devTests } from '@/dev/tests'
 
@@ -9,7 +11,7 @@ import { devTests } from '@/dev/tests'
 // 404s in production. A static route (e.g. app/(frontend)/dev/blocks/page.tsx) would take
 // precedence over this catch-all, so app-specific labs can live alongside it. The views read live
 // Payload data — dynamic content, so under Cache Components they render inside Suspense.
-const DevPage = createDevPage({ tests: devTests })
+const DevPage = createDevPage({ payload: getPayload({ config }), tests: devTests })
 
 export default function Page(props: Parameters<typeof DevPage>[0]) {
   return (

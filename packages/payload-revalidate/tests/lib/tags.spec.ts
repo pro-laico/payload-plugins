@@ -1,11 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { getState, stashState } from '../../src/lib/state'
-import { riskyAliasReason, tags } from '../../src/lib/tags'
+import { describe, expect, it } from 'vitest'
+import { createTags, riskyAliasReason } from '../../src/lib/tags'
 
-const reset = () => stashState({ prefix: '', observe: false })
-
-describe('tags', () => {
-  afterEach(reset)
+describe('createTags', () => {
+  const tags = createTags()
 
   it('builds list, doc, global, and all tags', () => {
     expect(tags.list('posts')).toBe('posts')
@@ -26,16 +23,19 @@ describe('tags', () => {
     expect(tags.list('posts', { scope: 'recent', draft: true })).toBe('posts:list:recent:draft')
   })
 
-  it('applies the stashed prefix to every builder', () => {
-    stashState({ prefix: 'shop', observe: false })
-    expect(tags.list('posts')).toBe('shop:posts')
-    expect(tags.doc('posts', 42, { draft: true })).toBe('shop:posts:42:draft')
-    expect(tags.global('header')).toBe('shop:global:header')
-    expect(tags.all()).toBe('shop:all')
+  it('binds the given prefix into every builder', () => {
+    const prefixed = createTags('shop')
+    expect(prefixed.list('posts')).toBe('shop:posts')
+    expect(prefixed.doc('posts', 42, { draft: true })).toBe('shop:posts:42:draft')
+    expect(prefixed.global('header')).toBe('shop:global:header')
+    expect(prefixed.all()).toBe('shop:all')
   })
 
-  it('defaults to no prefix when nothing was stashed', () => {
-    expect(getState().prefix).toBe('')
+  it('two builder sets are independent — no shared state', () => {
+    const a = createTags('a')
+    const b = createTags()
+    expect(a.all()).toBe('a:all')
+    expect(b.all()).toBe('all')
   })
 })
 

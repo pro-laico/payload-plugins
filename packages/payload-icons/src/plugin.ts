@@ -3,7 +3,7 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 import { Icon } from './collections/Icon'
 import { createIconRequestCollection, ICON_REQUEST_SLUG } from './collections/IconRequest'
 import { createIconSetCollection, ICON_SET_SLUG } from './collections/IconSet'
-import { stashConfig, stashIconSetSlug } from './lib/getPayloadClient'
+import { createClearIconRequestsEndpoint } from './endpoints/clearIconRequests'
 import type { IconsPluginOptions } from './types'
 
 /**
@@ -45,10 +45,6 @@ export const iconsPlugin =
     } = opts
     if (!enabled) return config
 
-    // Stash the resolved iconSet slug at config-build time so the cache resolver (`./cache`)
-    // honors `iconSetOverrides.slug` — any process that loads the config runs this.
-    stashIconSetSlug(iconSetOverrides?.slug ?? ICON_SET_SLUG)
-
     const additions: CollectionConfig[] = [Icon(iconOverrides)]
     if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', usagePanel, ...iconSetOverrides }))
     if (trackRequests) additions.push(createIconRequestCollection(iconRequestOverrides))
@@ -56,8 +52,12 @@ export const iconsPlugin =
     return {
       ...config,
       collections: [...(config.collections ?? []), ...additions],
-      // Stash the resolved slugs so decoupled tooling (e.g. @pro-laico/payload-dev-tools) can
-      // discover the plugin and read them from just `payload.config` — no import.
+      // The usage panel's "Clear runtime requests" button calls this — endpoints run on
+      // req.payload, so no handle wiring is needed on the admin side.
+      endpoints: trackRequests ? [...(config.endpoints ?? []), createClearIconRequestsEndpoint()] : config.endpoints,
+      // The resolved slugs, data-only, on the config itself: decoupled tooling (e.g.
+      // @pro-laico/payload-dev-tools) discovers the plugin from `payload.config`, and this
+      // package's own server surfaces read them off the handle the app passes in.
       custom: {
         ...config.custom,
         payloadIcons: {
@@ -66,13 +66,6 @@ export const iconsPlugin =
           iconSetSlug: includeIconSet ? (iconSetOverrides?.slug ?? ICON_SET_SLUG) : null,
           iconRequestSlug: trackRequests ? ICON_REQUEST_SLUG : null,
         },
-      },
-      onInit: async (payload) => {
-        await config.onInit?.(payload)
-        // Remember the app's config so the server components (<Icon> et al) resolve it from
-        // globalThis — no `@payload-config` alias (and thus no transpilePackages) required
-        // once Payload has booted.
-        stashConfig(payload.config)
       },
     }
   }

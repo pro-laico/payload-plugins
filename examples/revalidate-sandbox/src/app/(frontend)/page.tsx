@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { connection } from 'next/server'
 import { Suspense } from 'react'
-import { Icon } from '@pro-laico/payload-icons/components/Icon'
+import { Icon } from '@/components/PayloadIcon'
 import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 import { SandboxShell } from '@pro-laico/sandbox-shell'
 import { getFeaturedPostIds, getImage, getImageIds, getPost, getPostIds, getService, getServiceIds } from '@/lib/getters'

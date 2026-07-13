@@ -1,5 +1,4 @@
-import { stashState } from '../state'
-import { tags } from '../tags'
+import { createTags } from '../tags'
 import type { ReferenceEdge, RenderMapOptions, RevalidateInspection } from '../../types'
 
 const code = (s: string): string => `\`${s}\``
@@ -38,9 +37,9 @@ const edgePhrase = (edges: ReferenceEdge[], nameKey: 'from' | 'to'): string[] =>
  */
 export function renderRevalidateMap(inspection: RevalidateInspection, opts: RenderMapOptions = {}): string {
   const { graph, prefix, observing, rules, settings, reads, events } = inspection
-  // The tag builders read the prefix from the globalThis state slot — seed it so examples
-  // below carry the same namespace the app's hooks and `./cache` helpers apply.
-  stashState({ prefix, observe: false })
+  // Local builders bound to the inspection's own prefix, so examples below carry the same
+  // namespace the app's hooks and `./cache` helpers apply.
+  const tags = createTags(prefix)
   const live = opts.live ?? true
   const slugs = Object.keys(settings).sort()
   const optedOut = graph.collections.filter((slug) => !settings[slug]).sort()

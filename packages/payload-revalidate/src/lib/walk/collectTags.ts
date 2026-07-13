@@ -1,8 +1,8 @@
 import type { Field } from 'payload'
 
 import { isId, isPlainObject } from '../values'
-import { tags } from '../tags'
-import type { BakedEmbed, IndexSource, SchemaIndex, WalkOptions, WalkResult } from '../../types'
+import { createTags } from '../tags'
+import type { BakedEmbed, IndexSource, SchemaIndex, Tags, WalkOptions, WalkResult } from '../../types'
 
 /**
  * The runtime bake-in walk: given a value a getter just fetched and the field schema it
@@ -38,7 +38,13 @@ export const indexSchema = (config: IndexSource): SchemaIndex => {
  * when the read is draft-scoped. Does NOT emit the top-level doc's own tag; that's the
  * caller's job.
  */
-export function collectDepTags(value: unknown, fields: Field[], schema: SchemaIndex, opts: WalkOptions = {}): WalkResult {
+export function collectDepTags(
+  value: unknown,
+  fields: Field[],
+  schema: SchemaIndex,
+  opts: WalkOptions = {},
+  tags: Tags = createTags(),
+): WalkResult {
   const maxDepth = opts.maxDepth ?? 6
   const maxTags = opts.maxTags ?? 64
   const seen = new Set<string>()

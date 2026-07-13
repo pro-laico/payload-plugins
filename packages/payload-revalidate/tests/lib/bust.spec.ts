@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getObservations, resetObservations } from '../../src/lib/observe/registry'
-import { stashState } from '../../src/lib/state'
 import { bust, safeRevalidate } from '../../src/lib/bust'
 
 const revalidateTag = vi.fn()
@@ -16,13 +15,11 @@ vi.mock('next/cache', () => ({
 
 describe('lib/bust', () => {
   beforeEach(() => {
-    stashState({ prefix: '', observe: true })
     resetObservations()
     revalidateTag.mockReset()
     updateTag.mockReset()
     updateTagAvailable = false
   })
-  afterEach(() => stashState({ prefix: '', observe: false }))
 
   it('busts each unique tag with expire-now semantics (single-arg revalidateTag)', async () => {
     await bust(
@@ -33,6 +30,7 @@ describe('lib/bust', () => {
       ],
       { slug: 'posts', id: 1, operation: 'update', lane: 'published' },
       'hook',
+      true,
     )
     expect(revalidateTag.mock.calls).toEqual([['posts:1'], ['posts']])
   })
@@ -65,7 +63,7 @@ describe('lib/bust', () => {
   })
 
   it('records the event before busting, with deduped reasons', async () => {
-    await bust([{ tag: 'posts', reason: 'list' }], { slug: 'posts', operation: 'create', lane: 'published' }, 'hook')
+    await bust([{ tag: 'posts', reason: 'list' }], { slug: 'posts', operation: 'create', lane: 'published' }, 'hook', true)
     const { events } = getObservations()
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({
@@ -75,8 +73,14 @@ describe('lib/bust', () => {
     })
   })
 
+  it('records nothing when observe is off — still busts', async () => {
+    await bust([{ tag: 'posts', reason: 'list' }], { slug: 'posts', operation: 'create', lane: 'published' }, 'hook', false)
+    expect(getObservations().events).toHaveLength(0)
+    expect(revalidateTag).toHaveBeenCalledWith('posts')
+  })
+
   it('records nothing and busts nothing for an empty bust list', async () => {
-    await bust([], { slug: 'posts', operation: 'update', lane: 'published' }, 'hook')
+    await bust([], { slug: 'posts', operation: 'update', lane: 'published' }, 'hook', true)
     expect(getObservations().events).toHaveLength(0)
     expect(revalidateTag).not.toHaveBeenCalled()
   })

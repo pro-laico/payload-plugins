@@ -1,7 +1,7 @@
 import config from '@payload-config'
-// The plugin's drop-in component — one import, fetches by name and inlines the SVG (resolves
-// config via the @payload-config alias on its own; no wiring).
-import { Icon as PayloadIcon } from '@pro-laico/payload-icons/components/Icon'
+// The plugin's icon component, seeded once with this app's live Payload session
+// (see src/components/PayloadIcon.ts — packages never resolve Payload themselves).
+import { Icon as PayloadIcon } from '@/components/PayloadIcon'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'

@@ -112,12 +112,13 @@ describe('icon-name misses at render time (dev-only console.warn diagnosis)', ()
   it('resolving a name with NO active icon set warns with the actual cause', async () => {
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
-      // getIconSvg just returns undefined on a miss; warnIconMissDev is the diagnosis the <Icon>
-      // component fires alongside it (dev-only, once per name per process).
+      // getIconSvg just returns undefined on a miss; warnIconMissDev is the diagnosis the icon
+      // component fires alongside it (dev-only, once per name per process). Both run on the
+      // lab's own handle — package code never resolves Payload itself.
       const { getIconSvg, warnIconMissDev } = await import('@pro-laico/payload-icons/cache')
-      const svg = await getIconSvg('never-registered')
+      const svg = await getIconSvg(payload, 'never-registered')
       expect(svg).toBeFalsy()
-      await warnIconMissDev('never-registered')
+      await warnIconMissDev(payload, 'never-registered')
       const warn = spy.mock.calls.map((c) => c.join(' ')).find((m) => m.includes('[payload-icons]'))
       expect(warn).toContain('did not resolve')
       expect(warn).toContain('no active icon set — activate one')

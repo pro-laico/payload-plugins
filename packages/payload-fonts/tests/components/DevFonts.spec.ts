@@ -11,13 +11,13 @@ describe('DevFonts (guards)', () => {
 
   it('renders nothing in production (lets next/font own the prod path)', async () => {
     vi.stubEnv('NODE_ENV', 'production')
-    const el = await DevFonts({ config: {} as never, definition: undefined })
+    const el = await DevFonts({ payload: {} as never, definition: undefined })
     expect(el).toBeNull()
   })
 
   it('stands down in dev when the definition already has fonts', async () => {
     vi.stubEnv('NODE_ENV', 'development')
-    const el = await DevFonts({ config: {} as never, definition: { sans: { variable: 'font-x' } } })
+    const el = await DevFonts({ payload: {} as never, definition: { sans: { variable: 'font-x' } } })
     expect(el).toBeNull()
   })
 })

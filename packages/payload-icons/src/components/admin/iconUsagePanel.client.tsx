@@ -2,10 +2,10 @@
 
 import type React from 'react'
 import { useMemo, useState } from 'react'
-import { Button, Pill, toast, useAllFormFields } from '@payloadcms/ui'
+import { Button, Pill, toast, useAllFormFields, useConfig } from '@payloadcms/ui'
 
+import { CLEAR_ICON_REQUESTS_PATH } from '../../endpoints/clearIconRequests'
 import type { IconUsage, IconUsagePanelClientProps, LiveRequest } from '../../types'
-import { clearIconRequests } from './clearIconRequests'
 
 /** Matches the live `name` field of each `iconsArray` row so we can read the
  *  set's current names straight from form state (updates as you edit). */
@@ -53,6 +53,12 @@ const formatDate = (iso: string | null): string => {
  */
 export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ manifest, scanCommand, liveRequests }) => {
   const [fields] = useAllFormFields()
+  const {
+    config: {
+      routes: { api },
+      serverURL,
+    },
+  } = useConfig()
   // Local working copy so the "Clear runtime requests" action can empty the list
   // immediately without a full page reload.
   const [live, setLive] = useState<LiveRequest[]>(liveRequests)
@@ -87,7 +93,9 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
   const handleClear = async (): Promise<void> => {
     setClearing(true)
     try {
-      const result = await clearIconRequests()
+      // The plugin's own endpoint — runs on req.payload with the admin's cookie auth.
+      const res = await fetch(`${serverURL ?? ''}${api}${CLEAR_ICON_REQUESTS_PATH}`, { method: 'DELETE', credentials: 'include' })
+      const result = (await res.json()) as { success: boolean; message: string }
       if (result.success) {
         setLive([])
         toast.success(result.message)

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CollectionSettings } from '../../../src/types'
+import { createTags } from '../../../src/lib/tags'
 import { createAfterChange } from '../../../src/hooks/collection/afterChange'
 import { createAfterDelete } from '../../../src/hooks/collection/afterDelete'
 
@@ -27,6 +28,8 @@ const change = async (
     slug: 'posts',
     settings: { ...settings, ...overrides.settings },
     rules: overrides.rules ?? [],
+    tags: createTags(),
+    observe: false,
     diffSchema: overrides.diffSchema,
     joinRules: overrides.joinRules,
   })
@@ -330,6 +333,8 @@ describe('createAfterDelete', () => {
       slug: 'posts',
       settings: { ...settings, ...scoped } as CollectionSettings,
       rules: [{ on: 'posts', bust: ['ruled'], whenFields: ['whatever'] }],
+      tags: createTags(),
+      observe: false,
     })
     await hook({ doc: { id: 1, slug: 'bye' }, req: { context: {} } } as never)
     const tags = bustedTags()
@@ -343,6 +348,8 @@ describe('createAfterDelete', () => {
       slug: 'posts',
       settings,
       rules: [],
+      tags: createTags(),
+      observe: false,
       joinRules: [{ on: 'author', determinants: [] }],
     })
     await hook({ doc: { id: 1, slug: 'bye', author: { id: 5 } }, req: { context: {} } } as never)
@@ -352,7 +359,7 @@ describe('createAfterDelete', () => {
   })
 
   it('honors context.disableRevalidate', async () => {
-    const hook = createAfterDelete({ slug: 'posts', settings, rules: [] })
+    const hook = createAfterDelete({ slug: 'posts', settings, rules: [], tags: createTags(), observe: false })
     await hook({ doc: { id: 1 }, req: { context: { disableRevalidate: true } } } as never)
     expect(bust).not.toHaveBeenCalled()
   })

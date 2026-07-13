@@ -1,6 +1,7 @@
 import config from '@payload-config'
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
+import { getPayload } from 'payload'
 import type React from 'react'
 import definitionFonts from '@/app/definition'
 import '@pro-laico/sandbox-shell/styles.css'
@@ -32,7 +33,7 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
       <head>
-        <DevFonts config={config} definition={definitionFonts} />
+        <DevFonts payload={getPayload({ config })} definition={definitionFonts} />
         <style dangerouslySetInnerHTML={{ __html: shellUsesSeededSans }} />
       </head>
       <body style={{ margin: 0 }}>{children}</body>

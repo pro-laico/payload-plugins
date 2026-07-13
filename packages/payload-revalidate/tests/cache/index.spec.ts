@@ -1,8 +1,8 @@
+import type { Payload } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { stashConfig } from '../../src/lib/configStash'
 import { getObservations, resetObservations } from '../../src/lib/observe/registry'
-import { stashState } from '../../src/lib/state'
-import { cacheDoc, cacheGlobal, cacheIds, revalidateAll, revalidateDoc, revalidateList } from '../../src/cache/index'
+import { createCacheHelpers } from '../../src/cache/index'
+import type { PayloadRevalidateMarker } from '../../src/types'
 
 const cacheTag = vi.fn()
 const revalidateTag = vi.fn()
@@ -12,7 +12,17 @@ vi.mock('next/cache', () => ({
   revalidateTag: (...args: unknown[]) => revalidateTag(...args),
 }))
 
-const config = {
+const marker: PayloadRevalidateMarker = {
+  options: {},
+  endpointPath: null,
+  prefix: '',
+  observe: true,
+  lists: { posts: ['recent'] },
+  extraTags: {},
+  rules: [],
+}
+
+const schema = {
   collections: [
     {
       slug: 'posts',
@@ -24,14 +34,18 @@ const config = {
     { slug: 'media', fields: [] },
   ],
   globals: [{ slug: 'header', fields: [{ name: 'logo', type: 'upload', relationTo: 'media' }] }],
-} as never
+}
+
+/** A Payload-shaped stub handle — the helpers only touch `.config`. */
+const handleWith = (config: Record<string, unknown>): Payload => ({ config }) as unknown as Payload
+
+const handle = handleWith({ ...schema, custom: { payloadRevalidate: marker } })
+const { cacheDoc, cacheGlobal, cacheIds, revalidateAll, revalidateDoc, revalidateList } = createCacheHelpers(handle)
 
 const applied = (): string[] => cacheTag.mock.calls.flat() as string[]
 
-describe('cache helpers (atomic)', () => {
+describe('cache helpers (atomic, bound to a handle)', () => {
   beforeEach(() => {
-    stashState({ prefix: '', observe: true, lists: { posts: ['recent'] } })
-    stashConfig(config)
     resetObservations()
     cacheTag.mockReset()
     revalidateTag.mockReset()
@@ -76,27 +90,29 @@ describe('cache helpers (atomic)', () => {
     expect(getObservations().reads[0]).toMatchObject({ list: 'mystery', undeclared: true })
   })
 
-  it('cacheIds does NOT flag scopes when no declaration stash exists — status is unknowable, not undeclared', async () => {
-    stashState({ prefix: '', observe: true })
-    await cacheIds([1], 'posts', { list: 'mystery' })
-    expect(getObservations().reads[0]?.undeclared).toBeUndefined()
+  it('honors the marker prefix in every tag', async () => {
+    const prefixed = createCacheHelpers(handleWith({ ...schema, custom: { payloadRevalidate: { ...marker, prefix: 'shop' } } }))
+    await prefixed.cacheDoc({ id: 1 }, 'posts')
+    expect(applied().sort()).toEqual(['shop:all', 'shop:posts:1'].sort())
   })
 
   it('enforces Next’s 128-tag limit deterministically — statics survive, the read is flagged capped', async () => {
-    const wide = {
-      collections: [
-        { slug: 'posts', fields: [{ name: 'gallery', type: 'array', fields: [{ name: 'img', type: 'upload', relationTo: 'media' }] }] },
-        { slug: 'media', fields: [] },
-      ],
-      globals: [],
-    } as never
-    stashConfig(wide)
+    const wide = createCacheHelpers(
+      handleWith({
+        collections: [
+          { slug: 'posts', fields: [{ name: 'gallery', type: 'array', fields: [{ name: 'img', type: 'upload', relationTo: 'media' }] }] },
+          { slug: 'media', fields: [] },
+        ],
+        globals: [],
+        custom: { payloadRevalidate: marker },
+      }),
+    )
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       // 70 baked-in docs under a raised walk cap; the draft read doubles every dep tag:
       // 140 deps + 3 statics > 128. Our slice keeps statics (inserted first) and flags it.
       const doc = { id: 1, gallery: Array.from({ length: 70 }, (_, i) => ({ img: { id: i + 1 } })) }
-      await cacheDoc(doc, 'posts', { draft: true, walk: { maxTags: 100 } })
+      await wide.cacheDoc(doc, 'posts', { draft: true, walk: { maxTags: 100 } })
       const tags = applied()
       expect(tags).toHaveLength(128)
       expect(tags).toContain('all')
@@ -106,7 +122,6 @@ describe('cache helpers (atomic)', () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining('128'), expect.anything())
     } finally {
       error.mockRestore()
-      stashConfig(config)
     }
   })
 
@@ -140,5 +155,34 @@ describe('cache helpers (atomic)', () => {
     revalidateTag.mockReset()
     await revalidateAll()
     expect(revalidateTag).toHaveBeenCalledWith('all')
+  })
+
+  it('accepts the handle as a promise — only each read awaits it', async () => {
+    const lazy = createCacheHelpers(Promise.resolve(handle))
+    await lazy.cacheDoc({ id: 7 }, 'posts')
+    expect(applied()).toContain('posts:7')
+  })
+})
+
+describe('marker absent (plugin not applied to the handle’s config)', () => {
+  beforeEach(() => {
+    resetObservations()
+    cacheTag.mockReset()
+  })
+
+  it('degrades: doc returned, unprefixed static tags applied, scope status unknowable, one every-env alert naming the fix', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const bare = createCacheHelpers(handleWith({ ...schema, custom: {} }))
+      const doc = { id: 1 }
+      await expect(bare.cacheDoc(doc, 'posts')).resolves.toBe(doc)
+      expect(applied()).toContain('posts:1')
+      await bare.cacheIds([1], 'posts', { list: 'mystery' })
+      // No marker → declaration status unknowable, not "undeclared".
+      expect(getObservations().reads.find((r) => r.kind === 'ids')?.undeclared).toBeUndefined()
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('revalidatePlugin()'), expect.anything())
+    } finally {
+      error.mockRestore()
+    }
   })
 })
