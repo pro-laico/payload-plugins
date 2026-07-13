@@ -1,17 +1,27 @@
-import type { Field } from 'payload'
+import type {
+  ArrayField,
+  BlocksField,
+  GroupField,
+  JoinField,
+  RelationshipField,
+  RichTextField,
+  TabsField,
+  TextField,
+  UploadField,
+} from 'payload'
 import { describe, expect, it } from 'vitest'
 import { collectDepTags, indexSchema } from '../../src/walk/collectTags'
 
-const media = { slug: 'media', fields: [{ name: 'alt', type: 'text' }] as Field[] }
+const media = { slug: 'media', fields: [{ name: 'alt', type: 'text' }] satisfies TextField[] }
 const team = {
   slug: 'team',
-  fields: [{ name: 'avatar', type: 'upload', relationTo: 'media' }] as Field[],
+  fields: [{ name: 'avatar', type: 'upload', relationTo: 'media' }] satisfies UploadField[],
 }
 const schema = indexSchema({ collections: [media, team] })
 
 describe('collectDepTags (atomic: only baked-in content tags)', () => {
   it('never tags raw ids — references are the id-keyed getter’s job', () => {
-    const fields: Field[] = [
+    const fields: RelationshipField[] = [
       { name: 'author', type: 'relationship', relationTo: 'team' },
       { name: 'reviewers', type: 'relationship', relationTo: 'team', hasMany: true },
     ]
@@ -21,7 +31,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('tags populated docs with provenance (via path + kind)', () => {
-    const fields: Field[] = [
+    const fields: [RelationshipField, UploadField] = [
       { name: 'author', type: 'relationship', relationTo: 'team' },
       { name: 'hero', type: 'upload', relationTo: 'media' },
     ]
@@ -32,13 +42,13 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('tags polymorphic values only when populated', () => {
-    const fields: Field[] = [{ name: 'any', type: 'relationship', relationTo: ['team', 'media'], hasMany: true }]
+    const fields: RelationshipField[] = [{ name: 'any', type: 'relationship', relationTo: ['team', 'media'], hasMany: true }]
     const doc = { any: [{ relationTo: 'team', value: 3 }, { relationTo: 'media', value: { id: 4 } }, 5] }
     expect(collectDepTags(doc, fields, schema).tags).toEqual(['media:4'])
   })
 
   it('recurses populated docs with their own schema, bounded by maxDepth', () => {
-    const fields: Field[] = [{ name: 'author', type: 'relationship', relationTo: 'team' }]
+    const fields: RelationshipField[] = [{ name: 'author', type: 'relationship', relationTo: 'team' }]
     const doc = { author: { id: 7, avatar: { id: 12 } } }
     const result = collectDepTags(doc, fields, schema)
     expect(result.tags.sort()).toEqual(['media:12', 'team:7'])
@@ -47,7 +57,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('survives reference cycles', () => {
-    const buddies = { slug: 'buddies', fields: [{ name: 'friend', type: 'relationship', relationTo: 'buddies' }] as Field[] }
+    const buddies = { slug: 'buddies', fields: [{ name: 'friend', type: 'relationship', relationTo: 'buddies' }] satisfies RelationshipField[] }
     const cyclic = indexSchema({ collections: [buddies] })
     const a: Record<string, unknown> = { id: 1 }
     const b = { id: 2, friend: a }
@@ -56,9 +66,9 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('walks arrays, blocks (block slug in the path), groups, and named tabs', () => {
-    const cta = { slug: 'cta', fields: [{ name: 'target', type: 'relationship', relationTo: 'team' }] as Field[] }
+    const cta = { slug: 'cta', fields: [{ name: 'target', type: 'relationship', relationTo: 'team' }] satisfies RelationshipField[] }
     const withBlocks = indexSchema({ collections: [media, team], blocks: [cta] })
-    const fields: Field[] = [
+    const fields: [ArrayField, BlocksField, GroupField, TabsField] = [
       { name: 'gallery', type: 'array', fields: [{ name: 'shot', type: 'upload', relationTo: 'media' }] },
       {
         name: 'layout',
@@ -88,7 +98,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('finds POPULATED upload/relationship/link nodes inside Lexical richText, skipping id nodes', () => {
-    const fields: Field[] = [{ name: 'body', type: 'richText' }]
+    const fields: RichTextField[] = [{ name: 'body', type: 'richText' }]
     const doc = {
       body: {
         root: {
@@ -109,9 +119,9 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
     // A block node's `fields` hold ordinary Payload field data: a populated
     // single-relationTo relationship is a bare `{ id, … }` doc the generic
     // wrapper scan cannot see. The config-level blocks registry resolves it.
-    const feature = { slug: 'feature', fields: [{ name: 'product', type: 'relationship', relationTo: 'team' }] as Field[] }
+    const feature = { slug: 'feature', fields: [{ name: 'product', type: 'relationship', relationTo: 'team' }] satisfies RelationshipField[] }
     const withBlocks = indexSchema({ collections: [media, team], blocks: [feature] })
-    const fields: Field[] = [{ name: 'body', type: 'richText' }]
+    const fields: RichTextField[] = [{ name: 'body', type: 'richText' }]
     const doc = {
       body: {
         root: {
@@ -130,7 +140,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('tags populated join docs only', () => {
-    const fields: Field[] = [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }]
+    const fields: JoinField[] = [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }]
     const postsIdx = indexSchema({ collections: [{ slug: 'posts', fields: [] }] })
     const doc = { posts: { docs: [11, { id: 12 }] } }
     expect(collectDepTags(doc, fields, postsIdx).tags).toEqual(['posts:12'])
@@ -139,7 +149,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   it('emits a join MEMBERSHIP tag keyed by the owning doc id — even when members are ids', () => {
     // The membership dependency (needs busting on create/delete/reassign) is separate from
     // the baked members; it fires whether or not any member is populated.
-    const fields: Field[] = [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }]
+    const fields: JoinField[] = [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }]
     const postsIdx = indexSchema({ collections: [{ slug: 'posts', fields: [] }] })
     const result = collectDepTags({ id: 5, posts: { docs: [11, { id: 12 }] } }, fields, postsIdx)
     expect(result.tags.sort()).toEqual(['posts:12', 'posts:join:author:5'])
@@ -151,16 +161,16 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('keys join membership by the populated PARENT doc, not the root entry', () => {
-    const authors = { slug: 'authors', fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }] as Field[] }
+    const authors = { slug: 'authors', fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }] satisfies JoinField[] }
     const idx = indexSchema({ collections: [authors, { slug: 'posts', fields: [] }] })
-    const fields: Field[] = [{ name: 'author', type: 'relationship', relationTo: 'authors' }]
+    const fields: RelationshipField[] = [{ name: 'author', type: 'relationship', relationTo: 'authors' }]
     const result = collectDepTags({ id: 1, author: { id: 9, posts: { docs: [] } } }, fields, idx)
     expect(result.tags).toContain('posts:join:author:9')
     expect(result.tags).toContain('authors:9')
   })
 
   it('fans out a polymorphic join collection', () => {
-    const fields: Field[] = [{ name: 'refs', type: 'join', collection: ['posts', 'pages'], on: 'owner' }]
+    const fields: JoinField[] = [{ name: 'refs', type: 'join', collection: ['posts', 'pages'], on: 'owner' }]
     const idx = indexSchema({
       collections: [
         { slug: 'posts', fields: [] },
@@ -180,7 +190,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
         { slug: 'pages', fields: [] },
       ],
     })
-    const fields: Field[] = [{ name: 'refs', type: 'join', collection: ['posts', 'pages'], on: 'owner' }]
+    const fields: JoinField[] = [{ name: 'refs', type: 'join', collection: ['posts', 'pages'], on: 'owner' }]
     const doc = {
       id: 3,
       refs: {
@@ -195,27 +205,31 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('unwraps locale maps on localized fields', () => {
-    const fields: Field[] = [{ name: 'hero', type: 'upload', relationTo: 'media', localized: true }]
+    const fields: UploadField[] = [{ name: 'hero', type: 'upload', relationTo: 'media', localized: true }]
     const doc = { hero: { en: { id: 1 }, de: { id: 2 } } }
     expect(collectDepTags(doc, fields, schema).tags.sort()).toEqual(['media:1', 'media:2'])
   })
 
   it('unwraps a localized GROUP fetched with locale:all — tags populated docs in every locale', () => {
     const idx = indexSchema({ collections: [media], localization: { locales: ['en', 'de'] } })
-    const fields: Field[] = [{ name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] }]
+    const fields: GroupField[] = [
+      { name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] },
+    ]
     const doc = { meta: { en: { og: { id: 1 } }, de: { og: { id: 2 } } } }
     expect(collectDepTags(doc, fields, idx).tags.sort()).toEqual(['media:1', 'media:2'])
   })
 
   it('does NOT misread a single-locale localized group as a locale map', () => {
     const idx = indexSchema({ collections: [media], localization: { locales: ['en', 'de'] } })
-    const fields: Field[] = [{ name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] }]
+    const fields: GroupField[] = [
+      { name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] },
+    ]
     expect(collectDepTags({ meta: { og: { id: 5 } } }, fields, idx).tags).toEqual(['media:5'])
   })
 
   it('unwraps a localized named TAB fetched with locale:all', () => {
     const idx = indexSchema({ collections: [media], localization: { locales: ['en', 'de'] } })
-    const fields: Field[] = [
+    const fields: TabsField[] = [
       { type: 'tabs', tabs: [{ name: 'seo', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] }] },
     ]
     const doc = { seo: { en: { og: { id: 3 } }, de: { og: { id: 4 } } } }
@@ -224,19 +238,21 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
 
   it('without configured locale codes a group locale map is undetectable (documented limitation, safe under-tag)', () => {
     const idx = indexSchema({ collections: [media] }) // no localization → no codes
-    const fields: Field[] = [{ name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] }]
+    const fields: GroupField[] = [
+      { name: 'meta', type: 'group', localized: true, fields: [{ name: 'og', type: 'upload', relationTo: 'media' }] },
+    ]
     const doc = { meta: { en: { og: { id: 1 } }, de: { og: { id: 2 } } } }
     expect(collectDepTags(doc, fields, idx).tags).toEqual([])
   })
 
   it('walks each doc of a list and dedupes shared embeds', () => {
-    const fields: Field[] = [{ name: 'author', type: 'relationship', relationTo: 'team' }]
+    const fields: RelationshipField[] = [{ name: 'author', type: 'relationship', relationTo: 'team' }]
     const result = collectDepTags([{ author: { id: 7 } }, { author: { id: 7 } }, { author: { id: 8 } }], fields, schema)
     expect(result.tags.sort()).toEqual(['team:7', 'team:8'])
   })
 
   it('caps the tag count and reports it', () => {
-    const fields: Field[] = [{ name: 'reviewers', type: 'relationship', relationTo: 'team', hasMany: true }]
+    const fields: RelationshipField[] = [{ name: 'reviewers', type: 'relationship', relationTo: 'team', hasMany: true }]
     const doc = { reviewers: Array.from({ length: 10 }, (_, i) => ({ id: i + 1 })) }
     const result = collectDepTags(doc, fields, schema, { maxTags: 3 })
     expect(result.tags).toHaveLength(3)
@@ -244,7 +260,7 @@ describe('collectDepTags (atomic: only baked-in content tags)', () => {
   })
 
   it('never treats bare strings in text fields as ids', () => {
-    const fields: Field[] = [{ name: 'title', type: 'text' }]
+    const fields: TextField[] = [{ name: 'title', type: 'text' }]
     expect(collectDepTags({ title: 'media:1 looks like a tag' }, fields, schema).tags).toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import type { Field, Where } from 'payload'
+import type { GroupField, JoinField, TabsField, Where } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { collectJoinMembership, extractOnValues, whereFields } from '../../src/lib/joins'
 
@@ -15,7 +15,7 @@ describe('whereFields', () => {
 
 describe('collectJoinMembership', () => {
   it('indexes joins by the CHILD collection with their on field', () => {
-    const authors: { slug: string; fields: Field[] } = {
+    const authors: { slug: string; fields: JoinField[] } = {
       slug: 'authors',
       fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }],
     }
@@ -24,7 +24,7 @@ describe('collectJoinMembership', () => {
   })
 
   it('captures where-filter fields as membership determinants', () => {
-    const authors: { slug: string; fields: Field[] } = {
+    const authors: { slug: string; fields: JoinField[] } = {
       slug: 'authors',
       fields: [{ name: 'live', type: 'join', collection: 'posts', on: 'author', where: { status: { equals: 'published' } } }],
     }
@@ -32,11 +32,11 @@ describe('collectJoinMembership', () => {
   })
 
   it('merges hosts joining the same child on the same field, unioning determinants', () => {
-    const authors: { slug: string; fields: Field[] } = {
+    const authors: { slug: string; fields: JoinField[] } = {
       slug: 'authors',
       fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author', where: { status: { equals: 'published' } } }],
     }
-    const editors: { slug: string; fields: Field[] } = {
+    const editors: { slug: string; fields: JoinField[] } = {
       slug: 'editors',
       fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author', where: { featured: { equals: true } } }],
     }
@@ -47,7 +47,7 @@ describe('collectJoinMembership', () => {
   })
 
   it('fans out a polymorphic join to each child collection', () => {
-    const owners: { slug: string; fields: Field[] } = {
+    const owners: { slug: string; fields: JoinField[] } = {
       slug: 'owners',
       fields: [{ name: 'things', type: 'join', collection: ['posts', 'pages'], on: 'owner' }],
     }
@@ -57,7 +57,7 @@ describe('collectJoinMembership', () => {
   })
 
   it('finds joins nested in groups and tabs', () => {
-    const authors: { slug: string; fields: Field[] } = {
+    const authors: { slug: string; fields: [GroupField, TabsField] } = {
       slug: 'authors',
       fields: [
         { name: 'meta', type: 'group', fields: [{ name: 'posts', type: 'join', collection: 'posts', on: 'author' }] },

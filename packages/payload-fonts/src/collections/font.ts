@@ -1,4 +1,4 @@
-import type { ArrayField, CollectionConfig, CollectionSlug, Field } from 'payload'
+import type { ArrayField, CollectionConfig, CollectionSlug, GroupField, NumberField, RadioField, TextField } from 'payload'
 
 import { authd } from '../access'
 import { cleanupFontAssetsHook } from '../hooks/collection/cleanupFontAssets'
@@ -43,7 +43,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
   const families = resolveFontFamilies(opts.families)
 
-  const fields: Field[] = [
+  const fields: [TextField, RadioField, NumberField, GroupField, ArrayField] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
     {
       name: 'family',

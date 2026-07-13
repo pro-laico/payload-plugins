@@ -1,12 +1,12 @@
-import type { Field, FieldHook } from 'payload'
+import type { FieldHook, NumberField, TextField } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { createImagesCollection } from '../../../src/collections/images'
 
 const VIRTUAL_URL_FIELDS = ['src', 'srcset', 'aspectRatio', 'placeholderURL', 'thumbnailURL', 'variantVersion'] as const
 
-const fieldByName = (name: string): Field & { hooks?: { afterRead?: FieldHook[] }; virtual?: boolean; admin?: { hidden?: boolean } } =>
-  createImagesCollection().fields.find((f) => 'name' in f && f.name === name) as never
+const fieldByName = (name: string): TextField | NumberField =>
+  createImagesCollection().fields.find((f) => 'name' in f && f.name === name) as TextField | NumberField
 
 const read = (name: string, doc: Record<string, unknown>, opts: { serverURL?: string; intent?: Record<string, unknown> } = {}): unknown => {
   const hook = fieldByName(name).hooks?.afterRead?.[0] as FieldHook

@@ -1,5 +1,5 @@
 import type Mux from '@mux/mux-node'
-import type { CollectionConfig, Field } from 'payload'
+import type { CollectionConfig, TextField } from 'payload'
 import { getAfterDeleteHook } from '../hooks/collection/afterDelete'
 import { getBeforeChangeHook } from '../hooks/collection/beforeChange'
 import { getBeforeValidateHook } from '../hooks/collection/beforeValidate'
@@ -26,7 +26,7 @@ const signableUrlField = (
   label: string,
   type: 'video' | 'thumbnail' | 'gif',
   buildUrl: (playbackId: string) => URL,
-): Field => ({
+): TextField => ({
   name,
   label,
   type: 'text',

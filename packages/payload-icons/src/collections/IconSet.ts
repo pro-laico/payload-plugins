@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, Field } from 'payload'
+import type { CollectionConfig, CollectionSlug, TextField, UIField } from 'payload'
 
 import { enforceSingleActive } from '../hooks/collection/enforceSingleActive'
 import { kebabCaseName } from '../hooks/field/kebabCaseName'
@@ -18,7 +18,7 @@ const IconUsagePanelPath = '@pro-laico/payload-icons/admin/iconUsagePanel'
 const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
 
 /** Inline title field so the collection has no template dependency. */
-const titleField = (defaultValue = 'New Icon Set'): Field => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
+const titleField = (defaultValue = 'New Icon Set'): TextField => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
 
 /**
  * Builds the `iconSet` collection — a named `name → icon` mapping with a
@@ -46,7 +46,7 @@ export const createIconSetCollection = (
   // The "Requested icons" panel — a server UI field that scans usage (live in dev,
   // manifest in prod) and diffs it against this set's icons. Config-free: the panel
   // uses its defaults (ICON_USAGE_MANIFEST env for the manifest path in prod).
-  const usageField: Field[] = usagePanel ? [{ name: 'iconUsage', type: 'ui', admin: { components: { Field: IconUsagePanelPath } } }] : []
+  const usageField: UIField[] = usagePanel ? [{ name: 'iconUsage', type: 'ui', admin: { components: { Field: IconUsagePanelPath } } }] : []
 
   return {
     slug,
