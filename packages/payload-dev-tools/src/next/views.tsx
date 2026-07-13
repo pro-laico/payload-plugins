@@ -17,7 +17,6 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
     collection: icons.iconSetSlug as CollectionSlug,
     depth: 1,
     limit: 50,
-    overrideAccess: true,
     pagination: false,
   })
   const sets = (
@@ -98,10 +97,7 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
   const slotIds: Record<string, string | number | null> = {}
   if (fonts.fontSetSlug) {
     try {
-      const set = (await payload.findGlobal({ slug: fonts.fontSetSlug as GlobalSlug, depth: 0, overrideAccess: true })) as unknown as Record<
-        string,
-        unknown
-      >
+      const set = (await payload.findGlobal({ slug: fonts.fontSetSlug as GlobalSlug, depth: 0 })) as unknown as Record<string, unknown>
       for (const key of fonts.familyKeys) {
         const value = set[key]
         slotIds[key] = typeof value === 'string' || typeof value === 'number' ? value : null
@@ -118,7 +114,6 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
         where: { font: { in: ids } },
         depth: 0,
         limit: 200,
-        overrideAccess: true,
         pagination: false,
       })
       faces = res.docs as OptimizedFace[]
@@ -178,12 +173,12 @@ export async function ImagesView({
   let unfiled = 0
   if (foldersSlug) {
     try {
-      const res = await payload.find({ collection: foldersSlug as CollectionSlug, depth: 0, limit: 100, overrideAccess: true, sort: 'name' })
+      const res = await payload.find({ collection: foldersSlug as CollectionSlug, depth: 0, limit: 100, sort: 'name' })
       for (const doc of res.docs as { id: string | number; name?: string }[]) {
-        const { totalDocs } = await payload.count({ collection: sourceSlug, where: { folder: { equals: doc.id } }, overrideAccess: true })
+        const { totalDocs } = await payload.count({ collection: sourceSlug, where: { folder: { equals: doc.id } } })
         if (totalDocs > 0) folders.push({ id: doc.id, name: doc.name ?? String(doc.id), count: totalDocs })
       }
-      unfiled = (await payload.count({ collection: sourceSlug, where: UNFILED_WHERE, overrideAccess: true })).totalDocs
+      unfiled = (await payload.count({ collection: sourceSlug, where: UNFILED_WHERE })).totalDocs
     } catch {}
   }
 
@@ -199,7 +194,6 @@ export async function ImagesView({
     collection: sourceSlug,
     depth: 0,
     limit: 60,
-    overrideAccess: true,
     sort: '-createdAt',
     ...(where ? { where } : {}),
   })
@@ -277,7 +271,7 @@ export async function MuxView({ payload, snapshot }: { payload: Payload; snapsho
   const mux = snapshot.mux
   if (!mux) return <p className="pdtp-muted">payload-mux isn't installed.</p>
 
-  const res = await payload.find({ collection: mux.slug as CollectionSlug, depth: 0, limit: 50, overrideAccess: true, sort: '-createdAt' })
+  const res = await payload.find({ collection: mux.slug as CollectionSlug, depth: 0, limit: 50, sort: '-createdAt' })
   const docs = res.docs as { id: string | number; title?: string; status?: string; duration?: number }[]
 
   return (

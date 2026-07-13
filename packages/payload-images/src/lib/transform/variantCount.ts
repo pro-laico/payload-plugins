@@ -8,7 +8,6 @@ export const countVariantsForSource = async (payload: Payload, variantSlug: stri
     where: { source: { equals: sourceId } },
     limit: 0, // count only — the indexed `source` field makes this cheap
     depth: 0,
-    overrideAccess: true,
   })
   return res.totalDocs
 }

@@ -55,7 +55,7 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
       }
 
       // Read the active selection from the `fontSet` global. The shared secret is the trust
-      // boundary → `overrideAccess: true`.
+      // boundary → local-API default access override is fine.
       let selection: FontSelection | undefined
       try {
         const fontSetGlobal = (await payload.findGlobal({
@@ -63,7 +63,6 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           // depth 1 populates each slot's typeface (defaultPopulate: title/family), so the
           // diagnostics can name the selected typeface.
           depth: 1,
-          overrideAccess: true,
           // `as unknown as` — in a project with generated types this resolves to the concrete
           // fontSet interface, which doesn't structurally overlap a string-keyed record.
         })) as unknown as FontSelection
@@ -96,7 +95,6 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
               where: { font: { in: uniqueIds } },
               depth: 0,
               limit: 1000,
-              overrideAccess: true,
             })
             for (const doc of res.docs as unknown as Array<Record<string, unknown>>) {
               const fontId = refId(doc.font)

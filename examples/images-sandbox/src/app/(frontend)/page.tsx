@@ -44,10 +44,9 @@ export default async function HomePage() {
       depth: 0,
       sort: 'createdAt',
       select: { alt: true, width: true, height: true, focalX: true, focalY: true },
-      overrideAccess: true,
     })
   ).docs as ImageListItem[]
-  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt', overrideAccess: true })).docs as PageDoc[]
+  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs as PageDoc[]
 
   return (
     <SandboxShell

@@ -29,7 +29,6 @@ const createOriginal = async (name: string) =>
     collection: 'fontOriginal' as never,
     data: {} as never,
     file: { name, data: fixture, mimetype: 'font/woff2', size: fixture.byteLength },
-    overrideAccess: true,
   })) as unknown as { id: string | number; filename: string }
 
 beforeAll(async () => {
@@ -53,12 +52,10 @@ afterAll(async () => {
 
 describe('typeface validation (thrown APIErrors — the save is rejected)', () => {
   it('a typeface with no files at all is rejected with a plain instruction', async () => {
-    const err = await payload
-      .create({ collection: 'font' as never, data: { title: 'Empty Face', family: 'sans' } as never, overrideAccess: true })
-      .then(
-        () => undefined,
-        (e: Error) => e,
-      )
+    const err = await payload.create({ collection: 'font' as never, data: { title: 'Empty Face', family: 'sans' } as never }).then(
+      () => undefined,
+      (e: Error) => e,
+    )
     expect(err?.message).toContain('Add at least one font file before saving.')
     record('typeface with no files', err?.message)
   })
@@ -68,13 +65,11 @@ describe('typeface validation (thrown APIErrors — the save is rejected)', () =
     await payload.create({
       collection: 'font' as never,
       data: { title: 'First Face', family: 'sans', weights: [{ weight: '400', style: 'normal', file: orig.id }] } as never,
-      overrideAccess: true,
     })
     const err = await payload
       .create({
         collection: 'font' as never,
         data: { title: 'Second Face', family: 'sans', weights: [{ weight: '400', style: 'normal', file: orig.id }] } as never,
-        overrideAccess: true,
       })
       .then(
         () => undefined,
@@ -98,7 +93,6 @@ describe('typeface validation (thrown APIErrors — the save is rejected)', () =
             { weight: '400', style: 'normal', file: b.id },
           ],
         } as never,
-        overrideAccess: true,
       })
       .then(
         () => undefined,
@@ -118,7 +112,6 @@ describe('typeface validation (thrown APIErrors — the save is rejected)', () =
         collection: 'fontOriginal' as never,
         data: {} as never,
         file: { name: 'fake.woff2', data: garbage, mimetype: 'font/woff2', size: garbage.byteLength }, // lies about its type
-        overrideAccess: true,
       })
       .then(
         () => undefined,
@@ -138,14 +131,12 @@ describe('optimize-hook failures (the save SUCCEEDS — a logger.warn is the onl
     const doc = (await payload.create({
       collection: 'font' as never,
       data: { title: 'Corrupt Face', family: 'serif', weights: [{ weight: '700', style: 'normal', file: orig.id }] } as never,
-      overrideAccess: true,
     })) as unknown as { id: string | number }
     expect(doc.id).toBeTruthy() // silent-ish success…
 
     const optimized = await payload.find({
       collection: 'fontOptimized' as never,
       where: { font: { equals: doc.id } } as never,
-      overrideAccess: true,
     })
     expect(optimized.totalDocs).toBe(0) // …with broken output
 
@@ -163,7 +154,6 @@ describe('optimize-hook failures (the save SUCCEEDS — a logger.warn is the onl
     const doc = (await payload.create({
       collection: 'font' as never,
       data: { title: 'Vanishing Face', family: 'mono', weights: [{ weight: '400', style: 'italic', file: orig.id }] } as never,
-      overrideAccess: true,
     })) as unknown as { id: string | number }
     expect(doc.id).toBeTruthy()
 

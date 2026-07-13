@@ -38,7 +38,6 @@ export const enforceSingleActive: CollectionBeforeChangeHook = async ({ data, or
         ...(hasDrafts ? { _status: { equals: draft ? 'draft' : 'published' } } : {}),
       },
       context: { [CASCADE]: true },
-      overrideAccess: true,
     })
   } catch (err) {
     // Rethrow WITH context: the raw adapter/validation error gives no hint it came from the

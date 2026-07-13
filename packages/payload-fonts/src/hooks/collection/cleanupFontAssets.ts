@@ -24,7 +24,6 @@ export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSl
         collection: collection.slug as CollectionSlug,
         id,
         depth: 0,
-        overrideAccess: true,
         req,
       })) as unknown as Record<string, unknown>
     } catch {
@@ -38,11 +37,10 @@ export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSl
         where: { font: { equals: id } },
         depth: 0,
         limit: 1000,
-        overrideAccess: true,
         req,
       })
       for (const d of optimized.docs as Array<{ id: string | number }>) {
-        await req.payload.delete({ collection: optimizedSlug, id: d.id, overrideAccess: true, req })
+        await req.payload.delete({ collection: optimizedSlug, id: d.id, req })
       }
     } catch (err) {
       req.payload.logger.warn({ msg: 'Could not delete optimized fonts', err })
@@ -52,7 +50,7 @@ export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSl
     if (data) {
       for (const oid of originalIdsFromDoc(data)) {
         try {
-          await req.payload.delete({ collection: originalSlug, id: oid, overrideAccess: true, req })
+          await req.payload.delete({ collection: originalSlug, id: oid, req })
         } catch (err) {
           if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete font original', err })
         }

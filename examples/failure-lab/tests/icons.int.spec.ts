@@ -25,7 +25,6 @@ const createIcon = async (name: string, svg: string) => {
     collection: 'icon' as never,
     data: {} as never,
     file: { name, data, mimetype: 'image/svg+xml', size: data.byteLength },
-    overrideAccess: true,
   })) as unknown as { id: string | number; svgString?: string; optimized?: string }
 }
 
@@ -99,7 +98,6 @@ describe('SVG processing failures (the save SUCCEEDS — the doc carries the rep
         collection: 'icon' as never,
         data: {} as never,
         file: { name: 'not-an-icon.txt', data, mimetype: 'text/plain', size: data.byteLength },
-        overrideAccess: true,
       })
       .then(
         () => undefined,

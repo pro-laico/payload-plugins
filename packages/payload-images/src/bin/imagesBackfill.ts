@@ -43,7 +43,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
 
     let page = 1
     for (;;) {
-      const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, overrideAccess: true, sort: 'id' })
+      const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, sort: 'id' })
       for (const raw of res.docs) {
         //EXCUSE: docs of a runtime-chosen collection are untyped; the shape is duck-checked field by field below
         const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number }
@@ -76,7 +76,6 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
             collection: slug,
             id: doc.id,
             data: data as never, //EXCUSE: data for a runtime-chosen collection can't satisfy the generated per-collection data type
-            overrideAccess: true,
             ...(settingFocal ? {} : { context: { disableRevalidate: true } }),
           })
           stamped++

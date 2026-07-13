@@ -18,7 +18,6 @@ export const purgeVariantsForSource = async (
   const res = await payload.delete({
     collection: asSlug(variantSlug),
     where: { source: { equals: sourceId } },
-    overrideAccess: true,
     req,
   })
   if (res?.errors?.length)

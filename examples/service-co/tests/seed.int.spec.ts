@@ -63,33 +63,31 @@ describe('service-co — all plugins seed together', () => {
       ['iconSet', 2],
       ['payload-folders', 4],
     ] as const) {
-      const { totalDocs } = await payload.find({ collection: slug, limit: 0, overrideAccess: true })
+      const { totalDocs } = await payload.find({ collection: slug, limit: 0 })
       expect(totalDocs, slug).toBe(count)
     }
   })
 
   it('payload folders: every image files into a seeded folder', async () => {
-    const { docs } = await payload.find({ collection: 'payload-folders', depth: 0, overrideAccess: true })
+    const { docs } = await payload.find({ collection: 'payload-folders', depth: 0 })
     expect(docs.map((f) => (f as { name?: string }).name).sort()).toEqual(['Projects', 'Services', 'Site', 'Team'])
     const projects = docs.find((f) => (f as { name?: string }).name === 'Projects') as { id: string | number }
     const { totalDocs } = await payload.find({
       collection: 'images',
       where: { folder: { equals: projects.id } },
       limit: 0,
-      overrideAccess: true,
     })
     expect(totalDocs).toBe(6)
     const unfiled = await payload.find({
       collection: 'images',
       where: { or: [{ folder: { exists: false } }, { folder: { equals: null } }] },
       limit: 0,
-      overrideAccess: true,
     })
     expect(unfiled.totalDocs).toBe(0)
   })
 
   it('payload-images: stores dimensions on upload (originals ready to transform on demand)', async () => {
-    const { docs } = await payload.find({ collection: 'images', where: { filename: { contains: 'hero' } }, limit: 1, overrideAccess: true })
+    const { docs } = await payload.find({ collection: 'images', where: { filename: { contains: 'hero' } }, limit: 1 })
     const hero = docs[0] as { width?: number; height?: number }
     expect(hero?.width).toBeGreaterThan(0)
     expect(hero?.height).toBeGreaterThan(0)
@@ -100,7 +98,6 @@ describe('service-co — all plugins seed together', () => {
       collection: 'icon',
       where: { filename: { equals: 'architecture.svg' } },
       limit: 1,
-      overrideAccess: true,
     })
     const architecture = docs[0] as { svgString?: string }
     expect(architecture?.svgString).toContain('currentColor')
@@ -110,7 +107,6 @@ describe('service-co — all plugins seed together', () => {
       where: { active: { equals: true } },
       depth: 0,
       limit: 1,
-      overrideAccess: true,
     })
     expect(sets).toHaveLength(1)
   })
@@ -121,7 +117,6 @@ describe('service-co — all plugins seed together', () => {
       where: { slug: { equals: 'cedar-hill-residence' } },
       depth: 1,
       limit: 1,
-      overrideAccess: true,
     })
     const project = docs[0] as { coverImage?: { id?: unknown }; services?: unknown[]; featured?: boolean }
     expect(project?.featured).toBe(true)
@@ -130,7 +125,7 @@ describe('service-co — all plugins seed together', () => {
   })
 
   it('payload-fonts: an active fontSet points at seeded typefaces', async () => {
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 0, overrideAccess: true })) as unknown as Record<string, unknown>
+    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 0 })) as unknown as Record<string, unknown>
     // Each family slot holds a `font` id once the selection is wired.
     expect(fontSet.sans ?? fontSet.serif ?? fontSet.display).toBeTruthy()
   })
@@ -138,13 +133,12 @@ describe('service-co — all plugins seed together', () => {
   it('payload-fonts: a single variable file carrying both styles is flagged ital-capable', async () => {
     // Recursive's one upload has wght 300–1000 AND slnt 0…-15 — the optimize hook detects the
     // slant range and marks the served file so an italic face is emitted from the same WOFF2.
-    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Recursive' } }, depth: 0, overrideAccess: true })
+    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Recursive' } }, depth: 0 })
     const recursive = docs[0] as { id: string | number }
     const optimized = await payload.find({
       collection: 'fontOptimized',
       where: { font: { equals: recursive.id } },
       depth: 0,
-      overrideAccess: true,
     })
     expect(optimized.docs).toHaveLength(1)
     const face = optimized.docs[0] as { weight?: string; style?: string; isVariable?: boolean; italCapable?: boolean; obliqueAngle?: number }
@@ -156,19 +150,19 @@ describe('service-co — all plugins seed together', () => {
   })
 
   it('payload-fonts: explicit italics upload alongside their uprights (Inter variable, Lora/JBM statics)', async () => {
-    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0, overrideAccess: true })
+    const { docs } = await payload.find({ collection: 'font', where: { title: { equals: 'Inter' } }, depth: 0 })
     const inter = docs[0] as { id: string | number }
-    const optimized = await payload.find({ collection: 'fontOptimized', where: { font: { equals: inter.id } }, depth: 0, overrideAccess: true })
+    const optimized = await payload.find({ collection: 'fontOptimized', where: { font: { equals: inter.id } }, depth: 0 })
     const styles = (optimized.docs as { style?: string; weight?: string }[]).map((d) => `${d.weight}/${d.style}`).sort()
     expect(styles).toEqual(['100 900/italic', '100 900/normal'])
 
-    const { totalDocs: optimizedTotal } = await payload.find({ collection: 'fontOptimized', limit: 0, overrideAccess: true })
+    const { totalDocs: optimizedTotal } = await payload.find({ collection: 'fontOptimized', limit: 0 })
     // Inter 2 (variable pair) + Lora 4 + JetBrains Mono 4 (400/700 × normal/italic) + Recursive 1
     expect(optimizedTotal).toBe(11)
   })
 
   it('SiteSettings global resolves its refs (hero image + featured project)', async () => {
-    const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 1, overrideAccess: true })) as {
+    const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 1 })) as {
       companyName?: string
       heroImage?: { id?: unknown }
       featuredProject?: { id?: unknown }
@@ -183,9 +177,9 @@ describe('service-co — all plugins seed together', () => {
     // skips the videos definition (reporting why), and the optional showreel ref is dropped rather
     // than failing the run. With creds, the same seed ingests the clip and wires the ref.
     expect(result.skipped).toEqual([{ slug: 'mux-video', reason: expect.stringContaining('MUX_TOKEN_ID') }])
-    const { totalDocs } = await payload.find({ collection: 'mux-video', limit: 0, overrideAccess: true })
+    const { totalDocs } = await payload.find({ collection: 'mux-video', limit: 0 })
     expect(totalDocs).toBe(0)
-    const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })) as { showreel?: unknown }
+    const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as { showreel?: unknown }
     expect(settings.showreel ?? null).toBeNull()
   })
 
@@ -206,7 +200,7 @@ describe('service-co — all plugins seed together', () => {
       ['projects', 3],
       ['services', 4],
     ] as const) {
-      const { totalDocs } = await payload.find({ collection: slug, limit: 0, overrideAccess: true })
+      const { totalDocs } = await payload.find({ collection: slug, limit: 0 })
       expect(totalDocs, `${slug} after reseed`).toBe(count)
     }
     // No strays: every image belongs to a folder, exactly as a single seed produces.
@@ -214,7 +208,6 @@ describe('service-co — all plugins seed together', () => {
       collection: 'images',
       where: { or: [{ folder: { exists: false } }, { folder: { equals: null } }] },
       limit: 0,
-      overrideAccess: true,
     })
     expect(unfiled.totalDocs).toBe(0)
   })

@@ -57,7 +57,7 @@ export const createObservationRecorder = (deps: {
     dbRatiosLoading = true
     void payload
       //EXCUSE: the select targets a runtime-configured collection an app's generated types may not know
-      .find({ collection: slug, limit: 100, depth: 0, overrideAccess: true, select: { ratio: true } as never })
+      .find({ collection: slug, limit: 100, depth: 0, select: { ratio: true } as never })
       .then((res) => {
         dbRatios = res.docs.flatMap((doc) => {
           const ratio = Number((doc as { ratio?: string }).ratio) //EXCUSE: docs of a runtime-configured collection are untyped; NaN-guarded below
@@ -96,14 +96,13 @@ export const createObservationRecorder = (deps: {
     }
 
     const update = async (): Promise<boolean> => {
-      const found = await payload.find({ collection: slug, where: { profileKey: { equals: key } }, limit: 1, depth: 0, overrideAccess: true })
+      const found = await payload.find({ collection: slug, where: { profileKey: { equals: key } }, limit: 1, depth: 0 })
       const existing = found.docs[0] as unknown as RenderProfileDoc | undefined //EXCUSE: docs of a runtime-configured collection are untyped; fields are null-guarded
       if (!existing) return false
       await payload.update({
         collection: slug,
         id: existing.id,
         data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) } as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type
-        overrideAccess: true,
       })
       return true
     }
@@ -122,7 +121,6 @@ export const createObservationRecorder = (deps: {
             lastSeenAt: nowIso,
             widths: mergeWidths(null),
           } as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type
-          overrideAccess: true,
         })
       } catch (err) {
         if (!isDuplicateKeyError(err, 'profileKey')) throw err

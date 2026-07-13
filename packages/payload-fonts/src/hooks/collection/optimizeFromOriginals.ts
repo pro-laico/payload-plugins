@@ -69,7 +69,6 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         where: { font: { equals: fontId } },
         depth: 0,
         limit: 1000,
-        overrideAccess: true,
         req,
       })
       const byOriginal = new Map<string | number, Record<string, unknown>>()
@@ -90,7 +89,6 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
               collection: optimizedSlug,
               id: current.id as string | number,
               data: { weight: d.weight ?? current.weight, style: d.style } as never,
-              overrideAccess: true,
               req,
             })
           }
@@ -104,7 +102,6 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
             collection: originalSlug,
             id: d.originalId,
             depth: 0,
-            overrideAccess: true,
             req,
           })) as {
             filename?: string | null
@@ -131,7 +128,6 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
           await req.payload.create({
             collection: optimizedSlug,
             req: { ...req },
-            overrideAccess: true,
             data: {
               font: fontId,
               original: d.originalId,
@@ -161,7 +157,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
       for (const [oid, d] of byOriginal) {
         if (desiredIds.has(oid)) continue
         try {
-          await req.payload.delete({ collection: optimizedSlug, id: d.id as string | number, overrideAccess: true, req })
+          await req.payload.delete({ collection: optimizedSlug, id: d.id as string | number, req })
         } catch (err) {
           if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete stale optimized font', err })
         }
@@ -174,7 +170,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         for (const oid of originalIdsFromDoc(previousDoc as Record<string, unknown>)) {
           if (stillReferenced.has(oid)) continue
           try {
-            await req.payload.delete({ collection: originalSlug, id: oid, overrideAccess: true, req })
+            await req.payload.delete({ collection: originalSlug, id: oid, req })
           } catch (err) {
             if (!isNotFound(err)) req.payload.logger.warn({ msg: `Could not delete de-referenced font original ${oid}`, err })
           }

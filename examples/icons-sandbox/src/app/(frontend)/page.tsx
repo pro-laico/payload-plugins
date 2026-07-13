@@ -36,7 +36,7 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 export default async function Home() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
-  const { docs } = await payload.find({ collection: 'icon', limit: 24, overrideAccess: true })
+  const { docs } = await payload.find({ collection: 'icon', limit: 24 })
   const names = docs.map((d) => iconName(d.filename))
   const name = names[0]
 

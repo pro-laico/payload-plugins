@@ -41,7 +41,6 @@ const getActiveIconSet = cache(async (draft: boolean): Promise<IconSetMap> => {
       depth: 1,
       draft,
       pagination: false,
-      overrideAccess: true,
       select: { iconsArray: true },
       // Scope the populated icon docs to just the svgString we inline.
       populate: { icon: { svgString: true } },
@@ -108,7 +107,6 @@ export const warnIconMissDev = async (name: string, draft = false): Promise<void
         limit: 1,
         depth: 0,
         draft: d,
-        overrideAccess: true,
       }
       return (await payload.find(find)).docs.length > 0
     }

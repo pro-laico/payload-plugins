@@ -59,7 +59,6 @@ describe('payload-icons wiring', () => {
       collection: 'icon',
       data: {},
       file: { name: 'triangle.svg', data, mimetype: 'image/svg+xml', size: data.byteLength },
-      overrideAccess: true,
     })) as { id: string | number; svgString?: string; optimized?: string }
 
     expect(doc.svgString).toBeTruthy()

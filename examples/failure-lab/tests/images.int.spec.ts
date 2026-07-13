@@ -51,7 +51,6 @@ beforeAll(async () => {
       collection: 'images' as never,
       data: { alt: name } as never,
       file: { data: png, mimetype: 'image/png', name, size: png.byteLength },
-      overrideAccess: true,
     })) as unknown as { id: string | number; filename: string }
 
   const gone = await mk('gone.png')

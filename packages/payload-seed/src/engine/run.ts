@@ -51,10 +51,7 @@ async function describeFailedDoc(
   try {
     // Through `unknown`: in an app context findByID returns the app's generated union, which
     // needn't overlap with a plain record (e.g. PayloadMigration has no index signature).
-    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, overrideAccess: true, depth: 0 })) as unknown as Record<
-      string,
-      unknown
-    >
+    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, depth: 0 })) as unknown as Record<string, unknown>
     const label = [useAsTitle ? doc[useAsTitle] : undefined, doc.title, doc.name, doc.slug, doc.filename].find(
       (v): v is string => typeof v === 'string' && v.trim().length > 0,
     )
@@ -170,7 +167,6 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
       collection: collection as CollectionSlug,
       where: { id: { exists: true } },
       req,
-      overrideAccess: true,
       context: { disableRevalidate: true },
       disableTransaction: true,
     })) as { errors?: Array<{ id?: string | number; message?: string }> }
@@ -185,7 +181,6 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
           collection: collection as CollectionSlug,
           id: e.id,
           req,
-          overrideAccess: true,
           context: { disableRevalidate: true },
           disableTransaction: true,
         })
@@ -270,7 +265,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     deferredByNode.set(d.node, set)
   }
 
-  const baseArgs = { depth: 0, overrideAccess: true, context: { disableRevalidate: true }, req } as const
+  const baseArgs = { depth: 0, context: { disableRevalidate: true }, req } as const
 
   const docIds = new Map<string, string | number>()
   const recordIndex = new Map<string, { slug: string; record: BuiltRecord }>()

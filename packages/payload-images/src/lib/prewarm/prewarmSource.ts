@@ -46,7 +46,6 @@ const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, 
       limit: 100,
       page,
       depth: 0,
-      overrideAccess: true,
     })
     for (const doc of res.docs) {
       const key = (doc as { cacheKey?: unknown }).cacheKey //EXCUSE: docs of a runtime-configured collection are untyped; string-guarded below
@@ -63,13 +62,13 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   const variantSlug = asSlug(deps.variantSlug)
   const profilesSlug = asSlug(deps.profilesSlug)
 
-  const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, overrideAccess: true, disableErrors: true })
+  const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, disableErrors: true })
   const source = (raw ?? null) as SourceRow | null //EXCUSE: a doc of a runtime-configured collection is untyped; fields are null-guarded
   if (!source || (!source.filename && !source.url)) return { targets: 0, generated: 0, failed: 0, skipped: 'missing' }
   if (typeof source.mimeType === 'string' && !IMAGE_MIME_TYPES.includes(source.mimeType))
     return { targets: 0, generated: 0, failed: 0, skipped: 'non-raster' }
 
-  const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0, overrideAccess: true }))
+  const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 }))
     .docs as unknown as RenderProfileDoc[] //EXCUSE: docs of a runtime-configured collection are untyped; compute null-guards every field
 
   const targets = computePrewarmTargets({

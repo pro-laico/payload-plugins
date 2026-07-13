@@ -11,20 +11,20 @@ import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, 
 //     thing a content edit re-materializes, at every usage site at once.
 //   • references stay ids; the page awaits the referenced doc's own getter (getImage, getIcon,
 //     getMuxVideo), so an image alt edit busts images:{id} and exactly one entry refreshes.
-// Reads keep `overrideAccess: true` (server-side, trusted; public read access is also set on the
-// content collections, so this is belt-and-suspenders). Watch it all live at /dev/revalidate.
+// Reads rely on the local API's default access override (server-side, trusted; public read access
+// is also set on the content collections, so this is belt-and-suspenders). Watch it all live at /dev/revalidate.
 
 export const getSiteSettings = async (): Promise<SiteSettings> => {
   'use cache'
   const payload = await getPayloadClient()
-  const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0, overrideAccess: true })) as unknown as SiteSettings
+  const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as unknown as SiteSettings
   return cacheGlobal(settings, 'site-settings')
 }
 
 export const getServiceIds = async (): Promise<(string | number)[]> => {
   'use cache'
   const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'services', sort: 'order', limit: 20, depth: 0, select: {}, overrideAccess: true })
+  const res = await payload.find({ collection: 'services', sort: 'order', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'services', { list: 'ordered', label: 'service-ids' })
   return res.docs.map((doc) => doc.id)
 }
@@ -32,7 +32,7 @@ export const getServiceIds = async (): Promise<(string | number)[]> => {
 export const getService = async (id: string | number): Promise<Service | null> => {
   'use cache'
   const payload = await getPayloadClient()
-  const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true, overrideAccess: true })) as Service | null
+  const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true })) as Service | null
   return cacheDoc(doc, 'services', { label: 'service-by-id' })
 }
 
@@ -46,7 +46,6 @@ export const getProjectIds = async (): Promise<(string | number)[]> => {
     limit: 50,
     depth: 0,
     select: {},
-    overrideAccess: true,
   })
   await cacheIds(res, 'projects', { list: 'work', label: 'project-ids' })
   return res.docs.map((doc) => doc.id)
@@ -61,7 +60,6 @@ export const getFeaturedProjectId = async (): Promise<string | number | null> =>
     limit: 1,
     depth: 0,
     select: {},
-    overrideAccess: true,
   })
   await cacheIds(res, 'projects', { list: 'featured', label: 'featured-project-id' })
   return res.docs[0]?.id ?? null
@@ -70,7 +68,7 @@ export const getFeaturedProjectId = async (): Promise<string | number | null> =>
 export const getProject = async (id: string | number): Promise<Project | null> => {
   'use cache'
   const payload = await getPayloadClient()
-  const doc = (await payload.findByID({ collection: 'projects', id, depth: 0, disableErrors: true, overrideAccess: true })) as Project | null
+  const doc = (await payload.findByID({ collection: 'projects', id, depth: 0, disableErrors: true })) as Project | null
   return cacheDoc(doc, 'projects', { label: 'project-by-id' })
 }
 
@@ -78,14 +76,14 @@ export const getProject = async (id: string | number): Promise<Project | null> =
 export const getProjectBySlug = async (slug: string): Promise<Project | null> => {
   'use cache'
   const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'projects', where: { slug: { equals: slug } }, limit: 1, depth: 0, overrideAccess: true })
+  const res = await payload.find({ collection: 'projects', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
   return cacheDoc((res.docs[0] as unknown as Project | undefined) ?? null, 'projects', { as: slug, label: 'project-by-slug' })
 }
 
 export const getTeamIds = async (): Promise<(string | number)[]> => {
   'use cache'
   const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'team', sort: 'order', limit: 20, depth: 0, select: {}, overrideAccess: true })
+  const res = await payload.find({ collection: 'team', sort: 'order', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'team', { list: 'ordered', label: 'team-ids' })
   return res.docs.map((doc) => doc.id)
 }
@@ -93,14 +91,14 @@ export const getTeamIds = async (): Promise<(string | number)[]> => {
 export const getTeamMember = async (id: string | number): Promise<TeamMember | null> => {
   'use cache'
   const payload = await getPayloadClient()
-  const doc = (await payload.findByID({ collection: 'team', id, depth: 0, disableErrors: true, overrideAccess: true })) as TeamMember | null
+  const doc = (await payload.findByID({ collection: 'team', id, depth: 0, disableErrors: true })) as TeamMember | null
   return cacheDoc(doc, 'team', { label: 'team-member-by-id' })
 }
 
 export const getTestimonialIds = async (): Promise<(string | number)[]> => {
   'use cache'
   const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'testimonials', limit: 20, depth: 0, select: {}, overrideAccess: true })
+  const res = await payload.find({ collection: 'testimonials', limit: 20, depth: 0, select: {} })
   await cacheIds(res, 'testimonials', { label: 'testimonial-ids' })
   return res.docs.map((doc) => doc.id)
 }
@@ -113,7 +111,6 @@ export const getTestimonial = async (id: string | number): Promise<Testimonial |
     id,
     depth: 0,
     disableErrors: true,
-    overrideAccess: true,
   })) as Testimonial | null
   return cacheDoc(doc, 'testimonials', { label: 'testimonial-by-id' })
 }
@@ -134,7 +131,6 @@ export const getImage = async (id: string | number, render?: ImageRenderContext)
     select: RESPONSIVE_IMAGE_SELECT,
     context: { ...render },
     disableErrors: true,
-    overrideAccess: true,
   })) as MediaImage | null
   return cacheDoc(doc, 'images', { label: 'image-by-id' })
 }
@@ -144,7 +140,7 @@ export const getImage = async (id: string | number, render?: ImageRenderContext)
 export const getIcon = async (id: string | number): Promise<IconDoc | null> => {
   'use cache'
   const payload = await getPayloadClient()
-  const doc = (await payload.findByID({ collection: 'icon', id, depth: 0, disableErrors: true, overrideAccess: true })) as IconDoc | null
+  const doc = (await payload.findByID({ collection: 'icon', id, depth: 0, disableErrors: true })) as IconDoc | null
   return cacheDoc(doc, 'icon', { label: 'icon-by-id' })
 }
 
@@ -158,7 +154,6 @@ export const getMuxVideo = async (id: string | number): Promise<MuxVideoDoc | nu
     id,
     depth: 0,
     disableErrors: true,
-    overrideAccess: true,
   })) as MuxVideoDoc | null
   return cacheDoc(doc, 'mux-video', { label: 'mux-video-by-id' })
 }

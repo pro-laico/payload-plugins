@@ -11,10 +11,9 @@ export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt', overrideAccess: true })).docs as Media[]
-  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt', overrideAccess: true }))
-    .docs as Service[]
-  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt', overrideAccess: true })).docs as Post[]
+  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs as Media[]
+  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs as Service[]
+  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs as Post[]
 
   return (
     <SandboxShell

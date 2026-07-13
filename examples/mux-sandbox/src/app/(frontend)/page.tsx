@@ -12,8 +12,7 @@ export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt', overrideAccess: true }))
-    .docs as VideoDoc[]
+  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs as VideoDoc[]
 
   return (
     <SandboxShell

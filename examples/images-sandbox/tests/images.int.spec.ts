@@ -24,7 +24,7 @@ const getHandler = (payload: Payload, method: string, path: string) => {
 }
 
 const countVariants = async (payload: Payload, sourceId: string | number): Promise<number> => {
-  const r = await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 100, overrideAccess: true })
+  const r = await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 100 })
   return r.totalDocs
 }
 
@@ -71,7 +71,6 @@ describe('payload-images wiring', () => {
       collection: 'images',
       data: { alt: 'green', focalX: 40, focalY: 60 },
       file: { data: png, mimetype: 'image/png', name: 'green.png', size: png.byteLength },
-      overrideAccess: true,
     })
     sourceId = String(doc.id)
   }, 60_000)
@@ -145,7 +144,7 @@ describe('payload-images wiring', () => {
 
   it('stores the placeholder tiers at upload, and placeholder serves the read a finished placeholder', async () => {
     // The seed uploads ran the beforeChange generator — every tier is a non-empty string.
-    const doc = (await payload.findByID({ collection: 'images', id: sourceId, overrideAccess: true })) as unknown as Record<string, unknown>
+    const doc = (await payload.findByID({ collection: 'images', id: sourceId })) as unknown as Record<string, unknown>
     for (const f of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl']) {
       expect(typeof doc[f], f).toBe('string')
       expect((doc[f] as string).length).toBeGreaterThan(5)
@@ -177,7 +176,6 @@ describe('payload-images wiring', () => {
     const cropped = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      overrideAccess: true,
       context: { image: { aspectRatio: '16:9' } },
     })) as { placeholder?: string | null }
     expect(cropped.placeholder).toMatch(/^data:image\/png;base64,/)
@@ -187,7 +185,6 @@ describe('payload-images wiring', () => {
     const webp = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      overrideAccess: true,
       context: { image: { aspectRatio: '16:9' }, blur: { quality: 'xxl' } },
     })) as { placeholder?: string | null }
     expect(webp.placeholder).toMatch(/^data:image\/webp;base64,/)
@@ -198,7 +195,6 @@ describe('payload-images wiring', () => {
     const rawHash = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      overrideAccess: true,
       context: { image: { aspectRatio: '16:9' }, blur: { format: 'hash' } },
     })) as { placeholder?: string | null }
     expect((rawHash.placeholder as string).length).toBe((doc.blurHashSm as string).length)
@@ -208,7 +204,6 @@ describe('payload-images wiring', () => {
     const xl = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      overrideAccess: true,
       context: { blur: { quality: 'xl', format: 'hash' } },
     })) as { placeholder?: string | null }
     expect(xl.placeholder).toBe(doc.blurHashXl)
@@ -234,13 +229,12 @@ describe('payload-images wiring', () => {
       collection: 'images',
       data: { alt: 'saliency blob' }, // no focal → the hook may suggest one
       file: { data: png, mimetype: 'image/png', name: 'blob.png', size: png.byteLength },
-      overrideAccess: true,
     })) as { id: string | number; focalX?: number | null; focalY?: number | null }
 
     // The blob sits at (75%, 25%) — the suggestion should land in that quadrant, never the 50/50 default.
     expect(doc.focalX).toBeGreaterThan(55)
     expect(doc.focalY).toBeLessThan(45)
-    await payload.delete({ collection: 'images', id: doc.id, overrideAccess: true })
+    await payload.delete({ collection: 'images', id: doc.id })
   })
 
   it('<ResponsiveImage> renders a single <img> (Shape B) painting the render-ready doc it was handed', async () => {
@@ -251,7 +245,6 @@ describe('payload-images wiring', () => {
       collection: 'images',
       id: sourceId,
       depth: 0,
-      overrideAccess: true,
       select: RESPONSIVE_IMAGE_SELECT,
       context: { image: { aspectRatio: '16:9', quality: 80 } },
     })) as { id: string | number; alt?: string; src?: string; srcset?: string; placeholder?: string }
@@ -291,7 +284,7 @@ describe('payload-images wiring', () => {
 
   it('getImageUrl builds an absolute, focal-cropped OG URL that the endpoint serves (the generateMetadata pattern)', async () => {
     const { getImageUrl } = await import('@pro-laico/payload-images/utils/urls')
-    const doc = await payload.findByID({ collection: 'images', id: sourceId, depth: 0, overrideAccess: true })
+    const doc = await payload.findByID({ collection: 'images', id: sourceId, depth: 0 })
 
     // What you'd drop into `openGraph.images[].url` in a Next generateMetadata.
     const ogUrl = getImageUrl(doc, { width: 1200, aspectRatio: '1200:630', baseUrl: 'https://cdn.example.com' }) as string
@@ -317,7 +310,7 @@ describe('payload-images wiring', () => {
     expect(await countVariants(payload, sourceId)).toBeGreaterThan(0)
 
     // Deleting the source removes its variants via the beforeDelete hook.
-    await payload.delete({ collection: 'images', id: sourceId, overrideAccess: true })
+    await payload.delete({ collection: 'images', id: sourceId })
     expect(await countVariants(payload, sourceId)).toBe(0)
   })
 
@@ -339,7 +332,7 @@ describe('payload-images wiring', () => {
     expect(result.created.images).toBe(3)
     expect(result.created.pages).toBe(1)
 
-    const imgs = await payload.find({ collection: 'images', limit: 50, overrideAccess: true, sort: 'createdAt' })
+    const imgs = await payload.find({ collection: 'images', limit: 50, sort: 'createdAt' })
     expect(imgs.totalDocs).toBe(3)
     const lighthouse = imgs.docs.find((d) => d.alt === 'Landscape sample') as
       | { id: string | number; focalX?: number; focalY?: number; src?: string; srcset?: string; placeholderURL?: string }
@@ -354,9 +347,7 @@ describe('payload-images wiring', () => {
     expect(lighthouse?.placeholderURL).toContain('w=32')
 
     // The page resolved its `ref('images', 'lighthouse')` token to the seeded image doc's id.
-    const page = (await payload.find({ collection: 'pages', depth: 0, overrideAccess: true })).docs[0] as
-      | { heroImage?: string | number }
-      | undefined
+    const page = (await payload.find({ collection: 'pages', depth: 0 })).docs[0] as { heroImage?: string | number } | undefined
     expect(page?.heroImage).toBe(lighthouse?.id)
 
     // And the transform endpoint renders a seeded image, focal-cropped, end to end.

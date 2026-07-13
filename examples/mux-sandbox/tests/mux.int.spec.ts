@@ -89,7 +89,6 @@ describe('payload-mux wiring', () => {
     payload.create({
       collection: 'mux-video',
       data: { title: `wh-${assetId}`, assetId, duration, playbackOptions: [{ playbackId: `pb-${assetId}`, playbackPolicy: 'public' }] },
-      overrideAccess: true,
     })
 
   it('verifies a correctly-signed webhook and applies the update', async () => {

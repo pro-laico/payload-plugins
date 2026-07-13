@@ -58,7 +58,6 @@ describe('smart prewarm', () => {
       collection: 'images',
       data: { alt: 'observed' },
       file: { data: png, mimetype: 'image/png', name: 'observed.png', size: png.byteLength },
-      overrideAccess: true,
     })
     observedId = String(doc.id)
   }, 60_000)
@@ -92,7 +91,6 @@ describe('smart prewarm', () => {
       collection: 'images',
       data: { alt: 'fresh' },
       file: { data: png, mimetype: 'image/png', name: 'fresh.png', size: png.byteLength },
-      overrideAccess: true,
     })
     // The create hook queued a job with a 30s waitUntil; queue an immediately-eligible one instead.
     await payload.jobs.queue({
@@ -121,7 +119,7 @@ describe('smart prewarm', () => {
     // enqueues (it recomputes from current state when it runs, so it already covers the edit).
     const req = await createLocalReq({}, payload)
     await payload.db.deleteMany({ collection: 'payload-jobs', req, where: {} })
-    await payload.update({ collection: 'images', id: observedId, data: { focalX: 20, focalY: 30 }, overrideAccess: true })
+    await payload.update({ collection: 'images', id: observedId, data: { focalX: 20, focalY: 30 } })
     const job = await poll(async () => {
       const r = await payload.find({ collection: 'payload-jobs', where: { taskSlug: { equals: 'imagesPrewarm' } }, limit: 100 })
       return r.docs.find((d) => {

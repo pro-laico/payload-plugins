@@ -63,7 +63,7 @@ describe('payload-fonts seeding (integration)', () => {
     expect(inter.variable?.upright).toBeTruthy()
 
     // The fontSet global was wired to the typefaces via ref() — sans → the Inter doc.
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as {
+    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1 })) as {
       sans?: { title?: string }
     }
     expect(fontSet.sans?.title).toBe('Inter')

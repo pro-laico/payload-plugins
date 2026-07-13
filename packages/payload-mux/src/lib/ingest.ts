@@ -105,7 +105,6 @@ export async function ingestMuxVideo(payload: Payload, opts: IngestMuxVideoOptio
       title: opts.title,
       source: { file: opts.source, playbackPolicy: opts.playbackPolicy, posterTimestamp: opts.posterTimestamp },
     } as never,
-    overrideAccess: true,
   })
   return doc as { id: string | number }
 }

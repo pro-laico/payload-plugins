@@ -94,7 +94,6 @@ describe('write side outside a request scope (CLI seeds, payload run scripts)', 
     const doc = (await payload.create({
       collection: 'posts' as never,
       data: { title: 'First Post', slug: 'first-post', order: 1 } as never,
-      overrideAccess: true,
     })) as unknown as { id: string | number }
     expect(doc.id).toBeTruthy() // revalidateTag exploding never fails the write
 
@@ -106,7 +105,7 @@ describe('write side outside a request scope (CLI seeds, payload run scripts)', 
 
     // Warned ONCE per process — a seed of 500 docs must not print 500 of these.
     const before = messages().filter((m) => m.includes('[payload-revalidate]')).length
-    await payload.create({ collection: 'posts' as never, data: { title: 'Second', slug: 'second-post' } as never, overrideAccess: true })
+    await payload.create({ collection: 'posts' as never, data: { title: 'Second', slug: 'second-post' } as never })
     const after = messages().filter((m) => m.includes('[payload-revalidate]')).length
     expect(after).toBe(before)
     record('hook write with no request scope', warn, `subsequent writes: no repeat warning (${before} total)`)

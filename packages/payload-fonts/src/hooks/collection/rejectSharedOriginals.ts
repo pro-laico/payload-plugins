@@ -25,7 +25,6 @@ export const makeRejectSharedOriginals =
       where: where as never,
       depth: 0,
       limit: 1,
-      overrideAccess: true,
       req,
     })
     if (res.totalDocs > 0) {

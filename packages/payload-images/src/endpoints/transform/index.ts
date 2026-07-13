@@ -127,7 +127,6 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
             sort: '-width',
             limit: 24,
             depth: 0,
-            overrideAccess: true,
             select: {
               width: true,
               height: true,

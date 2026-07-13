@@ -84,7 +84,6 @@ describe('local-API writes without credentials', () => {
     const doc = (await payload.create({
       collection: 'mux-video' as never,
       data: { title: 'No Media Yet' } as never,
-      overrideAccess: true,
     })) as unknown as {
       id: string | number
     }
@@ -97,7 +96,6 @@ describe('local-API writes without credentials', () => {
       .create({
         collection: 'mux-video' as never,
         data: { title: 'Ingest Me', source: { file: 'assets/media/ok.txt' } } as never,
-        overrideAccess: true,
       })
       .then(
         () => undefined,
@@ -112,12 +110,10 @@ describe('local-API writes without credentials', () => {
 
   it('creating with an `assetId` rejects raw too, but the LOG carries the [payload-mux] context', async () => {
     clearLogs()
-    const err = await payload
-      .create({ collection: 'mux-video' as never, data: { title: 'Fetch Me', assetId: 'fake-asset' } as never, overrideAccess: true })
-      .then(
-        () => undefined,
-        (e: Error) => e,
-      )
+    const err = await payload.create({ collection: 'mux-video' as never, data: { title: 'Fetch Me', assetId: 'fake-asset' } as never }).then(
+      () => undefined,
+      (e: Error) => e,
+    )
     expect(err?.message).toContain('Could not resolve authentication method')
     const logged = errorMessages().find((m) => m.includes('[payload-mux]'))
     expect(logged).toContain("Error preparing Mux asset for 'Fetch Me'") // names the doc — log-only
@@ -180,9 +176,8 @@ describe('endpoint failures', () => {
     }
     const res = await callWebhook(event, muxSignature(event, WEBHOOK_SECRET))
     expect(res.status).toBe(200)
-    const doc = (
-      await payload.find({ collection: 'mux-video' as never, where: { assetId: { equals: 'asset_errored_1' } } as never, overrideAccess: true })
-    ).docs[0] as unknown as { status?: string; error?: string }
+    const doc = (await payload.find({ collection: 'mux-video' as never, where: { assetId: { equals: 'asset_errored_1' } } as never }))
+      .docs[0] as unknown as { status?: string; error?: string }
     expect(doc?.status).toBe('errored')
     expect(doc?.error).toContain('Input file is corrupt or unsupported')
     record('signed asset.errored webhook', `doc.status: ${doc?.status}`, `doc.error: ${doc?.error}`)

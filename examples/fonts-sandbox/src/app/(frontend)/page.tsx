@@ -19,9 +19,7 @@ async function getActive(payload: Payload): Promise<ActiveEntry[]> {
 
   const titleByFamily = new Map<string, string>()
   try {
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1, overrideAccess: true })) as unknown as Partial<
-      Record<string, { title?: string } | null>
-    >
+    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1 })) as unknown as Partial<Record<string, { title?: string } | null>>
     for (const family of ['sans', 'serif', 'mono', 'display']) {
       const doc = fontSet?.[family]
       if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)

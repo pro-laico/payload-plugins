@@ -57,7 +57,6 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
       where: { cacheKey: { equals: key } },
       limit: 1,
       depth: 0,
-      overrideAccess: true,
     })
     const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined //EXCUSE: docs of a runtime-configured collection are untyped; readBytes null-guards every field
     if (variant) {
@@ -132,7 +131,6 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
             focalY: src.focalY ?? null,
           },
           overwriteExistingFiles: true,
-          overrideAccess: true,
         })
       } catch (err) {
         if (isForeignKeyError(err)) {

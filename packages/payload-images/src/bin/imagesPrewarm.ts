@@ -51,7 +51,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
 
     let page = 1
     outer: for (;;) {
-      const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, overrideAccess: true, sort: 'id', select: {} })
+      const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, sort: 'id', select: {} })
       for (const doc of res.docs) {
         if (processed >= max) break outer
         processed++

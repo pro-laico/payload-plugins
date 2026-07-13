@@ -19,7 +19,7 @@ import type {
 
 const countDocs = async (payload: Payload, slug: string, where?: Where): Promise<number | null> => {
   try {
-    return (await payload.count({ collection: slug as CollectionSlug, overrideAccess: true, ...(where ? { where } : {}) })).totalDocs
+    return (await payload.count({ collection: slug as CollectionSlug, ...(where ? { where } : {}) })).totalDocs
   } catch {
     return null
   }
@@ -66,7 +66,6 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
         where: { active: { equals: true } },
         limit: 1,
         depth: 0,
-        overrideAccess: true,
         pagination: false,
       })
       const doc = res.docs[0] as { title?: string } | undefined
@@ -82,7 +81,6 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
         sort: '-count',
         limit: 20,
         depth: 0,
-        overrideAccess: true,
         pagination: false,
       })
       misses = (res.docs as { name?: string; count?: number; lastRequestedAt?: string }[]).flatMap((d) =>
@@ -104,10 +102,7 @@ const fontsSnapshot = async (payload: Payload, marker: FontsMarker): Promise<Fon
   if (fontSetSlug && familyKeys.length) {
     try {
       // Through `unknown`: in an app context `findGlobal` returns the app's generated global type.
-      const set = (await payload.findGlobal({ slug: fontSetSlug as GlobalSlug, depth: 1, overrideAccess: true })) as unknown as Record<
-        string,
-        unknown
-      >
+      const set = (await payload.findGlobal({ slug: fontSetSlug as GlobalSlug, depth: 1 })) as unknown as Record<string, unknown>
       for (const key of familyKeys) {
         const value = set[key]
         slots[key] = value && typeof value === 'object' && 'title' in value ? ((value as { title?: string }).title ?? null) : null

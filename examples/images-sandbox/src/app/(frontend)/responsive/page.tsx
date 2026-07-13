@@ -10,9 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function ResponsivePage() {
   const payload = await getPayload({ config })
-  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt', overrideAccess: true })).docs[0] as
-    | ImageDoc
-    | undefined
+  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs[0] as ImageDoc | undefined
 
   if (!img) {
     return (

@@ -20,7 +20,7 @@ const transform = (payload: Payload) => {
 }
 
 const countVariants = async (payload: Payload, sourceId: string | number): Promise<number> => {
-  const r = await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 100, overrideAccess: true })
+  const r = await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 100 })
   return r.totalDocs
 }
 
@@ -62,7 +62,6 @@ describe('nearby-quality fallback', () => {
       collection: 'images',
       data: { alt: 'wide' },
       file: { data: png, mimetype: 'image/png', name: 'wide.png', size: png.byteLength },
-      overrideAccess: true,
     })
     sourceId = String(doc.id)
   }, 60_000)

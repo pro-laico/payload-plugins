@@ -43,7 +43,6 @@ const loadLiveRequests = async (): Promise<LiveRequest[]> => {
       limit: 500,
       depth: 0,
       sort: '-count',
-      overrideAccess: true,
     })
     return res.docs.map((d) => {
       const r = d as { name?: string; count?: number | null; lastRequestedAt?: string | null }

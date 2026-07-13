@@ -30,7 +30,6 @@ export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
           // collections — hosts without payload-icons' iconSet can't type `active`.
           data: { active: true, _status: 'published' } as never,
           draft: false,
-          overrideAccess: true,
         })
         return Response.json({ success: true })
       } catch (e) {

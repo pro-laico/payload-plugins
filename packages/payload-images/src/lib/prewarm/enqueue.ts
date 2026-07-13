@@ -42,7 +42,6 @@ export const enqueuePrewarmJob = async (payload: Payload, args: EnqueuePrewarmAr
         },
         limit: 100,
         depth: 0,
-        overrideAccess: true,
       })
       const dupe = pending.docs.some((doc) => {
         const input = (doc as { input?: unknown }).input //EXCUSE: payload-jobs input is untyped JSON; shape-guarded below

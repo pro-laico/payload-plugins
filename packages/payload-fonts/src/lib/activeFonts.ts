@@ -41,9 +41,7 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   try {
     // `as unknown as` — in a project with generated types findGlobal resolves to the concrete
     // fontSet interface, which doesn't structurally overlap a string-keyed record.
-    selection = (await payload.findGlobal({ slug: fontSetSlug, depth: 0, overrideAccess: true })) as unknown as Partial<
-      Record<FontFamily, unknown>
-    >
+    selection = (await payload.findGlobal({ slug: fontSetSlug, depth: 0 })) as unknown as Partial<Record<FontFamily, unknown>>
   } catch {
     return [] // fontSet global not registered
   }
@@ -60,7 +58,7 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   if (!familyIds.length) return []
 
   const uniqueIds = [...new Set(familyIds.map((r) => r.id))]
-  const res = await payload.find({ collection: optimizedSlug, where: { font: { in: uniqueIds } }, depth: 0, limit: 1000, overrideAccess: true })
+  const res = await payload.find({ collection: optimizedSlug, where: { font: { in: uniqueIds } }, depth: 0, limit: 1000 })
 
   const facesByFont = new Map<string | number, RawFace[]>()
   for (const d of res.docs as unknown as Array<Record<string, unknown>>) {

@@ -16,7 +16,6 @@ export const servedFilesHook =
       const { totalDocs } = await req.payload.count({
         collection: optimizedSlug as CollectionSlug,
         where: { font: { equals: id } },
-        overrideAccess: true,
         req,
       })
       ;(doc as Record<string, unknown>).servedFiles = totalDocs

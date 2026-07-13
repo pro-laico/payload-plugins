@@ -20,7 +20,7 @@ const transform = (payload: Payload) => {
 }
 
 const countVariants = async (payload: Payload, sourceId: string | number): Promise<number> =>
-  (await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 0, overrideAccess: true })).totalDocs
+  (await payload.find({ collection: 'generated-images', where: { source: { equals: sourceId } }, limit: 0 })).totalDocs
 
 /** Poll until the source has at least `n` persisted variants (persist is fire-and-forget). */
 const waitForCount = async (payload: Payload, sourceId: string | number, n: number, tries = 50): Promise<number> => {
@@ -68,7 +68,6 @@ describe('presets + variant cap', () => {
       collection: 'images',
       data: { alt: 'preset', presets: [{ template: 'og' }] },
       file: { data: png, mimetype: 'image/png', name: 'preset.png', size: png.byteLength },
-      overrideAccess: true,
     })
     // Eager generation (afterChange → void work() in tests) creates the og variant — poll for it.
     for (let i = 0; i < 40 && (await countVariants(payload, doc.id)) < 1; i++) await new Promise((r) => setTimeout(r, 100))
@@ -89,7 +88,6 @@ describe('presets + variant cap', () => {
       collection: 'images',
       data: { alt: 'capped', variantLimit: 2, presets: [{ template: 'og' }] }, // og toggled on → cap-exempt
       file: { data: png, mimetype: 'image/png', name: 'capped.png', size: png.byteLength },
-      overrideAccess: true,
     })
     // The eager hook pre-generates og on create; clear so the cap test starts from a known count.
     const req0 = await createLocalReq({}, payload)

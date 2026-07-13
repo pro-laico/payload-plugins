@@ -17,12 +17,10 @@ const uploadIcon = async (payload: Payload, name: string, pathD: string) => {
     collection: 'icon',
     data: {},
     file: { name: `${name}.svg`, data, mimetype: 'image/svg+xml', size: data.byteLength },
-    overrideAccess: true,
   })) as { id: number; svgString?: string }
 }
 
-const svgOf = async (payload: Payload, id: number) =>
-  ((await payload.findByID({ collection: 'icon', id, overrideAccess: true })) as { svgString?: string }).svgString
+const svgOf = async (payload: Payload, id: number) => ((await payload.findByID({ collection: 'icon', id })) as { svgString?: string }).svgString
 
 /** Replicates `getActiveIconSet`: the active set's name→svg map in one populated query, with the
  *  `_status: published` guard on the published path (so a draft-lane-active set can't leak). */
@@ -36,7 +34,6 @@ const activeMap = async (payload: Payload, draft = false): Promise<Record<string
       depth: 1,
       draft,
       pagination: false,
-      overrideAccess: true,
       select: { iconsArray: true },
       populate: { icon: { svgString: true } },
     })
@@ -76,7 +73,7 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
     if (dbDir) rmSync(dirname(join(dbDir, 'test.db')), { recursive: true, force: true })
   })
 
-  const clearSets = () => payload.delete({ collection: 'iconSet', where: { id: { exists: true } }, overrideAccess: true })
+  const clearSets = () => payload.delete({ collection: 'iconSet', where: { id: { exists: true } } })
 
   it('registers iconSet with an active flag + iconsArray + drafts, and iconRequest — and no global', () => {
     const set = payload.config.collections.find((c) => c.slug === 'iconSet')
@@ -93,28 +90,27 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
     const created = (await payload.create({
       collection: 'iconSet',
       data: { title: 'Kebab', _status: 'published', iconsArray: [{ name: 'Arrow Right', icon: glyph.id }] },
-      overrideAccess: true,
     })) as { iconsArray?: { name?: string }[] }
     expect(created.iconsArray?.[0]?.name).toBe('arrow-right')
     await clearSets()
   })
 
   it('enforces the single-active invariant in the published lane', async () => {
-    const a = await payload.create({ collection: 'iconSet', data: { title: 'A', active: true, _status: 'published' }, overrideAccess: true })
-    const b = await payload.create({ collection: 'iconSet', data: { title: 'B', active: true, _status: 'published' }, overrideAccess: true })
+    const a = await payload.create({ collection: 'iconSet', data: { title: 'A', active: true, _status: 'published' } })
+    const b = await payload.create({ collection: 'iconSet', data: { title: 'B', active: true, _status: 'published' } })
 
-    let aDoc = (await payload.findByID({ collection: 'iconSet', id: a.id, overrideAccess: true })) as { active?: boolean }
+    let aDoc = (await payload.findByID({ collection: 'iconSet', id: a.id })) as { active?: boolean }
     expect(aDoc.active).toBe(false) // activating B deactivated A
-    let bDoc = (await payload.findByID({ collection: 'iconSet', id: b.id, overrideAccess: true })) as { active?: boolean }
+    let bDoc = (await payload.findByID({ collection: 'iconSet', id: b.id })) as { active?: boolean }
     expect(bDoc.active).toBe(true)
 
-    await payload.update({ collection: 'iconSet', id: a.id, data: { active: true, _status: 'published' }, overrideAccess: true })
-    aDoc = (await payload.findByID({ collection: 'iconSet', id: a.id, overrideAccess: true })) as { active?: boolean }
-    bDoc = (await payload.findByID({ collection: 'iconSet', id: b.id, overrideAccess: true })) as { active?: boolean }
+    await payload.update({ collection: 'iconSet', id: a.id, data: { active: true, _status: 'published' } })
+    aDoc = (await payload.findByID({ collection: 'iconSet', id: a.id })) as { active?: boolean }
+    bDoc = (await payload.findByID({ collection: 'iconSet', id: b.id })) as { active?: boolean }
     expect(aDoc.active).toBe(true)
     expect(bDoc.active).toBe(false)
 
-    const count = await payload.count({ collection: 'iconSet', where: { active: { equals: true } }, overrideAccess: true })
+    const count = await payload.count({ collection: 'iconSet', where: { active: { equals: true } } })
     expect(count.totalDocs).toBe(1)
     await clearSets()
   })
@@ -133,7 +129,6 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
           { name: 'check', icon: check.id },
         ],
       },
-      overrideAccess: true,
     })
 
     const map = await activeMap(payload)
@@ -155,20 +150,18 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
     const line = await payload.create({
       collection: 'iconSet',
       data: { title: 'Line', active: true, _status: 'published', iconsArray: [{ name: 'star', icon: lineStar.id }] },
-      overrideAccess: true,
     })
     const solid = await payload.create({
       collection: 'iconSet',
       data: { title: 'Solid', active: false, _status: 'published', iconsArray: [{ name: 'star', icon: solidStar.id }] },
-      overrideAccess: true,
     })
     expect(await resolveName(payload, 'star')).toBe(lineSvg)
 
     // Activate the other set — the same name now resolves to a different glyph site-wide.
-    await payload.update({ collection: 'iconSet', id: solid.id, data: { active: true, _status: 'published' }, overrideAccess: true })
+    await payload.update({ collection: 'iconSet', id: solid.id, data: { active: true, _status: 'published' } })
     expect(await resolveName(payload, 'star')).toBe(solidSvg)
     // line was deactivated by the single-active invariant
-    const lineDoc = (await payload.findByID({ collection: 'iconSet', id: line.id, overrideAccess: true })) as { active?: boolean }
+    const lineDoc = (await payload.findByID({ collection: 'iconSet', id: line.id })) as { active?: boolean }
     expect(lineDoc.active).toBe(false)
     await clearSets()
   })
@@ -183,21 +176,19 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
     await payload.create({
       collection: 'iconSet',
       data: { title: 'A', active: true, _status: 'published', iconsArray: [{ name: 'x', icon: aIcon.id }] },
-      overrideAccess: true,
     })
     // Set B: active but saved as a DRAFT (staged, not yet live).
     const b = await payload.create({
       collection: 'iconSet',
       data: { title: 'B', active: true, iconsArray: [{ name: 'x', icon: bIcon.id }] },
       draft: true,
-      overrideAccess: true,
     })
 
     expect(await resolveName(payload, 'x', false)).toBe(aSvg) // published frontend: still the live set
     expect(await resolveName(payload, 'x', true)).toBe(bSvg) // draft preview: the staged set
 
     // Publish B — the swap goes live and A is deactivated.
-    await payload.update({ collection: 'iconSet', id: b.id, data: { active: true, _status: 'published' }, overrideAccess: true })
+    await payload.update({ collection: 'iconSet', id: b.id, data: { active: true, _status: 'published' } })
     expect(await resolveName(payload, 'x', false)).toBe(bSvg)
     await clearSets()
   })
@@ -206,13 +197,13 @@ describe('payload-icons — iconSet active toggle + resolution', () => {
     await payload.db.deleteMany({ collection: 'iconRequest', req: await createLocalReq({}, payload), where: {} })
 
     await recordIconMiss(payload, 'phantom')
-    let rows = await payload.find({ collection: 'iconRequest', where: { name: { equals: 'phantom' } }, overrideAccess: true })
+    let rows = await payload.find({ collection: 'iconRequest', where: { name: { equals: 'phantom' } } })
     expect(rows.totalDocs).toBe(1)
     const first = rows.docs[0] as { count?: number; firstRequestedAt?: string }
     expect(first.count).toBe(1)
 
     await recordIconMiss(payload, 'phantom')
-    rows = await payload.find({ collection: 'iconRequest', where: { name: { equals: 'phantom' } }, overrideAccess: true })
+    rows = await payload.find({ collection: 'iconRequest', where: { name: { equals: 'phantom' } } })
     expect(rows.totalDocs).toBe(1) // upsert, not a second row
     const second = rows.docs[0] as { count?: number; firstRequestedAt?: string }
     expect(second.count).toBe(2)
