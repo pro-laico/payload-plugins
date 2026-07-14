@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug } from 'payload'
+import type { CollectionConfig } from 'payload'
 
 import { authd } from '../access'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
@@ -25,13 +25,13 @@ export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectio
       {
         name: 'font',
         type: 'relationship',
-        relationTo: fontSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        relationTo: fontSlug,
         admin: { readOnly: true },
       },
       {
         name: 'original',
         type: 'relationship',
-        relationTo: originalSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        relationTo: originalSlug,
         admin: { readOnly: true },
       },
       { name: 'weight', type: 'text', admin: { readOnly: true } },

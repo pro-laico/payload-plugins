@@ -5,9 +5,7 @@ import { createLocalReq, type Payload } from 'payload'
 import type { UploadDoc, UploadHandler } from '../types'
 
 const resolveStaticDir = (payload: Payload, slug: string): string => {
-  //TODO: replace `as` cast with proper typing
-  const collections = payload.collections as Record<string, { config?: { upload?: { staticDir?: string } } }>
-  const dir = collections?.[slug]?.config?.upload?.staticDir
+  const dir = payload.collections[slug]?.config?.upload?.staticDir
   const base = dir?.length ? dir : slug
   return path.isAbsolute(base) ? base : path.resolve(process.cwd(), base)
 }
@@ -15,9 +13,8 @@ const resolveStaticDir = (payload: Payload, slug: string): string => {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function readViaStorageHandlers(payload: Payload, slug: string, doc: UploadDoc): Promise<Buffer | null> {
-  //TODO: replace `as` cast with proper typing
-  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }>
-  const handlers = collections?.[slug]?.config?.upload?.handlers
+  //EXCUSE: the plugin invokes storage handlers with a light UploadDoc for a runtime-configured collection; Payload's handler type demands that collection's full generated doc
+  const handlers = payload.collections[slug]?.config?.upload?.handlers as UploadHandler[] | undefined
   if (!handlers?.length || !doc.filename) return null
   const ATTEMPTS = 4
   const RETRY_DELAY_MS = 1500

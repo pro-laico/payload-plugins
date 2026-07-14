@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 
 import { familyExportName, familyVarSuffix } from '../lib/families'
+import { isRecord } from '../lib/isRecord'
 import type { ExportFontsResponse, Family, RunDownloadFontsOptions, WeightFile } from '../types'
 
 const colors = {
@@ -14,11 +15,11 @@ const colors = {
 
 const DOWN_CODES = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH/
 const isServerDown = (err: unknown): boolean => {
-  if (!err || typeof err !== 'object') return false
-  //TODO: replace `as` cast with proper typing
-  const { code, message, cause, errors } = err as { code?: string; message?: string; cause?: unknown; errors?: unknown[] }
-  if (DOWN_CODES.test(code ?? '') || DOWN_CODES.test(message ?? '')) return true
-  return isServerDown(cause) || (Array.isArray(errors) && errors.some(isServerDown))
+  if (!isRecord(err)) return false
+  const code = typeof err.code === 'string' ? err.code : ''
+  const message = typeof err.message === 'string' ? err.message : ''
+  if (DOWN_CODES.test(code) || DOWN_CODES.test(message)) return true
+  return isServerDown(err.cause) || (Array.isArray(err.errors) && err.errors.some(isServerDown))
 }
 
 function resolveOptions(overrides?: RunDownloadFontsOptions) {
@@ -132,7 +133,7 @@ export default fonts
         warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}${hint}`)
         return
       }
-      manifest = (await res.json()) as ExportFontsResponse //TODO: replace `as` cast with proper typing
+      manifest = await res.json()
     } catch (err) {
       if (isServerDown(err)) {
         console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)

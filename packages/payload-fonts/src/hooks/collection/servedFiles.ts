@@ -1,18 +1,20 @@
-import type { CollectionAfterReadHook, CollectionSlug } from 'payload'
+import type { CollectionAfterReadHook } from 'payload'
+
+import { isRecord } from '../../lib/isRecord'
 
 export const servedFilesHook =
   (optimizedSlug: string): CollectionAfterReadHook =>
   async ({ doc, findMany, req }) => {
-    if (findMany || !req?.payload) return doc
-    const id = (doc as { id?: string | number }).id //TODO: replace `as` cast with proper typing
+    if (findMany || !req?.payload || !isRecord(doc)) return doc
+    const id = typeof doc.id === 'string' || typeof doc.id === 'number' ? doc.id : undefined
     if (id == null) return doc
     try {
       const { totalDocs } = await req.payload.count({
-        collection: optimizedSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        collection: optimizedSlug,
         where: { font: { equals: id } },
         req,
       })
-      ;(doc as Record<string, unknown>).servedFiles = totalDocs //TODO: replace `as` cast with proper typing
+      doc.servedFiles = totalDocs
     } catch (err) {
       req.payload.logger.warn({ msg: `[payload-fonts] could not count served files for typeface ${id}`, err })
     }

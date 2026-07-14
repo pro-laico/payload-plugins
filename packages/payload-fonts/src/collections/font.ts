@@ -1,4 +1,4 @@
-import type { ArrayField, CollectionConfig, CollectionSlug, GroupField, NumberField, RadioField, TextField } from 'payload'
+import type { ArrayField, CollectionConfig, GroupField, NumberField, RadioField, TextField } from 'payload'
 
 import { authd } from '../access'
 import { FONT_ORIGINAL_SLUG } from './fontOriginal'
@@ -11,6 +11,7 @@ import { requireFontFiles } from '../hooks/collection/requireFontFiles'
 import { cleanupFontAssetsHook } from '../hooks/collection/cleanupFontAssets'
 import { optimizeFromOriginalsHook } from '../hooks/collection/optimizeFromOriginals'
 import { makeRejectSharedOriginals } from '../hooks/collection/rejectSharedOriginals'
+import { isRecord } from '../lib/isRecord'
 
 const d = {
   servedFiles:
@@ -29,7 +30,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
   const fontSlug = 'font'
   const families = resolveFontFamilies(opts.families)
   const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
-  const originalSlug = (opts.originalSlug || FONT_ORIGINAL_SLUG) as CollectionSlug //TODO: replace `as` cast with proper typing
+  const originalSlug = opts.originalSlug || FONT_ORIGINAL_SLUG
 
   const fields: [TextField, RadioField, NumberField, GroupField, ArrayField] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
@@ -49,7 +50,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
         readOnly: true,
         position: 'sidebar',
         description: d.servedFiles,
-        condition: (data) => Boolean((data as { id?: unknown })?.id), //TODO: replace `as` cast with proper typing
+        condition: (data) => Boolean(isRecord(data) && data.id),
       },
     },
     {
@@ -58,7 +59,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       label: 'Variable font',
       admin: {
         description: d.variable,
-        condition: (data) => !hasWeights(data as Record<string, unknown>), //TODO: replace `as` cast with proper typing
+        condition: (data) => !hasWeights(isRecord(data) ? data : undefined),
       },
       fields: [
         {
@@ -77,7 +78,7 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
       labels: { singular: 'Weight file', plural: 'Weight files' },
       admin: {
         description: d.weights,
-        condition: (data) => !hasVariable(data as Record<string, unknown>), //TODO: replace `as` cast with proper typing
+        condition: (data) => !hasVariable(isRecord(data) ? data : undefined),
       },
       validate: ((rows: Array<{ weight?: string; style?: string }> | null | undefined) => {
         const seen = new Set<string>()
@@ -87,7 +88,8 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
           seen.add(key)
         }
         return true
-      }) as ArrayField['validate'], //TODO: replace `as` cast with proper typing
+        //EXCUSE: the row validator reads only { weight, style }, but ArrayField['validate'] types its value as the full generated field-value union
+      }) as ArrayField['validate'],
       fields: [
         {
           type: 'row',

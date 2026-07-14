@@ -1,6 +1,7 @@
-import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
 
 import { refId } from './refs'
+import { isRecord } from './isRecord'
 import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
 import type { ActiveFace, ActiveTypeface, BuildFontFaceCssOptions, FontFamily, GetActiveFontFacesOptions, RawFace } from '../types'
 
@@ -20,18 +21,18 @@ const familyKeysFromGlobal = (global: Record<string, unknown> | null | undefined
   global ? Object.keys(global).filter((k) => !k.startsWith('_') && !GLOBAL_META_KEYS.has(k)) : []
 
 export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFacesOptions = {}): Promise<ActiveTypeface[]> {
-  const fontSetSlug = (opts.fontSetSlug ?? 'fontSet') as GlobalSlug //TODO: replace `as` cast with proper typing
-  const optimizedSlug = (opts.optimizedSlug ?? 'fontOptimized') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const fontSetSlug = opts.fontSetSlug ?? 'fontSet'
+  const optimizedSlug = opts.optimizedSlug ?? 'fontOptimized'
 
-  let selection: Partial<Record<FontFamily, unknown>>
+  let selection: Record<string, unknown> = {}
   try {
-    //TODO: replace `as` cast with proper typing
-    selection = (await payload.findGlobal({ slug: fontSetSlug, depth: 0 })) as unknown as Partial<Record<FontFamily, unknown>>
+    const global = await payload.findGlobal({ slug: fontSetSlug, depth: 0 })
+    selection = isRecord(global) ? global : {}
   } catch {
     return []
   }
 
-  const families = opts.families ?? familyKeysFromGlobal(selection as Record<string, unknown>) //TODO: replace `as` cast with proper typing
+  const families = opts.families ?? familyKeysFromGlobal(selection)
 
   const familyIds = families
     .map((family) => ({ family, id: refId(selection?.[family]) }))
@@ -42,14 +43,13 @@ export async function getActiveFontFaces(payload: Payload, opts: GetActiveFontFa
   const res = await payload.find({ collection: optimizedSlug, where: { font: { in: uniqueIds } }, depth: 0, limit: 1000 })
 
   const facesByFont = new Map<string | number, RawFace[]>()
-  for (const d of res.docs as unknown as Array<Record<string, unknown>>) {
-    //TODO: replace `as` cast with proper typing
+  for (const d of res.docs) {
     if (typeof d.filename !== 'string') continue
     const fontId = refId(d.font)
     if (fontId == null) continue
     const face: RawFace = {
       filename: d.filename,
-      weight: (d.weight as string) || '400', //TODO: replace `as` cast with proper typing
+      weight: (typeof d.weight === 'string' ? d.weight : '') || '400',
       style: d.style === 'italic' ? 'italic' : 'normal',
       ...(d.italCapable ? { italCapable: true } : {}),
       ...(typeof d.obliqueAngle === 'number' ? { obliqueAngle: d.obliqueAngle } : {}),

@@ -1,10 +1,10 @@
-import type { CollectionSlug, RelationshipField, RowField } from 'payload'
+import type { RelationshipField, RowField } from 'payload'
 
 import type { FontFamilyConfig } from '../types'
 import { resolveFontFamilies } from '../lib/families'
 
 export const fontUploadFields = ({ fontSlug = 'font', families }: { fontSlug?: string; families?: FontFamilyConfig[] } = {}): RowField[] => {
-  const relationTo = fontSlug as CollectionSlug //TODO: replace `as` cast with proper typing
+  const relationTo = fontSlug
   const resolved = resolveFontFamilies(families)
   const slots: RelationshipField[] = resolved.map((family) => ({
     name: family.key,

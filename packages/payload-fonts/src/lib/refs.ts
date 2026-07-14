@@ -1,4 +1,6 @@
+import { isRecord } from './isRecord'
+
 export const refId = (ref: unknown): string | number | undefined => {
-  if (ref && typeof ref === 'object') return (ref as { id?: string | number }).id //TODO: replace `as` cast with proper typing
-  return (ref as string | number | null | undefined) ?? undefined //TODO: replace `as` cast with proper typing
+  if (isRecord(ref)) return typeof ref.id === 'string' || typeof ref.id === 'number' ? ref.id : undefined
+  return typeof ref === 'string' || typeof ref === 'number' ? ref : undefined
 }

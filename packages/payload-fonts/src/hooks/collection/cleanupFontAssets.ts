@@ -1,21 +1,18 @@
-import type { CollectionBeforeDeleteHook, CollectionSlug } from 'payload'
+import type { CollectionBeforeDeleteHook } from 'payload'
 
 import { isNotFound } from '../../lib/isNotFound'
 import { originalIdsFromDoc } from '../../lib/fontDoc'
+import { isRecord } from '../../lib/isRecord'
 
 export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSlug?: string } = {}): CollectionBeforeDeleteHook => {
-  const originalSlug = (opts.originalSlug || 'fontOriginal') as CollectionSlug //TODO: replace `as` cast with proper typing
-  const optimizedSlug = (opts.optimizedSlug || 'fontOptimized') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const originalSlug = opts.originalSlug || 'fontOriginal'
+  const optimizedSlug = opts.optimizedSlug || 'fontOptimized'
 
   return async ({ collection, id, req }) => {
     let data: Record<string, unknown> | undefined
     try {
-      data = (await req.payload.findByID({
-        collection: collection.slug as CollectionSlug, //TODO: replace `as` cast with proper typing
-        id,
-        depth: 0,
-        req,
-      })) as unknown as Record<string, unknown> //TODO: replace `as` cast with proper typing
+      const raw = await req.payload.findByID({ collection: collection.slug, id, depth: 0, req })
+      data = isRecord(raw) ? raw : {}
     } catch {}
 
     try {
@@ -26,8 +23,7 @@ export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSl
         limit: 1000,
         req,
       })
-      for (const d of optimized.docs as Array<{ id: string | number }>) {
-        //TODO: replace `as` cast with proper typing
+      for (const d of optimized.docs) {
         await req.payload.delete({ collection: optimizedSlug, id: d.id, req })
       }
     } catch (err) {

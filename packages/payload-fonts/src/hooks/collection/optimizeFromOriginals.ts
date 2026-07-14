@@ -1,28 +1,32 @@
-import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
+import type { CollectionAfterChangeHook } from 'payload'
 
 import { refId } from '../../lib/refs'
+import { isRecord } from '../../lib/isRecord'
 import { isNotFound } from '../../lib/isNotFound'
 import { originalIdsFromDoc } from '../../lib/fontDoc'
 import { readUploadBytes } from '../../lib/uploadBytes'
-import type { Desired, OptimizeFromOriginalsOptions, Ref } from '../../types'
+import type { Desired, OptimizeFromOriginalsOptions, UploadDoc } from '../../types'
 import { detectMetadata, isSubsetterLoadError, resolveCharsetText, subsetToWoff2 } from '../../lib/optimizeFont'
 
 let warnedSubsetterLoad = false
 
+const idOf = (v: unknown): string | number | undefined =>
+  isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number') ? v.id : undefined
+const asUploadDoc = (v: unknown): v is UploadDoc => isRecord(v)
+
 const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
   const desired: Desired[] = []
-  const variable = (data.variable ?? {}) as { upright?: Ref; italic?: Ref } //TODO: replace `as` cast with proper typing
+  const variable: Record<string, unknown> = isRecord(data.variable) ? data.variable : {}
   const uprightId = refId(variable.upright)
   const italicId = refId(variable.italic)
   if (uprightId != null) desired.push({ originalId: uprightId, style: 'normal', isVariable: true })
   if (italicId != null) desired.push({ originalId: italicId, style: 'italic', isVariable: true })
   if (uprightId == null && italicId == null) {
-    const weights = Array.isArray(data.weights) ? data.weights : []
-    for (const row of weights as Array<{ weight?: string; style?: string; file?: Ref }>) {
-      //TODO: replace `as` cast with proper typing
+    for (const row of Array.isArray(data.weights) ? data.weights : []) {
+      if (!isRecord(row)) continue
       const fid = refId(row.file)
-      if (fid != null)
-        desired.push({ originalId: fid, style: row.style === 'italic' ? 'italic' : 'normal', isVariable: false, weight: row.weight })
+      const weight = typeof row.weight === 'string' ? row.weight : undefined
+      if (fid != null) desired.push({ originalId: fid, style: row.style === 'italic' ? 'italic' : 'normal', isVariable: false, weight })
     }
   }
   return desired
@@ -30,13 +34,14 @@ const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
 
 export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {}): CollectionAfterChangeHook => {
   const charsetText = resolveCharsetText(opts.charset)
-  const originalSlug = (opts.originalSlug || 'fontOriginal') as CollectionSlug //TODO: replace `as` cast with proper typing
-  const optimizedSlug = (opts.optimizedSlug || 'fontOptimized') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const originalSlug = opts.originalSlug || 'fontOriginal'
+  const optimizedSlug = opts.optimizedSlug || 'fontOptimized'
 
   return async ({ doc, operation, previousDoc, req }) => {
-    const data = doc as Record<string, unknown> //TODO: replace `as` cast with proper typing
+    const data: Record<string, unknown> = isRecord(doc) ? doc : {}
     const desired = desiredFromDoc(data)
-    const fontId = data.id as string | number //TODO: replace `as` cast with proper typing
+    const fontId = idOf(data)
+    if (fontId == null) return doc
 
     const fwdHeaders: Record<string, string> = {}
     for (const h of ['cookie', 'authorization', 'origin', 'referer']) {
@@ -53,9 +58,8 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         req,
       })
       const byOriginal = new Map<string | number, Record<string, unknown>>()
-      for (const d of existing.docs as unknown as Array<Record<string, unknown>>) {
-        //TODO: replace `as` cast with proper typing
-        const oid = refId(d.original as Ref) //TODO: replace `as` cast with proper typing
+      for (const d of existing.docs) {
+        const oid = refId(d.original)
         if (oid != null) byOriginal.set(oid, d)
       }
       const desiredIds = new Set(desired.map((d) => d.originalId))
@@ -65,11 +69,12 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         const current = byOriginal.get(d.originalId)
         if (current) {
           const weightDrift = !d.isVariable && d.weight && String(current.weight ?? '') !== d.weight
-          if (weightDrift || String(current.style ?? '') !== d.style) {
+          const cid = idOf(current)
+          if ((weightDrift || String(current.style ?? '') !== d.style) && cid != null) {
             await req.payload.update({
               collection: optimizedSlug,
-              id: current.id as string | number, //TODO: replace `as` cast with proper typing
-              data: { weight: d.weight ?? current.weight, style: d.style } as never, //TODO: replace `as` cast with proper typing
+              id: cid,
+              data: { weight: d.weight ?? current.weight, style: d.style },
               req,
             })
           }
@@ -77,12 +82,8 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
         }
         let originalLabel = `original ${d.originalId}`
         try {
-          const original = (await req.payload.findByID({
-            collection: originalSlug,
-            id: d.originalId,
-            depth: 0,
-            req,
-          })) as { filename?: string | null; url?: string | null } //TODO: replace `as` cast with proper typing
+          const originalRaw = await req.payload.findByID({ collection: originalSlug, id: d.originalId, depth: 0, req })
+          const original: UploadDoc = asUploadDoc(originalRaw) ? originalRaw : {}
           if (original.filename) originalLabel = `original ${d.originalId} ('${original.filename}')`
           const bytes = await readUploadBytes(req.payload, originalSlug, original, { headers: fwdHeaders })
           if (!bytes) {
@@ -107,7 +108,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
               isVariable: meta?.isVariable ?? d.isVariable,
               italCapable,
               ...(italCapable && meta?.obliqueAngle ? { obliqueAngle: meta.obliqueAngle } : {}),
-            } as never, //TODO: replace `as` cast with proper typing
+            },
             file: { data: woff2, name: `${baseName}.woff2`, mimetype: 'font/woff2', size: woff2.length },
           })
         } catch (err) {
@@ -126,8 +127,10 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
 
       for (const [oid, d] of byOriginal) {
         if (desiredIds.has(oid)) continue
+        const did = idOf(d)
+        if (did == null) continue
         try {
-          await req.payload.delete({ collection: optimizedSlug, id: d.id as string | number, req }) //TODO: replace `as` cast with proper typing
+          await req.payload.delete({ collection: optimizedSlug, id: did, req })
         } catch (err) {
           if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete stale optimized font', err })
         }
@@ -135,8 +138,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {
 
       if (operation === 'update' && previousDoc) {
         const stillReferenced = new Set(originalIdsFromDoc(data))
-        for (const oid of originalIdsFromDoc(previousDoc as Record<string, unknown>)) {
-          //TODO: replace `as` cast with proper typing
+        for (const oid of originalIdsFromDoc(isRecord(previousDoc) ? previousDoc : {})) {
           if (stillReferenced.has(oid)) continue
           try {
             await req.payload.delete({ collection: originalSlug, id: oid, req })

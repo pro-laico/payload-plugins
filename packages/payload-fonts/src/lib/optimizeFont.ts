@@ -1,3 +1,4 @@
+import { isRecord } from './isRecord'
 import type { Charset, FontFileMetadata, FontkitFont, SubsetFontFn } from '../types'
 
 const CHARSET_PRESETS: Record<string, Array<[number, number]>> = {
@@ -42,11 +43,12 @@ const normalizeWeight = (weight?: number): string | undefined => {
 
 export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata | null> {
   try {
-    //TODO: replace `as` cast with proper typing
-    const mod = (await import('fontkit')) as unknown as { create?: (b: Buffer) => unknown; default?: { create?: (b: Buffer) => unknown } }
-    const create = mod.create ?? mod.default?.create
+    const mod: unknown = await import('fontkit')
+    const modRec = isRecord(mod) ? mod : {}
+    const defaultRec = isRecord(modRec.default) ? modRec.default : {}
+    const create = typeof modRec.create === 'function' ? modRec.create : typeof defaultRec.create === 'function' ? defaultRec.create : null
     if (!create) return null
-    const font = create(buffer) as FontkitFont //TODO: replace `as` cast with proper typing
+    const font: FontkitFont = create(buffer)
     const italic = Boolean(
       (typeof font.italicAngle === 'number' && font.italicAngle !== 0) ||
         (font['OS/2']?.fsSelection ?? 0) & 0x01 ||
@@ -81,7 +83,8 @@ export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata |
 }
 
 export async function subsetToWoff2(buffer: Buffer, charsetText: string): Promise<Buffer> {
-  const subsetFont = (await import('subset-font')).default as unknown as SubsetFontFn //TODO: replace `as` cast with proper typing
+  //EXCUSE: subset-font's default export is an untyped/mismatched function shape versus our SubsetFontFn
+  const subsetFont = (await import('subset-font')).default as unknown as SubsetFontFn
   return subsetFont(buffer, charsetText, { targetFormat: 'woff2' })
 }
 
