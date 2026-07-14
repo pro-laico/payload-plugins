@@ -1,4 +1,5 @@
 import { file, ref } from './refs'
+import { isRecord } from './lib/isRecord'
 import type { SeedDefinition } from './types'
 
 export const SEED_PACKAGE = '@pro-laico/payload-seed'
@@ -15,7 +16,7 @@ export function buildSeedRegistry(definitions: SeedDefinition[], packageName: st
     else if (def.kind === 'collection') {
       collections[def.slug] ??= new Set()
       const set = collections[def.slug]
-      for (const rec of def.build(tokens)) set?.add((rec as { _key: string })._key) //TODO: replace `as` cast with proper typing
+      for (const rec of def.build(tokens)) if (isRecord(rec) && typeof rec._key === 'string') set?.add(rec._key)
     }
   }
 

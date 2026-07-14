@@ -1,9 +1,10 @@
-import type { AnyToken, FileToken, Ref, RegistryCollectionSlug, RegistryCollections, RegistryKey } from './types'
+import { isRecord } from './lib/isRecord'
+import type { AnyToken, FileToken, Ref, RegistryCollectionSlug, RegistryCollections } from './types'
 
 export type { AnyRef, AnyToken, FileToken, Ref } from './types'
 
 export function ref<C extends RegistryCollectionSlug>(collection: C, key: RegistryCollections[C] & string): Ref<C> {
-  return { __seedRef: 'doc', collection, key: key as RegistryKey<C> } //TODO: replace `as` cast with proper typing
+  return { __seedRef: 'doc', collection, key }
 }
 
 export function file(name: string, options: Record<string, unknown> = {}): FileToken {
@@ -11,13 +12,11 @@ export function file(name: string, options: Record<string, unknown> = {}): FileT
 }
 
 export function isRef(value: unknown): value is Ref {
-  //TODO: replace `as` cast with proper typing
-  return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'doc'
+  return isRecord(value) && value.__seedRef === 'doc'
 }
 
 export function isFileToken(value: unknown): value is FileToken {
-  //TODO: replace `as` cast with proper typing
-  return typeof value === 'object' && value !== null && (value as { __seedRef?: unknown }).__seedRef === 'file'
+  return isRecord(value) && value.__seedRef === 'file'
 }
 
 export function isAnyToken(value: unknown): value is AnyToken {

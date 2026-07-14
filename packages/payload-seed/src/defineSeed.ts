@@ -12,12 +12,12 @@ export function defineSeed<TSlug extends CollectionSlug | GlobalSlug, const T ex
 ): DefinitionFor<TSlug> {
   let built: unknown
   try {
-    built = (build as (t: SeedTokens) => unknown)(tokens) //TODO: replace `as` cast with proper typing
+    built = build(tokens)
   } catch (e) {
     throw new Error(`[payload-seed] defineSeed('${slug}'): builder threw during classification: ${e instanceof Error ? e.message : String(e)}`)
   }
   const kind = Array.isArray(built) ? 'collection' : 'global'
-  //TODO: replace `as unknown as` cast with proper typing
+  //EXCUSE: DefinitionFor<TSlug> is a deferred conditional type (collection-vs-global on the generic TSlug); TS can't verify a runtime-built object matches it, so the return needs a bridge cast
   return { kind, slug, build, ...(opts?.disabled !== undefined ? { disabled: opts.disabled } : {}) } as unknown as DefinitionFor<TSlug>
 }
 

@@ -1,5 +1,6 @@
-import { type CollectionSlug, createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 
+import { isRecord } from '../lib/isRecord'
 import { buildGraph } from './graph'
 import { resolveOptions } from '../options'
 import { notifyAfterSeed } from '../listeners'
@@ -26,10 +27,16 @@ function deepestReason(err: unknown, fallback?: string): string {
   let deepest = err instanceof Error ? err : undefined
   while (deepest?.cause instanceof Error) deepest = deepest.cause
   let msg = deepest?.message ?? fallback ?? String(err)
-  //TODO: replace `as` cast with proper typing
-  const data = (deepest as undefined | { data?: { errors?: Array<{ path?: string; field?: string; message?: string }> } })?.data
-  if (data?.errors?.length) {
-    const fields = data.errors.map((e) => `${e.path ?? e.field ?? '?'}: ${e.message ?? '?'}`).join('; ')
+  const data = isRecord(deepest) && isRecord(deepest.data) ? deepest.data : undefined
+  const errors = data && Array.isArray(data.errors) ? data.errors : undefined
+  if (errors?.length) {
+    const fields = errors
+      .map((e) => {
+        const r = isRecord(e) ? e : {}
+        const path = typeof r.path === 'string' ? r.path : typeof r.field === 'string' ? r.field : '?'
+        return `${path}: ${typeof r.message === 'string' ? r.message : '?'}`
+      })
+      .join('; ')
     msg = `${msg} — ${fields}`
   }
   return msg.replace(/\s+/g, ' ').slice(0, 300)
@@ -43,8 +50,7 @@ async function describeFailedDoc(
   id: string | number,
 ): Promise<string> {
   try {
-    //TODO: replace `as` casts with proper typing
-    const doc = (await payload.findByID({ collection: slug as CollectionSlug, id, req, depth: 0 })) as unknown as Record<string, unknown>
+    const doc = await payload.findByID({ collection: slug, id, req, depth: 0 })
     const label = [useAsTitle ? doc[useAsTitle] : undefined, doc.title, doc.name, doc.slug, doc.filename].find(
       (v): v is string => typeof v === 'string' && v.trim().length > 0,
     )
@@ -58,11 +64,11 @@ const tokens = { ref, file }
 function discoverAssetCollections(payload: Payload): Map<string, AssetCollection> {
   const map = new Map<string, AssetCollection>()
   for (const slug of Object.keys(payload.collections)) {
-    //TODO: replace `as` casts with proper typing
-    const marker = payload.collections[slug as CollectionSlug]?.config.custom?.seedAsset as SeedAssetMarker | undefined
-    if (!marker) continue
-    const m = marker === true ? {} : marker
-    map.set(slug, { sourceField: m.sourceField ?? 'source', subdir: m.subdir })
+    const raw = payload.collections[slug]?.config.custom?.seedAsset
+    if (raw !== true && !isRecord(raw)) continue
+    const sourceField = raw !== true && typeof raw.sourceField === 'string' ? raw.sourceField : 'source'
+    const subdir = raw !== true && typeof raw.subdir === 'string' ? raw.subdir : undefined
+    map.set(slug, { sourceField, subdir })
   }
   return map
 }
@@ -74,13 +80,13 @@ function buildModel(definitions: SeedDefinition[]): BuiltModel {
   for (const def of definitions) {
     if (def.kind === 'collection') {
       const records: BuiltRecord[] = def.build(tokens).map((rec) => {
-        //TODO: replace `as` cast with proper typing
-        const { _key, _file, ...data } = rec as { _key: string; _file?: unknown } & Record<string, unknown>
-        return { key: _key, file: isFileToken(_file) ? _file : undefined, data }
+        const { _key, _file, ...data } = isRecord(rec) ? rec : {}
+        return { key: typeof _key === 'string' ? _key : '', file: isFileToken(_file) ? _file : undefined, data }
       })
       collections.push({ slug: def.slug, records })
     } else if (def.kind === 'global') {
-      globals.push({ slug: def.slug, data: def.build(tokens) as Record<string, unknown> }) //TODO: replace `as` cast with proper typing
+      const built = def.build(tokens)
+      globals.push({ slug: def.slug, data: isRecord(built) ? built : {} })
     }
   }
 
@@ -91,11 +97,8 @@ function partitionDefinitions(payload: Payload, defs: SeedDefinition[]): { activ
   const active: SeedDefinition[] = []
   const skipped: SkippedDefinition[] = []
   for (const def of defs) {
-    //TODO: replace `as` casts with proper typing
-    const fromCollection =
-      def.kind === 'collection'
-        ? (payload.collections[def.slug as CollectionSlug]?.config.custom?.seedDisabled as SeedDisabledMarker | undefined)
-        : undefined
+    const rawDisabled = def.kind === 'collection' ? payload.collections[def.slug]?.config.custom?.seedDisabled : undefined
+    const fromCollection = typeof rawDisabled === 'boolean' || typeof rawDisabled === 'string' ? rawDisabled : undefined
     const flag = def.disabled || fromCollection
     if (!flag) {
       active.push(def)
@@ -137,26 +140,24 @@ function stripRefsToSkipped(payload: Payload, model: BuiltModel, skipped: Skippe
 }
 
 async function clearCollection(payload: Payload, req: PayloadRequest, collection: string): Promise<void> {
-  const config = payload.collections[collection as CollectionSlug]?.config //TODO: replace `as` cast with proper typing
+  const config = payload.collections[collection]?.config
   if (!config) return
   payload.logger.info(`[payload-seed] clearing ${collection}`)
   const withHooks = Boolean(config.upload || config.hooks?.beforeDelete?.length || config.hooks?.afterDelete?.length)
   if (withHooks) {
-    //TODO: replace `as` casts with proper typing
-    const result = (await payload.delete({
-      collection: collection as CollectionSlug,
+    const result = await payload.delete({
+      collection,
       where: { id: { exists: true } },
       req,
       context: { disableRevalidate: true },
       disableTransaction: true,
-    })) as { errors?: Array<{ id?: string | number; message?: string }> }
+    })
     const failed: Array<{ label: string; reason: string }> = []
     for (const e of result?.errors ?? []) {
       if (e.id == null) continue
       try {
-        //TODO: replace `as` cast with proper typing
         await payload.delete({
-          collection: collection as CollectionSlug,
+          collection,
           id: e.id,
           req,
           context: { disableRevalidate: true },
@@ -175,10 +176,9 @@ async function clearCollection(payload: Payload, req: PayloadRequest, collection
       )
     }
   } else {
-    await payload.db.deleteMany({ collection: collection as CollectionSlug, req, where: {} }) //TODO: replace `as` cast with proper typing
+    await payload.db.deleteMany({ collection, req, where: {} })
   }
-  //TODO: replace `as` cast with proper typing
-  if (config.versions) await payload.db.deleteVersions({ collection: collection as CollectionSlug, req, where: {} })
+  if (config.versions) await payload.db.deleteVersions({ collection, req, where: {} })
 }
 
 export async function runSeed({ payload, req, options, definitions }: RunSeedArgs): Promise<SeedResult> {
@@ -190,7 +190,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   const model = buildModel(active)
   const collectionSlugs = new Set(Object.keys(payload.collections))
 
-  const isUpload = (slug: string): boolean => Boolean(payload.collections[slug as CollectionSlug]?.config.upload)
+  const isUpload = (slug: string): boolean => Boolean(payload.collections[slug]?.config.upload)
   const assetBySlug = discoverAssetCollections(payload)
 
   const fileCollections = new Set<string>([...collectionSlugs].filter(isUpload))
@@ -199,11 +199,10 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   const fieldNames = new Map<string, Set<string>>()
   const requiredFields = new Map<string, Set<string>>()
   for (const coll of model.collections) {
-    const cfg = payload.collections[coll.slug as CollectionSlug]?.config
+    const cfg = payload.collections[coll.slug]?.config
     if (!cfg) continue
     fieldNames.set(coll.slug, new Set(cfg.flattenedFields.map((f) => f.name)))
-    //TODO: replace `as` cast with proper typing
-    requiredFields.set(coll.slug, new Set(cfg.flattenedFields.filter((f) => (f as { required?: boolean }).required).map((f) => f.name)))
+    requiredFields.set(coll.slug, new Set(cfg.flattenedFields.filter((f) => 'required' in f && f.required).map((f) => f.name)))
   }
   for (const g of model.globals) {
     const cfg = payload.config.globals.find((gc) => gc.slug === g.slug)
@@ -254,7 +253,8 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     const { slug, record } = entry
     const deferFields = deferredByNode.get(nodeId)
     const source = deferFields ? Object.fromEntries(Object.entries(record.data).filter(([k]) => !deferFields.has(k))) : record.data
-    let data = resolveTokens(source, { docs: docIds, where: nodeId }) as Record<string, unknown> //TODO: replace `as` cast with proper typing
+    const resolved = resolveTokens(source, { docs: docIds, where: nodeId })
+    let data: Record<string, unknown> = isRecord(resolved) ? resolved : {}
     let uploadFile: Awaited<ReturnType<typeof readFileAsUpload>> | undefined
 
     if (record.file) {
@@ -275,13 +275,12 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
     payload.logger.info(`[payload-seed] seeding '${nodeId}'`)
     let doc: { id: string | number }
     try {
-      //TODO: replace `as` casts with proper typing
-      doc = (await payload.create({
-        collection: slug as CollectionSlug,
-        data: data as never,
+      doc = await payload.create({
+        collection: slug,
+        data,
         ...(uploadFile ? { file: uploadFile } : {}),
         ...baseArgs,
-      })) as { id: string | number }
+      })
     } catch (err) {
       throw new SeedRunError(`creating '${nodeId}': ${deepestReason(err)}`)
     }
@@ -297,8 +296,7 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
       if (!entry || id === undefined) continue
       const value = resolveTokens(entry.record.data[field], { docs: docIds, where: `${node}.${field}` })
       try {
-        //TODO: replace `as` casts with proper typing
-        await payload.update({ collection: entry.slug as CollectionSlug, id, data: { [field]: value } as never, ...baseArgs })
+        await payload.update({ collection: entry.slug, id, data: { [field]: value }, ...baseArgs })
       } catch (err) {
         throw new SeedRunError(`setting deferred field '${node}.${field}': ${deepestReason(err)}`)
       }
@@ -307,10 +305,10 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
   for (const g of model.globals) {
     payload.logger.info(`[payload-seed] seeding global '${g.slug}'`)
-    //TODO: replace `as` cast with proper typing
-    const data = resolveTokens(g.data, { docs: docIds, where: `global:${g.slug}` }) as Record<string, unknown>
+    const resolvedGlobal = resolveTokens(g.data, { docs: docIds, where: `global:${g.slug}` })
+    const data: Record<string, unknown> = isRecord(resolvedGlobal) ? resolvedGlobal : {}
     try {
-      await payload.updateGlobal({ slug: g.slug as never, data: data as never, ...baseArgs }) //TODO: replace `as` casts with proper typing
+      await payload.updateGlobal({ slug: g.slug, data, ...baseArgs })
     } catch (err) {
       throw new SeedRunError(`updating global '${g.slug}': ${deepestReason(err)}`)
     }

@@ -10,7 +10,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     process.exitCode = 1
     return
   }
-  const options = (config.custom?.payloadSeed?.options ?? {}) as SeedPluginOptions //TODO: replace `as` cast with proper typing
+  const options: SeedPluginOptions = config.custom?.payloadSeed?.options ?? {}
   const payload = await getPayload({ config })
   try {
     const result = await seed({ payload, options })

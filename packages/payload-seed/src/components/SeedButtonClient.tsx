@@ -4,7 +4,8 @@ import type React from 'react'
 import { useCallback, useState } from 'react'
 import { toast, useConfig } from '@payloadcms/ui'
 
-import type { SeedButtonProps, SeedResponseBody } from '../types'
+import { isRecord } from '../lib/isRecord'
+import type { SeedButtonProps } from '../types'
 
 export type { SeedButtonProps }
 
@@ -46,13 +47,16 @@ export const SeedButtonClient: React.FC<SeedButtonProps> = ({ endpoint }) => {
 
       const run = fetch(url, { method: 'POST', credentials: 'include' })
         .then(async (res) => {
-          const body = (await res.json().catch(() => ({}))) as SeedResponseBody //TODO: replace `as` cast with proper typing
+          const raw: unknown = await res.json().catch(() => ({}))
+          const error = isRecord(raw) && typeof raw.error === 'string' ? raw.error : undefined
+          const issues = isRecord(raw) && Array.isArray(raw.issues) ? raw.issues.filter((i): i is string => typeof i === 'string') : undefined
+          const message = isRecord(raw) && typeof raw.message === 'string' ? raw.message : undefined
           if (!res.ok) {
-            const base = body.error ?? 'An error occurred while seeding.'
-            throw new Error(body.issues?.length ? `${base}\n${summarizeIssues(body.issues)}` : base)
+            const base = error ?? 'An error occurred while seeding.'
+            throw new Error(issues?.length ? `${base}\n${summarizeIssues(issues)}` : base)
           }
           setSeeded(true)
-          return body
+          return { message }
         })
         .catch((err) => {
           setFailed(true)
