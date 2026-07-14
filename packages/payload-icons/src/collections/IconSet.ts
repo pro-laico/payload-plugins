@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, TextField, UIField } from 'payload'
+import type { CollectionConfig, TextField, UIField } from 'payload'
 
 import { mergeHooks } from '../lib/mergeHooks'
 import { authd } from '../access/authenticated'
@@ -48,10 +48,8 @@ export const createIconSetCollection = (
       useAsTitle: 'title',
       defaultColumns: ['title', 'active', '_status'],
       ...(livePreviewUrl && {
-        //TODO: replace `as` cast with proper typing
-        preview: (data, { req }) => livePreviewUrl({ data: data as Record<string, unknown>, req }),
-        //TODO: replace `as` cast with proper typing
-        livePreview: { url: ({ data, req }) => livePreviewUrl({ data: data as Record<string, unknown>, req }) },
+        preview: (data, { req }) => livePreviewUrl({ data, req }),
+        livePreview: { url: ({ data, req }) => livePreviewUrl({ data, req }) },
       }),
     },
     fields: [
@@ -82,7 +80,7 @@ export const createIconSetCollection = (
                       {
                         name: 'icon',
                         type: 'upload',
-                        relationTo: iconSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+                        relationTo: iconSlug,
                         displayPreview: false,
                         admin: { allowCreate: false, width: '75%', description: 'Select an icon.', style: { maxWidth: '350px' } },
                       },

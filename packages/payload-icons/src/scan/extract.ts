@@ -19,11 +19,10 @@ const lineColAt = (lineStarts: number[], index: number): { line: number; column:
   let hi = lineStarts.length - 1
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1
-    if ((lineStarts[mid] as number) <= index)
-      lo = mid //TODO: replace `as` cast with proper typing
+    if ((lineStarts[mid] ?? 0) <= index) lo = mid
     else hi = mid - 1
   }
-  return { line: lo + 1, column: index - (lineStarts[lo] as number) + 1 } //TODO: replace `as` cast with proper typing
+  return { line: lo + 1, column: index - (lineStarts[lo] ?? 0) + 1 }
 }
 
 const skipString = (source: string, i: number): number => {

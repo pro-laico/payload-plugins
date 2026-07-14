@@ -1,11 +1,11 @@
-import type { CollectionBeforeChangeHook, CollectionSlug } from 'payload'
+import type { CollectionBeforeChangeHook } from 'payload'
 
 const CASCADE = 'iconSetEnforceSingleActive'
 
 export const enforceSingleActive: CollectionBeforeChangeHook = async ({ data, originalDoc, collection, req, context }) => {
   if (!data?.active || context[CASCADE]) return data
 
-  const hasDrafts = Boolean((collection.versions as { drafts?: unknown } | undefined)?.drafts) //TODO: replace `as` cast with proper typing
+  const hasDrafts = Boolean(collection.versions?.drafts)
   const draft = hasDrafts && data._status === 'draft'
   const id = originalDoc?.id
 
@@ -13,8 +13,8 @@ export const enforceSingleActive: CollectionBeforeChangeHook = async ({ data, or
     await req.payload.update({
       req,
       draft,
-      collection: collection.slug as CollectionSlug, //TODO: replace `as` cast with proper typing
-      data: { active: false } as unknown as never, //TODO: replace `as` cast with proper typing
+      collection: collection.slug,
+      data: { active: false },
       where: {
         active: { equals: true },
         ...(id != null ? { id: { not_equals: id } } : {}),

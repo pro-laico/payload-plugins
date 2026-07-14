@@ -1,17 +1,15 @@
 import { cache } from 'react'
-import type { CollectionSlug, Payload, Where } from 'payload'
+import type { Payload, Where } from 'payload'
 
 import type { IconSetMap } from '../types'
+import { isRecord } from '../lib/isRecord'
 import { iconSetSlugOf } from '../lib/marker'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 
 import 'server-only'
 
 const activeWhere = (payload: Payload, slug: string, draft: boolean): Where => {
-  //TODO: replace `as` cast with proper typing
-  const hasDrafts = Boolean(
-    (payload.collections as Record<string, { config?: { versions?: { drafts?: unknown } } }>)?.[slug]?.config?.versions?.drafts,
-  )
+  const hasDrafts = Boolean(payload.collections?.[slug]?.config?.versions?.drafts)
   return !draft && hasDrafts ? { and: [{ active: { equals: true } }, { _status: { equals: 'published' } }] } : { active: { equals: true } }
 }
 
@@ -19,26 +17,27 @@ const getActiveIconSet = cache(async (handle: Payload | Promise<Payload>, draft:
   const payload = await handle
   const slug = iconSetSlugOf(payload.config)
 
-  const set = (await payload
-    .find({
-      collection: slug as CollectionSlug, //TODO: replace `as` cast with proper typing
-      where: activeWhere(payload, slug, draft),
-      limit: 1,
-      depth: 1,
-      draft,
-      pagination: false,
-      select: { iconsArray: true },
-      populate: { icon: { svgString: true } },
-    })
-    .then((res) => res.docs[0] || null)) as {
-    iconsArray?: { name?: string | null; icon?: { svgString?: string | null } | string | number | null }[]
-  } | null //TODO: replace `as` cast with proper typing
-
+  const res = await payload.find({
+    collection: slug,
+    where: activeWhere(payload, slug, draft),
+    limit: 1,
+    depth: 1,
+    draft,
+    pagination: false,
+    select: { iconsArray: true },
+    populate: { icon: { svgString: true } },
+  })
+  const set = res.docs[0]
   if (!set) return {}
+
   const map: IconSetMap = {}
-  for (const row of set.iconsArray ?? []) {
-    const svg = row?.icon && typeof row.icon === 'object' ? row.icon.svgString : undefined
-    if (row?.name && svg) map[row.name] = svg
+  const rows = Array.isArray(set.iconsArray) ? set.iconsArray : []
+  for (const row of rows) {
+    if (!isRecord(row)) continue
+    const icon = row.icon
+    const svg = isRecord(icon) && typeof icon.svgString === 'string' ? icon.svgString : undefined
+    const name = row.name
+    if (typeof name === 'string' && svg) map[name] = svg
   }
   return map
 })
@@ -46,8 +45,7 @@ const getActiveIconSet = cache(async (handle: Payload | Promise<Payload>, draft:
 const tagIconRead = async (handle: Payload | Promise<Payload>): Promise<void> => {
   try {
     if (!(await handle).config.custom?.payloadRevalidate) return
-    //TODO: replace `as` cast with proper typing
-    const { cacheTag } = (await import('next/cache')) as unknown as { cacheTag: (...tags: string[]) => void }
+    const { cacheTag } = await import('next/cache')
     cacheTag(ICONS_REVALIDATE_TAG)
   } catch {}
 }
@@ -67,7 +65,7 @@ export const warnIconMissDev = async (handle: Payload | Promise<Payload>, name: 
     const slug = iconSetSlugOf(payload.config)
     const activeSetExists = async (d: boolean): Promise<boolean> => {
       const find = {
-        collection: slug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        collection: slug,
         where: activeWhere(payload, slug, d),
         limit: 1,
         depth: 0,

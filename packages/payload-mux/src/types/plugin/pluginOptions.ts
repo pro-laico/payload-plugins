@@ -1,4 +1,4 @@
-import type { PayloadRequest, TypedCollection } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 
 import type { MuxVideoInitSettings } from '../settings/initSettings'
 import type { MuxVideoUploadSettings } from '../settings/uploadSettings'
@@ -9,7 +9,7 @@ export interface MuxVideoPluginOptions {
   initSettings?: MuxVideoInitSettings
   uploadSettings?: MuxVideoUploadSettings
   playbackPolicy?: 'public' | 'signed'
-  extendCollection?: keyof TypedCollection
+  extendCollection?: CollectionSlug
   access?: (request: PayloadRequest) => Promise<boolean> | boolean
   signedUrlOptions?: MuxVideoSignedUrlOptions
   posterExtension?: 'webp' | 'jpg' | 'png'

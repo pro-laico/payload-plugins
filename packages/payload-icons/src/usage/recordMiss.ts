@@ -1,26 +1,26 @@
-import type { CollectionSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
 
 import { ICON_REQUEST_SLUG } from '../collections/IconRequest'
 
 export const recordIconMiss = async (payload: Payload, name: string): Promise<void> => {
   if (!name) return
-  const slug = ICON_REQUEST_SLUG as CollectionSlug //TODO: replace `as` cast with proper typing
-  if (!(payload.collections as Record<string, unknown>)?.[ICON_REQUEST_SLUG]) return //TODO: replace `as` cast with proper typing
+  if (!payload.collections?.[ICON_REQUEST_SLUG]) return
 
   const now = new Date().toISOString()
-  const existing = await payload.find({ collection: slug, where: { name: { equals: name } }, limit: 1, depth: 0 })
-  const doc = existing.docs[0] as { id: string | number; count?: number | null } | undefined //TODO: replace `as` cast with proper typing
+  const existing = await payload.find({ collection: ICON_REQUEST_SLUG, where: { name: { equals: name } }, limit: 1, depth: 0 })
+  const doc = existing.docs[0]
 
   if (doc) {
+    const count = typeof doc.count === 'number' ? doc.count : 0
     await payload.update({
-      collection: slug,
+      collection: ICON_REQUEST_SLUG,
       id: doc.id,
-      data: { count: (doc.count ?? 0) + 1, lastRequestedAt: now },
-    } as Parameters<typeof payload.update>[0]) //TODO: replace `as` cast with proper typing
+      data: { count: count + 1, lastRequestedAt: now },
+    })
   } else {
     await payload.create({
-      collection: slug,
+      collection: ICON_REQUEST_SLUG,
       data: { name, count: 1, firstRequestedAt: now, lastRequestedAt: now },
-    } as Parameters<typeof payload.create>[0]) //TODO: replace `as` cast with proper typing
+    })
   }
 }

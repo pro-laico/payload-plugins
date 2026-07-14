@@ -1,5 +1,5 @@
 import type Mux from '@mux/mux-node'
-import type { CollectionBeforeChangeHook, CollectionSlug } from 'payload'
+import type { CollectionBeforeChangeHook } from 'payload'
 
 import { delay } from '../../lib/delay'
 import { getAssetMetadata } from '../../lib/getAssetMetadata'
@@ -40,13 +40,13 @@ export const getBeforeChangeHook =
         data = { ...data, status: 'preparing', error: null }
       }
 
-      const base = data.title as string //TODO: replace `as` cast with proper typing
+      const base = typeof data.title === 'string' ? data.title : ''
       let uniqueTitle = base
       for (let n = 1; ; n++) {
         const titleClause = { title: { equals: uniqueTitle } }
         const where =
           operation === 'update' && originalDoc?.id != null ? { and: [titleClause, { id: { not_equals: originalDoc.id } }] } : titleClause
-        const { totalDocs } = await req.payload.count({ collection: collection.slug as CollectionSlug, where }) //TODO: replace `as` cast with proper typing
+        const { totalDocs } = await req.payload.count({ collection: collection.slug, where })
         if (totalDocs === 0) break
         uniqueTitle = `${base} (${n})`
       }

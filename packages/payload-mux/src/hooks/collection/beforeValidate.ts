@@ -3,21 +3,27 @@ import type { CollectionBeforeValidateHook } from 'payload'
 
 import { ingestMuxAsset } from '../../lib/ingest'
 import { getAssetMetadata } from '../../lib/getAssetMetadata'
-import type { MuxSourceInput, MuxVideoPluginOptions, NormalizedSource } from '../../types'
+import { isRecord } from '../../lib/isRecord'
+import type { MuxVideoPluginOptions, NormalizedSource } from '../../types'
 
 function normalizeSource(source: unknown): NormalizedSource | null {
   if (!source) return null
   if (typeof source === 'string') return { ref: source }
-  const s = source as MuxSourceInput //TODO: replace `as` cast with proper typing
-  const ref = s.url ?? s.file
+  if (!isRecord(source)) return null
+  const url = typeof source.url === 'string' ? source.url : undefined
+  const file = typeof source.file === 'string' ? source.file : undefined
+  const ref = url ?? file
   if (!ref) return null
-  return { ref, playbackPolicy: s.playbackPolicy, corsOrigin: s.corsOrigin, posterTimestamp: s.posterTimestamp }
+  const playbackPolicy = source.playbackPolicy === 'public' || source.playbackPolicy === 'signed' ? source.playbackPolicy : undefined
+  const corsOrigin = typeof source.corsOrigin === 'string' ? source.corsOrigin : undefined
+  const posterTimestamp = typeof source.posterTimestamp === 'number' ? source.posterTimestamp : undefined
+  return { ref, playbackPolicy, corsOrigin, posterTimestamp }
 }
 
 export const getBeforeValidateHook =
   (mux: Mux, options: MuxVideoPluginOptions = {}): CollectionBeforeValidateHook =>
   async ({ data, req }) => {
-    const d = (data ?? {}) as Record<string, unknown> //TODO: replace `as` cast with proper typing
+    const d: Record<string, unknown> = data ?? {}
     if (!('source' in d)) return data
 
     const { source, ...rest } = d

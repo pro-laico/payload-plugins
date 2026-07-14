@@ -1,7 +1,14 @@
 import type Mux from '@mux/mux-node'
-import { stat } from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
-import type { CollectionSlug, Payload } from 'payload'
+import { stat } from 'node:fs/promises'
+import type { Payload } from 'payload'
+
+// The fetch spec requires `duplex` when the body is a stream; TS's lib.dom RequestInit omits it.
+declare global {
+  interface RequestInit {
+    duplex?: 'half'
+  }
+}
 
 import { delay } from './delay'
 import type { IngestMuxAssetOptions, IngestMuxVideoOptions, MuxSource, MuxVideoNewAssetSettings } from '../types'
@@ -25,7 +32,8 @@ async function buildUploadBody(source: MuxSource): Promise<{ body: BodyInit; hea
   const { size } = await stat(source).catch(() => {
     throw new Error(`[payload-mux] source file not found: ${source}`)
   })
-  return { body: createReadStream(source) as unknown as BodyInit, headers: { 'Content-Length': String(size) } } //TODO: replace `as` cast with proper typing
+  //EXCUSE: a Node ReadStream streams straight to undici's fetch at runtime (no buffering large videos into memory); lib.dom's BodyInit has no type for a Node stream, and the web ReadableStream from Readable.toWeb() is structurally incompatible with lib.dom
+  return { body: createReadStream(source) as unknown as BodyInit, headers: { 'Content-Length': String(size) } }
 }
 
 export function resolveNewAssetSettings(
@@ -47,7 +55,7 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
   if (!upload.url) throw new Error(`[payload-mux] Mux did not return an upload URL for '${source}'`)
 
   const { body, headers } = await buildUploadBody(source)
-  const res = await fetch(upload.url, { method: 'PUT', body, headers, duplex: 'half' } as RequestInit & { duplex: 'half' }) //TODO: replace `as` cast with proper typing
+  const res = await fetch(upload.url, { method: 'PUT', body, headers, duplex: 'half' })
   if (!res.ok) throw new Error(`[payload-mux] upload PUT failed for '${source}': ${res.status} ${res.statusText}`)
 
   const ready = await pollUntil(
@@ -56,9 +64,10 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
     1000,
   )
   if (!ready.asset_id) throw new Error(`[payload-mux] Mux upload '${upload.id}' never produced an asset`)
+  const assetId = ready.asset_id
 
   const asset = await pollUntil(
-    () => mux.video.assets.retrieve(ready.asset_id as string), //TODO: replace `as` cast with proper typing
+    () => mux.video.assets.retrieve(assetId),
     (a) => a.status !== 'preparing',
     2000,
   )
@@ -72,13 +81,13 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
 }
 
 export async function ingestMuxVideo(payload: Payload, opts: IngestMuxVideoOptions): Promise<{ id: string | number }> {
-  const collection = (opts.collection ?? 'mux-video') as CollectionSlug //TODO: replace `as` cast with proper typing
+  const collection = opts.collection ?? 'mux-video'
   const doc = await payload.create({
     collection,
     data: {
       title: opts.title,
       source: { file: opts.source, playbackPolicy: opts.playbackPolicy, posterTimestamp: opts.posterTimestamp },
-    } as never, //TODO: replace `as` cast with proper typing
+    },
   })
-  return doc as { id: string | number } //TODO: replace `as` cast with proper typing
+  return { id: doc.id }
 }

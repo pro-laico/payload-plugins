@@ -5,9 +5,12 @@ import MuxUploader from '@mux/mux-uploader-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
 
+import { isRecord } from '../lib/isRecord'
 import './mux-uploader.css'
 
 const stripExtension = (name: string): string => name.replace(/\.[^./\\]+$/, '')
+
+const stringValue = (field: { value?: unknown } | undefined): string | undefined => (typeof field?.value === 'string' ? field.value : undefined)
 
 export const MuxUploaderField = () => {
   const { config } = useConfig()
@@ -20,9 +23,9 @@ export const MuxUploaderField = () => {
     title: fields.title,
     setTitle: (value: string) => dispatch({ type: 'UPDATE', path: 'title', value }),
     setFile: (value: File) => dispatch({ type: 'UPDATE', path: 'file', value }),
-    playbackUrl: fields['playbackOptions.0.playbackUrl']?.value as string | undefined, //TODO: replace `as` cast with proper typing
-    status: fields.status?.value as string | undefined, //TODO: replace `as` cast with proper typing
-    error: fields.error?.value as string | undefined, //TODO: replace `as` cast with proper typing
+    playbackUrl: stringValue(fields['playbackOptions.0.playbackUrl']),
+    status: stringValue(fields.status),
+    error: stringValue(fields.error),
   }))
 
   const { submit, setProcessing } = useForm()
@@ -35,14 +38,16 @@ export const MuxUploaderField = () => {
       toast.error(`Could not create a Mux upload (${response.status}): ${body}`)
       throw new Error(`[payload-mux] upload URL request failed (${response.status}): ${body}`)
     }
-    const { id, url } = (await response.json()) as { id: string; url: string } //TODO: replace `as` cast with proper typing
+    const data: unknown = await response.json()
+    const id = isRecord(data) && typeof data.id === 'string' ? data.id : ''
+    const url = isRecord(data) && typeof data.url === 'string' ? data.url : ''
     setUploadId(id)
     return url
   }, [apiUrl])
 
   const onUploadStart = useCallback(
     ({ detail: { file } }: { detail: { file: File } }) => {
-      const resolvedTitle = (title?.value as string) || stripExtension(file.name) //TODO: replace `as` cast with proper typing
+      const resolvedTitle = stringValue(title) || stripExtension(file.name)
       if (!title?.value) setTitle(resolvedTitle)
       setFile(new File([], resolvedTitle, { type: file.type, lastModified: file.lastModified }))
     },
@@ -72,8 +77,8 @@ export const MuxUploaderField = () => {
   }, [apiUrl, uploadId, setAssetId, setProcessing, submit])
 
   useEffect(() => {
-    const fileField = containerRef.current?.closest('form')?.querySelector('.file-field') as HTMLElement | null //TODO: replace `as` cast with proper typing
-    if (fileField) fileField.style.display = 'none'
+    const fileField = containerRef.current?.closest('form')?.querySelector('.file-field')
+    if (fileField instanceof HTMLElement) fileField.style.display = 'none'
   }, [])
 
   return (

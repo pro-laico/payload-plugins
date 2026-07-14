@@ -1,4 +1,4 @@
-import type { CollectionSlug, Payload, UIFieldServerComponent } from 'payload'
+import type { Payload, UIFieldServerComponent } from 'payload'
 
 import { scanIconUsagesLive } from '../../scan/live'
 import { loadIconUsageManifest } from '../../scan/load'
@@ -21,17 +21,18 @@ const getManifest = (manifestPath?: string): IconUsageManifest | null => {
 
 const loadLiveRequests = async (payload: Payload): Promise<LiveRequest[]> => {
   try {
-    if (!(payload.collections as Record<string, unknown>)?.[ICON_REQUEST_SLUG]) return [] //TODO: replace `as` cast with proper typing
+    if (!payload.collections?.[ICON_REQUEST_SLUG]) return []
     const res = await payload.find({
-      collection: ICON_REQUEST_SLUG as CollectionSlug, //TODO: replace `as` cast with proper typing
+      collection: ICON_REQUEST_SLUG,
       limit: 500,
       depth: 0,
       sort: '-count',
     })
-    return res.docs.map((d) => {
-      const r = d as { name?: string; count?: number | null; lastRequestedAt?: string | null } //TODO: replace `as` cast with proper typing
-      return { name: r.name ?? '', count: r.count ?? 0, lastRequestedAt: r.lastRequestedAt ?? null }
-    })
+    return res.docs.map((d) => ({
+      name: typeof d.name === 'string' ? d.name : '',
+      count: typeof d.count === 'number' ? d.count : 0,
+      lastRequestedAt: typeof d.lastRequestedAt === 'string' ? d.lastRequestedAt : null,
+    }))
   } catch {
     return []
   }

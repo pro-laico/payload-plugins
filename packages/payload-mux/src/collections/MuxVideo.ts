@@ -33,7 +33,7 @@ const signableUrlField = (
 })
 
 export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
-  slug: (options.extendCollection as string) ?? 'mux-video', //TODO: replace `as` cast with proper typing
+  slug: options.extendCollection ?? 'mux-video',
   labels: { singular: 'Video', plural: 'Videos' },
   custom: { seedAsset: { sourceField: 'source' } },
   access: { read: ({ req }) => isAllowed(options, req) },

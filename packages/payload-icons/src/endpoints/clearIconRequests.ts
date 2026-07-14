@@ -1,4 +1,4 @@
-import type { CollectionSlug, Endpoint } from 'payload'
+import type { Endpoint } from 'payload'
 
 import { ICON_REQUEST_SLUG } from '../collections/IconRequest'
 
@@ -11,13 +11,12 @@ export function createClearIconRequestsEndpoint(): Endpoint {
     handler: async (req) => {
       try {
         if (!req.user) return Response.json({ success: false, message: 'Not authorized to clear icon requests.' }, { status: 401 })
-        //TODO: replace `as` cast with proper typing
-        if (!(req.payload.collections as Record<string, unknown>)?.[ICON_REQUEST_SLUG]) {
+        if (!req.payload.collections?.[ICON_REQUEST_SLUG]) {
           return Response.json({ success: false, message: 'Request tracking is not enabled.' })
         }
 
         const res = await req.payload.delete({
-          collection: ICON_REQUEST_SLUG as CollectionSlug, //TODO: replace `as` cast with proper typing
+          collection: ICON_REQUEST_SLUG,
           where: { id: { exists: true } },
           user: req.user,
           overrideAccess: false,

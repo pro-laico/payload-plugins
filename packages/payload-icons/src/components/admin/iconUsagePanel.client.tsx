@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { Button, Pill, toast, useAllFormFields, useConfig } from '@payloadcms/ui'
 
 import { CLEAR_ICON_REQUESTS_PATH } from '../../endpoints/clearIconRequests'
+import { isRecord } from '../../lib/isRecord'
 import type { IconUsage, IconUsagePanelClientProps, LiveRequest } from '../../types'
 
 const ICON_NAME_PATH = /^iconsArray\.\d+\.name$/
@@ -55,7 +56,7 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
   const defined = useMemo(() => {
     const set = new Set<string>()
     for (const [path, state] of Object.entries(fields)) {
-      const value = (state as { value?: unknown } | undefined)?.value //TODO: replace `as` cast with proper typing
+      const value = isRecord(state) ? state.value : undefined
       if (ICON_NAME_PATH.test(path) && typeof value === 'string' && value.length > 0) set.add(value)
     }
     return set
@@ -79,12 +80,13 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
     setClearing(true)
     try {
       const res = await fetch(`${serverURL ?? ''}${api}${CLEAR_ICON_REQUESTS_PATH}`, { method: 'DELETE', credentials: 'include' })
-      const result = (await res.json()) as { success: boolean; message: string } //TODO: replace `as` cast with proper typing
-      if (result.success) {
+      const result: unknown = await res.json()
+      const message = isRecord(result) && typeof result.message === 'string' ? result.message : ''
+      if (isRecord(result) && result.success === true) {
         setLive([])
-        toast.success(result.message)
+        toast.success(message)
       } else {
-        toast.error(result.message)
+        toast.error(message)
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to clear icon requests.')

@@ -29,7 +29,7 @@ export const getMuxUploadHandler =
   async (req) => {
     if (!(await isAllowed(pluginOptions, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
-    const id = req.query?.id as string | undefined //TODO: replace `as` cast with proper typing
+    const id = typeof req.query?.id === 'string' ? req.query.id : undefined
     if (!id) return Response.json({ error: 'Missing upload id.' }, { status: 400 })
 
     try {
