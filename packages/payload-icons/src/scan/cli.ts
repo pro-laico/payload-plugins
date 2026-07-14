@@ -1,18 +1,7 @@
 #!/usr/bin/env node
-/**
- * `payload-icons-scan` — CLI wrapper around {@link scanIconUsages}. Run it in a
- * project's build (e.g. a `prebuild` script or CI step) to regenerate the
- * icon-usage manifest the admin "requested icons" panel reads.
- *
- * @example
- * ```sh
- * payload-icons-scan src app --out icon-usage-manifest.json
- * payload-icons-scan --component Icon --component Glyph --ext tsx,jsx
- * ```
- */
 
-import { DEFAULT_ROOTS, resolveManifestPath, scanIconUsages, writeIconUsageManifest } from './index.js'
 import type { ParsedArgs } from '../types/index.js'
+import { DEFAULT_ROOTS, resolveManifestPath, scanIconUsages, writeIconUsageManifest } from './index.js'
 
 const HELP = `payload-icons-scan — scan source for literal <Icon name="…"> usages
 
@@ -31,7 +20,6 @@ Options:
   -h, --help             Show this help
 `
 
-/** Splits a repeated or comma-joined option value into trimmed, non-empty parts. */
 const collect = (acc: string[], raw: string): void => {
   for (const part of raw.split(',')) {
     const v = part.trim()
@@ -84,7 +72,6 @@ const main = (): void => {
     process.stdout.write(HELP)
     return
   }
-  // Unknown options abort BEFORE scanning — a typo'd flag must not silently write a manifest.
   if (args.invalid) {
     process.stderr.write('payload-icons-scan: aborting (run with --help for usage)\n')
     process.exitCode = 1
@@ -98,8 +85,6 @@ const main = (): void => {
     extensions: args.extensions.length ? args.extensions : undefined,
     ignore: args.ignore.length ? args.ignore : undefined,
   })
-  // Every root missing means the scan ran in the wrong directory — fail loudly so CI catches it
-  // instead of shipping an empty manifest. Real roots with 0 usages still exit 0.
   if (rootsScanned === 0) {
     process.stderr.write(`payload-icons-scan: none of the scan roots exist: ${roots.join(', ')} (wrong directory?)\n`)
     process.exitCode = 1

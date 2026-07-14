@@ -1,18 +1,12 @@
-/**
- * Browser-side blurhash encode for the admin focal preview: draw the image onto a small canvas
- * and DCT the pixels into a coefficient grid. Works for unsaved files (object URLs) with no
- * server round trip. DOM-only — never import from server code.
- */
 import { BLURHASH_QUALITIES } from './qualities'
 import { encodeLinearGrid, srgbToLinear } from './codec'
 import type { LinearGrid, ParsedBlurhash } from '../../types'
 
 const SAMPLE_EDGE = 64
 
-/** The largest tier's component counts — encode ONCE at this ceiling; smaller tiers are derived by projection. */
 const MAX_COMPONENTS = Object.values(BLURHASH_QUALITIES).reduce(
-  (acc, [cx, cy]) => [Math.max(acc[0], cx), Math.max(acc[1], cy)] as [number, number],
-  [1, 1] as [number, number],
+  (acc, [cx, cy]) => [Math.max(acc[0], cx), Math.max(acc[1], cy)] as [number, number], //TODO: replace `as` cast with proper typing
+  [1, 1] as [number, number], //TODO: replace `as` cast with proper typing
 )
 
 export const encodeBlurhashFromImageSource = async (src: string, cx = MAX_COMPONENTS[0], cy = MAX_COMPONENTS[1]): Promise<ParsedBlurhash> => {

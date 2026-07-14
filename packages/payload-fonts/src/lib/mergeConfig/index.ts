@@ -1,3 +1,3 @@
-export { mergeCollection } from './mergeCollection'
-export { mergeGlobal } from './mergeGlobal'
 export { mergeHooks } from './mergeHooks'
+export { mergeGlobal } from './mergeGlobal'
+export { mergeCollection } from './mergeCollection'

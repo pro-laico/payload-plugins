@@ -1,76 +1,38 @@
-import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, GlobalConfig, Plugin, SanitizedConfig } from 'payload'
 
-import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
+import { createTags } from './lib/tags'
+import { stashInspect } from './lib/inspect'
+import { scanGettersLive } from './lib/scan/live'
+import { collectJoinMembership } from './lib/diff/joins'
+import { getObservations } from './lib/observe/registry'
+import { registerSeedListener } from './lib/seed/afterSeed'
 import { buildReferenceGraph } from './lib/graph/referenceGraph'
 import { createAfterChange } from './hooks/collection/afterChange'
 import { createAfterDelete } from './hooks/collection/afterDelete'
 import { createGlobalAfterChange } from './hooks/global/afterChange'
+import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
 import { changeDetectionFields, topLevelFieldNames } from './lib/fields'
-import { collectJoinMembership } from './lib/diff/joins'
-import { stashInspect } from './lib/inspect'
-import { getObservations } from './lib/observe/registry'
 import { globalEnabled, resolveCollectionSettings, resolveOptions } from './lib/options'
-import { scanGettersLive } from './lib/scan/live'
-import { registerSeedListener } from './lib/seed/afterSeed'
-import { createTags } from './lib/tags'
 import type { PayloadRevalidateMarker, ReferenceGraph, RevalidatePluginOptions } from './types'
 
-/** Absolute path to a bundled bin script, resolving the src→dist swap from this module's
- *  own location (so `payload <key>` works both in-workspace and when published). */
 function binScriptPath(name: string): string {
   const here = fileURLToPath(import.meta.url)
   const ext = here.endsWith('.ts') ? 'ts' : 'js'
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
-/**
- * Payload plugin that owns Next.js tag-based cache revalidation, surgically:
- *
- * - **Write side (automatic)** — every collection and global gets afterChange/afterDelete
- *   hooks that bust exactly the tags a change touches: the doc's tags always, the list
- *   tag only when list surfaces could actually change (create / delete / publish /
- *   unpublish / alias or `listFields` change), draft saves only the draft lane. Honors
- *   `context.disableRevalidate`.
- * - **Read side (one helper call)** — getters written with Next 16 `'use cache'` call
- *   `cacheDoc` / `cacheList` / `cacheGlobal` from `@pro-laico/payload-revalidate/cache`,
- *   which apply the canonical tags AND walk the fetched value to tag every embedded doc —
- *   so "update image 123" purges precisely the entries that render it.
- * - **Visibility** — a static reference graph (what CAN revalidate what) plus dev-time
- *   observation of materialized reads and bust events, served at `GET /api/revalidate-map`
- *   and rendered by `@pro-laico/payload-dev-tools` at `/dev/revalidate`.
- * - **Seed integration** — registers an after-seed listener `@pro-laico/payload-seed`
- *   invokes at the end of a run, flushing the seeded surface once (seed writes themselves
- *   stay hook-quiet via `context.disableRevalidate`).
- *
- * Add it LAST in the plugins array so collections other plugins contribute get hooks too.
- *
- * @example
- * ```ts
- * import { buildConfig } from 'payload'
- * import { revalidatePlugin } from '@pro-laico/payload-revalidate'
- *
- * export default buildConfig({ plugins: [seedPlugin(), iconsPlugin(), revalidatePlugin()] })
- * ```
- */
 export const revalidatePlugin =
   (opts: RevalidatePluginOptions = {}): Plugin =>
   (config: Config): Config => {
     const resolved = resolveOptions(opts)
     if (!resolved.enabled) return config
 
-    // One prefix-bound builder set for everything this factory creates (hooks, seed flush).
-    // The read side builds its own from the config marker on the handle the app passes it.
-    const tagBuilders = createTags(resolved.prefix)
-
-    // Index joins by CHILD collection so a write can bust the parent memberships it moves.
-    // Built from the pre-boot config (same order caveat as the hooks — the onInit warning
-    // covers late-registered collections).
-    const joinIndex = collectJoinMembership(config.collections)
-
-    const settingsBySlug: Record<string, ReturnType<typeof resolveCollectionSettings> & object> = {}
     const optedOut = new Set<string>()
+    const tagBuilders = createTags(resolved.prefix)
+    const joinIndex = collectJoinMembership(config.collections)
+    const settingsBySlug: Record<string, ReturnType<typeof resolveCollectionSettings> & object> = {}
     const collections = (config.collections ?? []).map((collection): CollectionConfig => {
       const settings = resolveCollectionSettings(collection, resolved)
       if (!settings) {
@@ -98,10 +60,8 @@ export const revalidatePlugin =
       }
     })
 
-    // Resolved data-only state: into the config marker (the read side's source of truth,
-    // read off the handle the app passes) and the seed listener's closure. No global stash.
-    const lists = Object.fromEntries(Object.entries(settingsBySlug).map(([slug, s]) => [slug, Object.keys(s.lists)]))
     const extraTags = Object.fromEntries(Object.entries(settingsBySlug).map(([slug, s]) => [slug, s.extraTags]))
+    const lists = Object.fromEntries(Object.entries(settingsBySlug).map(([slug, s]) => [slug, Object.keys(s.lists)]))
     registerSeedListener({ tags: tagBuilders, lists, extraTags, rules: resolved.rules, observe: resolved.observe })
 
     const globals = (config.globals ?? []).map((global): GlobalConfig => {
@@ -110,24 +70,16 @@ export const revalidatePlugin =
       return { ...global, hooks: { ...global.hooks, afterChange: [...(global.hooks?.afterChange ?? []), hook] } }
     })
 
-    // The inspection getter behind the map endpoint and the dev-tools view. The graph is
-    // built lazily and preferably from the BOOTED config (all plugins applied — this
-    // factory only sees collections registered before it in the plugins array), minus
-    // Payload's own internal collections (payload-preferences et al), which only add noise.
-    let graph: ReferenceGraph | null = null
     let graphFromBootedConfig = false
-    // Set by onInit when Payload boots in this process — factory-scoped, not a global stash;
-    // the inspect closure prefers it because it has ALL plugins' contributions applied.
+    let graph: ReferenceGraph | null = null
     let bootedConfig: SanitizedConfig | null = null
     stashInspect(() => {
+      //TODO: replace `as` cast with proper typing
       const booted = (bootedConfig ?? undefined) as Parameters<typeof buildReferenceGraph>[0] | undefined
       if (!graph || (!graphFromBootedConfig && booted)) {
         graphFromBootedConfig = Boolean(booted)
         const source = booted ?? { collections, globals, blocks: config.blocks }
         const built = buildReferenceGraph({ ...source, collections: (source.collections ?? []).filter((c) => !c.slug.startsWith('payload-')) })
-        // Drop edges into filtered-out nodes (e.g. the `folder` relationship Payload
-        // injects → `payload-folders`): the dev-tools graph only renders listed nodes,
-        // and React Flow discards dangling edges with console errors.
         const known = new Set([...built.collections, ...built.globals, '*'])
         graph = { ...built, edges: built.edges.filter((edge) => known.has(edge.from) && known.has(edge.to)) }
       }
@@ -143,8 +95,6 @@ export const revalidatePlugin =
         observing: resolved.observe,
         rules: resolved.rules,
         settings,
-        // Live source scan (the payload-icons pattern): what the CODE declares, before
-        // anything materializes. Dev-only — production has no source on disk.
         getters: resolved.observe ? scanGettersLive() : [],
         ...getObservations(),
       }
@@ -164,19 +114,12 @@ export const revalidatePlugin =
       ...config,
       collections,
       globals,
-      // `payload revalidate-map` — dump the dependency map as Markdown/JSON from the config,
-      // no server booted (Payload's CLI loads the config and calls the script with it).
       bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidateMap') }],
       endpoints: resolved.endpoint ? [...(config.endpoints ?? []), ...createMapEndpoints({ observe: resolved.observe })] : config.endpoints,
-      // Data-only discovery marker for decoupled tooling (dev-tools) — see PayloadRevalidateMarker.
       custom: { ...config.custom, payloadRevalidate: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)
-        // Factory-scoped: the inspect closure prefers the booted config (all plugins applied).
         bootedConfig = payload.config
-        // Order guard: this factory can only hook collections/globals that existed when it
-        // ran. Anything a LATER plugin contributed is silently unhooked — tagged reads
-        // (e.g. payload-icons' shared tag) would never bust. Say so loudly at boot.
         const lateCollections = payload.config.collections
           .map((c) => c.slug)
           .filter((slug) => !settingsBySlug[slug] && !optedOut.has(slug) && !slug.startsWith('payload-'))

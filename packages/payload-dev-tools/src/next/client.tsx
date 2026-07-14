@@ -1,11 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+
 import type { SeedError, SeedSnapshot, SpecimenStyle } from '../types'
 
-/** The `/dev` index's seed controls — same flow as the toolbar's Seed view: POST the seed
- *  plugin's own endpoint, two-click confirm when destructive, surface `{ error, issues }`. */
 export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute: string }) {
   const router = useRouter()
   const [running, setRunning] = useState(false)
@@ -21,7 +20,7 @@ export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute:
         setConfirming(false)
         router.refresh()
       } else {
-        const body = (await res.json().catch(() => null)) as SeedError | null
+        const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
         setError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
         setConfirming(false)
       }
@@ -91,9 +90,6 @@ export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute:
   )
 }
 
-/** The `/dev/fonts` interactive specimen — the sample renders in the family's `--font-set*`
- *  variable at the clicked weight/style. Only weights and styles the typeface actually serves
- *  are offered. */
 export function FontSpecimen({
   familyKey,
   title,
@@ -156,12 +152,10 @@ export function FontSpecimen({
   )
 }
 
-/** The `/dev/icons` set switcher — activates a set via `POST /api/dev/icons/activate` and
- *  refreshes, so the grid (and the whole site) re-skins to the newly active set. */
 export function IconSetSwitcher({ sets }: { sets: { id: string | number; title: string; active: boolean }[] }) {
   const router = useRouter()
-  const [busy, setBusy] = useState<string | number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | number | null>(null)
 
   const activate = async (id: string | number) => {
     setBusy(id)
@@ -173,6 +167,7 @@ export function IconSetSwitcher({ sets }: { sets: { id: string | number; title: 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id }),
       })
+      //TODO: replace `as` cast with proper typing
       if (res.ok) router.refresh()
       else setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Failed (HTTP ${res.status}).`)
     } catch {
@@ -202,8 +197,6 @@ export function IconSetSwitcher({ sets }: { sets: { id: string | number; title: 
   )
 }
 
-/** The `/dev/revalidate` manual bust box — POST one tag to payload-revalidate's map
- *  endpoint and refresh, so the event log shows the manual bust immediately. */
 export function BustTagCard({ endpointPath }: { endpointPath: string }) {
   const router = useRouter()
   const [tag, setTag] = useState('')
@@ -221,6 +214,7 @@ export function BustTagCard({ endpointPath }: { endpointPath: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ tag: tag.trim() }),
       })
+      //TODO: replace `as` cast with proper typing
       if (res.ok) {
         setTag('')
         router.refresh()

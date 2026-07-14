@@ -1,9 +1,3 @@
-/**
- * The one definition of "this change invalidates the source's variants": file replaced, focal
- * moved, or hotspot edited — the same field set `variantCacheKey` hashes. Shared by the purge
- * hook (drop stale variants) and the prewarm hook (re-generate them) so the triggers can't drift.
- */
-
 export interface VariantIdentityChange {
   fileChanged: boolean
   focalChanged: boolean

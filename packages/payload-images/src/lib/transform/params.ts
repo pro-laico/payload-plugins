@@ -1,11 +1,8 @@
-/** Pure parsing / validation for the on-demand transform endpoint — no Sharp, no Node APIs. */
 import type { Fit, Format, OutputFormat, ParseResult, QuerySource, TransformConstraints } from '../../types'
 
 export const FITS: Fit[] = ['cover', 'contain', 'inside', 'outside', 'fill']
 export const FORMATS: Format[] = ['auto', 'avif', 'webp', 'jpeg', 'png']
 
-/** Default srcset width increment AND the default endpoint snap grid — sharing the value means
- *  well-behaved srcset widths pass through unchanged. */
 export const DEFAULT_PIXEL_STEP = 50
 
 export const DEFAULT_CONSTRAINTS: TransformConstraints = {
@@ -21,12 +18,8 @@ export const DEFAULT_CONSTRAINTS: TransformConstraints = {
 
 export const clampInt = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, Math.round(n)))
 
-/** Snap quality to the nearest multiple of 5, then clamp — bounds how many distinct variants
- *  a single (source, size, format) can spawn. */
 export const bucketQuality = (q: number, [lo, hi]: [number, number]): number => clampInt(Math.round(q / 5) * 5, lo, hi)
 
-/** Parse "16:9" | "1.78" → a number, or undefined when unparseable / non-positive.
- *  The `:` separator is the one canonical string form — `16/9` is rejected, not silently accepted. */
 export const parseAspectRatio = (ar: number | string | null | undefined): number | undefined => {
   if (ar == null) return undefined
   if (typeof ar === 'number') return Number.isFinite(ar) && ar > 0 ? ar : undefined
@@ -45,14 +38,10 @@ export const parseAspectRatio = (ar: number | string | null | undefined): number
 export const mimeForFormat = (fmt: OutputFormat): string => `image/${fmt}`
 export const extForFormat = (fmt: OutputFormat): string => (fmt === 'jpeg' ? 'jpg' : fmt)
 
-/** The concrete formats the plugin can encode/accept, in preference order. */
 export const ENCODABLE_FORMATS: OutputFormat[] = ['avif', 'webp', 'jpeg', 'png']
 
-/** Upload mime types accepted by the image collections — derived so they can't drift. */
 export const IMAGE_MIME_TYPES: string[] = ENCODABLE_FORMATS.map(mimeForFormat)
 
-/** Negotiate a concrete output format from the `Accept` header when `fmt=auto`, constrained to
- *  the configured `allowed` formats. Falls back jpeg → png → whatever's allowed. */
 export const negotiateFormat = (accept: string | null | undefined, allowed?: Format[], preferAvif = false): OutputFormat => {
   const a = accept ?? ''
   const ok = (f: OutputFormat): boolean => !allowed || allowed.includes(f)
@@ -74,8 +63,6 @@ const read = (q: QuerySource, key: string): string | undefined => {
   return v == null ? undefined : String(v)
 }
 
-/** Parse + validate the transform query params: width snaps to the grid, a missing dimension is
- *  derived from `ar`, quality clamps, unknown `fit`/`fmt` fall back. Requires width or height. */
 export const parseTransformParams = (q: QuerySource, c: TransformConstraints): ParseResult => {
   const ar = parseAspectRatio(read(q, 'ar'))
 
@@ -88,9 +75,6 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   let w = wRaw != null ? cap(Math.round(wRaw)) : undefined
   let h = hRaw != null ? cap(Math.round(hRaw)) : undefined
 
-  // Derive the missing dimension from the ratio. If the derived value would exceed maxDimension,
-  // clamp IT and rescale the given dimension too, so the aspect ratio is preserved rather than
-  // silently squashed (a tall/wide crop of a huge source must stay the requested shape).
   if (ar) {
     if (w != null && h == null) {
       let dh = Math.round(w / ar)
@@ -112,9 +96,6 @@ export const parseTransformParams = (q: QuerySource, c: TransformConstraints): P
   if (w == null && h == null) return { ok: false, error: 'width or height required' }
 
   if (c.dimensionStep > 1) {
-    // Snap to the grid — or to a ladder width when that's closer, so an explicit `pixelStep`
-    // ladder's widths pass through exactly whatever their values. Either way the continuous
-    // dimension space collapses to a finite set (anti-DoS).
     const ladder = c.widthLadder
     const snap = (n: number | undefined): number | undefined => {
       if (n == null) return n

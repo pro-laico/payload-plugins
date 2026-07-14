@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
 import type { ChromeSlot, Corner, DevLink, DevSnapshot, SeedError, Settings, Size, StageSelection, TestMeta, View } from '../types'
 
@@ -28,9 +29,6 @@ const readSettings = (): Settings => {
   }
 }
 
-/** A selection cookie (`testKey:versionId`), read client-side — the server reads the same cookie
- *  (test pages for the stage cookie, `resolveDevChrome` for the chrome slots), so the toolbar
- *  chips and the rendered result always agree. */
 const readSelectionCookie = (name: string): StageSelection | null => {
   const raw = document.cookie
     .split('; ')
@@ -46,30 +44,24 @@ const readSelectionCookie = (name: string): StageSelection | null => {
   }
 }
 
-/**
- * The toolbar panel — THE controller for the dev experience. Navigation happens through it (the
- * dev pages render content only, no nav of their own), the panel stays open across route changes
- * (it lives in the layout, and rows are client-side `<Link>`s), and the Tests view both opens a
- * test's page and toggles which version that page shows.
- */
 export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: DevLink[] }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-  const [hidden, setHidden] = useState(false)
   const [open, setOpen] = useState(false)
+  const [hidden, setHidden] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+  const [seeding, setSeeding] = useState(false)
   const [view, setView] = useState<View>('main')
+  const [draftBusy, setDraftBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [draft, setDraft] = useState<boolean | null>(null)
+  const [snapshotError, setSnapshotError] = useState(false)
   const [settings, setSettings] = useState<Settings>(DEFAULTS)
+  const [snapshot, setSnapshot] = useState<DevSnapshot | null>(null)
+  const [seedError, setSeedError] = useState<SeedError | null>(null)
   const [selection, setSelection] = useState<StageSelection | null>(null)
   const [chrome, setChrome] = useState<Record<ChromeSlot, StageSelection | null>>({ header: null, footer: null })
-  const [snapshot, setSnapshot] = useState<DevSnapshot | null>(null)
-  const [snapshotError, setSnapshotError] = useState(false)
-  const [draft, setDraft] = useState<boolean | null>(null)
-  const [draftBusy, setDraftBusy] = useState(false)
-  const [seeding, setSeeding] = useState(false)
-  const [confirming, setConfirming] = useState(false)
-  const [seedError, setSeedError] = useState<SeedError | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setHidden(sessionStorage.getItem(HIDE_KEY) === '1')
@@ -83,22 +75,20 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     try {
       const res = await fetch('/api/dev', { headers: { accept: 'application/json' }, credentials: 'include' })
       if (!res.ok) throw new Error(String(res.status))
-      setSnapshot((await res.json()) as DevSnapshot)
+      setSnapshot((await res.json()) as DevSnapshot) //TODO: replace `as` cast with proper typing
       setSnapshotError(false)
     } catch {
       setSnapshotError(true)
     }
   }, [])
 
-  // Lazy: the snapshot loads on first open, not on page load.
   useEffect(() => {
     if (open && !snapshot && !snapshotError) void fetchSnapshot()
   }, [open, snapshot, snapshotError, fetchSnapshot])
 
-  // Draft mode is server-held state (`__prerender_bypass` is httpOnly), so re-read it on every
-  // open — a preview route or another tab may have flipped it. null = endpoint unavailable, row hidden.
   useEffect(() => {
     if (!open) return
+    //TODO: replace `as` cast with proper typing
     void fetch('/api/dev/draft', { credentials: 'include' })
       .then(async (res) => (res.ok ? setDraft(((await res.json()) as { enabled: boolean }).enabled) : setDraft(null)))
       .catch(() => setDraft(null))
@@ -110,7 +100,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     try {
       const res = await fetch(`/api/dev/draft?enable=${draft ? 0 : 1}`, { credentials: 'include' })
       if (!res.ok) throw new Error(String(res.status))
-      setDraft(((await res.json()) as { enabled: boolean }).enabled)
+      setDraft(((await res.json()) as { enabled: boolean }).enabled) //TODO: replace `as` cast with proper typing
       router.refresh()
     } catch {
       setDraft(null)
@@ -121,8 +111,6 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
 
   const base = snapshot?.devRoute ?? '/dev'
 
-  /** Select a version: write the cookie, then show it — refresh if we're already on the test's
-   *  page, navigate there if not. The panel stays open either way. */
   const selectVersion = useCallback(
     (testKey: string, versionId: string) => {
       // biome-ignore lint/suspicious/noDocumentCookie: dev-only synchronous cookie write; Cookie Store API is async and not universal
@@ -135,8 +123,6 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     [base, pathname, router],
   )
 
-  /** Set/clear a chrome override (header/footer swap): the cookie applies SITE-WIDE in dev —
-   *  `resolveDevChrome` in the host layout swaps the variant in wherever you browse. */
   const selectChrome = useCallback(
     (slot: ChromeSlot, sel: StageSelection | null) => {
       // biome-ignore lint/suspicious/noDocumentCookie: dev-only synchronous cookie write; Cookie Store API is async and not universal
@@ -171,7 +157,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
         router.refresh()
         return
       }
-      const body = (await res.json().catch(() => null)) as SeedError | null
+      const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
       setSeedError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
     } catch {
       setSeedError({ error: 'Seed request failed — is the dev server running?' })
@@ -485,8 +471,6 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
             {view === 'tests' ? (
               <div>
                 {tests.map((t) => {
-                  // header/footer kinds are chrome OVERRIDES: chips swap the variant into the real
-                  // layout site-wide (via resolveDevChrome) instead of opening a test page.
                   if (t.kind === 'header' || t.kind === 'footer') {
                     const slot = t.kind
                     const active = chrome[slot]?.testKey === t.key ? chrome[slot] : null
@@ -516,7 +500,6 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                   }
                   const testPath = `${base}/tests/${t.key}`
                   const onPage = pathname === testPath
-                  // The page defaults to the first version when no cookie targets this test.
                   const selectedId = selection?.testKey === t.key ? selection.versionId : t.versions[0]?.id
                   return (
                     <div key={t.key} className="pdt-card">

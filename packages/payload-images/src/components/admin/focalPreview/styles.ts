@@ -32,7 +32,6 @@ export const handleStyle: React.CSSProperties = {
   zIndex: 3,
 }
 
-/** Ratio label as a corner chip, so tiles carry no caption line. */
 export const tileLabelStyle: React.CSSProperties = {
   position: 'absolute',
   left: 4,

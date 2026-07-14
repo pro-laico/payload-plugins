@@ -1,10 +1,3 @@
-/**
- * Upload-time metadata: when a save carries an actual file (`req.file` — never a metadata-only
- * edit), one Sharp decode stores the placeholder tiers, palette, alpha flags, and a saliency
- * focal suggestion in the same write. The suggestion never fights the editor: on create it
- * applies unless a spot was picked (a dragged point is never exactly 50/50); on update it
- * applies only when the doc has no focal at all.
- */
 import type { CollectionBeforeChangeHook } from 'payload'
 
 import { analyzeImageMetadata } from '../../lib/metadata/analyze'
@@ -18,7 +11,7 @@ export const generateImageMetadataBeforeChange = (): CollectionBeforeChangeHook 
 
     try {
       const analysis = await analyzeImageMetadata(file.data)
-      const doc = data as Record<string, unknown> //EXCUSE: hook data for a runtime-configured collection is untyped
+      const doc = data as Record<string, unknown> //TODO: replace `as` cast with proper typing
       Object.assign(doc, analysis.placeholderFields)
       doc.palette = analysis.palette
       doc.hasAlpha = analysis.hasAlpha

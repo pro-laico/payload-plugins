@@ -1,42 +1,30 @@
-/**
- * Payload custom-bin entry, registered as `payload images:backfill` — stamps the upload-time
- * metadata (placeholder tiers, palette, alpha flags) onto every image that predates the hook.
- *
- *   payload images:backfill                    # only images missing metadata (idempotent)
- *   payload images:backfill --force            # regenerate every image
- *   payload images:backfill --focal            # also set the saliency focal on docs still at 50/50
- *   payload images:backfill --collection media # an extendCollection target
- *
- * `--focal` is opt-in because it CHANGES CROPS on a live site (busts caches, regenerates
- * variants); everything else is additive metadata that alters no rendered pixels.
- */
 import { getPayload, type SanitizedConfig } from 'payload'
-import { asSlug } from '../lib/asSlug'
 
-import { readPluginMarker } from '../lib/pluginMarker'
-import { analyzeImageMetadata } from '../lib/metadata/analyze'
-import { resolveStaticDir } from '../lib/transform/staticDir'
-import { getServerSideURL } from '../lib/getServerSideURL'
-import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
-import { readBytes } from '../lib/transform/source'
+import { asSlug } from '../lib/asSlug'
 import type { UploadDocLike } from '../types'
+import { readBytes } from '../lib/transform/source'
+import { readPluginMarker } from '../lib/pluginMarker'
+import { getServerSideURL } from '../lib/getServerSideURL'
+import { resolveStaticDir } from '../lib/transform/staticDir'
+import { analyzeImageMetadata } from '../lib/metadata/analyze'
+import { PLACEHOLDER_FIELD_NAMES } from '../lib/placeholders/qualities'
 
 export const script = async (config: SanitizedConfig): Promise<void> => {
   const argv = process.argv.slice(2)
   const force = argv.includes('--force')
   const focal = argv.includes('--focal')
-  const collectionIdx = argv.indexOf('--collection')
   const marker = readPluginMarker(config)
+  const collectionIdx = argv.indexOf('--collection')
   const slug = asSlug((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker.sourceSlug ?? 'images')
 
   const payload = await getPayload({ config })
   try {
-    const staticDir = resolveStaticDir(payload, slug)
-    const base = payload.config.serverURL || getServerSideURL() || ''
     let failed = 0
     let stamped = 0
     let skipped = 0
     let processed = 0
+    const staticDir = resolveStaticDir(payload, slug)
+    const base = payload.config.serverURL || getServerSideURL() || ''
 
     const hasAllMetadata = (doc: Record<string, unknown>): boolean =>
       PLACEHOLDER_FIELD_NAMES.every((f) => typeof doc[f] === 'string' && doc[f]) && doc.palette != null && typeof doc.hasAlpha === 'boolean'
@@ -45,8 +33,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     for (;;) {
       const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, sort: 'id' })
       for (const raw of res.docs) {
-        //EXCUSE: docs of a runtime-chosen collection are untyped; the shape is duck-checked field by field below
-        const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number }
+        const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number } //TODO: replace `as` cast with proper typing
         processed++
         const wantsFocal = focal && doc.focalX === 50 && doc.focalY === 50
         if (!force && !wantsFocal && hasAllMetadata(doc)) {
@@ -75,7 +62,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
           await payload.update({
             collection: slug,
             id: doc.id,
-            data: data as never, //EXCUSE: data for a runtime-chosen collection can't satisfy the generated per-collection data type
+            data: data as never, //TODO: replace `as` cast with proper typing
             ...(settingFocal ? {} : { context: { disableRevalidate: true } }),
           })
           stamped++

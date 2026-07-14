@@ -14,7 +14,7 @@ const fakePayload = (existing?: Partial<RenderProfileDoc>) => {
   const create = vi.fn().mockResolvedValue({})
   const update = vi.fn().mockResolvedValue({})
   const logger = { warn: vi.fn(), info: vi.fn(), error: vi.fn() }
-  return { payload: { find, create, update, logger } as unknown as Payload, lookup, create, update, logger } //EXCUSE: test double — only the members the recorder touches
+  return { payload: { find, create, update, logger } as unknown as Payload, lookup, create, update, logger }
 }
 
 const make = (p: Payload) => createObservationRecorder({ payload: p, profilesSlug: 'image-render-profiles', seedCandidates: [] })
@@ -97,7 +97,7 @@ describe('createObservationRecorder', () => {
     const { payload, lookup, logger } = fakePayload()
     lookup.mockRejectedValue(new Error('db down'))
     const rec = make(payload)
-    for (let i = 0; i < 200; i++) rec.observe({ parts: parts({ quality: (i % 40) * 5 + 40, ratio: `${i}` as never }), width: 100 }) //EXCUSE: synthetic distinct ratios to overflow the buffer
+    for (let i = 0; i < 200; i++) rec.observe({ parts: parts({ quality: (i % 40) * 5 + 40, ratio: `${i}` as never }), width: 100 })
     await expect(rec.flushNow()).resolves.toBeUndefined()
     expect(logger.warn).toHaveBeenCalled() // buffer cap + flush failure, warned not thrown
   })

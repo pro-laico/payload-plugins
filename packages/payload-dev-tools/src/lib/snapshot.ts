@@ -1,4 +1,5 @@
 import type { CollectionSlug, GlobalSlug, Payload, Where } from 'payload'
+
 import type {
   CollectionCount,
   DevSnapshot,
@@ -19,6 +20,7 @@ import type {
 
 const countDocs = async (payload: Payload, slug: string, where?: Where): Promise<number | null> => {
   try {
+    //TODO: replace `as` cast with proper typing
     return (await payload.count({ collection: slug as CollectionSlug, ...(where ? { where } : {}) })).totalDocs
   } catch {
     return null
@@ -47,7 +49,6 @@ const imagesSnapshot = async (payload: Payload, marker: ImagesMarker): Promise<I
   return {
     sourceSlug,
     variantSlug,
-    // The marker stores the endpoint-relative path ('/img'); report it as requested (/api/img).
     basePath: `/api${marker.basePath ?? '/img'}`,
     sourceCount: await countDocs(payload, sourceSlug),
     variantCount: variantSlug ? await countDocs(payload, variantSlug) : null,
@@ -62,13 +63,13 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
   if (iconSetSlug) {
     try {
       const res = await payload.find({
-        collection: iconSetSlug as CollectionSlug,
+        collection: iconSetSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
         where: { active: { equals: true } },
         limit: 1,
         depth: 0,
         pagination: false,
       })
-      const doc = res.docs[0] as { title?: string } | undefined
+      const doc = res.docs[0] as { title?: string } | undefined //TODO: replace `as` cast with proper typing
       activeSet = doc?.title ?? null
     } catch {}
   }
@@ -77,12 +78,13 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
   if (marker.iconRequestSlug) {
     try {
       const res = await payload.find({
-        collection: marker.iconRequestSlug as CollectionSlug,
+        collection: marker.iconRequestSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
         sort: '-count',
         limit: 20,
         depth: 0,
         pagination: false,
       })
+      //TODO: replace `as` cast with proper typing
       misses = (res.docs as { name?: string; count?: number; lastRequestedAt?: string }[]).flatMap((d) =>
         d.name ? [{ name: d.name, count: d.count ?? 1, lastRequestedAt: d.lastRequestedAt ?? null }] : [],
       )
@@ -102,9 +104,11 @@ const fontsSnapshot = async (payload: Payload, marker: FontsMarker): Promise<Fon
   if (fontSetSlug && familyKeys.length) {
     try {
       // Through `unknown`: in an app context `findGlobal` returns the app's generated global type.
+      //TODO: replace `as` cast with proper typing
       const set = (await payload.findGlobal({ slug: fontSetSlug as GlobalSlug, depth: 1 })) as unknown as Record<string, unknown>
       for (const key of familyKeys) {
         const value = set[key]
+        //TODO: replace `as` cast with proper typing
         slots[key] = value && typeof value === 'object' && 'title' in value ? ((value as { title?: string }).title ?? null) : null
       }
     } catch {}
@@ -126,7 +130,6 @@ const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnap
   const collection = payload.config.collections.find((c) => c.slug === slug)
   return {
     slug,
-    // The mux plugin marks its collection `custom.seedDisabled` when MUX_TOKEN_ID/SECRET are absent.
     credentialed: !collection?.custom?.seedDisabled,
     total: await countDocs(payload, slug),
     ready: await countDocs(payload, slug, { status: { equals: 'ready' } }),
@@ -134,6 +137,7 @@ const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnap
 }
 
 const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
+  //TODO: replace `as` cast with proper typing
   const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
     | (() => RevalidateInspection)
     | undefined
@@ -148,15 +152,14 @@ const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
   }
 }
 
-/** Build the full dev snapshot from a booted Payload instance. Sibling @pro-laico plugins are
- *  discovered through their `config.custom` markers — no imports, so none of them are required. */
 export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
+  //TODO: replace `as` cast with proper typing
   const custom = (payload.config.custom ?? {}) as Record<string, Record<string, unknown> | undefined>
+  const muxMarker = custom.payloadMux
   const seedMarker = custom.payloadSeed
-  const imagesMarker = custom.payloadImages
   const iconsMarker = custom.payloadIcons
   const fontsMarker = custom.payloadFonts
-  const muxMarker = custom.payloadMux
+  const imagesMarker = custom.payloadImages
   const revalidateMarker = custom.payloadRevalidate
 
   const collections: CollectionCount[] = []
@@ -166,7 +169,7 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
     generatedAt: new Date().toISOString(),
     env: { nodeEnv: process.env.NODE_ENV ?? 'development', nodeVersion: process.version },
     adminRoute: payload.config.routes?.admin ?? '/admin',
-    devRoute: (custom.payloadDevTools?.devRoute as string | undefined) ?? '/dev',
+    devRoute: (custom.payloadDevTools?.devRoute as string | undefined) ?? '/dev', //TODO: replace `as` cast with proper typing
     plugins: {
       seed: !!seedMarker,
       images: !!imagesMarker,

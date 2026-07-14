@@ -1,18 +1,9 @@
-/**
- * BlurHash crop by closed-form coefficient projection. The decode is a finite cosine series,
- * so the cropped function's least-squares cosine coefficients are an exact linear map of the
- * originals: `d[k][l] = m_k·m_l · Σᵢⱼ c[i][j] · Ix[k][i] · Iy[l][j]` with basis-overlap
- * integrals `I[k][i] = ∫₀¹ cos(πi·(a + w·u))·cos(πk·u) du` and true orthogonality norms.
- * No sampling anywhere — exact up to the truncation + quantization every blurhash pays.
- */
 import { encodeCoefficients, parseBlurhash } from './codec'
 import type { Coefficient, CropCoefficientsOptions, CropWindow, ParsedBlurhash } from '../../types'
 
-/** ∫₀¹ cos(α + δ·u) du — the degenerate δ→0 limit is cos(α). */
 const cosIntegral = (alpha: number, delta: number): number =>
   Math.abs(delta) < 1e-9 ? Math.cos(alpha) : (Math.sin(alpha + delta) - Math.sin(alpha)) / delta
 
-/** The 1D basis-overlap matrix `M[k][i]` for a crop `[a, a+w]`, norms folded in. */
 const overlapMatrix = (outN: number, inN: number, a: number, w: number): number[][] =>
   Array.from({ length: outN }, (_, k) =>
     Array.from({ length: inN }, (_, i) => {
@@ -24,11 +15,9 @@ const overlapMatrix = (outN: number, inN: number, a: number, w: number): number[
     }),
   )
 
-/** Crop in coefficient space (parse → project → serialize). */
 export const cropBlurhashCoefficients = (hash: string, window: CropWindow, opts: CropCoefficientsOptions = {}): string =>
   encodeCoefficients(projectCoefficients(parseBlurhash(hash), window, opts))
 
-/** The projection itself, exposed for benchmarking parse/serialize separately. */
 export const projectCoefficients = (parsed: ParsedBlurhash, window: CropWindow, opts: CropCoefficientsOptions = {}): ParsedBlurhash => {
   const { cx, cy, coeffs } = parsed
   const outCx = opts.cx ?? cx

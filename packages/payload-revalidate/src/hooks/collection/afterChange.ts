@@ -1,69 +1,12 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
 import { bust } from '../../lib/bust'
-import { anyChanged, changedFields } from '../../lib/diff/changedFields'
-import { extractOnValues } from '../../lib/diff/joins'
 import { docRecord, isId } from '../../lib/values'
-import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent, Tags } from '../../types'
+import { extractOnValues } from '../../lib/diff/joins'
+import { anyChanged, changedFields } from '../../lib/diff/changedFields'
 import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, listTags, ruleTags } from './busts'
+import type { Bust, CollectionHookInput, JoinMembership, Lanes, RevalidateEvent, Tags } from '../../types'
 
-/**
- * The write side: one afterChange + one afterDelete per collection, computing the blast
- * radius from WHICH FIELDS changed — the atomic decision table:
- *
- * | Event                                    | doc tags (id + alias) | list tags | lanes |
- * | ---------------------------------------- | --------------------- | --------- | ----- |
- * | content-only edit (the common case)      | ✅                    | —         | both  |
- * | edit touching a scope's declared fields¹ | ✅                    | just those scopes | both |
- * | membership event²                        | ✅                    | bare + ALL scopes | both |
- * | draft save (draft → draft)               | ✅ (draft lane)       | scopes whose fields changed, draft lane | draft |
- * | alias (slug) change                      | ✅ old AND new alias  | —³        | both  |
- * | delete (incl. trash / restore-from-trash)| ✅                    | bare + ALL scopes | both  |
- *
- * ¹ `settings.lists` — each scope names its membership/order determinants (sort + filter
- *   fields, dotted paths supported); an edit busts a scope only when the diff intersects.
- *   Relationship/upload values are compared by ID (Payload returns `doc` at request depth
- *   but `previousDoc` at depth 0 — a populated doc must not read as a change); joins are
- *   derived and excluded from the diff.
- * ² create, delete, publish, unpublish (published→draft — indistinguishable from a draft
- *   save over a published doc, so both lanes bust for that signature), and trash
- *   transitions (`deletedAt` set or cleared — a soft delete/restore changes list
- *   membership exactly like a delete, but arrives as an update).
- * ³ id-lists hold ids, not slugs — an alias change re-renders the doc's own entries via
- *   the doc tag; list membership/order is untouched.
- *
- * `extraTags` follow the lanes: published-surface writes bust the base tag (draft reads
- * carry it too), draft saves bust only the `:draft` variants. Dependency `rules` fire on
- * published-surface writes when their `whenFields` changed — OR on any membership event,
- * because a publish's field delta may have arrived across earlier (rule-skipped) draft
- * saves and be invisible to the publish-time diff. Deletes fire rules unconditionally.
- * Every path honors `context.disableRevalidate` (the repo-wide opt-out the seed engine
- * sets) and reports through `lib/bust.ts`, so the dev map logs the event with per-tag
- * reasons.
- *
- * On top of the table, a write also busts JOIN MEMBERSHIP for any join this collection is
- * the child of: a `posts` write moves the membership of the `category` whose join renders
- * "all my posts". A join is a live query with no stable id, so create/delete/reassign
- * changes the list with none of the current members changing — surgically handled by
- * {@link joinMembershipBusts}/{@link deleteJoinBusts}, which bust only the affected
- * parent(s) on the `{child}:join:{on}:{parentId}` tag their entries carry.
- */
-
-/**
- * A write to a CHILD collection moves its parents' join membership (a `category` renders
- * "all my posts"; a join is a live query, so create/delete/reassign changes the list with
- * none of the current members changing). Surgical — bust ONLY the parents whose membership
- * actually moved, on the tag their entry carries:
- *
- * - **reassignment** — the `on` value changed: bust every parent the child left OR joined
- *   (the symmetric difference), never the ones it stayed in.
- * - **filtered membership** — a `where`-determinant changed while the parent held steady:
- *   the child may have flipped in/out of the filtered list, so bust its current parent(s).
- *
- * Create falls out of the reassignment case (no old parents → all new ones are "joined");
- * `changed === null` makes the determinant gate fire too, harmlessly hitting the same set.
- * Deletes go through {@link deleteJoinBusts} — the parents the child *was* in.
- */
 const joinMembershipBusts = (
   tags: Tags,
   slug: string,
@@ -102,15 +45,10 @@ export const createAfterChange =
     const docs = { doc: current, previousDoc: previous }
 
     const status = current._status
-    const isDraftSave = typeof status === 'string' && status !== 'published'
     const wasPublished = previous._status === 'published'
-    // published → draft is ambiguous: an unpublish and a draft save over a published doc
-    // arrive with the SAME hook signature. Both lanes bust for either reading — correct
-    // for the unpublish, a harmless over-bust for the draft save.
+    const isDraftSave = typeof status === 'string' && status !== 'published'
     const publishedToDraft = isDraftSave && wasPublished
     const isPublish = !isDraftSave && typeof status === 'string' && previousDoc != null && !wasPublished
-    // Trash (`trash: true`) soft-deletes via an UPDATE that sets `deletedAt` — list
-    // membership changes exactly like a delete; restore is the transition back.
     const trashTransition = previousDoc != null && (current.deletedAt != null) !== (previous.deletedAt != null)
     const membership = operation === 'create' || isPublish || publishedToDraft || trashTransition
 
@@ -120,9 +58,6 @@ export const createAfterChange =
 
     const operationName: RevalidateEvent['trigger']['operation'] = operation === 'create' ? 'create' : isPublish ? 'publish' : 'update'
 
-    // A plain draft save touches only the draft lane; publish and published→draft
-    // transitions and published edits touch both (draft-lane entries show the published
-    // doc too).
     const lanes: Lanes = isDraftSave && !publishedToDraft ? 'draft' : 'both'
 
     const busts: Bust[] = []
@@ -133,7 +68,6 @@ export const createAfterChange =
     if (membership) {
       busts.push(...allListTags(tags, slug, settings, lanes))
     } else {
-      // Field-driven: only the scopes whose declared determinants actually changed.
       for (const [scope, fields] of Object.entries(settings.lists)) {
         if (anyChanged(changed, fields, docs)) busts.push(...listTags(tags, slug, scope, lanes))
       }

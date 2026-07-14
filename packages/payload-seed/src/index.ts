@@ -1,35 +1,19 @@
-// The plugin
 export { seedPlugin } from './plugin'
 export type { SeedPluginOptions } from './types'
 
-// Authoring: define seed data (the `ref` / `file` tokens are supplied to each builder callback —
-// `defineSeed('x', ({ ref, file }) => …)` — so they aren't imported). One helper for both:
-// `defineSeed` infers collection (array of records) vs global (single object) from the slug.
 export { defineSeed } from './defineSeed'
 
-// The augmentable interface that generated types fill in (so `ref` keys are typed)
 export type { SeedRegistry } from './types'
 
-// Authoring types for seed helpers COMPOSED across files (e.g. per-block seed fragments that a
-// page definition assembles): `SeedTokens` types a helper's `{ ref, file }` parameter, `WithRefs`
-// widens a generated data type so `Ref` tokens may sit in relationship fields, and `Ref` /
-// `FileToken` are the token value types themselves.
-export type { CollectionSeedData, GlobalSeedData, WithRefs } from './types'
 export type { SeedTokens } from './types'
 export type { FileToken, Ref } from './types'
-// The token constructors themselves, for code that builds seed data OUTSIDE a builder
-// callback — e.g. unit tests exercising a composed seed fragment directly.
 export { file, isFileToken, isRef, ref } from './refs'
+export type { CollectionSeedData, GlobalSeedData, WithRefs } from './types'
 
-// Run the seed from a script or test (the `payload seed` command and endpoint use this)
 export { seed } from './engine/run'
 export type { SeedResult } from './types'
 
-// After-seed listeners: decoupled plugins register (by shared symbol slot or this helper) to run
-// once at the end of every seed — e.g. @pro-laico/payload-revalidate's cache flush.
-export { registerAfterSeedListener } from './listeners'
 export type { AfterSeedListener } from './types'
+export { registerAfterSeedListener } from './listeners'
 
-// The error classes a failing run throws, so callers can branch on (and test) failure modes:
-// SeedValidationError collects every model issue; SeedRunError names the write that died.
 export { SeedRunError, SeedValidationError } from './engine/validate'

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { extractIconUsages } from '../../src/scan/extract.js'
 
-/** Convenience: just the names, in source order. */
 const names = (src: string, components?: string[]): string[] =>
   extractIconUsages(src, components ? { components } : undefined).map((u) => u.name)
 

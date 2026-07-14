@@ -3,36 +3,16 @@ import type { PluginConfig } from 'svgo'
 
 import type { IconData } from '../../types'
 
-// Strip executable content from untrusted SVG uploads before they're stored and later inlined
-// via dangerouslySetInnerHTML: <script> elements (svgo 4's `removeScripts`, renamed from 3.x's
-// `removeScriptElement`) + on* event handlers. Also drop legacy editor attributes that survive
-// preset-default and break React rendering when the root attrs are spread onto a JSX <svg>
-// (`xml:space` → "Invalid DOM property") or mean nothing inline (`version`, `enable-background`).
 const sanitizePlugins: PluginConfig[] = [
   'removeScripts',
-  // elemSeparator '|': removeAttrs treats ':' as its element:attr:value separator, which would
-  // split the literal attribute name `xml:space` — swap the separator so it matches verbatim.
   { name: 'removeAttrs', params: { attrs: ['on.*', 'xml:space', 'enable-background', 'version'], elemSeparator: '|' } },
 ]
 
-// svgo has no builtin for javascript: URLs, so scrub (xlink:)href values from the serialized
-// output as a final pass.
 const stripDangerousUrls = (svg: string): string => svg.replace(/\s(?:xlink:)?href\s*=\s*(["'])\s*javascript:[^"']*\1/gi, '')
 
-// The optimizer targets FILL glyphs: presentation attrs are stripped and fill="currentColor" is
-// re-added, so a stroke-outline source (Lucide-style) renders its enclosed shapes as solid blobs.
 const STROKE_WARNING = 'Warning: stroke-based icon detected — enclosed shapes will render filled. Use a fill-based glyph.'
 const isStrokeBased = (svg: string): boolean => /fill\s*=\s*(["'])\s*none\s*\1/i.test(svg) && /\bstroke(?:-width)?\s*=/i.test(svg)
 
-/**
- * Optimize and sanitize an uploaded SVG: run svgo (sanitize → preset-default → strip presentation
- * attrs → re-add `currentColor` fill/stroke so the icon themes with CSS color), tighten the
- * `viewBox` to the real path bounds, and store the result as `svgString` for inline rendering.
- *
- * svgo + svg-path-bbox are imported dynamically so they never land in a frontend/edge bundle —
- * this only runs server-side when an SVG is actually uploaded. On failure the raw upload is still
- * stored (never optimized/inlined) and the `optimized` field carries the error so the doc shows it.
- */
 export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload['logger']): Promise<IconData> => {
   try {
     const [{ optimize }, { svgPathBbox }] = await Promise.all([import('svgo'), import('svg-path-bbox')])
@@ -42,7 +22,6 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
 
     const strokeBased = isStrokeBased(svg)
     if (strokeBased) logger.warn(`[payload-icons] ${STROKE_WARNING}`)
-    // Prefix the report field so the editor sees the warning on the doc, not just in the server log.
     const report = (msg: string): string => (strokeBased ? `${STROKE_WARNING} ${msg}` : msg)
 
     const hasTransforms = svg.includes('transform=')
@@ -53,8 +32,6 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
         hasClipPaths,
         hasTransforms,
       })
-      // Even when we skip optimization we MUST strip scripts/event handlers, because svgString is
-      // later inlined via dangerouslySetInnerHTML for every visitor.
       const sanitized = stripDangerousUrls(optimize(svg, { multipass: false, plugins: sanitizePlugins }).data)
       return { ...icon, optimized: report('Skipped optimization (transform/clip-path present); scripts stripped'), svgString: sanitized }
     }
@@ -63,7 +40,6 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
       path: 'input.svg',
       multipass: true,
       plugins: [
-        // Strip <script> elements + on* handlers first so nothing downstream re-introduces them.
         ...sanitizePlugins,
         'preset-default',
         'convertStyleToAttrs',
@@ -87,8 +63,6 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
         { name: 'mergePaths', params: { force: false, noSpaceAfterFlags: true } },
         { name: 'cleanupNumericValues', params: { floatPrecision: 1, leadingZero: true } },
         { name: 'removeUnknownsAndDefaults', params: { keepAriaAttrs: true, keepDataAttrs: true, keepRoleAttr: true } },
-        // Re-add currentColor so the icon inherits CSS `color` on the frontend (after the
-        // presentation attrs above were stripped).
         { name: 'addAttributesToSVGElement', params: { attributes: [{ fill: 'currentColor' }, { stroke: 'currentColor' }] } },
         { name: 'convertTransform', params: { convertToShorts: true, degPrecision: 1, floatPrecision: 1, transformPrecision: 1 } },
         {
@@ -166,7 +140,6 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
         const width = maxX - minX
         const height = maxY - minY
 
-        // Square the viewBox around the glyph's center so icons share a consistent box.
         const side = Math.max(width, height)
         const centerX = minX + width / 2
         const centerY = minY + height / 2
@@ -189,14 +162,10 @@ export const formatSvg = async (icon: IconData, svgData: Buffer, logger: Payload
     return { ...icon, filesize: finalSize, optimized: report(optimizedString), svgString: svgStr }
   } catch (error) {
     logger.error({ msg: '[payload-icons] Error processing SVG', err: error })
-    // Surface the failure on the doc itself — both output fields are condition-hidden when empty,
-    // so a silent return would look like a normal save while the icon never renders.
     return { ...icon, optimized: `Optimization failed: ${error instanceof Error ? error.message : String(error)} — icon will not render.` }
   }
 }
 
-/** `beforeChange` hook: when an SVG file is uploaded (create or update), optimize + sanitize it
- *  and fold `svgString`/`optimized` into the doc. A no-op for changes that carry no new file. */
 export const formatSVGHook: CollectionBeforeChangeHook = async ({ data, operation, req }) => {
   if (operation === 'create' || operation === 'update') {
     if (data?.filename && req.file) {

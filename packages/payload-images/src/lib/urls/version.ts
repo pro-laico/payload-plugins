@@ -9,11 +9,6 @@ const fnv1a = (s: string): string => {
   return (h >>> 0).toString(36)
 }
 
-/**
- * A short, stable version token from the identity fields that change the rendered pixels — the
- * same inputs the server folds into the variant cache key — so a file replace or focal edit
- * busts immutable browser/CDN caches. Undefined when no identity is available (a bare id).
- */
 export const deriveVersion = (src?: VersionSource | null): string | undefined => {
   if (!src) return undefined
   const { filename, focalX, focalY } = src

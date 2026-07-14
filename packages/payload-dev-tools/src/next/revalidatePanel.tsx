@@ -1,8 +1,7 @@
 'use client'
 
-import '@xyflow/react/dist/style.css'
-
 import dagre from '@dagrejs/dagre'
+import { useMemo, useState } from 'react'
 import {
   Background,
   Handle,
@@ -13,9 +12,11 @@ import {
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react'
-import { useMemo, useState } from 'react'
-import type { GraphNodeData, Read, RevalidateInspection } from '../types'
+
 import { BustTagCard } from './client'
+import type { GraphNodeData, Read, RevalidateInspection } from '../types'
+
+import '@xyflow/react/dist/style.css'
 
 const RICH_TEXT_NODE = '*'
 const clock = (iso: string): string => iso.slice(11, 19)
@@ -24,14 +25,12 @@ const readName = (read: Read): string =>
   read.label ??
   `${read.kind}:${read.collection ?? read.global ?? '?'}${read.as !== undefined ? `:${read.as}` : ''}${read.list ? `:${read.list}` : ''}${read.draft ? ' (draft)' : ''}`
 
-/** Which node a read belongs to, and which collection a tag points at (prefix-aware). */
 const readNode = (read: Read): string | null => read.collection ?? (read.global ? `global:${read.global}` : null)
 const tagCollection = (tag: string, prefix: string): string => {
   const bare = prefix && tag.startsWith(`${prefix}:`) ? tag.slice(prefix.length + 1) : tag
   return bare.split(':')[0] ?? bare
 }
 
-/** Observed bake-ins as `edited -> renderer` pairs — colors the schema edges by real usage. */
 const bakedPairs = (reads: Read[], prefix: string): Set<string> => {
   const pairs = new Set<string>()
   for (const read of reads) {
@@ -63,8 +62,6 @@ function GraphNode({ data }: NodeProps<FlowNode<GraphNodeData>>) {
 
 const nodeTypes: NodeTypes = { pdtp: GraphNode }
 
-/** Left→right layered layout: sources are the things you EDIT, targets the surfaces that
- *  go stale. Sized by label so dagre spaces long slugs correctly. */
 const layout = (nodes: FlowNode<GraphNodeData>[], edges: FlowEdge[]): FlowNode<GraphNodeData>[] => {
   const g = new dagre.graphlib.Graph()
   g.setGraph({ rankdir: 'LR', nodesep: 24, ranksep: 120 })
@@ -115,8 +112,6 @@ function ExploreTab({
       },
     }))
 
-    // Direction of staleness: editing `edge.to` makes `edge.from` stale — source is the
-    // edited side so the graph reads left (cause) → right (effect).
     const flowEdges: FlowEdge[] = data.graph.edges.map((edge) => {
       const isBaked = baked.has(`${edge.to}->${edge.from}`)
       const active = selected !== null && (edge.to === selected || edge.from === selected)
@@ -171,16 +166,6 @@ function ExploreTab({
   )
 }
 
-/**
- * The focused, evidence-based answer for one node — three layers, never conflated:
- *
- * 1. **What a write here busts** — tags, by event kind. Facts from the decision table.
- * 2. **What observably purges right now** — the cached entries that actually carry those
- *    tags. This is the truth of "what happens if I edit/create a doc here today".
- * 3. **Potential coupling** — schema edges. A reference alone never propagates a purge
- *    (ids are stable); an edge only becomes real when a getter is OBSERVED baking the
- *    content in. Each edge is labeled accordingly.
- */
 function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }) {
   const { graph, rules, reads, prefix } = data
   const p = prefix ? `${prefix}:` : ''
@@ -194,9 +179,7 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
   const ownRules = rules.filter((r) => r.on === slug)
   const scopes = Object.entries(settings?.lists ?? {})
 
-  // Observed: entries carrying this collection's DOC tags (own entries + bake-ins)…
   const docTagCarriers = new Map<string, { name: string; baked: boolean }[]>()
-  // …and entries carrying its LIST tags (what membership events actually purge).
   const listCarriers = reads.filter((read) => read.kind === 'ids' && read.collection === slug)
   if (!isGlobal && node !== RICH_TEXT_NODE) {
     for (const read of reads) {
@@ -222,8 +205,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
     )
   }
 
-  // The getters the CODE declares for this node (live source scan), matched against
-  // runtime observation so each shows whether it has materialized yet.
   const helperKind = { cacheDoc: 'doc', cacheIds: 'ids', cacheGlobal: 'global' } as const
   const nodeGetters = data.getters
     .filter((g) => g.slug === slug && (isGlobal ? g.helper === 'cacheGlobal' : g.helper !== 'cacheGlobal'))
@@ -254,7 +235,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
         {label(node)} <span className="pdtp-kind">{isGlobal ? 'global' : 'collection'}</span>
       </h2>
 
-      {/* 0 — the tag vocabulary this node lives under */}
       <p className="pdtp-note" style={{ margin: '0 0 12px' }}>
         Tags:{' '}
         {vocabulary.map((tag) => (
@@ -264,7 +244,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
         ))}
       </p>
 
-      {/* 1 — the facts: which write busts which tags */}
       <h3 className="pdtp-rev-subhead">A write here busts…</h3>
       <ul className="pdtp-rev-list">
         {isGlobal ? (
@@ -313,7 +292,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
         )}
       </ul>
 
-      {/* 2 — the observed reality: which entries those tags actually purge today */}
       <h3 className="pdtp-rev-subhead" style={{ marginTop: 14 }}>
         …which currently purges (observed)
       </h3>
@@ -355,7 +333,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
         </p>
       ) : null}
 
-      {/* 2b — the getters the code declares for this node (source scan + runtime match) */}
       {nodeGetters.length ? (
         <div style={{ marginTop: 14 }}>
           <h3 className="pdtp-rev-subhead">Getters in your code</h3>
@@ -383,7 +360,6 @@ function NodeDetail({ node, data }: { node: string; data: RevalidateInspection }
         </div>
       ) : null}
 
-      {/* 3 — potential coupling: schema edges, real only when observed baked */}
       <div className="pdtp-rev-cols" style={{ marginTop: 14 }}>
         <div>
           <h3 className="pdtp-rev-subhead">Can be referenced by (schema)</h3>
@@ -546,7 +522,6 @@ function ReadsTab({ data }: { data: RevalidateInspection }) {
           {data.reads.map((read) => {
             const all = [...read.staticTags, ...read.depTags]
             return (
-              // Keyed by the full observed shape: a label like `icon-by-id` repeats across ids (`as`).
               <tr key={`${readName(read)}|${String(read.as ?? '')}|${read.list ?? ''}|${read.draft ? 'd' : 'p'}`}>
                 <td className="pdtp-code">{readName(read)}</td>
                 <td className="pdtp-mono" title={all.join('\n')}>
@@ -634,10 +609,6 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
-/** The `/dev/revalidate` panel — tabbed so a grown project stays navigable: Explore (the
- *  interactive dependency graph + per-node lookup), Fields (the per-field blast-radius
- *  tables), Reads (observed cache entries with atomic-health badges), Events (the bust
- *  log + manual bust box). */
 export function RevalidatePanel({ data, endpointPath }: { data: RevalidateInspection; endpointPath: string | null }) {
   const [tab, setTab] = useState<TabKey>('explore')
   const [selected, setSelected] = useState<string | null>(null)

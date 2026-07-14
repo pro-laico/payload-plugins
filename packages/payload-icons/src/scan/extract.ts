@@ -1,35 +1,13 @@
-/**
- * Pure, dependency-free extraction of literal icon names from one source file's
- * text. This is the core of the build-time usage scan that powers the admin
- * "requested icons" panel — kept side-effect-free (no `fs`) so it is trivially
- * unit-testable and reusable from any walker.
- *
- * It is tag-aware, NOT a naive regex. The scanner walks the file skipping
- * strings and comments, and for every `<Icon …>` opening tag it parses the
- * attribute list, so a `>` inside an expression (`check={a > b}`) or a `name`
- * substring inside a sibling attribute (`iconName`, `data-name`) never trips
- * it.
- *
- * ONLY string-literal names are collected — the value must resolve statically:
- *   - `name="x"` / `name='x'`            (direct attribute strings)
- *   - `name={"x"}` / `name={'x'}`        (string literal in an expression slot)
- *   - `` name={`x`} ``                   (template literal, no interpolation)
- * Dynamic `name={expr}` (variables, concatenation, interpolated templates) is
- * intentionally skipped — a static scan cannot know its value.
- */
-
 import type { ExtractedUsage, ExtractOptions } from '../types/index.js'
 
 const DEFAULT_COMPONENTS = ['Icon']
 
-/** Plausible icon names only — set-row names are kebab-cased, so prose placeholders (`…`) never qualify. */
 const PLAUSIBLE_NAME = /^[\w-]+$/
 
 const isWhitespace = (c: string): boolean => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f' || c === '\v'
 const isIdentStart = (c: string): boolean => /[A-Za-z_$]/.test(c)
 const isTagNameBoundary = (c: string | undefined): boolean => c === undefined || isWhitespace(c) || c === '/' || c === '>'
 
-/** Builds a binary-searchable index of line-start offsets for fast line/column lookup. */
 const buildLineIndex = (source: string): number[] => {
   const starts = [0]
   for (let i = 0; i < source.length; i++) if (source[i] === '\n') starts.push(i + 1)
@@ -37,18 +15,17 @@ const buildLineIndex = (source: string): number[] => {
 }
 
 const lineColAt = (lineStarts: number[], index: number): { line: number; column: number } => {
-  // Binary search for the greatest line-start <= index.
   let lo = 0
   let hi = lineStarts.length - 1
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1
-    if ((lineStarts[mid] as number) <= index) lo = mid
+    if ((lineStarts[mid] as number) <= index)
+      lo = mid //TODO: replace `as` cast with proper typing
     else hi = mid - 1
   }
-  return { line: lo + 1, column: index - (lineStarts[lo] as number) + 1 }
+  return { line: lo + 1, column: index - (lineStarts[lo] as number) + 1 } //TODO: replace `as` cast with proper typing
 }
 
-/** Skips a `"…"` / `'…'` string starting at `i` (the opening quote). Returns the index just past the closing quote. */
 const skipString = (source: string, i: number): number => {
   const quote = source[i]
   i++
@@ -64,7 +41,6 @@ const skipString = (source: string, i: number): number => {
   return i
 }
 
-/** Skips a `` `…` `` template (including nested `${ … }`) starting at the opening backtick. Returns the index just past the closing backtick. */
 const skipTemplate = (source: string, i: number): number => {
   i++
   while (i < source.length) {
@@ -83,7 +59,6 @@ const skipTemplate = (source: string, i: number): number => {
   return i
 }
 
-/** Skips a balanced `{ … }` region starting at the opening brace, honoring nested braces, strings, templates, and comments. Returns the index just past the closing brace. */
 const skipBraces = (source: string, i: number): number => {
   let depth = 0
   while (i < source.length) {
@@ -126,31 +101,23 @@ const skipBlockComment = (source: string, i: number): number => {
   return Math.min(i + 2, source.length)
 }
 
-/**
- * Interprets a JSX attribute expression container's INNER text (the part
- * between `{` and `}`). Returns the literal string if the whole expression is a
- * single string or non-interpolated template literal, otherwise `null`
- * (dynamic — skipped).
- */
 const interpretExpression = (inner: string): string | null => {
   const expr = inner.trim()
   if (expr.length < 2) return null
   const first = expr[0]
   const last = expr[expr.length - 1]
   if ((first === '"' || first === "'") && last === first) {
-    // Must be a SINGLE string literal — reject concatenation like `"a" + b`.
     if (skipString(expr, 0) !== expr.length) return null
     return unquote(expr)
   }
   if (first === '`' && last === '`') {
     if (skipTemplate(expr, 0) !== expr.length) return null
-    if (expr.includes('${')) return null // interpolated — dynamic
+    if (expr.includes('${')) return null
     return expr.slice(1, -1)
   }
   return null
 }
 
-/** Decodes a quoted string literal's escapes into its runtime value. */
 const unquote = (literal: string): string => {
   const body = literal.slice(1, -1)
   return body.replace(/\\(.)/g, (_, ch: string) => {
@@ -167,14 +134,6 @@ const unquote = (literal: string): string => {
   })
 }
 
-/**
- * Parses the attribute list of an `<Icon …>` opening tag and, if a literal
- * `name` is present, returns it with the absolute source index of its value.
- *
- * @param source full file text
- * @param start index of the first attribute char (just past the tag name)
- * @returns the literal name + value index, or `null` if absent/dynamic
- */
 const parseNameAttr = (source: string, start: number): { name: string; index: number } | null => {
   let i = start
   while (i < source.length) {
@@ -183,10 +142,9 @@ const parseNameAttr = (source: string, start: number): { name: string; index: nu
       i++
       continue
     }
-    if (c === '>') return null // end of opening tag, no name found
-    if (c === '/' && source[i + 1] === '>') return null // self-closing, no name
+    if (c === '>') return null
+    if (c === '/' && source[i + 1] === '>') return null
     if (c === '{') {
-      // Spread attribute `{...props}` — skip it wholesale.
       i = skipBraces(source, i)
       continue
     }
@@ -194,19 +152,16 @@ const parseNameAttr = (source: string, start: number): { name: string; index: nu
       i++
       continue
     }
-    // Read an attribute name.
     const attrStart = i
     while (i < source.length && /[\w:-]/.test(source.charAt(i))) i++
     const attrName = source.slice(attrStart, i)
-    // Skip whitespace before a possible `=`.
     let j = i
     while (j < source.length && isWhitespace(source.charAt(j))) j++
     if (source[j] !== '=') {
-      // Boolean attribute (no value) — continue scanning from here.
       i = j
       continue
     }
-    j++ // past '='
+    j++
     while (j < source.length && isWhitespace(source.charAt(j))) j++
     const valChar = source[j]
     let valueIndex = j
@@ -221,7 +176,6 @@ const parseNameAttr = (source: string, start: number): { name: string; index: nu
       valueIndex = j + 1
       i = end
     } else {
-      // Malformed/unexpected — bail on this tag.
       return null
     }
     if (attrName === 'name') {
@@ -231,25 +185,6 @@ const parseNameAttr = (source: string, start: number): { name: string; index: nu
   return null
 }
 
-/**
- * Extracts every literal icon-name usage from a single file's source text.
- * See the module doc for what counts as a literal. Returns occurrences in
- * source order; de-duplication across files happens in the aggregator.
- *
- * The scan looks directly for `<Icon …>` tag starts and parses each opening tag
- * with full string/brace awareness (so the `name` value and the tag's end are
- * found correctly). It deliberately does NOT try to mask surrounding strings or
- * comments: JSX text routinely contains apostrophes (`it's`) and `//` (`http://`)
- * that a whole-file lexer would mis-read as a string/comment and skip a real
- * usage past. Instead, two surgical guards keep commentary out without a lexer:
- * a candidate whose line leads with `//` or `*` (line comments, JSDoc
- * continuations — real JSX never starts a line that way) is skipped, and
- * extracted names must look like icon names ({@link PLAUSIBLE_NAME}), so prose
- * placeholders like `…` are dropped. An `<Icon name="…">` written literally in
- * a JS string (or a mid-line comment) can still be picked up — a harmless
- * over-count for an inventory, where missing a real usage would be the worse
- * failure.
- */
 export const extractIconUsages = (source: string, options: ExtractOptions = {}): ExtractedUsage[] => {
   const components = options.components?.length ? options.components : DEFAULT_COMPONENTS
   const componentSet = new Set(components)
@@ -263,7 +198,6 @@ export const extractIconUsages = (source: string, options: ExtractOptions = {}):
       i++
       continue
     }
-    // Candidate opening tag — read the tag name and check it against the set.
     let k = i + 1
     if (k >= n || !isIdentStart(source.charAt(k))) {
       i++
@@ -276,8 +210,6 @@ export const extractIconUsages = (source: string, options: ExtractOptions = {}):
       i = k
       continue
     }
-    // Comment guard: only the text between the line start and this `<` counts,
-    // so a URL's `//` earlier on the line never triggers a false skip.
     const linePrefix = source.slice(source.lastIndexOf('\n', i - 1) + 1, i).trimStart()
     if (linePrefix.startsWith('//') || linePrefix.startsWith('*')) {
       i = k

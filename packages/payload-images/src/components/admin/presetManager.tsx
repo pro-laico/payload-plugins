@@ -104,7 +104,6 @@ const primaryBtn = (disabled: boolean): React.CSSProperties => ({
 })
 
 // ——— pure helpers ———
-/** "1200×630 · cover · q80 · jpeg" — the settings a preset resolves to. */
 const specSummary = (s: PresetSpec): string =>
   [
     s.width && s.height ? `${s.width}×${s.height}` : s.width ? `${s.width}w` : s.height ? `${s.height}h` : null,
@@ -118,10 +117,8 @@ const specSummary = (s: PresetSpec): string =>
 
 const isCustom = (e: PresetEntry): boolean => !e.template && !!e.name
 
-/** A preset row read out of form state, tagged with its row index so it can be removed. */
 type RowEntry = PresetEntry & { rowIndex: number }
 
-/** One row's subfield state for `addFieldRow` — value + initialValue per leaf. */
 const toSubFieldState = (entry: PresetEntry): Record<string, { initialValue: unknown; valid: true; value: unknown }> =>
   Object.fromEntries(
     Object.entries(entry)
@@ -136,7 +133,6 @@ const isInt = (s: string): boolean => /^\d+$/.test(s.trim())
 type Draft = { name: string; width: string; height: string; aspectRatio: string; fit: string; quality: string; format: string }
 const EMPTY_DRAFT: Draft = { name: '', width: '', height: '', aspectRatio: '', fit: '', quality: '', format: '' }
 
-/** Field-keyed validation of the custom-preset draft; empty result = addable. */
 const validateDraft = (d: Draft, takenNames: Set<string>): Partial<Record<keyof Draft | 'geometry', string>> => {
   const errs: Partial<Record<keyof Draft | 'geometry', string>> = {}
   const name = d.name.trim()
@@ -155,56 +151,48 @@ const draftToEntry = (d: Draft): PresetEntry => ({
   name: d.name.trim(),
   ...(d.width.trim() ? { width: Number(d.width) } : {}),
   ...(d.height.trim() ? { height: Number(d.height) } : {}),
-  ...(d.aspectRatio.trim() ? { aspectRatio: d.aspectRatio.trim() as PresetEntry['aspectRatio'] } : {}),
-  ...(d.fit ? { fit: d.fit as PresetEntry['fit'] } : {}),
+  ...(d.aspectRatio.trim() ? { aspectRatio: d.aspectRatio.trim() as PresetEntry['aspectRatio'] } : {}), //TODO: replace `as` cast with proper typing
+  ...(d.fit ? { fit: d.fit as PresetEntry['fit'] } : {}), //TODO: replace `as` cast with proper typing
   ...(d.quality.trim() ? { quality: Number(d.quality) } : {}),
-  ...(d.format ? { format: d.format as PresetEntry['format'] } : {}),
+  ...(d.format ? { format: d.format as PresetEntry['format'] } : {}), //TODO: replace `as` cast with proper typing
 })
 
-/**
- * Edits the hidden `presets` array — the image's guaranteed variants (cap-exempt, pre-generated
- * on save, served at `/api/img/:id?preset=<name>`). Active presets are listed with the settings
- * they resolve to; config templates one click away; custom presets built in a validated form.
- */
 export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) => {
-  // The `presets` array lives in form state as ROWS (`presets.N.<leaf>`) — the array path's own
-  // `value` is just the row count. Read each row's leaves and mutate via the rows API; a plain
-  // useField(path: 'presets') setValue would desync the rows and read nothing after a save.
-  const { addFieldRow, removeFieldRow } = useForm()
   const [fields] = useAllFormFields()
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
-  const [attempted, setAttempted] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const { addFieldRow, removeFieldRow } = useForm()
+  const [attempted, setAttempted] = useState(false)
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
 
   const rowCount = fields?.presets?.rows?.length ?? 0
   const entries: RowEntry[] = Array.from({ length: rowCount }, (_, rowIndex) => {
     const leaf = (key: string): unknown => fields[`presets.${rowIndex}.${key}`]?.value
-    const str = (key: string): string | null => (typeof leaf(key) === 'string' && leaf(key) !== '' ? (leaf(key) as string) : null) //EXCUSE: narrowed by the typeof check in the same expression
-    const num = (key: string): number | undefined => (typeof leaf(key) === 'number' ? (leaf(key) as number) : undefined) //EXCUSE: narrowed by the typeof check in the same expression
+    const str = (key: string): string | null => (typeof leaf(key) === 'string' && leaf(key) !== '' ? (leaf(key) as string) : null) //TODO: replace `as` cast with proper typing
+    const num = (key: string): number | undefined => (typeof leaf(key) === 'number' ? (leaf(key) as number) : undefined) //TODO: replace `as` cast with proper typing
     return {
       rowIndex,
       template: str('template'),
       name: str('name'),
       width: num('width'),
       height: num('height'),
-      aspectRatio: (str('aspectRatio') as PresetEntry['aspectRatio']) ?? undefined, //EXCUSE: the text field stores the "16:9" template-literal form as a plain string
-      fit: (str('fit') as PresetEntry['fit']) ?? undefined, //EXCUSE: select-field state carries the option union as a plain string
+      aspectRatio: (str('aspectRatio') as PresetEntry['aspectRatio']) ?? undefined, //TODO: replace `as` cast with proper typing
+      fit: (str('fit') as PresetEntry['fit']) ?? undefined, //TODO: replace `as` cast with proper typing
       quality: num('quality'),
-      format: (str('format') as PresetEntry['format']) ?? undefined, //EXCUSE: select-field state carries the option union as a plain string
+      format: (str('format') as PresetEntry['format']) ?? undefined, //TODO: replace `as` cast with proper typing
     }
   })
 
-  const activeTemplates = entries.filter((e) => e.template)
   const customs = entries.filter(isCustom)
-  const inactiveTemplates = Object.entries(templates).filter(([name]) => !entries.some((e) => e.template === name))
+  const activeTemplates = entries.filter((e) => e.template)
   const takenNames = new Set<string>([...Object.keys(templates), ...customs.map((e) => e.name ?? '')])
+  const inactiveTemplates = Object.entries(templates).filter(([name]) => !entries.some((e) => e.template === name))
 
+  const showErrors = attempted
   const errors = validateDraft(draft, takenNames)
-  const showErrors = attempted // only complain once they try to add
   const fieldErr = (k: keyof Draft | 'geometry'): string | undefined => (showErrors ? errors[k] : undefined)
 
   const addEntry = (entry: PresetEntry): void =>
-    addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) as never }) //EXCUSE: subFieldState wants full FormState fields; the reducer only reads value/initialValue/valid
+    addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) as never }) //TODO: replace `as` cast with proper typing
   const addTemplate = (name: string): void => addEntry({ template: name })
   const removeEntry = (entry: RowEntry): void => removeFieldRow({ path: 'presets', rowIndex: entry.rowIndex })
 
@@ -221,39 +209,6 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
     (k: keyof Draft) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void =>
       setDraft((d) => ({ ...d, [k]: e.target.value }))
-
-  const textField = (k: keyof Draft, label: string, placeholder: string, opts?: { flex?: number; type?: string }): React.ReactElement => (
-    <div style={{ flex: opts?.flex ?? 1, minWidth: 72 }}>
-      <label style={fieldLabel}>
-        {label}
-        <input
-          type={opts?.type ?? 'text'}
-          inputMode={opts?.type === 'number' ? 'numeric' : undefined}
-          min={opts?.type === 'number' ? 1 : undefined}
-          style={{ ...inputStyle, marginTop: '0.2rem', ...(fieldErr(k) ? invalidInput : {}) }}
-          placeholder={placeholder}
-          value={draft[k]}
-          onChange={set(k)}
-        />
-      </label>
-    </div>
-  )
-
-  const selectField = (k: keyof Draft, label: string, options: readonly string[]): React.ReactElement => (
-    <div style={{ flex: 1, minWidth: 88 }}>
-      <label style={fieldLabel}>
-        {label}
-        <select style={{ ...inputStyle, marginTop: '0.2rem', cursor: 'pointer' }} value={draft[k]} onChange={set(k)}>
-          <option value="">default</option>
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
-  )
 
   const presetRow = (entry: RowEntry): React.ReactElement => {
     const template = entry.template ? templates[entry.template] : undefined
@@ -272,6 +227,39 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
       </div>
     )
   }
+
+  const selectField = (k: keyof Draft, label: string, options: readonly string[]): React.ReactElement => (
+    <div style={{ flex: 1, minWidth: 88 }}>
+      <label style={fieldLabel}>
+        {label}
+        <select style={{ ...inputStyle, marginTop: '0.2rem', cursor: 'pointer' }} value={draft[k]} onChange={set(k)}>
+          <option value="">default</option>
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+
+  const textField = (k: keyof Draft, label: string, placeholder: string, opts?: { flex?: number; type?: string }): React.ReactElement => (
+    <div style={{ flex: opts?.flex ?? 1, minWidth: 72 }}>
+      <label style={fieldLabel}>
+        {label}
+        <input
+          type={opts?.type ?? 'text'}
+          inputMode={opts?.type === 'number' ? 'numeric' : undefined}
+          min={opts?.type === 'number' ? 1 : undefined}
+          style={{ ...inputStyle, marginTop: '0.2rem', ...(fieldErr(k) ? invalidInput : {}) }}
+          placeholder={placeholder}
+          value={draft[k]}
+          onChange={set(k)}
+        />
+      </label>
+    </div>
+  )
 
   return (
     <div style={card}>

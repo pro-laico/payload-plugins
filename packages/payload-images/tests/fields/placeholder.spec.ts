@@ -1,8 +1,3 @@
-/**
- * The `placeholder` virtual's read contract: an undeclared read gets the light raw `sm` hash;
- * ANY declared render — even an empty one (natural ratio) — gets a finished, paintable data URI,
- * because it pairs with <ResponsiveImage>, which paints the value as a CSS url().
- */
 import { describe, expect, it } from 'vitest'
 
 import { placeholderAfterRead } from '../../src/hooks/field/placeholder'

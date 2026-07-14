@@ -1,4 +1,3 @@
-/** The doc shape the virtual URL afterRead hooks (hooks/field/virtualUrls) read their inputs from. */
 export interface ImageDocLike {
   id?: string | number
   width?: number | null

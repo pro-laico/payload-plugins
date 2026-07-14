@@ -1,8 +1,9 @@
 'use client'
 
-import { toast, useConfig } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useState } from 'react'
+import { toast, useConfig } from '@payloadcms/ui'
+
 import type { SeedButtonProps, SeedResponseBody } from '../types'
 
 export type { SeedButtonProps }
@@ -24,16 +25,13 @@ const summarizeIssues = (issues: string[]): string => {
   return shown.join('\n') + (more > 0 ? `\n…and ${more} more` : '')
 }
 
-/** The client half of the seed button — assumes seeding is enabled (the `SeedButton` server
- *  gate checks `ENABLE_SEED` and renders this only when the endpoint would accept the run).
- *  The seed wipes seeded collections, so the first click arms a confirm and the second runs. */
 export const SeedButtonClient: React.FC<SeedButtonProps> = ({ endpoint }) => {
   const { config } = useConfig()
-  const url = endpoint ?? `${config.serverURL ?? ''}${config.routes.api}/seed`
   const [seeded, setSeeded] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const url = endpoint ?? `${config.serverURL ?? ''}${config.routes.api}/seed`
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -48,7 +46,7 @@ export const SeedButtonClient: React.FC<SeedButtonProps> = ({ endpoint }) => {
 
       const run = fetch(url, { method: 'POST', credentials: 'include' })
         .then(async (res) => {
-          const body = (await res.json().catch(() => ({}))) as SeedResponseBody
+          const body = (await res.json().catch(() => ({}))) as SeedResponseBody //TODO: replace `as` cast with proper typing
           if (!res.ok) {
             const base = body.error ?? 'An error occurred while seeding.'
             throw new Error(body.issues?.length ? `${base}\n${summarizeIssues(body.issues)}` : base)

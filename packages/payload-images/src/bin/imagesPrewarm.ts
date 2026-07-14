@@ -1,16 +1,6 @@
-/**
- * Payload custom-bin entry, registered as `payload images:prewarm` — bulk-warm every source
- * against the learned render profiles (+ config seeds).
- *
- *   payload images:prewarm                      # enqueue one imagesPrewarm job per source (your runner executes them)
- *   payload images:prewarm --now                # generate inline, no jobs runner needed
- *   payload images:prewarm --collection media   # an extendCollection target
- *   payload images:prewarm --limit 200          # cap sources processed this run
- *   payload images:prewarm --queue prewarm      # enqueue onto a specific queue
- */
 import { getPayload, type SanitizedConfig } from 'payload'
-import { asSlug } from '../lib/asSlug'
 
+import { asSlug } from '../lib/asSlug'
 import { readPluginMarker } from '../lib/pluginMarker'
 import { enqueuePrewarmJob } from '../lib/prewarm/enqueue'
 import { prewarmSource } from '../lib/prewarm/prewarmSource'
@@ -36,7 +26,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const payload = await getPayload({ config })
   try {
     const deps = {
-      sourceSlug: slug as string,
+      sourceSlug: slug as string, //TODO: replace `as` cast with proper typing
       variantSlug: marker.variantSlug ?? 'generated-images',
       profilesSlug: prewarm.profilesSlug,
       seeds: prewarm.seeds,

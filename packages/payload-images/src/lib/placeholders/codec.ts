@@ -1,9 +1,3 @@
-/**
- * Minimal BlurHash codec with coefficient access — pure TS, implementing the spec
- * (https://github.com/woltapp/blurhash) directly because the npm package only exposes pixel
- * encode/decode and cropping in hash space needs the raw DCT coefficients. A parsed hash is
- * `{ cx, cy, coeffs }` where `coeffs[j][i]` is the linear-RGB coefficient of `cos(πi·x)·cos(πj·y)`.
- */
 import type { Coefficient, EncodeGridOptions, LinearGrid, ParsedBlurhash } from '../../types'
 
 const B83 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~'
@@ -63,7 +57,6 @@ export const parseBlurhash = (hash: string): ParsedBlurhash => {
   return { cx, cy, coeffs }
 }
 
-/** Quantize + serialize a coefficient grid back to a blurhash string. */
 export const encodeCoefficients = ({ cx, cy, coeffs }: ParsedBlurhash): string => {
   if (cx < 1 || cx > 9 || cy < 1 || cy > 9) throw new Error(`[blurhash] components out of range: ${cx}x${cy}`)
   let out = encode83((cy - 1) * 9 + (cx - 1), 1)
@@ -92,11 +85,6 @@ export const encodeCoefficients = ({ cx, cy, coeffs }: ParsedBlurhash): string =
   return out
 }
 
-/**
- * Evaluate the hash's cosine series over a window of the unit square (midpoint sampling).
- * `window` defaults to the full image; this IS the exact restricted blur, so it doubles as
- * the ground-truth reference for crop comparisons.
- */
 export const decodeToLinearGrid = (
   { cx, cy, coeffs }: ParsedBlurhash,
   width: number,
@@ -140,7 +128,6 @@ export const decodeToLinearGrid = (
   return grid
 }
 
-/** Blurhash encode from a linear pixel grid, midpoint basis sampling to match {@link decodeToLinearGrid}. */
 export const encodeLinearGrid = (grid: LinearGrid, cx: number, cy: number, opts: EncodeGridOptions = {}): ParsedBlurhash => {
   const height = grid.length
   const width = grid[0]!.length

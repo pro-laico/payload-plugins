@@ -7,8 +7,6 @@ import { Button, Pill, toast, useAllFormFields, useConfig } from '@payloadcms/ui
 import { CLEAR_ICON_REQUESTS_PATH } from '../../endpoints/clearIconRequests'
 import type { IconUsage, IconUsagePanelClientProps, LiveRequest } from '../../types'
 
-/** Matches the live `name` field of each `iconsArray` row so we can read the
- *  set's current names straight from form state (updates as you edit). */
 const ICON_NAME_PATH = /^iconsArray\.\d+\.name$/
 
 const panelStyle: React.CSSProperties = {
@@ -27,7 +25,6 @@ const codeStyle: React.CSSProperties = {
   borderRadius: '3px',
 }
 
-/** Groups manifest usages by icon name, preserving the manifest's stable order. */
 const groupByName = (usages: IconUsage[]): Map<string, IconUsage[]> => {
   const map = new Map<string, IconUsage[]>()
   for (const u of usages) {
@@ -44,42 +41,30 @@ const formatDate = (iso: string | null): string => {
   return Number.isNaN(t) ? '' : new Date(t).toLocaleDateString()
 }
 
-/**
- * Three-way compare for the IconSet edit view: the names this repo requests in
- * code (the build-time manifest), the names actually requested in production
- * that didn't resolve (the `iconRequest` collection), and the names defined in
- * the set being edited (live form state). Adding a row clears its "missing"
- * badge immediately.
- */
 export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ manifest, scanCommand, liveRequests }) => {
   const [fields] = useAllFormFields()
+  const [clearing, setClearing] = useState(false)
+  const [live, setLive] = useState<LiveRequest[]>(liveRequests)
   const {
     config: {
       routes: { api },
       serverURL,
     },
   } = useConfig()
-  // Local working copy so the "Clear runtime requests" action can empty the list
-  // immediately without a full page reload.
-  const [live, setLive] = useState<LiveRequest[]>(liveRequests)
-  const [clearing, setClearing] = useState(false)
 
-  // All hooks run unconditionally (before any early return) so hook order stays
-  // stable across renders.
   const defined = useMemo(() => {
     const set = new Set<string>()
     for (const [path, state] of Object.entries(fields)) {
-      const value = (state as { value?: unknown } | undefined)?.value
+      const value = (state as { value?: unknown } | undefined)?.value //TODO: replace `as` cast with proper typing
       if (ICON_NAME_PATH.test(path) && typeof value === 'string' && value.length > 0) set.add(value)
     }
     return set
   }, [fields])
 
-  const usagesByName = useMemo(() => groupByName(manifest?.usages ?? []), [manifest])
   const liveByName = useMemo(() => new Map(live.map((r) => [r.name, r])), [live])
+  const usagesByName = useMemo(() => groupByName(manifest?.usages ?? []), [manifest])
 
   const staticNames = manifest?.names ?? []
-  // Union of names missing from this set: requested in code OR requested live.
   const missing = useMemo(() => {
     const names = new Set<string>()
     for (const n of staticNames) if (!defined.has(n)) names.add(n)
@@ -93,9 +78,8 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
   const handleClear = async (): Promise<void> => {
     setClearing(true)
     try {
-      // The plugin's own endpoint — runs on req.payload with the admin's cookie auth.
       const res = await fetch(`${serverURL ?? ''}${api}${CLEAR_ICON_REQUESTS_PATH}`, { method: 'DELETE', credentials: 'include' })
-      const result = (await res.json()) as { success: boolean; message: string }
+      const result = (await res.json()) as { success: boolean; message: string } //TODO: replace `as` cast with proper typing
       if (result.success) {
         setLive([])
         toast.success(result.message)
@@ -138,7 +122,6 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
 
       {live.length > 0 && (
         <div style={{ marginTop: '0.5rem' }}>
-          {/* type="button" so it never submits the surrounding IconSet edit form. */}
           <Button type="button" buttonStyle="secondary" size="small" disabled={clearing} onClick={handleClear}>
             {clearing ? 'Clearing…' : `Clear ${live.length} runtime request${live.length === 1 ? '' : 's'}`}
           </Button>
@@ -155,7 +138,6 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
               const liveReq = liveByName.get(name)
               return (
                 <li key={name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {/* Live (production) misses are the most urgent → error pill. */}
                   <Pill pillStyle={liveReq ? 'error' : 'warning'} size="small">
                     {name}
                   </Pill>

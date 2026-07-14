@@ -4,7 +4,6 @@ import { srgbToLinear } from '../../../src/lib/placeholders/codec'
 import type { LinearGrid } from '../../../src/types'
 import { buildPalette } from '../../../src/lib/metadata/palette'
 
-/** A WxH grid filled by a per-pixel sRGB color function. */
 const grid = (w: number, h: number, color: (x: number, y: number) => [number, number, number]): LinearGrid =>
   Array.from({ length: h }, (_, y) =>
     Array.from({ length: w }, (_, x) => {

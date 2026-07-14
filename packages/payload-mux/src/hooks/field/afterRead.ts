@@ -1,9 +1,8 @@
 import type Mux from '@mux/mux-node'
 import type { FieldHook } from 'payload'
+
 import type { MuxVideoPluginOptions } from '../../types'
 
-/** Sign a playback id for a given media `type` when the policy is `signed`, and append the
- *  token to `url`. A no-op for public playback. */
 const signIfNeeded = async (
   mux: Mux,
   options: MuxVideoPluginOptions,
@@ -19,9 +18,6 @@ const signIfNeeded = async (
   url.searchParams.set('token', token)
 }
 
-/** The afterRead behind a signable virtual URL field (`playbackUrl` / `posterUrl` / `gifUrl`). On
- *  read it builds the Mux URL from the sibling `playbackId`, stamps the poster `time` for
- *  thumbnail/gif, and signs it when the policy is `signed`. Returns null until a playback id exists. */
 export const signableUrlAfterRead =
   (mux: Mux, options: MuxVideoPluginOptions, type: 'video' | 'thumbnail' | 'gif', buildUrl: (playbackId: string) => URL): FieldHook =>
   async ({ data, siblingData }) => {

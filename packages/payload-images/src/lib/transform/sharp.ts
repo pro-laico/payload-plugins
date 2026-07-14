@@ -1,12 +1,8 @@
-/**
- * Server-only Sharp transform. `sharp` is a lazy import (optional peer, never in client
- * bundles); the crop geometry is pure and lives in ./geometry.
- */
 import type { Sharp } from 'sharp'
 
-import { loadSharp } from './sharpInstance'
-import { withTransformLimit } from './limit'
 import { mimeForFormat } from './params'
+import { withTransformLimit } from './limit'
+import { loadSharp } from './sharpInstance'
 import { coverCropGeometry, cropRegion, fitWithinSource, hotspotWindow } from './geometry'
 import type { HotspotOpts, OutputFormat, TransformInput, TransformOutput } from '../../types'
 
@@ -25,8 +21,6 @@ const encode = (pipeline: Sharp, format: OutputFormat, quality: number): Sharp =
   }
 }
 
-/** Focal cover-crop (or plain resize for other fits) + encode, behind {@link withTransformLimit}
- *  so a burst of concurrent srcset requests can't saturate the host. */
 export const transformImage = (src: Buffer, input: TransformInput): Promise<TransformOutput> =>
   withTransformLimit(async () => {
     const sharp = await loadSharp()

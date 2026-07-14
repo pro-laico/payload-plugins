@@ -1,25 +1,14 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionSlug, PayloadHandler } from 'payload'
+
 import { getAssetMetadata } from '../lib/getAssetMetadata'
 import type { AssetLike, MuxVideoPluginOptions } from '../types'
 
-const ok = () => new Response('Success!', { status: 200 })
 const fail = () => new Response('Error', { status: 500 })
+const ok = () => new Response('Success!', { status: 200 })
 
-// One info line per process so users can confirm the webhook wiring end to end.
 let verifiedLogged = false
 
-/**
- * `POST /api/mux/webhook` — keep Payload in sync with Mux. `unwrap()` verifies the Mux
- * signature and returns a typed event; we then set metadata + status on `video.asset.ready` /
- * `updated`, delete the doc on `video.asset.deleted`, mark the doc errored on
- * `video.asset.errored`, and (when `autoCreateOnWebhook`) backfill a doc for an asset Payload
- * doesn't have yet. 200s after a handled event so Mux stops retrying; 500s on a failed
- * handler so Mux retries it.
- *
- * Note: Payload pre-parses the request body, so the signature is verified against a
- * re-serialized payload rather than the original bytes — unavoidable at the endpoint layer.
- */
 export const muxWebhookHandler =
   (mux: Mux, pluginOptions: MuxVideoPluginOptions): PayloadHandler =>
   async (req) => {
@@ -42,7 +31,7 @@ export const muxWebhookHandler =
       req.payload.logger.info('[payload-mux] webhook verified — receiving Mux events')
     }
 
-    const collection = ((pluginOptions.extendCollection as string) ?? 'mux-video') as CollectionSlug
+    const collection = ((pluginOptions.extendCollection as string) ?? 'mux-video') as CollectionSlug //TODO: replace `as` casts with proper typing
     const assetId = event.object.id
 
     const videos = await req.payload.find({ collection, where: { assetId: { equals: assetId } }, limit: 1, pagination: false })
@@ -52,10 +41,10 @@ export const muxWebhookHandler =
       const backfillable = event.type === 'video.asset.created' || event.type === 'video.asset.ready' || event.type === 'video.asset.updated'
       if (pluginOptions.autoCreateOnWebhook && backfillable) {
         try {
-          const title = (event.data as { meta?: { title?: string } }).meta?.title || assetId
-          const metadata = getAssetMetadata(event.data as AssetLike)
+          const title = (event.data as { meta?: { title?: string } }).meta?.title || assetId //TODO: replace `as` cast with proper typing
+          const metadata = getAssetMetadata(event.data as AssetLike) //TODO: replace `as` cast with proper typing
           const status = metadata.playbackOptions?.length ? 'ready' : 'preparing'
-          await req.payload.create({ collection, data: { title, assetId, ...metadata, status } as never })
+          await req.payload.create({ collection, data: { title, assetId, ...metadata, status } as never }) //TODO: replace `as` cast with proper typing
         } catch (err) {
           req.payload.logger.error({ err, msg: `[payload-mux] Failed to backfill asset '${assetId}'` })
           return fail()
@@ -69,9 +58,8 @@ export const muxWebhookHandler =
         case 'video.asset.ready':
         case 'video.asset.updated': {
           const metadata = getAssetMetadata(event.data)
-          // `updated` can fire before a playback id exists — only playback-bearing events mean 'ready'.
           const status = metadata.playbackOptions?.length ? { status: 'ready', error: null } : {}
-          await req.payload.update({ collection, id: video.id, data: { ...metadata, ...status } as never })
+          await req.payload.update({ collection, id: video.id, data: { ...metadata, ...status } as never }) //TODO: replace `as` cast with proper typing
           break
         }
         case 'video.asset.deleted':
@@ -80,7 +68,7 @@ export const muxWebhookHandler =
         case 'video.asset.errored': {
           req.payload.logger.error({ assetId, errors: event.data.errors, msg: '[payload-mux] Asset errored' })
           const error = event.data.errors?.messages?.join('; ') || event.data.errors?.type || 'Unknown Mux error'
-          await req.payload.update({ collection, id: video.id, data: { status: 'errored', error } as never })
+          await req.payload.update({ collection, id: video.id, data: { status: 'errored', error } as never }) //TODO: replace `as` cast with proper typing
           break
         }
         default:

@@ -1,18 +1,12 @@
 import type { CollectionConfig } from 'payload'
 
 import { anyone, authd } from '../../access'
+import type { CreateImagesOptions } from '../../types'
 import { IMAGE_MIME_TYPES } from '../../lib/transform/params'
 import { imageEnhancements, resolveAdminThumbnail } from './imageEnhancements'
-import type { CreateImagesOptions } from '../../types'
 
 const d = { alt: 'Describe the image for screen readers and SEO.' }
 
-/**
- * The source image upload collection: stores only the original (no pre-generated sizes) and
- * folds in {@link imageEnhancements}. Every rendered variant is generated on demand by the
- * transform endpoint, cached in generated-images, surfaced via the `variants` join, and purged
- * by the change/delete hooks.
- */
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
   const { localizeAlt = false, folders, maxOriginalSize } = opts
   const enh = imageEnhancements(opts)

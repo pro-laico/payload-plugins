@@ -1,10 +1,8 @@
-import { parseAspectRatio } from '../transform/params'
 import type { BuildUrlOptions } from '../../types'
+import { parseAspectRatio } from '../transform/params'
 
-/** Default endpoint base: `/api` + the fixed `/img` path. Override `path` only for a custom API route / basePath. */
 export const DEFAULT_TRANSFORM_API_PATH = '/api/img'
 
-/** One transform URL for an image id at a given width — or a named preset when `o.preset` is set. */
 export const buildVariantUrl = (id: string, width: number, o: BuildUrlOptions = {}): string => {
   const base = o.baseUrl ?? ''
   const params = new URLSearchParams()

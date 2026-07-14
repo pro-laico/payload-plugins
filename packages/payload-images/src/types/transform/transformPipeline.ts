@@ -1,6 +1,5 @@
-/** The Sharp transform's input request and its encoded output. */
-import type { Fit, OutputFormat } from './format'
 import type { HotspotOpts } from './geometry'
+import type { Fit, OutputFormat } from './format'
 
 export interface TransformInput {
   w?: number
@@ -11,7 +10,6 @@ export interface TransformInput {
   focalX?: number | null
   focalY?: number | null
   hotspot?: HotspotOpts
-  /** Max source pixels Sharp will decode (decompression-bomb + memory guard). Default ~100MP. */
   maxInputPixels?: number
 }
 

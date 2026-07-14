@@ -1,36 +1,26 @@
-/**
- * The shared "give me the bytes for this variant" engine: cache hit → stored copy; miss → Sharp
- * once, respond immediately, persist after the response — so a given (source, size, fit, quality,
- * format) variant is only ever generated once.
- */
 import { after } from 'next/server'
-import { asSlug } from '../asSlug'
 
+import { asSlug } from '../asSlug'
+import { readBytes } from './source'
+import { transformImage } from './sharp'
 import { variantCacheKey } from './variantKey'
 import { resolveStaticDir } from './staticDir'
-import { transformImage } from './sharp'
-import { readBytes } from './source'
-import { extForFormat, mimeForFormat } from './params'
 import { TransformOverloadError } from './limit'
+import { extForFormat, mimeForFormat } from './params'
 import { isDuplicateKeyError, isForeignKeyError } from '../errors'
 import type { GenBytes, GetVariantBytesArgs, TransformOutput, UploadDocLike, VariantBytes } from '../../types'
 
 const errorCode = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'code' in e ? e.code : undefined)
 
-/** Sharp itself failed to load — the fix is the install, not this image. */
 const isSharpLoadError = (err: unknown): boolean => {
   const s = `${String(err)} ${String(errorCode(err) ?? '')}`
   return /sharp|libvips/i.test(s) && /cannot find module|module_not_found|could not load|native|binding/i.test(s)
 }
 
-/** The actionable fix for a Sharp load failure — shared by the boot probe and the request-time catch. */
 export const SHARP_INSTALL_HINT = "install it (`pnpm add sharp`) and externalize it in next.config (`serverExternalPackages: ['sharp']`)"
 
 let warnedCacheLookup = false
 
-/** In-flight original-bytes reads, keyed by source identity, so a cold page firing many srcset
- *  widths (or any concurrent miss burst) reads each original ONCE and shares the Buffer while it's
- *  resolving — cleared on settle, so no Buffer is retained past the reads that need it. */
 const originalReadFlight = new Map<string, Promise<Buffer | null>>()
 
 const readOriginalCoalesced = (args: GetVariantBytesArgs): Promise<Buffer | null> => {
@@ -45,8 +35,6 @@ const readOriginalCoalesced = (args: GetVariantBytesArgs): Promise<Buffer | null
   return p
 }
 
-/** The cache-hit half of the engine: exact-key lookup + stored bytes, or null on any miss —
- *  including a failed lookup (warned once per process), which degrades to regeneration. */
 export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes | null> => {
   const { payload, source: src, params: p, format, variantSlug, base } = args
   const key = variantCacheKey(src, p, format)
@@ -58,7 +46,7 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
       limit: 1,
       depth: 0,
     })
-    const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined //EXCUSE: docs of a runtime-configured collection are untyped; readBytes null-guards every field
+    const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined //TODO: replace `as` cast with proper typing
     if (variant) {
       const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
       if (bytes) return { ok: true, data: bytes, mimeType: mimeForFormat(format), key }
@@ -75,7 +63,6 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
   return null
 }
 
-/** The generation half: Sharp once (coalesced per key via `genFlight`), persist per `deferPersist`. */
 export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<VariantBytes> => {
   const { payload, source: src, params: p, format, variantSlug, maxInputPixels, genFlight } = args
   const key = variantCacheKey(src, p, format)
@@ -109,7 +96,6 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
         maxInputPixels,
       })
     } catch (err) {
-      // Queue full → shed load with 503 (transient), don't log it as a transform error.
       if (err instanceof TransformOverloadError) return { ok: false, status: 503, msg: 'Server busy' }
       const hint = isSharpLoadError(err) ? ` — sharp failed to load; ${SHARP_INSTALL_HINT}` : ''
       payload.logger.error(`[payload-images] transform failed for ${src.id}: ${String(err)}${hint}`)
@@ -122,7 +108,7 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
           collection: asSlug(variantSlug),
           file: { data: out.data, mimetype: out.mimeType, name: `${key}.${extForFormat(format)}`, size: out.data.byteLength },
           data: {
-            source: src.id as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type
+            source: src.id as never, //TODO: replace `as` cast with proper typing
             cacheKey: key,
             fit: p.fit,
             format,
@@ -140,11 +126,7 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
         }
       }
     }
-    // 'never' → serve the bytes but add no storage (the at-cap path). A request context otherwise
-    // defers the row write until after the response flushes; a job/CLI context has no after() and
-    // must not fire-and-forget (the process may exit mid-persist), so it awaits inline.
     if (args.deferPersist === 'never') {
-      // no persist
     } else if (args.deferPersist === false) {
       await persist()
     } else {

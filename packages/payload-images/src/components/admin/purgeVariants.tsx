@@ -18,13 +18,11 @@ const button: React.CSSProperties = {
 
 const note: React.CSSProperties = { color: 'var(--theme-elevation-500)', fontSize: '0.8rem', margin: '0.25rem 0 0' }
 
-/** A button that purges every on-demand variant of this source image (POST, authenticated by
- *  Payload's session cookie). Only shown on a saved doc. */
 export const PurgeVariants: React.FC<PurgeVariantsProps> = ({ purgePath = '/img/purge' }) => {
   const { config } = useConfig()
   const { id } = useDocumentInfo()
-  const apiRoute = config?.routes?.api || '/api'
   const [busy, setBusy] = useState(false)
+  const apiRoute = config?.routes?.api || '/api'
 
   if (id == null) return null
 

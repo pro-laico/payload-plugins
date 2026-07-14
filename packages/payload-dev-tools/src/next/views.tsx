@@ -1,12 +1,11 @@
 import Link from 'next/link'
 import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
-import type { DevSnapshot, OptimizedFace, RevalidateInspection } from '../types'
-import { FontSpecimen, IconSetSwitcher } from './client'
-import { RevalidatePanel } from './revalidatePanel'
-import { facesToStyles } from './specimen'
 
-/** `/dev/icons` — every set as a switcher button (activating one re-skins the site), the active
- *  set's glyphs as a grid, and any runtime misses. */
+import { facesToStyles } from './specimen'
+import { RevalidatePanel } from './revalidatePanel'
+import { FontSpecimen, IconSetSwitcher } from './client'
+import type { DevSnapshot, OptimizedFace, RevalidateInspection } from '../types'
+
 export async function IconsView({ payload, snapshot }: { payload: Payload; snapshot: DevSnapshot }) {
   const icons = snapshot.icons
   if (!icons?.iconSetSlug) {
@@ -14,11 +13,12 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
   }
 
   const res = await payload.find({
-    collection: icons.iconSetSlug as CollectionSlug,
+    collection: icons.iconSetSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
     depth: 1,
     limit: 50,
     pagination: false,
   })
+  //TODO: replace `as` cast with proper typing
   const sets = (
     res.docs as {
       id: string | number
@@ -55,7 +55,6 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
           <div className="pdtp-icon-grid">
             {active.rows.map((row) => (
               <figure key={row.name} className="pdtp-icon-cell" style={{ margin: 0 }}>
-                {/* dangerouslySetInnerHTML: svgString is sanitized by payload-icons on save */}
                 <span dangerouslySetInnerHTML={{ __html: row.svg }} />
                 <figcaption>{row.name}</figcaption>
               </figure>
@@ -85,18 +84,14 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
 
 const capitalize = (key: string): string => key.charAt(0).toUpperCase() + key.slice(1)
 
-/** `/dev/fonts` — one interactive specimen per family slot, rendered in the family's own
- *  `--font-set*` variable so the page shows the actual served fonts (the host layout loads them
- *  via extractFonts / DevFonts). The weight/style controls are built from the `fontOptimized`
- *  docs, so only faces that really exist are offered. */
 export async function FontsView({ payload, snapshot }: { payload: Payload; snapshot: DevSnapshot }) {
   const fonts = snapshot.fonts
   if (!fonts) return <p className="pdtp-muted">payload-fonts isn't installed.</p>
 
-  // Which typeface fills each slot (ids), then every served face of those typefaces.
   const slotIds: Record<string, string | number | null> = {}
   if (fonts.fontSetSlug) {
     try {
+      //TODO: replace `as` cast with proper typing
       const set = (await payload.findGlobal({ slug: fonts.fontSetSlug as GlobalSlug, depth: 0 })) as unknown as Record<string, unknown>
       for (const key of fonts.familyKeys) {
         const value = set[key]
@@ -105,18 +100,18 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
     } catch {}
   }
 
-  const ids = Object.values(slotIds).filter((id): id is string | number => id !== null && id !== undefined)
   let faces: OptimizedFace[] = []
+  const ids = Object.values(slotIds).filter((id): id is string | number => id !== null && id !== undefined)
   if (fonts.fontOptimizedSlug && ids.length) {
     try {
       const res = await payload.find({
-        collection: fonts.fontOptimizedSlug as CollectionSlug,
+        collection: fonts.fontOptimizedSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
         where: { font: { in: ids } },
         depth: 0,
         limit: 200,
         pagination: false,
       })
-      faces = res.docs as OptimizedFace[]
+      faces = res.docs as OptimizedFace[] //TODO: replace `as` cast with proper typing
     } catch {}
   }
 
@@ -144,13 +139,8 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
   )
 }
 
-/** The where-clause for docs with no folder — the pattern Payload's own folder views use. */
 const UNFILED_WHERE = { or: [{ folder: { exists: false } }, { folder: { equals: null } }] }
 
-/** `/dev/images` — every original through the on-demand transform endpoint (`?w=320`), so the
- *  grid itself exercises payload-images end-to-end. When the collection has Payload folders
- *  enabled, the folders render as filter chips (`?folder=<id>`, `?folder=none` for unfiled) so
- *  you can click through the library the way it's organized. */
 export async function ImagesView({
   payload,
   snapshot,
@@ -164,16 +154,17 @@ export async function ImagesView({
   if (!images) return <p className="pdtp-muted">payload-images isn't installed.</p>
 
   const base = snapshot.devRoute
-  const sourceSlug = images.sourceSlug as CollectionSlug
+  const sourceSlug = images.sourceSlug as CollectionSlug //TODO: replace `as` cast with proper typing
 
-  // Folder chips — only when the root folders feature is on (a collection opted in).
-  const foldersConfig = payload.config.folders
-  const foldersSlug = foldersConfig ? (foldersConfig.slug ?? 'payload-folders') : null
-  const folders: { id: string | number; name: string; count: number }[] = []
   let unfiled = 0
+  const foldersConfig = payload.config.folders
+  const folders: { id: string | number; name: string; count: number }[] = []
+  const foldersSlug = foldersConfig ? (foldersConfig.slug ?? 'payload-folders') : null
   if (foldersSlug) {
     try {
+      //TODO: replace `as` cast with proper typing
       const res = await payload.find({ collection: foldersSlug as CollectionSlug, depth: 0, limit: 100, sort: 'name' })
+      //TODO: replace `as` cast with proper typing
       for (const doc of res.docs as { id: string | number; name?: string }[]) {
         const { totalDocs } = await payload.count({ collection: sourceSlug, where: { folder: { equals: doc.id } } })
         if (totalDocs > 0) folders.push({ id: doc.id, name: doc.name ?? String(doc.id), count: totalDocs })
@@ -197,7 +188,7 @@ export async function ImagesView({
     sort: '-createdAt',
     ...(where ? { where } : {}),
   })
-  const docs = res.docs as { id: string | number; filename?: string; alt?: string }[]
+  const docs = res.docs as { id: string | number; filename?: string; alt?: string }[] //TODO: replace `as` cast with proper typing
 
   return (
     <>
@@ -245,11 +236,9 @@ export async function ImagesView({
   )
 }
 
-/** `/dev/revalidate` — the dependency map, rendered by the tabbed client panel (Explore /
- *  Map / Reads / Events). All data comes live off payload-revalidate's inspection slot,
- *  read here (server side, structural — no import) and passed down as plain props. */
 export function RevalidateView({ snapshot }: { snapshot: DevSnapshot }) {
   const meta = snapshot.revalidate
+  //TODO: replace `as` cast with proper typing
   const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
     | (() => RevalidateInspection)
     | undefined
@@ -266,12 +255,13 @@ const formatDuration = (seconds?: number | null): string => {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** `/dev/mux` — the videos with their persisted ingest status. */
 export async function MuxView({ payload, snapshot }: { payload: Payload; snapshot: DevSnapshot }) {
   const mux = snapshot.mux
   if (!mux) return <p className="pdtp-muted">payload-mux isn't installed.</p>
 
+  //TODO: replace `as` cast with proper typing
   const res = await payload.find({ collection: mux.slug as CollectionSlug, depth: 0, limit: 50, sort: '-createdAt' })
+  //TODO: replace `as` cast with proper typing
   const docs = res.docs as { id: string | number; title?: string; status?: string; duration?: number }[]
 
   return (

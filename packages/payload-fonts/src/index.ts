@@ -1,19 +1,10 @@
-// The plugin
 export { default, fontsPlugin } from './plugin'
 
-// Font families (slots). `FontFamilyConfig` is the `{ key, label?, fallback? }` shape you pass to
-// `fontsPlugin({ families })`; spread `DEFAULT_FONT_FAMILIES` to extend the built-in set.
-export { DEFAULT_FONT_FAMILIES } from './lib/families'
 export type { FontFamilyConfig } from './types'
+export { DEFAULT_FONT_FAMILIES } from './lib/families'
 
-// Frontend serving. The dev-only runtime component lives at the `@pro-laico/payload-fonts/DevFonts`
-// subpath; `extractFonts` collects the generated next/font/local classes for `<html>`;
-// `getActiveFontFaces` resolves the active `fontSet` selection to its served files (the read behind
-// DevFonts, for custom UIs that list or serve the active fonts) and `buildFontFaceCss` turns them
-// into `@font-face` rules + family variables. `ActiveTypeface`/`ActiveFace` are their shared shape.
 export { extractFonts } from './extractFonts'
-export { buildFontFaceCss, getActiveFontFaces } from './lib/activeFonts'
 export type { ActiveFace, ActiveTypeface } from './types'
+export { buildFontFaceCss, getActiveFontFaces } from './lib/activeFonts'
 
-// Response shape of `GET /api/fonts/export` — for custom consumers of the endpoint.
 export type { ExportFamilyDiagnostics, ExportFontsResponse } from './types'

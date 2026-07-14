@@ -2,19 +2,13 @@
 
 import MuxPlayer from '@mux/mux-player-react'
 import MuxUploader from '@mux/mux-uploader-react'
-import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
+
 import './mux-uploader.css'
 
-/** Strip the extension from a filename (`clip.final.mp4` → `clip.final`). */
 const stripExtension = (name: string): string => name.replace(/\.[^./\\]+$/, '')
 
-/**
- * The admin Field for the `muxUploader` UI field. Four states: an uploader before a video
- * exists, a "processing" notice while Mux encodes, an error notice when Mux rejected the
- * upload (`status: 'errored'`), and the Mux player once a playback URL is available. Uploads
- * go directly to Mux via a direct-upload URL the plugin's endpoint mints.
- */
 export const MuxUploaderField = () => {
   const { config } = useConfig()
   const apiUrl = config.routes.api
@@ -26,9 +20,9 @@ export const MuxUploaderField = () => {
     title: fields.title,
     setTitle: (value: string) => dispatch({ type: 'UPDATE', path: 'title', value }),
     setFile: (value: File) => dispatch({ type: 'UPDATE', path: 'file', value }),
-    playbackUrl: fields['playbackOptions.0.playbackUrl']?.value as string | undefined,
-    status: fields.status?.value as string | undefined,
-    error: fields.error?.value as string | undefined,
+    playbackUrl: fields['playbackOptions.0.playbackUrl']?.value as string | undefined, //TODO: replace `as` cast with proper typing
+    status: fields.status?.value as string | undefined, //TODO: replace `as` cast with proper typing
+    error: fields.error?.value as string | undefined, //TODO: replace `as` cast with proper typing
   }))
 
   const { submit, setProcessing } = useForm()
@@ -41,14 +35,14 @@ export const MuxUploaderField = () => {
       toast.error(`Could not create a Mux upload (${response.status}): ${body}`)
       throw new Error(`[payload-mux] upload URL request failed (${response.status}): ${body}`)
     }
-    const { id, url } = (await response.json()) as { id: string; url: string }
+    const { id, url } = (await response.json()) as { id: string; url: string } //TODO: replace `as` cast with proper typing
     setUploadId(id)
     return url
   }, [apiUrl])
 
   const onUploadStart = useCallback(
     ({ detail: { file } }: { detail: { file: File } }) => {
-      const resolvedTitle = (title?.value as string) || stripExtension(file.name)
+      const resolvedTitle = (title?.value as string) || stripExtension(file.name) //TODO: replace `as` cast with proper typing
       if (!title?.value) setTitle(resolvedTitle)
       setFile(new File([], resolvedTitle, { type: file.type, lastModified: file.lastModified }))
     },
@@ -60,8 +54,6 @@ export const MuxUploaderField = () => {
 
     const fetchUpload = async () => (await fetch(`${apiUrl}/mux/upload?id=${uploadId}`)).json()
     let upload = await fetchUpload()
-    // The asset_id may lag the upload by a moment; poll until Mux assigns it — but bound it so a
-    // stuck/errored upload can't hang the form on "processing" forever.
     const deadline = Date.now() + 60_000
     while (!upload.asset_id && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -76,14 +68,11 @@ export const MuxUploaderField = () => {
 
     const { asset_id } = upload
     setAssetId(asset_id)
-    // Defer the submit so the assetId dispatch is flushed first.
     setTimeout(() => submit({ overrides: { assetId: asset_id } }), 0)
   }, [apiUrl, uploadId, setAssetId, setProcessing, submit])
 
-  // Hide Payload's default `.file-field` (present only when extending an upload collection),
-  // scoped to this field's own form so it can't hide a file field elsewhere on the page.
   useEffect(() => {
-    const fileField = containerRef.current?.closest('form')?.querySelector('.file-field') as HTMLElement | null
+    const fileField = containerRef.current?.closest('form')?.querySelector('.file-field') as HTMLElement | null //TODO: replace `as` cast with proper typing
     if (fileField) fileField.style.display = 'none'
   }, [])
 

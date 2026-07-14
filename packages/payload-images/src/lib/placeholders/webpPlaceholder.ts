@@ -1,26 +1,15 @@
-/**
- * Micro-webp placeholders — the high-quality end of the tier ladder, where a real image format
- * out-spends blurhash per byte. Per-read cropping decodes the STORED ~1 KB micro-image, never
- * the original. Server-only (Sharp).
- */
 import type { Sharp } from 'sharp'
 
-import { loadSharp } from '../transform/sharpInstance'
 import type { CropWindow } from '../../types'
+import { loadSharp } from '../transform/sharpInstance'
 
 const WEBP_DATA_URI_PREFIX = 'data:image/webp;base64,'
 
-/** Encode the stored full-frame micro-webp for one tier. Takes an already-EXIF-rotated pipeline. */
 export const encodeWebpPlaceholder = async (pipeline: Sharp, width: number): Promise<string> => {
   const buf = await pipeline.clone().resize(width, undefined, { withoutEnlargement: true }).webp({ quality: 55 }).toBuffer()
   return `${WEBP_DATA_URI_PREFIX}${buf.toString('base64')}`
 }
 
-/**
- * Crop a stored micro-webp data URI to a fractional window (same geometry as the transform
- * endpoint and the blurhash crop). Identity windows and any failure return the stored URI —
- * a full-frame placeholder still paints.
- */
 export const cropWebpDataUri = async (uri: string, window: CropWindow): Promise<string> => {
   if (window.x0 <= 0 && window.y0 <= 0 && window.w >= 1 && window.h >= 1) return uri
   const comma = uri.indexOf(',')

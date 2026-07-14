@@ -1,8 +1,3 @@
-/**
- * Sanity-style palette extraction — pure math over the same tiny linear-RGB grid the blurhash
- * encoder samples, so it costs no extra decode. Coarse histogram → the seven Vibrant-style
- * swatches, each carrying a contrast-safe text color.
- */
 import { linearToSrgb } from '../placeholders/codec'
 import type { Candidate, ImagePalette, LinearGrid, PaletteSwatch } from '../../types'
 
@@ -20,7 +15,6 @@ const saturationLightness = (r: number, g: number, b: number): { s: number; l: n
   return { s, l }
 }
 
-/** WCAG-ish relative luminance from sRGB ints. */
 const luminance = (r: number, g: number, b: number): number => {
   const lin = (v: number): number => {
     const x = v / 255
@@ -43,7 +37,6 @@ const DARK_MAX = 0.32
 const LIGHT_MIN = 0.68
 const VIBRANT_SAT = 0.35
 
-/** Build the palette from a linear-RGB pixel grid (any size; the blurhash 64px grid is plenty). */
 export const buildPalette = (grid: LinearGrid): ImagePalette => {
   const bins = new Map<number, { r: number; g: number; b: number; count: number }>()
   let total = 0

@@ -1,18 +1,10 @@
-/**
- * The prewarm observation recorder — the transform endpoint's write path into the render-profile
- * registry, built so the serving path never pays for it: `observe()` is pure in-memory map work
- * (never awaits, never throws), and a single unref'd timer flushes the buffer to the collection.
- * Steady-state hit counting is throttled (≤4 writes/hour/profile/process); NEW information — a
- * profile or width not yet persisted — flushes within one interval.
- */
 import type { Payload } from 'payload'
+
 import { asSlug } from '../asSlug'
-
 import { isDuplicateKeyError } from '../errors'
-import { canonicalProfileKey, type RatioCandidate, ratioToken } from './profileKey'
 import type { ProfileParts, RenderProfileDoc, WidthHistogram } from '../../types'
+import { canonicalProfileKey, type RatioCandidate, ratioToken } from './profileKey'
 
-/** Buffer→DB flush interval; overridable for tests via IMAGES_PREWARM_FLUSH_MS. */
 const FLUSH_MS = Number(process.env.IMAGES_PREWARM_FLUSH_MS) || 30_000
 const HIT_FLUSH_MS = 15 * 60_000
 const RATIO_REFRESH_MS = 5 * 60_000
@@ -23,17 +15,13 @@ interface BufferEntry {
   parts: ProfileParts
   hits: number
   widths: Map<number, number>
-  /** Widths already persisted for this profile (this process) — a width outside it is "new". */
   persistedWidths: Set<number>
   lastFlushedAt?: number
 }
 
 export interface ObservationRecorder {
-  /** O(1), synchronous, never throws — safe on the serving path. */
   observe(o: { parts: ProfileParts; width?: number }): void
-  /** Declared-ratio candidates for classification: seeds first, then learned (buffer + DB). */
   knownRatios(): RatioCandidate[]
-  /** Drain the buffer to the collection immediately (tests / CLI). */
   flushNow(): Promise<void>
 }
 
@@ -56,11 +44,10 @@ export const createObservationRecorder = (deps: {
     if (dbRatiosLoading || Date.now() - dbRatiosLoadedAt < RATIO_REFRESH_MS) return
     dbRatiosLoading = true
     void payload
-      //EXCUSE: the select targets a runtime-configured collection an app's generated types may not know
-      .find({ collection: slug, limit: 100, depth: 0, select: { ratio: true } as never })
+      .find({ collection: slug, limit: 100, depth: 0, select: { ratio: true } as never }) //TODO: replace `as` cast with proper typing
       .then((res) => {
         dbRatios = res.docs.flatMap((doc) => {
-          const ratio = Number((doc as { ratio?: string }).ratio) //EXCUSE: docs of a runtime-configured collection are untyped; NaN-guarded below
+          const ratio = Number((doc as { ratio?: string }).ratio) //TODO: replace `as` cast with proper typing
           return Number.isFinite(ratio) && ratio > 0 ? [{ token: ratioToken(ratio), ratio }] : []
         })
         dbRatiosLoadedAt = Date.now()
@@ -97,12 +84,12 @@ export const createObservationRecorder = (deps: {
 
     const update = async (): Promise<boolean> => {
       const found = await payload.find({ collection: slug, where: { profileKey: { equals: key } }, limit: 1, depth: 0 })
-      const existing = found.docs[0] as unknown as RenderProfileDoc | undefined //EXCUSE: docs of a runtime-configured collection are untyped; fields are null-guarded
+      const existing = found.docs[0] as unknown as RenderProfileDoc | undefined //TODO: replace `as` cast with proper typing
       if (!existing) return false
       await payload.update({
         collection: slug,
         id: existing.id,
-        data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) } as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type
+        data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) } as never, //TODO: replace `as` cast with proper typing
       })
       return true
     }
@@ -120,11 +107,11 @@ export const createObservationRecorder = (deps: {
             hitCount: entry.hits,
             lastSeenAt: nowIso,
             widths: mergeWidths(null),
-          } as never, //EXCUSE: data for a runtime-configured collection can't satisfy the generated per-collection data type
+          } as never, //TODO: replace `as` cast with proper typing
         })
       } catch (err) {
         if (!isDuplicateKeyError(err, 'profileKey')) throw err
-        await update() // another process created it between the find and the create
+        await update()
       }
     }
 

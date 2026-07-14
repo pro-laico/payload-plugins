@@ -1,10 +1,5 @@
 import type { OptimizedFace, SpecimenStyle } from '../types'
 
-/** The served faces of one typeface → selectable specimen styles. A variable face's range
- *  (`'100 900'`) becomes clickable stops at every 100 (range ends always included); static faces
- *  list their exact weights. An upright variable face flagged `italCapable` (ital/slnt axes)
- *  contributes an italic style from the same file — unless an explicit italic exists. Styles
- *  with no faces are omitted. */
 export const facesToStyles = (faces: OptimizedFace[]): SpecimenStyle[] => {
   const hasExplicitItalic = faces.some((f) => f.style === 'italic')
   return (['normal', 'italic'] as const).flatMap((style) => {

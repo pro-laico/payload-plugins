@@ -1,4 +1,3 @@
-/** The parsed + validated transform query params, and the query source they parse from. */
 import type { Fit, Format } from './format'
 
 export interface ParsedParams {

@@ -1,17 +1,8 @@
-import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { type Dirent, readdirSync, readFileSync, statSync } from 'node:fs'
 
-import type { LiveScanOptions, ScannedGetter } from '../../types'
 import { extractGetterCalls } from './extract'
-
-/**
- * In-process getter scan (the payload-icons live-scan pattern): walk the app's source
- * and extract every `cacheDoc`/`cacheIds`/`cacheGlobal` call site, so the dev map shows
- * the getters the CODE declares — file, line, enclosing function — before any of them
- * has materialized at runtime. Dev-only (invoked from the inspection getter when
- * `observe` is on; production has no source on disk), and TTL-cached because the
- * toolbar polls the snapshot.
- */
+import type { LiveScanOptions, ScannedGetter } from '../../types'
 
 const DEFAULT_EXTENSIONS = ['tsx', 'ts', 'jsx', 'js']
 const DEFAULT_IGNORE = ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
@@ -25,7 +16,7 @@ const walk = (dir: string, exts: Set<string>, ignore: Set<string>, out: string[]
   try {
     entries = readdirSync(dir, { withFileTypes: true })
   } catch {
-    return // unreadable/missing — skip
+    return
   }
   for (const entry of entries) {
     const full = join(dir, entry.name)
@@ -40,13 +31,12 @@ const walk = (dir: string, exts: Set<string>, ignore: Set<string>, out: string[]
 
 let cached: { at: number; getters: ScannedGetter[] } | null = null
 
-/** Scan (or return the recent cached scan). Never throws — missing roots yield []. */
 export const scanGettersLive = (options: LiveScanOptions = {}): ScannedGetter[] => {
   if (cached && Date.now() - cached.at < TTL_MS) return cached.getters
 
+  const ignore = new Set(DEFAULT_IGNORE)
   const cwd = options.cwd ?? process.cwd()
   const exts = new Set(DEFAULT_EXTENSIONS)
-  const ignore = new Set(DEFAULT_IGNORE)
 
   const files: string[] = []
   for (const root of options.roots?.length ? options.roots : DEFAULT_ROOTS) {
@@ -79,7 +69,6 @@ export const scanGettersLive = (options: LiveScanOptions = {}): ScannedGetter[] 
   return getters
 }
 
-/** Test helper: drop the TTL cache. */
 export const resetGetterScan = (): void => {
   cached = null
 }

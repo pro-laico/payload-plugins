@@ -1,29 +1,15 @@
 import type { Config, Plugin } from 'payload'
 
 import type { FontsPluginOptions } from './types'
-import { createFontCollection } from './collections/font'
-import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collections/fontOptimized'
-import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
-import { exportFontsEndpoint } from './endpoints/exportFonts'
-import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
 import { probeSubsetter } from './lib/optimizeFont'
-import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
 import { resolveFontFamilies } from './lib/families'
+import { createFontCollection } from './collections/font'
+import { exportFontsEndpoint } from './endpoints/exportFonts'
+import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
+import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
+import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
+import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collections/fontOptimized'
 
-/**
- * `@pro-laico/payload-fonts` — three collections, standard Payload primitives:
- *
- * - `font` (visible): the typeface. Editors drop files into `upload` fields backed by
- *   `fontOriginal` (a `variable` group or a `weights` array). Seed it by uploading the raw files
- *   to `fontOriginal` and referencing them from the typeface's slots.
- * - `fontOriginal` (hidden): the raw uploaded files. Register it with your storage adapter's
- *   client-uploads instance to keep big fonts off the request body in production.
- * - `fontOptimized` (hidden): the subsetted WOFF2 the site serves, built from the originals by
- *   the `font` save hook. Always server-side stored.
- *
- * Plus the `fontSet` global (the active selection — on by default) and the `GET /api/fonts/export`
- * endpoint the `payload-fonts-download` CLI reads to write fonts for `next/font/local`.
- */
 export const fontsPlugin =
   (opts: FontsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
@@ -64,8 +50,6 @@ export const fontsPlugin =
       collections,
       globals,
       endpoints,
-      // Stash the resolved slugs + families so decoupled tooling (e.g. @pro-laico/payload-dev-tools)
-      // can discover the plugin and read them from just `payload.config` — no import.
       custom: {
         ...config.custom,
         payloadFonts: {
@@ -80,12 +64,6 @@ export const fontsPlugin =
       },
       onInit: async (payload) => {
         await config.onInit?.(payload)
-        // Dev-only probe for the most common deployment mistake: a bundler inlined the subsetter's
-        // wasm/native assets, which otherwise only surfaces on the first font save. Importing
-        // `subset-font` is not enough — harfbuzz reads its wasm lazily on the first subset call —
-        // so probeSubsetter runs a real (garbage-buffer) subset and reports only load failures.
-        // Not awaited (never slows boot) and never runs in production, where the same failure is
-        // still caught loudly on the first font save.
         if (process.env.NODE_ENV !== 'production') {
           void probeSubsetter().then((err) => {
             if (err) {

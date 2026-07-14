@@ -1,63 +1,16 @@
-import 'server-only'
-
 import type { Payload } from 'payload'
 
+import { isId } from '../lib/values'
+import { createManualBusters } from './manual'
 import { readRevalidateMarker } from '../lib/marker'
 import { recordRead } from '../lib/observe/registry'
 import { createTags, riskyAliasReason } from '../lib/tags'
-import { isId } from '../lib/values'
-import type { CacheDocOptions, CacheHelpers, CacheIdsOptions, PayloadRevalidateMarker, Tags, WalkOptions } from '../types'
 import { alertOnce, applyCacheTags, finish, warnOnce, withDraftVariants } from './finish'
-import { createManualBusters } from './manual'
+import type { CacheDocOptions, CacheHelpers, CacheIdsOptions, PayloadRevalidateMarker, Tags, WalkOptions } from '../types'
 
-/**
- * The read side — atomic by design, bound ONCE to the app's live Payload session. Seed the
- * factory in one module with the same handle your getters fetch with (the `getPayload`
- * promise is welcome as-is — only each read awaits it):
- *
- * ```ts
- * // lib/cache.ts — the one seam
- * import config from '@payload-config'
- * import { getPayload } from 'payload'
- * import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
- *
- * export const { cacheDoc, cacheIds, cacheGlobal } = createCacheHelpers(getPayload({ config }))
- * ```
- *
- * Two rules shape every getter:
- *
- * 1. **Fetch shallow, reference by id.** A doc's entry holds ITS content; anything it
- *    references stays an id, rendered by a component that self-fetches through an
- *    id-keyed `cacheDoc` getter. Freshness then lives per doc: editing an image busts
- *    `media:{id}` and ONLY the image's own entry re-materializes — every host entry
- *    (holding just the id) survives, and Next recomposes on the next request.
- * 2. **Lists are id-lists.** `cacheIds` tags membership/order only; each item is its own
- *    `cacheDoc` entry. A title edit re-renders one card, not the archive.
- *
- * Populated content that DOES get baked in (depth > 0) is still tagged for correctness —
- * and reported as a refactor candidate in dev (console + the /dev/revalidate map).
- *
- * @example
- * ```ts
- * import config from '@payload-config'
- * import { getPayload } from 'payload'
- * import { cacheDoc, cacheIds } from '@/lib/cache'
- *
- * export async function getPostIds(page = 1) {
- *   'use cache'
- *   const payload = await getPayload({ config })
- *   const res = await payload.find({ collection: 'posts', page, limit: 12, sort: '-publishedAt', select: {}, depth: 0 })
- *   return cacheIds(res, 'posts', { list: 'recent' })
- * }
- *
- * export async function getPost(id: string | number) {
- *   'use cache'
- *   const payload = await getPayload({ config })
- *   return cacheDoc(await payload.findByID({ collection: 'posts', id, depth: 0, disableErrors: true }), 'posts')
- * }
- * ```
- */
+import 'server-only'
 
+//TODO: replace `as` casts with proper typing
 const docId = (doc: unknown): string | number | undefined =>
   typeof doc === 'object' && doc !== null && isId((doc as { id?: unknown }).id) ? (doc as { id: string | number }).id : undefined
 
@@ -68,14 +21,6 @@ interface ReadCtx {
   observe: boolean
 }
 
-/**
- * Build the read-side helpers ({@link CacheHelpers}) bound to the app's one live session.
- * MUST be seeded at module scope (once per app), never per render — the helpers resolve
- * prefix/scopes/observe from the handle's own config marker on every read, so the same
- * session that fetched a doc is the one that tags it. A `Payload` handle must never cross
- * a `'use cache'` boundary as an ARGUMENT (it isn't serializable) — keep it in module
- * closure, exactly like this factory does.
- */
 export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHelpers => {
   const ctx = async (): Promise<ReadCtx> => {
     const payload = await handle
@@ -88,12 +33,6 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     return { payload, marker, tags: createTags(marker?.prefix), observe: marker?.observe ?? false }
   }
 
-  /**
-   * Tag a doc-scoped read — THE atomic unit. Tags: `all`, `{slug}:{id}` (when the doc
-   * resolved), `{slug}:{as}` (the alias/identifier it was keyed by — also on `null` misses),
-   * any baked-in doc's tag (dev-flagged), and `:draft` variants when `draft`. A `null` doc
-   * with no `as` falls back to the bare list tag so the miss still purges on the next create.
-   */
   async function cacheDoc<T>(doc: T, collection: string, options: CacheDocOptions = {}): Promise<T> {
     const { payload, tags, observe } = await ctx()
     const id = docId(doc)
@@ -113,22 +52,12 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     return doc
   }
 
-  /**
-   * Tag an id-list read (a Payload result, an array of docs, or a plain id array). Tags:
-   * `all` + the collection's list tag (scoped via `list`, bare otherwise) — deliberately NO
-   * per-doc tags and no walk: this entry is membership/order only, and each item renders
-   * through its own id-keyed `cacheDoc` getter. Content edits never touch it; membership
-   * events (and the scope's declared fields) do.
-   */
   async function cacheIds<T>(result: T, collection: string, options: CacheIdsOptions = {}): Promise<T> {
     const { marker, tags, observe } = await ctx()
+    //TODO: replace `as` cast with proper typing
     const items: unknown[] = Array.isArray(result) ? result : ((result as { docs?: unknown[] } | null)?.docs ?? [])
     const name = options.label ?? `ids:${collection}${options.list ? `:${options.list}` : ''}`
 
-    // Teach: full docs passed here means content is (presumably) rendered from this entry,
-    // but ids-only tagging will NOT refresh it on content edits. Upload plumbing is exempt:
-    // Payload returns it even under `select: {}`, so on an upload collection those keys say
-    // nothing about what the getter selected.
     const uploadMeta = ['filename', 'filesize', 'mimeType', 'width', 'height', 'focalX', 'focalY', 'url', 'thumbnailURL', 'sizes']
     const contentKeys = items
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
@@ -140,9 +69,6 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
         `${name} received docs carrying content (${[...new Set(contentKeys)].slice(0, 5).join(', ')}…) — cacheIds tags membership only. Fetch with select: {} and render items through id-keyed cacheDoc getters, or content edits won't refresh this entry.`,
       )
 
-    // Police the scope: hooks bust only DECLARED scopes, so an undeclared one goes stale on
-    // reorders. Only when the marker is present — without it (plugin not applied to this
-    // handle's config) declaration status is unknowable and the warning would be spurious.
     const declared = marker?.lists[collection]
     const undeclared = marker !== undefined && options.list !== undefined && !(declared ?? []).includes(options.list)
     if (undeclared)
@@ -172,7 +98,6 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     return result
   }
 
-  /** Tag a global read. Tags: `all`, `global:{slug}`, baked-in docs (dev-flagged), draft variants. */
   async function cacheGlobal<T>(doc: T, slug: string, options: CacheDocOptions = {}): Promise<T> {
     const { payload, tags, observe } = await ctx()
     await finish({

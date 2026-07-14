@@ -1,14 +1,9 @@
-/**
- * afterChange on the source → purge stale variants when the file, focal, or hotspot changed
- * (their cache keys are now unreachable). A metadata-only edit leaves variants valid. Best-effort
- * and logged: a failed purge must never block the source write.
- */
 import type { CollectionAfterChangeHook } from 'payload'
 
-import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
-import { purgeVariantsForSource } from './purgeVariantsForSource'
-import { detectVariantIdentityChange } from './variantIdentity'
 import type { PurgeOptions } from '../../types'
+import { detectVariantIdentityChange } from './variantIdentity'
+import { purgeVariantsForSource } from './purgeVariantsForSource'
+import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 
 export const purgeStaleVariantsAfterChange = (opts: PurgeOptions = {}): CollectionAfterChangeHook => {
   const variantSlug = opts.variantSlug || GENERATED_IMAGES_SLUG

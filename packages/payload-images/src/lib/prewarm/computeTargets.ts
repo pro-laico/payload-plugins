@@ -1,22 +1,12 @@
-/**
- * The prewarm list for one source, computed PURELY from the registry + seeds + constraints. The
- * correctness trick: every unit is rebuilt as the query a browser would send and replayed through
- * `parseTransformParams`, so snapping/bucketing produce byte-identical `variantCacheKey`s — dedup
- * against organically generated variants is exact, and a warmed variant is a guaranteed cache hit.
- */
-import { FITS, FORMATS, bucketQuality, parseAspectRatio, parseTransformParams } from '../transform/params'
-import { variantCacheKey } from '../transform/variantKey'
 import { ratioToken } from './profileKey'
+import { variantCacheKey } from '../transform/variantKey'
+import { FITS, FORMATS, bucketQuality, parseAspectRatio, parseTransformParams } from '../transform/params'
 import type { ComputeTargetsArgs, Fit, OutputFormat, PrewarmTarget, QuerySource, WidthHistogram } from '../../types'
 
-/** Ladder used for a profile/seed with no width observations yet — the common breakpoint spread. */
 export const DEFAULT_PREWARM_WIDTHS = [320, 640, 1024, 1600]
-/** Top observed widths warmed per profile. */
 const MAX_WIDTHS_PER_PROFILE = 4
-/** Profiles not seen within this window stop being warmed (seeds are pinned and never expire). */
 const PROFILE_TTL_DAYS = 30
 
-/** One render shape to expand into (width × format) targets. */
 interface WarmUnit {
   ar?: number
   fit: Fit
@@ -38,9 +28,8 @@ const topWidths = (hist: WidthHistogram | null | undefined): number[] | undefine
 
 const asFit = (fit: string | undefined): Fit => FITS.find((f) => f === fit) ?? 'cover'
 
-/** A profile's concrete format, or undefined when it observed `auto` (expand to the configured set). */
 const concreteFormat = (format: string): OutputFormat | undefined =>
-  format !== 'auto' && FORMATS.some((f) => f === format) ? (format as OutputFormat) : undefined //EXCUSE: narrowed by the FORMATS membership check on the previous clause
+  format !== 'auto' && FORMATS.some((f) => f === format) ? (format as OutputFormat) : undefined //TODO: replace `as` cast with proper typing
 
 export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[] => {
   const { source, seeds, formats, constraints, existingKeys, maxVariantsPerImage } = args
@@ -50,15 +39,12 @@ export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[]
   const natural = source.width && source.height && source.height > 0 ? source.width / source.height : undefined
   const q = constraints.defaultQuality
 
-  // Built-ins first: the exact renders the virtual fields emit on every read (src / thumbnailURL /
-  // placeholderURL) — they occupy the front of the list so the budget can never evict them.
   const units: WarmUnit[] = [
     { ar: natural, fit: 'cover', quality: q, widths: [Math.min(sourceWidth ?? 1280, 1280)], formats },
     { ar: 1, fit: 'cover', quality: q, widths: [160], formats },
     { ar: natural, fit: 'cover', quality: 40, widths: [32], formats },
   ]
 
-  // Seeds: pinned by config. Widths: explicit, else the matching profile's observations, else the ladder.
   for (const seed of seeds) {
     const ar = seed.aspectRatio != null ? parseAspectRatio(seed.aspectRatio) : natural
     const fit = asFit(seed.fit)
@@ -69,7 +55,6 @@ export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[]
     units.push({ ar, fit, quality, widths, formats })
   }
 
-  // Observed profiles: TTL-filtered, busiest first.
   const cutoff = now.getTime() - PROFILE_TTL_DAYS * 86_400_000
   const live = args.profiles
     .filter((p) => p.lastSeenAt == null || new Date(p.lastSeenAt).getTime() >= cutoff)
@@ -86,7 +71,6 @@ export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[]
     })
   }
 
-  // Expand each unit through the endpoint's own parser so keys match organic traffic exactly.
   const targets: PrewarmTarget[] = []
   const seen = new Set<string>()
   for (const unit of units) {

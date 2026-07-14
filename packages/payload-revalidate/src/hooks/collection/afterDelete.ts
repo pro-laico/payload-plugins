@@ -1,12 +1,11 @@
 import type { CollectionAfterDeleteHook } from 'payload'
 
 import { bust } from '../../lib/bust'
-import { extractOnValues } from '../../lib/diff/joins'
 import { docRecord, isId } from '../../lib/values'
+import { extractOnValues } from '../../lib/diff/joins'
 import type { Bust, CollectionHookInput, JoinMembership, Tags } from '../../types'
 import { aliasOf, allListTags, docTags, extraTagBusts, joinTags, ruleTags } from './busts'
 
-/** Delete side: the parents a child *was* a member of lose it from every lane. */
 const deleteJoinBusts = (tags: Tags, slug: string, joinRules: JoinMembership[], doc: Record<string, unknown>): Bust[] =>
   joinRules.flatMap(({ on }) => extractOnValues(doc, on).flatMap((parent) => joinTags(tags, slug, on, parent, 'both')))
 

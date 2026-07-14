@@ -1,12 +1,12 @@
 'use client'
 
-import { useDocumentInfo, useField, useForm, useUploadEdits } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDocumentInfo, useField, useForm, useUploadEdits } from '@payloadcms/ui'
 
 import { BlurhashTile, WebpTile } from './tiles'
-import { chipStyle, handleStyle, note, selectStyle, tileLabelStyle } from './styles'
 import { clamp, windowCss } from '../../../lib/transform/geometry'
+import { chipStyle, handleStyle, note, selectStyle, tileLabelStyle } from './styles'
 import { encodeBlurhashFromImageSource } from '../../../lib/placeholders/encodeFromCanvas'
 import type { DisplayMode, DragMode, FocalPreviewProps, HotspotOpts, ParsedBlurhash } from '../../../types'
 import {
@@ -19,14 +19,6 @@ import {
   WEBP_TIERS,
 } from '../../../lib/placeholders/qualities'
 
-/**
- * The image's art-direction editor: an inline focal/hotspot/crop picker + live ratio previews.
- * It ENHANCES Payload's native focal pipeline — the focal point writes through the shared
- * `UploadEdits` context, while the hotspot size and crop rect write their own stored fields.
- * All three layers are non-destructive (the original file is never touched), and the tiles share
- * the transform endpoint's `hotspotWindow` math via `windowCss`, so preview, placeholder, and
- * endpoint renderings always agree. No network calls.
- */
 const DEFAULT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9']
 
 const clampPct = (n: number): number => clamp(n, 0, 100)
@@ -45,23 +37,23 @@ const parseRatio = (r: string): number => {
 }
 
 export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFAULT_RATIOS, readOnly }) => {
-  const { data } = useDocumentInfo()
-  const { value: file } = useField<File | undefined>({ path: 'file' })
-  const { uploadEdits, updateUploadEdits } = useUploadEdits()
   const { setModified } = useForm()
+  const { data } = useDocumentInfo()
+  const { uploadEdits, updateUploadEdits } = useUploadEdits()
+  const { value: file } = useField<File | undefined>({ path: 'file' })
 
-  const focalSizeField = useField<number>({ path: 'focalSize' })
-  const cropLeftField = useField<number>({ path: 'cropLeft' })
   const cropTopField = useField<number>({ path: 'cropTop' })
+  const cropLeftField = useField<number>({ path: 'cropLeft' })
   const cropRightField = useField<number>({ path: 'cropRight' })
+  const focalSizeField = useField<number>({ path: 'focalSize' })
   const cropBottomField = useField<number>({ path: 'cropBottom' })
 
   const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
-  const focalSize = num(focalSizeField.value, num(data?.focalSize, 100))
-  const cropLeft = num(cropLeftField.value, num(data?.cropLeft, 0))
   const cropTop = num(cropTopField.value, num(data?.cropTop, 0))
+  const cropLeft = num(cropLeftField.value, num(data?.cropLeft, 0))
   const cropRight = num(cropRightField.value, num(data?.cropRight, 0))
   const cropBottom = num(cropBottomField.value, num(data?.cropBottom, 0))
+  const focalSize = num(focalSizeField.value, num(data?.focalSize, 100))
 
   const [objectUrl, setObjectUrl] = useState<string | null>(null)
   useEffect(() => {
@@ -86,8 +78,8 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     typeof data?.width === 'number' && typeof data?.height === 'number' ? { w: data.width, h: data.height } : null,
   )
 
-  const [hash, setHash] = useState<ParsedBlurhash | null>(null)
   const [mode, setMode] = useState<DisplayMode>('normal')
+  const [hash, setHash] = useState<ParsedBlurhash | null>(null)
   const [quality, setQuality] = useState<PlaceholderQuality>('sm')
   const [dialogRatio, setDialogRatio] = useState<string | null>(null)
   useEffect(() => {
@@ -117,8 +109,8 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     return () => window.removeEventListener('keydown', onKey)
   }, [dialogRatio])
 
-  const stageRef = useRef<HTMLDivElement>(null)
   const dragMode = useRef<DragMode>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const [handleAngle, setHandleAngle] = useState(Math.PI / 4)
 
   const setCrop = useCallback(
@@ -180,11 +172,9 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
       </div>
     )
 
-  // Stage-space hotspot circle: diameter = focalSize% of the crop region's shorter side in
-  // DISPLAY px — the shorter region side in units of stage WIDTH (height in width-units = 1/stageAr).
-  const stageAr = srcDims ? srcDims.w / srcDims.h : 3 / 2
   const regionWpct = 1 - (cropLeft + cropRight) / 100
   const regionHpct = 1 - (cropTop + cropBottom) / 100
+  const stageAr = srcDims ? srcDims.w / srcDims.h : 3 / 2
   const shorterWidthUnits = Math.min(regionWpct, regionHpct / stageAr)
   const circleDiaPctOfWidth = focalSize * shorterWidthUnits
 
@@ -199,7 +189,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
     applyFromEvent(e.clientX, e.clientY)
   }
 
-  /** One ratio preview surface (image window + optional placeholder overlay + label chip). */
   const tileSurface = (r: string): React.ReactElement => {
     const tileAr = parseRatio(r)
     const css = srcDims ? windowCss(srcDims.w, srcDims.h, tileAr, hotspot) : null
@@ -327,7 +316,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
       </p>
 
       <div>
-        {/* Center the stage so a tall (1:1 / portrait) image capped by max-height isn't left-anchored. */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <div
             ref={stageRef}
@@ -346,8 +334,6 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
             }}
             style={{
               position: 'relative',
-              // Shrink-to-fit the (height-capped) image, but never past the panel width — minWidth:0
-              // defeats the flex min-content floor that would otherwise let a wide image overflow.
               maxWidth: '100%',
               minWidth: 0,
               borderRadius: 'var(--style-radius-m, 4px)',

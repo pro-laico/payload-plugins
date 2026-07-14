@@ -1,14 +1,10 @@
 import type { Payload } from 'payload'
 
 import { bust } from '../lib/bust'
-import { readRevalidateMarker } from '../lib/marker'
 import { createTags } from '../lib/tags'
 import type { CacheHelpers } from '../types'
+import { readRevalidateMarker } from '../lib/marker'
 
-/** The manual busters — for flows outside the auto-attached hooks. Bound to the app's
- *  handle by {@link createCacheHelpers}; prefix, declared scopes, and the observe gate all
- *  come off the handle's own config marker at call time. Never throw in write paths: a
- *  missing marker busts unprefixed tags (the alert comes from the read side). */
 export const createManualBusters = (
   handle: Payload | Promise<Payload>,
 ): Pick<CacheHelpers, 'revalidateDoc' | 'revalidateList' | 'revalidateGlobal' | 'revalidateAll'> => {

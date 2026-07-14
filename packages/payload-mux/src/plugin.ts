@@ -1,33 +1,20 @@
 import Mux from '@mux/mux-node'
-import type { Config, Plugin } from 'payload'
 import { deepMerge } from 'payload'
-import { MuxVideo } from './collections/MuxVideo'
-import { createMuxUploadHandler, getMuxUploadHandler } from './endpoints/upload'
-import { muxWebhookHandler } from './endpoints/webhook'
-import type { MuxVideoPluginOptions } from './types'
+import type { Config, Plugin } from 'payload'
 
-/**
- * Brings Mux Video to Payload. Adds a `mux-video` collection (or extends one you name),
- * registers the upload + webhook endpoints, and wires the admin uploader. Direct uploads go
- * straight to Mux; a webhook keeps Payload in sync and deletes cascade both ways.
- *
- * Credentials default to the standard `MUX_*` env vars, so `muxVideoPlugin()` is enough — pass
- * options only to override (custom env var name, playback policy, etc).
- */
+import { MuxVideo } from './collections/MuxVideo'
+import type { MuxVideoPluginOptions } from './types'
+import { muxWebhookHandler } from './endpoints/webhook'
+import { createMuxUploadHandler, getMuxUploadHandler } from './endpoints/upload'
+
 export const muxVideoPlugin =
   (pluginOptions: MuxVideoPluginOptions = {}): Plugin =>
   (incomingConfig: Config): Config => {
     if (pluginOptions.enabled === false) return incomingConfig
 
     const mux = new Mux(pluginOptions.initSettings)
-    // Expose the options on config.custom so external tooling (e.g. a seeder) can build a Mux
-    // client from the already-configured credentials, given just `payload` — read by string
-    // key, no import, so other packages stay decoupled from this one.
     const config: Config = { ...incomingConfig, custom: { ...incomingConfig.custom, payloadMux: { options: pluginOptions } } }
 
-    // Without credentials the collection still registers (so generated types stay stable), but
-    // ingest can't reach Mux — mark it seed-disabled so a seeder skips its definition with this
-    // reason instead of failing mid-run. Set the env vars and the next seed picks it up.
     const hasCreds = Boolean(
       (pluginOptions.initSettings?.tokenId ?? process.env.MUX_TOKEN_ID) &&
         (pluginOptions.initSettings?.tokenSecret ?? process.env.MUX_TOKEN_SECRET),
@@ -38,8 +25,6 @@ export const muxVideoPlugin =
       console.warn('[payload-mux] MUX_TOKEN_ID / MUX_TOKEN_SECRET not set — uploads, server-side ingest, and webhook handling will fail')
     }
 
-    // Signed playback needs the JWT key pair — without it every read of a signed video throws
-    // in the virtual URL fields, so warn at boot instead of failing per-request.
     const signed =
       pluginOptions.playbackPolicy === 'signed' || pluginOptions.uploadSettings?.new_asset_settings?.playback_policy?.includes('signed')
     const hasSigningKeys = Boolean(

@@ -34,7 +34,6 @@ const compute = (over: Partial<ComputeTargetsArgs> = {}) =>
     ...over,
   })
 
-/** The key an ORGANIC request with this query would produce — the round-trip oracle. */
 const organicKey = (query: QuerySource, format: OutputFormat): string => {
   const parsed = parseTransformParams(query, DEFAULT_CONSTRAINTS)
   if (!parsed.ok) throw new Error(parsed.error)

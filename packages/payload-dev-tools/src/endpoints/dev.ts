@@ -1,13 +1,8 @@
 import type { Endpoint } from 'payload'
-import { buildDevSnapshot } from '../lib/snapshot'
-import { devToolsEnabled } from '../options'
 
-/**
- * `GET /api/dev` — the machine-readable snapshot (see {@link buildDevSnapshot}) for `fetch`,
- * `curl`, and AI agents. A browser asking for HTML is redirected to the dev pages (`devRoute`,
- * where the host mounts `createDevPage`) — the human view lives there, inside the app;
- * `?format=json` skips the redirect. Outside dev it 404s (see {@link devToolsEnabled}).
- */
+import { devToolsEnabled } from '../options'
+import { buildDevSnapshot } from '../lib/snapshot'
+
 export function createDevEndpoint({ enabled, devRoute }: { enabled?: boolean; devRoute: string }): Endpoint {
   return {
     path: '/dev',

@@ -1,34 +1,26 @@
 import { createOnce } from '../lib/once'
 import { recordRead } from '../lib/observe/registry'
-import { collectDepTags, indexSchema } from '../lib/walk/collectTags'
 import type { BakedEmbed, FinishInput, IndexSource } from '../types'
-
-/** The shared tail of every `./cache` read — bake-in walk, advisories, tag-limit
- *  enforcement, observation record, and the actual `cacheTag` application. */
+import { collectDepTags, indexSchema } from '../lib/walk/collectTags'
 
 const dev = (): boolean => process.env.NODE_ENV === 'development'
 
-/** Warned-once registry so each read shape logs each advisory once per process (dev only). */
 const warnedOnce = createOnce()
 export const warnOnce = (key: string, message: string): void => {
   if (dev() && warnedOnce(key)) console.warn(`[payload-revalidate] ${message}`)
 }
 
-/** Failure paths alert once per key in EVERY environment: each of these means entries are
- *  materializing under-tagged (silently unbustable) — that must be visible in prod logs,
- *  where until now the plugin degraded with zero signal. */
 const alertedOnce = createOnce()
 export const alertOnce = (key: string, message: string, cause?: unknown): void => {
   if (alertedOnce(key)) console.error(`[payload-revalidate] ${message}`, cause instanceof Error ? cause.message : (cause ?? ''))
 }
 
-/** Next allows at most 128 tags per cache entry — tags past the limit are dropped. */
 const NEXT_MAX_TAGS = 128
 
-/** Apply Next's cacheTag without exploding outside a `'use cache'` scope. */
 export const applyCacheTags = async (allTags: string[]): Promise<void> => {
   if (allTags.length === 0) return
   try {
+    //TODO: replace `as` cast with proper typing
     const { cacheTag } = (await import('next/cache')) as unknown as { cacheTag: (...tags: string[]) => void }
     cacheTag(...allTags)
   } catch (err) {
@@ -40,16 +32,11 @@ export const applyCacheTags = async (allTags: string[]): Promise<void> => {
   }
 }
 
-/** Add `:draft` variants for a draft-scoped read — every tag except the `all` tag (passed
- *  in exactly, since its prefixed form comes from the caller's builders). */
 export const withDraftVariants = (base: string[], draft: boolean | undefined, allTag: string): string[] => {
   if (!draft) return base
   return [...base, ...base.filter((tag) => tag !== allTag).map((tag) => `${tag}:draft`)]
 }
 
-/** Shared tail for doc/global reads: walk for bake-ins, advise, record, cacheTag. The
- *  schema comes off the handle's own config — a live handle always carries it, so the walk
- *  can never be skipped for an unreachable config. */
 export const finish = async ({
   payload,
   tags,
@@ -63,12 +50,13 @@ export const finish = async ({
   slug,
   options,
 }: FinishInput): Promise<void> => {
+  //TODO: replace `as` cast with proper typing
   const index = options.walk === false || value == null ? null : indexSchema(payload.config as unknown as IndexSource)
   const entity = index ? (kind === 'global' ? index.global(slug) : index.collection(slug)) : undefined
   const walked =
     index && entity
       ? collectDepTags(value, entity.fields, index, options.walk === false ? undefined : options.walk, tags)
-      : { tags: [], embeds: [] as BakedEmbed[], capped: false }
+      : { tags: [], embeds: [] as BakedEmbed[], capped: false } //TODO: replace `as` cast with proper typing
 
   const name = options.label ?? `${kind}:${slug}${as !== undefined ? `:${as}` : ''}`
   if (walked.capped)
@@ -82,10 +70,6 @@ export const finish = async ({
   const statics = withDraftVariants([...staticTags, ...(options.tags ?? [])], options.draft, tags.all())
   const deps = withDraftVariants(walked.tags, options.draft, tags.all())
 
-  // Enforce Next's per-entry tag limit OURSELVES, statics first: past 128 Next silently
-  // drops the tail, and draft reads double the dep tags — so a walk under `maxTags` can
-  // still overflow. Deterministic retention (statics, then deps in walk order) plus a
-  // loud flag beats Next's silent truncation.
   const ordered = [...new Set([...statics, ...deps])]
   const trimmed = ordered.length > NEXT_MAX_TAGS
   const applied = trimmed ? ordered.slice(0, NEXT_MAX_TAGS) : ordered

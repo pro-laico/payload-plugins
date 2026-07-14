@@ -1,8 +1,6 @@
-import { DEFAULT_CONSTRAINTS } from '../../lib/transform/params'
 import type { TransformConstraints } from '../../types'
+import { DEFAULT_CONSTRAINTS } from '../../lib/transform/params'
 
-/** Fold optional constraint overrides onto the package defaults; sanitize the width ladder
- *  (positive, deduped, capped by maxDimension) so the snap can trust it. */
 export const resolveConstraints = (cfg: Partial<TransformConstraints>): TransformConstraints => {
   const maxDimension = cfg.maxDimension ?? DEFAULT_CONSTRAINTS.maxDimension
   const widthLadder = cfg.widthLadder

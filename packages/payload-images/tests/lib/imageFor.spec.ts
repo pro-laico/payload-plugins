@@ -10,7 +10,7 @@ type FindArgs = { id: string | number; collection: string; context: Record<strin
 
 const fakePayload = (sourceSlug?: string) => {
   const findByID = vi.fn<(args: FindArgs) => Promise<typeof doc | null>>().mockResolvedValue(doc)
-  const payload = { config: { custom: { payloadImages: sourceSlug ? { sourceSlug } : {} } }, findByID } as unknown as Payload //EXCUSE: test double — only the two members the helper touches
+  const payload = { config: { custom: { payloadImages: sourceSlug ? { sourceSlug } : {} } }, findByID } as unknown as Payload
   return { payload, findByID }
 }
 

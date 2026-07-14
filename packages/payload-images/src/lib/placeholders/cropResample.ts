@@ -1,10 +1,5 @@
-/**
- * BlurHash crop by resampling: evaluate the series over the crop window at a small sample grid,
- * then re-encode — "decode → crop → re-encode" without ever materializing an image. Matches what
- * stock blurhash tooling produces; kept as the comparison baseline for the coefficient projection.
- */
-import { decodeToLinearGrid, encodeCoefficients, encodeLinearGrid, parseBlurhash } from './codec'
 import type { CropResampleOptions, CropWindow } from '../../types'
+import { decodeToLinearGrid, encodeCoefficients, encodeLinearGrid, parseBlurhash } from './codec'
 
 export const cropBlurhashResample = (hash: string, window: CropWindow, opts: CropResampleOptions = {}): string => {
   const parsed = parseBlurhash(hash)

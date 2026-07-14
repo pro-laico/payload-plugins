@@ -1,7 +1,7 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
-import { findTopLevelField } from './fields'
 import { createOnce } from './once'
+import { findTopLevelField } from './fields'
 import type {
   CollectionRevalidateConfig,
   CollectionSettings,
@@ -24,24 +24,14 @@ export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedR
 
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 
-/** Config-build-time shape check warned once per slug+key: `custom.revalidate` markers are
- *  authored by third-party packages WITHOUT types, and a malformed entry must degrade to
- *  "ignored with a warning" — not throw from the afterChange hook on every save. */
 const shapeWarnedOnce = createOnce()
 const shapeWarn = (slug: string, key: string, expected: string): void => {
   if (shapeWarnedOnce(`${slug}:${key}`))
     console.warn(`[payload-revalidate] collection '${slug}': revalidate config '${key}' is malformed (expected ${expected}) — ignoring it.`)
 }
 
-/**
- * Merge a collection's `custom.revalidate` marker with the plugin's per-slug options
- * (options win, field by field) and apply defaults. Returns `null` when the collection is
- * opted out — either side saying `false` opts out, but an options object overrides a
- * marker `false` (options always win). Malformed pieces are dropped with a warning, never
- * allowed through to the hooks.
- */
 export function resolveCollectionSettings(collection: CollectionConfig, resolved: ResolvedRevalidateOptions): CollectionSettings | null {
-  const marker = (collection.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate
+  const marker = (collection.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate //TODO: replace `as` cast with proper typing
   const override = resolved.collections[collection.slug]
   if (override === false) return null
   if (marker === false && override === undefined) return null
@@ -60,8 +50,9 @@ export function resolveCollectionSettings(collection: CollectionConfig, resolved
     shapeWarn(collection.slug, 'lists', 'an object of { [scope]: { fields: string[] } }')
   } else {
     for (const [scope, config] of Object.entries(rawLists ?? {})) {
+      //TODO: replace `as` cast with proper typing
       if (typeof config === 'object' && config !== null && isStringArray((config as { fields?: unknown }).fields)) {
-        lists[scope] = (config as { fields: string[] }).fields
+        lists[scope] = (config as { fields: string[] }).fields //TODO: replace `as` cast with proper typing
       } else {
         shapeWarn(collection.slug, `lists.${scope}`, '{ fields: string[] }')
       }
@@ -77,8 +68,7 @@ export function resolveCollectionSettings(collection: CollectionConfig, resolved
   return { idField, lists, extraTags }
 }
 
-/** Whether a global gets the auto-attached hook (its marker or the plugin's `globals` map can opt it out). */
 export function globalEnabled(global: GlobalConfig, resolved: ResolvedRevalidateOptions): boolean {
-  const marker = (global.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate
+  const marker = (global.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate //TODO: replace `as` cast with proper typing
   return resolved.globals[global.slug] !== false && marker !== false
 }

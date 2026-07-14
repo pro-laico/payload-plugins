@@ -1,5 +1,3 @@
-/** The image-doc shape the stored-placeholder reader duck-checks (tiers + focal/hotspot crop). */
-
 export interface ImageDocLike {
   width?: number | null
   height?: number | null

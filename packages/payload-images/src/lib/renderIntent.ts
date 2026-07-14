@@ -1,14 +1,7 @@
-/**
- * The read-side render contract: a getter declares WHAT it's rendering on the read
- * (`context: { image, blur }`), and the doc comes back self-sufficient — virtual `src`/`srcset`
- * built for exactly that render, the virtual `placeholder` finished for the same box.
- * `context` is an untyped bag, so everything is validated structurally.
- */
 import { FITS, FORMATS, parseAspectRatio } from './transform/params'
-import { isPlaceholderFormat, isPlaceholderQuality } from './placeholders/qualities'
 import type { ParsedBlurIntent, ParsedRenderIntent } from '../types'
+import { isPlaceholderFormat, isPlaceholderQuality } from './placeholders/qualities'
 
-/** The lean select for a read that feeds `<ResponsiveImage>`. */
 export const RESPONSIVE_IMAGE_SELECT = {
   alt: true,
   src: true,
@@ -16,7 +9,6 @@ export const RESPONSIVE_IMAGE_SELECT = {
   placeholder: true,
 } as const
 
-/** Read + validate `context.image` off the operation. Absent → `declared: false`. */
 export const readImageIntent = (req: { context?: Record<string, unknown> } | undefined): ParsedRenderIntent => {
   const raw = req?.context?.image
   if (typeof raw !== 'object' || raw === null) return { declared: false }
@@ -29,7 +21,6 @@ export const readImageIntent = (req: { context?: Record<string, unknown> } | und
   return out
 }
 
-/** Read + validate `context.blur` off the operation. Absent → `declared: false`. */
 export const readBlurIntent = (req: { context?: Record<string, unknown> } | undefined): ParsedBlurIntent => {
   const raw = req?.context?.blur
   if (typeof raw !== 'object' || raw === null) return { declared: false }

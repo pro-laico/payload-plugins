@@ -1,2 +1,2 @@
-export type * from './inspection'
 export type * from './renderMap'
+export type * from './inspection'

@@ -1,9 +1,3 @@
-/**
- * Deterministic cache key for a generated variant: source identity (`id` + `filename` + focal +
- * hotspot) plus the transform params and resolved format. Keyed on `filename`, not `updatedAt`,
- * to match exactly what `purgeStaleVariantsAfterChange` triggers on — a metadata-only edit keeps
- * the stored variants valid, and keys go stale in lockstep with the purge hook.
- */
 import { createHash } from 'node:crypto'
 
 import type { CacheKeyDoc, ParsedParams } from '../../types'

@@ -36,7 +36,6 @@ const schema = {
   globals: [{ slug: 'header', fields: [{ name: 'logo', type: 'upload', relationTo: 'media' }] }],
 }
 
-/** A Payload-shaped stub handle — the helpers only touch `.config`. */
 const handleWith = (config: Record<string, unknown>): Payload => ({ config }) as unknown as Payload
 
 const handle = handleWith({ ...schema, custom: { payloadRevalidate: marker } })

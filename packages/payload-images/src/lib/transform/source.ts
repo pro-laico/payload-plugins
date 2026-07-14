@@ -1,16 +1,11 @@
-/**
- * Read the raw bytes of an upload doc — local disk, the storage adapter's handlers, or a URL
- * fetch — with a path-traversal guard on the local read and an SSRF guard on the remote fetch.
- */
-import fs from 'node:fs/promises'
 import path from 'node:path'
+import fs from 'node:fs/promises'
 import { createLocalReq, type Payload } from 'payload'
 
 import type { UploadDocLike, UploadHandler } from '../../types'
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024
 
-/** True for hostnames in loopback / private / link-local space (the SSRF sinks). */
 const isPrivateHost = (hostname: string): boolean => {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
   if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '::1') return true
@@ -28,22 +23,13 @@ const isPrivateHost = (hostname: string): boolean => {
   return /^fe80:/i.test(h) || /^f[cd][0-9a-f]{2}:/i.test(h)
 }
 
-/** SSRF guard: always allow the configured server origin itself (self-fetching Payload's own
- *  static route must work, even on localhost in dev); otherwise refuse private hosts. */
 const isAllowedFetchTarget = (target: URL, trusted: URL | null): boolean => {
   if (trusted && target.host === trusted.host) return true
   return !isPrivateHost(target.hostname)
 }
 
-/**
- * Read the bytes through the collection's storage-adapter `upload.handlers` (Vercel Blob, S3, …)
- * — the same server-side path Payload's own file route takes after its access check, invoked
- * directly so it needs no origin, cookie, or open read access. (The self-fetch fallback can't
- * serve an access-controlled collection like `generated-images`: its unauthenticated request
- * 403s and every variant read becomes a cache miss.)
- */
 const readViaStorageHandlers = async (payload: Payload, slug: string, doc: UploadDocLike): Promise<Buffer | null> => {
-  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }> //EXCUSE: indexes the app's generated slug map by a runtime string; only the probed shape is claimed
+  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }> //TODO: replace `as` cast with proper typing
   const handlers = collections?.[slug]?.config?.upload?.handlers
   if (!handlers?.length || !doc.filename) return null
   try {
@@ -56,11 +42,6 @@ const readViaStorageHandlers = async (payload: Payload, slug: string, doc: Uploa
   return null
 }
 
-/**
- * Read an upload's bytes, in order: the local file under `staticDir`, the storage-adapter
- * handlers (pass `via`), the doc's absolute URL, or its relative URL resolved against `baseUrl`
- * (self-fetching Payload's static file route). Null when nothing yields bytes.
- */
 export const readBytes = async (
   doc: UploadDocLike,
   staticDir: string,
@@ -70,13 +51,11 @@ export const readBytes = async (
   if (doc.filename) {
     const base = path.resolve(staticDir)
     const filePath = path.resolve(base, doc.filename)
-    // Async read — a sync read of a multi-MB original blocks the event loop on the serving path.
-    // ENOENT falls through to the storage-adapter / URL branches (the original miss behavior).
     if (filePath === base || filePath.startsWith(base + path.sep)) {
       try {
         return await fs.readFile(filePath)
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err //TODO: replace `as` cast with proper typing
       }
     }
   }

@@ -1,19 +1,12 @@
-/**
- * Warm one source: load it + the profile registry + the already-generated cacheKeys, compute the
- * bounded target list, and generate each variant through the same engine the endpoint uses —
- * sequentially (the Sharp FIFO gate owns real concurrency; sequential keeps job memory flat),
- * with an awaited persist (no request to defer behind). Idempotent: a retry recomputes and only
- * redoes what's still missing.
- */
 import type { CollectionSlug, Payload } from 'payload'
-import { asSlug } from '../asSlug'
 
-import { getServerSideURL } from '../getServerSideURL'
-import { getOrCreateVariantBytes } from '../transform/getVariantBytes'
+import { asSlug } from '../asSlug'
 import { readBytes } from '../transform/source'
-import { resolveStaticDir } from '../transform/staticDir'
+import { getServerSideURL } from '../getServerSideURL'
 import { IMAGE_MIME_TYPES } from '../transform/params'
 import { computePrewarmTargets } from './computeTargets'
+import { resolveStaticDir } from '../transform/staticDir'
+import { getOrCreateVariantBytes } from '../transform/getVariantBytes'
 import type {
   OutputFormat,
   PrewarmSourceResult,
@@ -48,7 +41,7 @@ const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, 
       depth: 0,
     })
     for (const doc of res.docs) {
-      const key = (doc as { cacheKey?: unknown }).cacheKey //EXCUSE: docs of a runtime-configured collection are untyped; string-guarded below
+      const key = (doc as { cacheKey?: unknown }).cacheKey //TODO: replace `as` cast with proper typing
       if (typeof key === 'string' && key) keys.add(key)
     }
     if (!res.hasNextPage) break
@@ -63,13 +56,13 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   const profilesSlug = asSlug(deps.profilesSlug)
 
   const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, disableErrors: true })
-  const source = (raw ?? null) as SourceRow | null //EXCUSE: a doc of a runtime-configured collection is untyped; fields are null-guarded
+  const source = (raw ?? null) as SourceRow | null //TODO: replace `as` cast with proper typing
   if (!source || (!source.filename && !source.url)) return { targets: 0, generated: 0, failed: 0, skipped: 'missing' }
   if (typeof source.mimeType === 'string' && !IMAGE_MIME_TYPES.includes(source.mimeType))
     return { targets: 0, generated: 0, failed: 0, skipped: 'non-raster' }
 
   const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 }))
-    .docs as unknown as RenderProfileDoc[] //EXCUSE: docs of a runtime-configured collection are untyped; compute null-guards every field
+    .docs as unknown as RenderProfileDoc[] //TODO: replace `as` cast with proper typing
 
   const targets = computePrewarmTargets({
     source,
@@ -82,7 +75,6 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   })
 
   const base = payload.config.serverURL || getServerSideURL()
-  // Read the original ONCE for the whole job (default up to 24 variants) instead of per target.
   const originalBytes = targets.length
     ? ((await readBytes(source, resolveStaticDir(payload, sourceSlug), base, { payload, slug: deps.sourceSlug })) ?? undefined)
     : undefined

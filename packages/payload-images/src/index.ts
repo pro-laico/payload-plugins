@@ -15,13 +15,7 @@ export { RESPONSIVE_IMAGE_SELECT } from './lib/renderIntent'
 // The Sanity-style helper around it: seed once with the app's Payload handle, chain the render.
 export { createImageFor } from './lib/imageFor'
 export type { ImageFor, ImageForChain, ImageSource } from './types'
-export type {
-  AspectRatio,
-  BlurRenderIntent,
-  ImageRenderContext,
-  ImageRenderIntent,
-  ResponsiveImageDoc,
-} from './types'
+export type { AspectRatio, BlurRenderIntent, ImageRenderContext, ImageRenderIntent, ResponsiveImageDoc } from './types'
 export type { Fit, Format, OutputFormat } from './types'
 
 // The image doc's stored palette + the placeholder tier/answer-form unions the render contract uses.

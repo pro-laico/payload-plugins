@@ -3,16 +3,14 @@
 import type React from 'react'
 import { useEffect, useRef } from 'react'
 
+import type { HotspotOpts, ParsedBlurhash } from '../../../types'
 import { coverCropWindow } from '../../../lib/placeholders/window'
 import { projectCoefficients } from '../../../lib/placeholders/cropCoefficients'
 import { decodeToLinearGrid, linearToSrgb } from '../../../lib/placeholders/codec'
 import { BLURHASH_QUALITIES, type BlurhashQuality, WEBP_QUALITIES, type WebpQuality } from '../../../lib/placeholders/qualities'
-import type { HotspotOpts, ParsedBlurhash } from '../../../types'
 
 const canvasStyle: React.CSSProperties = { display: 'block', width: '100%', height: '100%' }
 
-/** Paints a focal-cropped blurhash: project the full hash onto the crop window at the tier's
- *  component count (pure math), decode a small grid, putImageData, let CSS scale it. */
 export const BlurhashTile: React.FC<{
   hash: ParsedBlurhash
   srcAr: number
@@ -51,9 +49,6 @@ export const BlurhashTile: React.FC<{
   return <canvas ref={canvasRef} style={canvasStyle} aria-label="placeholder preview" />
 }
 
-/** Paints a micro-webp tier the way the server serves it: render the crop window of the stored
- *  full-frame placeholder into exactly its output pixels and let CSS upscale, so the tile matches
- *  the real placeholder's resolution (including `withoutEnlargement` on small sources). */
 export const WebpTile: React.FC<{ src: string; srcAr: number; tileAr: number; hotspot: HotspotOpts; quality: WebpQuality }> = ({
   src,
   srcAr,

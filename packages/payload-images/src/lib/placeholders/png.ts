@@ -1,11 +1,7 @@
-/**
- * BlurHash → PNG `data:` URI in pure JS: decode to a small pixel grid and hand-assemble a
- * minimal PNG (8-bit RGB, filter 0, one zlib deflate). Server-only (node:zlib).
- */
 import { deflateSync } from 'node:zlib'
 
-import { decodeToLinearGrid, linearToSrgb, parseBlurhash } from './codec'
 import type { BlurhashPngOptions } from '../../types'
+import { decodeToLinearGrid, linearToSrgb, parseBlurhash } from './codec'
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
@@ -48,7 +44,6 @@ const rgbPng = (pixels: Uint8Array, width: number, height: number): Buffer => {
   return Buffer.concat([signature, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', new Uint8Array(0))])
 }
 
-/** Render a blurhash string to a `data:image/png;base64,…` URI. */
 export const blurhashToPngDataUri = (hash: string, opts: BlurhashPngOptions = {}): string => {
   const parsed = parseBlurhash(hash)
   const width = Math.max(1, Math.round(opts.width ?? 32))

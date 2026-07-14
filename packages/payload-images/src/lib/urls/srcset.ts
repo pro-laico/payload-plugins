@@ -1,14 +1,8 @@
-import { DEFAULT_PIXEL_STEP } from '../transform/params'
 import { deriveVersion } from './version'
 import { buildVariantUrl } from './variantUrl'
+import { DEFAULT_PIXEL_STEP } from '../transform/params'
 import type { BuildSrcsetOptions, BuildSrcsetResult, ImageResource } from '../../types'
 
-/**
- * The widths for a srcset. A numeric `pixelStep` yields every multiple up to the source's
- * intrinsic width, then the exact source width on top (so the srcset tops out at true native
- * resolution); an array is an explicit non-linear ladder, filtered below the source width with
- * the source width on top. Never exceeds the source (no upscaling) or `maxWidth`.
- */
 export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = DEFAULT_PIXEL_STEP, maxWidth = 4096): number[] => {
   const known = sourceWidth && sourceWidth > 0 ? Math.min(maxWidth, Math.round(sourceWidth)) : undefined
 
@@ -35,11 +29,6 @@ export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = 
   return widths
 }
 
-/**
- * A responsive `srcset` (widths up to the source's intrinsic width) + a default `src`, from an id
- * OR a populated doc — a doc also supplies the width cap and the cache-busting version token, so
- * `buildSrcset(doc, { aspectRatio: '16:9' })` is the whole call.
- */
 export const buildSrcset = (resource: ImageResource, o: BuildSrcsetOptions = {}): BuildSrcsetResult | null => {
   if (resource == null) return null
   const doc = typeof resource === 'object' ? resource : undefined

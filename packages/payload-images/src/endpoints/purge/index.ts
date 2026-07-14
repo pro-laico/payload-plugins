@@ -1,19 +1,14 @@
 import type { Endpoint, PayloadRequest } from 'payload'
-import { asSlug } from '../../lib/asSlug'
 
 import { routeId } from '../routeId'
-import { purgeVariantsForSource } from '../../hooks/collection/purgeVariantsForSource'
-import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
+import { asSlug } from '../../lib/asSlug'
 import type { PurgeEndpointConfig } from '../../types'
+import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
+import { purgeVariantsForSource } from '../../hooks/collection/purgeVariantsForSource'
 
-/**
- * POST `/img/purge/:id` — delete all generated variants of a source image. Requires a logged-in
- * user who can READ that source, so a user can't purge (and force costly regeneration of)
- * variants for images they can't even see.
- */
 export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => {
-  const variantSlug = cfg.variantSlug || GENERATED_IMAGES_SLUG
   const sourceSlug = asSlug(cfg.sourceSlug || 'images')
+  const variantSlug = cfg.variantSlug || GENERATED_IMAGES_SLUG
 
   return {
     path: '/img/purge/:id',

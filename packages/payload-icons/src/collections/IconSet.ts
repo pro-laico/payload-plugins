@@ -1,33 +1,25 @@
 import type { CollectionConfig, CollectionSlug, TextField, UIField } from 'payload'
 
-import { enforceSingleActive } from '../hooks/collection/enforceSingleActive'
-import { kebabCaseName } from '../hooks/field/kebabCaseName'
-import { activeField } from '../lib/activeField'
-import { authd } from '../access/authenticated'
 import { mergeHooks } from '../lib/mergeHooks'
-import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
+import { authd } from '../access/authenticated'
+import { activeField } from '../lib/activeField'
 import type { IconSetCollectionOverrides } from '../types'
+import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
+import { kebabCaseName } from '../hooks/field/kebabCaseName'
+import { enforceSingleActive } from '../hooks/collection/enforceSingleActive'
 
-/** The default slug for the icon-set collection. */
+const d = {
+  iconRowName: 'The name the frontend looks the icon up by (auto kebab-cased).',
+}
+
 export const ICON_SET_SLUG = 'iconSet'
 
-/** Admin import-map path for the IconSet "requested icons" usage panel. */
 const IconUsagePanelPath = '@pro-laico/payload-icons/admin/iconUsagePanel'
 
-/** Admin import-map path for the per-row label inside `iconsArray`. */
 const IconRowLabelPath = '@pro-laico/payload-icons/admin/iconRowLabel'
 
-/** Inline title field so the collection has no template dependency. */
 const titleField = (defaultValue = 'New Icon Set'): TextField => ({ name: 'title', type: 'text', required: true, unique: true, defaultValue })
 
-/**
- * Builds the `iconSet` collection — a named `name → icon` mapping with a
- * single-active toggle; the frontend renders the active set.
- *
- * `iconSlug` and `usagePanel` are wired by the plugin (from the icon collection's
- * slug and the top-level `usagePanel` option); they aren't part of the public
- * override surface.
- */
 export const createIconSetCollection = (
   opts: IconSetCollectionOverrides & { iconSlug?: string; usagePanel?: boolean } = {},
 ): CollectionConfig => {
@@ -43,18 +35,12 @@ export const createIconSetCollection = (
     drafts = true,
   } = opts
 
-  // The "Requested icons" panel — a server UI field that scans usage (live in dev,
-  // manifest in prod) and diffs it against this set's icons. Config-free: the panel
-  // uses its defaults (ICON_USAGE_MANIFEST env for the manifest path in prod).
   const usageField: UIField[] = usagePanel ? [{ name: 'iconUsage', type: 'ui', admin: { components: { Field: IconUsagePanelPath } } }] : []
 
   return {
     slug,
     labels: { singular: 'Icon Set', plural: 'Icon Sets' },
     access: { create: authd, delete: authd, read: authd, update: authd },
-    // Data-only marker for @pro-laico/payload-revalidate (no dependency): its hooks bust
-    // the shared icons tag on every published set write — activating a set, editing its
-    // iconsArray, publishing — matching the tag `getIconSvg` applies.
     custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },
     admin: {
       group,
@@ -62,7 +48,9 @@ export const createIconSetCollection = (
       useAsTitle: 'title',
       defaultColumns: ['title', 'active', '_status'],
       ...(livePreviewUrl && {
+        //TODO: replace `as` cast with proper typing
         preview: (data, { req }) => livePreviewUrl({ data: data as Record<string, unknown>, req }),
+        //TODO: replace `as` cast with proper typing
         livePreview: { url: ({ data, req }) => livePreviewUrl({ data: data as Record<string, unknown>, req }) },
       }),
     },
@@ -88,18 +76,13 @@ export const createIconSetCollection = (
                         name: 'name',
                         type: 'text',
                         required: true,
-                        // Normalize to kebab-case so the typed name matches `<Icon name>`.
                         hooks: { beforeValidate: [kebabCaseName] },
-                        admin: {
-                          width: '25%',
-                          description: 'The name the frontend looks the icon up by (auto kebab-cased).',
-                          style: { maxWidth: '350px' },
-                        },
+                        admin: { width: '25%', description: d.iconRowName, style: { maxWidth: '350px' } },
                       },
                       {
                         name: 'icon',
                         type: 'upload',
-                        relationTo: iconSlug as CollectionSlug,
+                        relationTo: iconSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
                         displayPreview: false,
                         admin: { allowCreate: false, width: '75%', description: 'Select an icon.', style: { maxWidth: '350px' } },
                       },

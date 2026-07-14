@@ -1,15 +1,10 @@
 import type { Endpoint } from 'payload'
-import { runSeed } from '../engine/run'
-import { SeedRunError, SeedValidationError } from '../engine/validate'
-import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
-import type { ResolvedSeedOptions } from '../types'
 
-/**
- * Builds `POST /api/seed`. Gated by the `ENABLE_SEED` runtime guard and requires an
- * authenticated user (any user — not necessarily an admin). Each write sets
- * `context.disableRevalidate`, so app revalidate hooks skip during the run; the engine
- * does no final revalidation.
- */
+import { runSeed } from '../engine/run'
+import type { ResolvedSeedOptions } from '../types'
+import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
+import { SeedRunError, SeedValidationError } from '../engine/validate'
+
 export function createSeedEndpoint(options: ResolvedSeedOptions): Endpoint {
   return {
     path: '/seed',

@@ -1,11 +1,5 @@
-/** The live-inspection shape payload-revalidate stashes on its shared symbol slot
- *  (structural — no import; the server view reads the slot and passes plain data in). */
 export type RevalidateInspection = {
-  graph: {
-    collections: string[]
-    globals: string[]
-    edges: { from: string; to: string; via: string; kind: string; polymorphic?: boolean }[]
-  }
+  graph: { collections: string[]; globals: string[]; edges: { from: string; to: string; via: string; kind: string; polymorphic?: boolean }[] }
   prefix: string
   observing: boolean
   rules: { on: string; bust: string[]; whenFields?: string[] }[]

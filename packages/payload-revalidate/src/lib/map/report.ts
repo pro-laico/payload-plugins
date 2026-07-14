@@ -4,7 +4,6 @@ import type { ReferenceEdge, RenderMapOptions, RevalidateInspection } from '../.
 const code = (s: string): string => `\`${s}\``
 const list = (xs: string[]): string => (xs.length ? xs.map(code).join(', ') : '—')
 
-/** Group edges by an accessor (`from` or `to`) into slug → edges. */
 const groupBy = (edges: ReferenceEdge[], key: 'from' | 'to'): Map<string, ReferenceEdge[]> => {
   const out = new Map<string, ReferenceEdge[]>()
   for (const edge of edges) {
@@ -16,7 +15,6 @@ const groupBy = (edges: ReferenceEdge[], key: 'from' | 'to'): Map<string, Refere
   return out
 }
 
-/** One `via (kind)` phrase per target, deduped, for the embed/embedded-by lines. */
 const edgePhrase = (edges: ReferenceEdge[], nameKey: 'from' | 'to'): string[] =>
   [...groupBy(edges, nameKey)]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -25,29 +23,17 @@ const edgePhrase = (edges: ReferenceEdge[], nameKey: 'from' | 'to'): string[] =>
         `${code(name)} via ${es.map((e) => code(e.via === '' ? '(root)' : e.via)).join(', ')} (${[...new Set(es.map((e) => e.kind))].join('/')})`,
     )
 
-/**
- * Render a {@link RevalidateInspection} — the exact shape the plugin stashes and the
- * `GET /api/revalidate-map` endpoint returns — as a self-contained Markdown document: the
- * "what revalidates what" map an AI or developer can read to understand a project's cache
- * dependency structure without booting the app or opening the dev-tools view.
- *
- * Works on both the static inspection {@link buildStaticInspection} derives from a config
- * AND a live inspection with observed reads/events (pipe `curl …/api/revalidate-map` in) —
- * the live-only sections just render when present.
- */
 export function renderRevalidateMap(inspection: RevalidateInspection, opts: RenderMapOptions = {}): string {
   const { graph, prefix, observing, rules, settings, reads, events } = inspection
-  // Local builders bound to the inspection's own prefix, so examples below carry the same
-  // namespace the app's hooks and `./cache` helpers apply.
-  const tags = createTags(prefix)
-  const live = opts.live ?? true
-  const slugs = Object.keys(settings).sort()
-  const optedOut = graph.collections.filter((slug) => !settings[slug]).sort()
-  const byFrom = groupBy(graph.edges, 'from')
-  const byTo = groupBy(graph.edges, 'to')
-  const sample = slugs[0] ?? graph.collections.find((s) => settings[s]) ?? 'posts'
   const lines: string[] = []
+  const live = opts.live ?? true
+  const tags = createTags(prefix)
+  const byTo = groupBy(graph.edges, 'to')
+  const slugs = Object.keys(settings).sort()
+  const byFrom = groupBy(graph.edges, 'from')
   const w = (s = ''): void => void lines.push(s)
+  const optedOut = graph.collections.filter((slug) => !settings[slug]).sort()
+  const sample = slugs[0] ?? graph.collections.find((s) => settings[s]) ?? 'posts'
 
   w(`# Revalidation map${prefix ? ` — namespace \`${prefix}\`` : ''}`)
   w()
@@ -67,8 +53,11 @@ export function renderRevalidateMap(inspection: RevalidateInspection, opts: Rend
 
   w('## Tag vocabulary')
   w()
-  if (prefix) w(`Every tag is prefixed with \`${prefix}:\`. Examples below use \`${sample}\`.`)
-  else w(`Examples below use \`${sample}\`.`)
+  if (prefix) {
+    w(`Every tag is prefixed with \`${prefix}:\`. Examples below use \`${sample}\`.`)
+  } else {
+    w(`Examples below use \`${sample}\`.`)
+  }
   w()
   w('| Tag | Example | Busted when |')
   w('| --- | --- | --- |')

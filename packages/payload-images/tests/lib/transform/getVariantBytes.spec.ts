@@ -24,7 +24,7 @@ const fakePayload = () => {
     return {}
   })
   const logger = { warn: vi.fn(), info: vi.fn(), error: vi.fn() }
-  const payload = { find, create, logger } as unknown as Payload //EXCUSE: test double — only the members the engine touches
+  const payload = { find, create, logger } as unknown as Payload
   return { payload, create, wasPersisted: () => createResolved }
 }
 

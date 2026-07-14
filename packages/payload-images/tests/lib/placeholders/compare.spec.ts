@@ -1,10 +1,3 @@
-/**
- * Method comparison: crop-by-resample (1) vs crop-by-coefficient-projection (2).
- *
- * Accuracy — both cropped hashes are decoded and RMSE'd (sRGB units, 0–255) against the
- * ground truth: the original hash's cosine series evaluated over the crop window (the
- * exact restricted blur). Performance — µs/op over warm loops, logged as a table.
- */
 import { describe, expect, it } from 'vitest'
 
 import { decodeToLinearGrid, encodeCoefficients, encodeLinearGrid, linearToSrgb, parseBlurhash } from '../../../src/lib/placeholders/codec'
@@ -13,7 +6,6 @@ import { cropBlurhashCoefficients } from '../../../src/lib/placeholders/cropCoef
 import { cropBlurhashResample } from '../../../src/lib/placeholders/cropResample'
 import { coverCropWindow } from '../../../src/lib/placeholders/window'
 
-/** Synthetic photo-ish source: smooth gradients + two colored blobs (linear RGB). */
 const syntheticGrid = (width: number, height: number): LinearGrid =>
   Array.from({ length: height }, (_, t) =>
     Array.from({ length: width }, (_, s) => {

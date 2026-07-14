@@ -1,9 +1,3 @@
-/**
- * The stored hotspot/crop fields — the non-destructive art-direction layers the focal preview
- * edits and the transform pipeline consumes (model in transform/geometry.ts). Hidden: the custom
- * component IS their UI. Deliberately NOT Payload's built-in "Edit image" crop, which rewrites
- * the uploaded file — these only shape what the endpoint renders.
- */
 import type { NumberField } from 'payload'
 
 const d = {

@@ -1,24 +1,8 @@
 import type { Field, Where } from 'payload'
 
-import type { JoinMembership } from '../../types'
 import { isId } from '../values'
+import type { JoinMembership } from '../../types'
 
-/**
- * Join membership: the write-side companion to the read side's `{child}:join:{on}:{parentId}`
- * tag. A `join` field on a PARENT collection (`category` renders "all my posts") is a live
- * query, not a stored reference — so its membership moves when a CHILD (`posts`) is
- * created, deleted, or reassigned, with none of the current members changing. The atomic
- * "ids are stable, skip them" rule doesn't hold for a join: the list *is* the content, and
- * there is no stable id to key freshness on.
- *
- * This module indexes joins by the CHILD collection (the joined side, `field.collection`) —
- * the collection whose writes move a parent's membership — so the per-collection write hook
- * can answer "which parent joins does a `posts` write touch?" and bust exactly the affected
- * parents' tags. Surgical: a post created in category A busts A's join entry, not B's.
- */
-
-/** The field paths a Payload `where` filters on — its query keys, minus the `and`/`or`
- *  combinators (whose values are nested clause arrays, recursed into). */
 export const whereFields = (where: Where | undefined): string[] => {
   const out = new Set<string>()
   const walk = (node: unknown): void => {
@@ -35,16 +19,8 @@ export const whereFields = (where: Where | undefined): string[] => {
   return [...out]
 }
 
-/**
- * Scan every collection's fields for `join` fields and index them by child collection.
- * Multiple parents joining the same child on the same field collapse to one rule (their
- * `where` determinants unioned) — the membership tag is keyed by (child, on, parentId), so
- * it's host-agnostic and a single tag serves every parent that reads the join. Descends the
- * same containers as the reference graph; joins can't live in a document's leaf value, so
- * only structural nesting is walked.
- */
 export const collectJoinMembership = (collections: { slug: string; fields: Field[] }[] | undefined): Record<string, JoinMembership[]> => {
-  const index = new Map<string, Map<string, Set<string>>>() // child -> on -> determinant fields
+  const index = new Map<string, Map<string, Set<string>>>()
   const add = (child: string, on: string, determinants: string[]): void => {
     let byOn = index.get(child)
     if (!byOn) {
@@ -87,13 +63,6 @@ export const collectJoinMembership = (collections: { slug: string; fields: Field
   return Object.fromEntries([...index].map(([child, byOn]) => [child, [...byOn].map(([on, set]) => ({ on, determinants: [...set] }))]))
 }
 
-/**
- * The parent id(s) a child doc's `on` field points at — the parents whose join membership
- * this child belongs to. Absorbs every shape the value arrives in: raw id (depth-0
- * `previousDoc`), populated doc (`{ id }`, request-depth `doc`), polymorphic wrapper
- * (`{ relationTo, value }`), and `hasMany` arrays of any of those. Dotted `on` paths (a
- * relationship nested in a group) are resolved, stopping at the first array.
- */
 export const extractOnValues = (data: unknown, on: string): (string | number)[] => {
   let current: unknown = data
   for (const key of on.split('.')) {
@@ -102,7 +71,7 @@ export const extractOnValues = (data: unknown, on: string): (string | number)[] 
       current = undefined
       break
     }
-    current = (current as Record<string, unknown>)[key]
+    current = (current as Record<string, unknown>)[key] //TODO: replace `as` cast with proper typing
   }
   const out: (string | number)[] = []
   const push = (value: unknown): void => {
@@ -110,7 +79,7 @@ export const extractOnValues = (data: unknown, on: string): (string | number)[] 
     if (isId(value)) {
       out.push(value)
     } else if (typeof value === 'object') {
-      const record = value as Record<string, unknown>
+      const record = value as Record<string, unknown> //TODO: replace `as` cast with proper typing
       if ('relationTo' in record && 'value' in record) push(record.value)
       else if (isId(record.id)) out.push(record.id)
     }

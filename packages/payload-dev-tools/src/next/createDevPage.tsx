@@ -1,35 +1,15 @@
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { STAGE_COOKIE } from '../cookies'
-import { parseStage } from '../harness'
-import { buildDevSnapshot } from '../lib/snapshot'
-import type { CreateDevPageOptions, DevPageProps, DevSnapshot, Test } from '../types'
-import { SeedCard } from './client'
-import { PDTP_CSS } from './pageStyles'
-import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './views'
+import { notFound } from 'next/navigation'
 
-/**
- * The `/dev` pages — real routes inside your app, one drop-in file:
- *
- *   // app/(frontend)/dev/[[...view]]/page.tsx
- *   import config from '@payload-config'
- *   import { getPayload } from 'payload'
- *   import { createDevPage } from '@pro-laico/payload-dev-tools/next'
- *   import { devTests } from '@/dev/tests'
- *   export const dynamic = 'force-dynamic'
- *   export default createDevPage({ payload: getPayload({ config }), tests: devTests })
- *
- * Views: `/dev` (overview + seed controls), `/dev/icons` (grid + active-set switcher),
- * `/dev/fonts` (specimens in the real served fonts), `/dev/images`, `/dev/mux`, and
- * `/dev/tests/<key>` (one page per test; the shown version is toggled from the toolbar). The
- * pages render content only — navigation lives in the `<DevToolbar>`, which stays open while you
- * browse between them. Because the file lives in your `(frontend)` group, everything inherits
- * your layout — header, fonts, globals — which is the point: visual confirmation happens in the
- * app, not a facsimile of it. The pages run on the `payload` handle you pass — your app's one
- * live session; package code never resolves Payload itself. Your own labs coexist: a static
- * route like `app/(frontend)/dev/blocks/page.tsx` always beats this catch-all.
- */
+import { SeedCard } from './client'
+import { parseStage } from '../harness'
+import { PDTP_CSS } from './pageStyles'
+import { STAGE_COOKIE } from '../cookies'
+import { buildDevSnapshot } from '../lib/snapshot'
+import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './views'
+import type { CreateDevPageOptions, DevPageProps, DevSnapshot, Test } from '../types'
+
 export function createDevPage(options: CreateDevPageOptions) {
   const { tests = [], enabled } = options
 
@@ -99,10 +79,8 @@ export function createDevPage(options: CreateDevPageOptions) {
   }
 }
 
-/** Content chrome only — heading + env line. Navigation is the toolbar's job. */
 const Shell = ({ snapshot, title, children }: { snapshot: DevSnapshot; title: string; children: ReactNode }) => (
   <div className="pdtp">
-    {/* dangerouslySetInnerHTML: our own static CSS — React would escape selector characters as a text child */}
     <style dangerouslySetInnerHTML={{ __html: PDTP_CSS }} />
     <div className="pdtp-container">
       <div className="pdtp-head">
@@ -182,11 +160,6 @@ const TestsIndex = ({ tests }: { tests: Test[] }) => (
   </>
 )
 
-/** One page per test. The shown version comes from the toolbar's selection cookie (defaulting to
- *  the first version) and renders inside your real frontend layout with NO extra chrome — the
- *  toolbar's Tests view names what you're looking at. The `display: contents` wrapper is
- *  layout-invisible; it exists only so screenshot tooling can assert `data-pdt-test` /
- *  `data-pdt-version`. */
 const TestPage = async ({ tests, testKey }: { tests: Test[]; testKey: string }) => {
   const test = tests.find((t) => t.key === testKey)
   if (!test) notFound()

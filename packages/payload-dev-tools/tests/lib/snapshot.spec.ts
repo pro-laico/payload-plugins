@@ -2,7 +2,6 @@ import type { Payload } from 'payload'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildDevSnapshot } from '../../src/lib/snapshot'
 
-/** A minimal fake Payload: counts come from `docs`, finds/findGlobal from the provided maps. */
 const fakePayload = ({
   custom = {},
   collections = [] as { slug: string; custom?: Record<string, unknown> }[],

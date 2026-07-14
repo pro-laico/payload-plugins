@@ -1,12 +1,7 @@
-/**
- * `<ResponsiveImage>` — a single plain `<img>` painting exactly what the read delivered: the
- * doc's `src`/`srcset` virtuals and its `placeholder` painted behind it while it loads.
- * Passive and sync: fetches nothing, never touches Payload, server- and client-tree safe.
- */
 import type { CSSProperties, ReactElement } from 'react'
 
-import { parseAspectRatio } from '../lib/transform/params'
 import type { Fit, ResponsiveImageProps } from '../types'
+import { parseAspectRatio } from '../lib/transform/params'
 
 export type { ImageProps, ResponsiveImageProps } from '../types'
 
@@ -40,8 +35,6 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
 
   const cssAr = parseAspectRatio(aspectRatio)
   const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
-  // A raw blurhash (an undeclared read's placeholder) is not paintable — url(<hash>) would fire
-  // a garbage request. Paint only actual URIs.
   const bg = placeholder && /^(data:|https?:|\/)/.test(placeholder) ? placeholder : undefined
 
   return (

@@ -1,19 +1,12 @@
 import type { CollectionConfig } from 'payload'
-import { asSlug } from '../lib/asSlug'
 
 import { authd } from '../access'
+import { asSlug } from '../lib/asSlug'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
 import type { CreateGeneratedImagesOptions } from '../types'
 
 export const GENERATED_IMAGES_SLUG = 'generated-images'
 
-/**
- * The hidden, durable cache of on-demand image variants — one upload doc per (source, settings,
- * focal) combination. An UPLOAD collection so variant bytes flow through whatever storage adapter
- * is configured; with cloud storage, register it with a SERVER-upload instance (the endpoint
- * creates docs via the Local API). Carries NO revalidation hooks on purpose: variants are derived
- * and disposable, so busting cache tags on every cache-miss create would be pure churn.
- */
 export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptions = {}): CollectionConfig => {
   const slug = opts.slug || GENERATED_IMAGES_SLUG
   const sourceSlug = asSlug(opts.sourceSlug || 'images')

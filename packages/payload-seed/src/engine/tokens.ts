@@ -1,10 +1,8 @@
-import { type AnyRef, isAnyToken, isRef, type Ref } from '../refs'
 import type { ResolveContext } from '../types'
+import { type AnyRef, isAnyToken, isRef, type Ref } from '../refs'
 
-/** The map key for a seeded doc node: `collection:_key`. */
 export const docNodeId = (collection: string, key: string): string => `${collection}:${key}`
 
-/** Walk a seed-data value and collect every ref token it contains (drives the dependency graph). */
 export function collectTokens(value: unknown, out: AnyRef[] = []): AnyRef[] {
   if (isRef(value)) {
     out.push(value)
@@ -18,12 +16,9 @@ export function collectTokens(value: unknown, out: AnyRef[] = []): AnyRef[] {
   return out
 }
 
-/** Deep-clone a seed-data value, replacing every ref token with its resolved id. Throws a
- *  contextual error if a ref can't be resolved (should be impossible after validation +
- *  topo-sort, but guards against engine bugs). */
 export function resolveTokens(value: unknown, ctx: ResolveContext): unknown {
   if (isRef(value)) return resolveRef(value, ctx)
-  if (isAnyToken(value)) return value // any non-ref token passes through untouched
+  if (isAnyToken(value)) return value
   if (Array.isArray(value)) return value.map((item) => resolveTokens(item, ctx))
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}

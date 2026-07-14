@@ -1,2 +1,2 @@
-export type * from './referenceGraph'
 export type * from './schemaIndex'
+export type * from './referenceGraph'

@@ -1,9 +1,3 @@
-/**
- * Virtual (computed, never stored) render fields, built by afterRead hooks (hooks/field/virtualUrls)
- * from the doc's own fields — so optimized URLs ride along in EVERY read (REST, GraphQL, Local API)
- * and through relationship population. A read that declares its render (`context.image`) gets
- * src/srcset built for exactly that render; an undeclared read gets natural-ratio defaults.
- */
 import type { NumberField, TextField } from 'payload'
 
 import {
@@ -24,7 +18,6 @@ const d = {
   thumbnailURL: 'Small focal-cropped square (160px) for cards, lists, and feeds.',
 }
 
-/** Fields the virtual URLs are computed from — kept selected via the collection's `forceSelect`. */
 export const VIRTUAL_URL_INPUTS = [
   'width',
   'height',

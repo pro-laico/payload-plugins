@@ -1,4 +1,3 @@
-/** Parsed `payload-icons-scan` command-line arguments. */
 export interface ParsedArgs {
   roots: string[]
   out?: string

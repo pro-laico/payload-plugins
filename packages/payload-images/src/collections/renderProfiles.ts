@@ -10,13 +10,6 @@ const d = {
   hitCount: 'Approximate total serves (flushed from per-process buffers, throttled).',
 }
 
-/**
- * The prewarm registry — one doc per render profile the transform endpoint has actually served
- * (ground truth: browser-chosen widths, real fit/quality/format). Written only by the endpoint's
- * buffered recorder; read by the prewarm job/CLI to decide which variants a new or changed image
- * should get ahead of its first request. Small by construction: the endpoint's snap grid and
- * quality buckets bound the distinct-profile space, and stale profiles stop being warmed (TTL).
- */
 export const createRenderProfilesCollection = (opts: { slug?: string } = {}): CollectionConfig => ({
   slug: opts.slug || IMAGE_RENDER_PROFILES_SLUG,
   access: { create: authd, delete: authd, read: authd, update: authd },

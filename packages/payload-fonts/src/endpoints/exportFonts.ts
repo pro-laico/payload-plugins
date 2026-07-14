@@ -1,7 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
-
 import type { CollectionSlug, Endpoint, GlobalSlug } from 'payload'
 
+import { refId } from '../lib/refs'
+import { readUploadBytes } from '../lib/uploadBytes'
+import { DEFAULT_FONT_FAMILIES } from '../lib/families'
 import type {
   ExportedFont,
   ExportFamilyDiagnostics,
@@ -11,28 +13,15 @@ import type {
   FontSelection,
   TypefaceRef,
 } from '../types'
-import { refId } from '../lib/refs'
-import { DEFAULT_FONT_FAMILIES } from '../lib/families'
-import { readUploadBytes } from '../lib/uploadBytes'
 
 const DEFAULT_FAMILY_KEYS: Family[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
 
-/**
- * Constant-time secret compare. Both sides are sha256-hashed to a fixed 32 bytes first, so the
- * comparison is constant-time regardless of length.
- */
 function secretsMatch(provided: string, secret: string): boolean {
   const a = createHash('sha256').update(provided).digest()
   const b = createHash('sha256').update(secret).digest()
   return timingSafeEqual(a, b)
 }
 
-/**
- * `GET /api/fonts/export`. Resolves the active fonts from the `fontSet` global — each family
- * points at ONE `font` typeface — and returns the bytes of that typeface's served
- * `fontOptimized` files so the `payload-fonts-download` CLI can write them for
- * `next/font/local`. Secured by the project's `PAYLOAD_SECRET` (Bearer).
- */
 export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endpoint => {
   const {
     path: endpointPath = '/fonts/export',
@@ -47,39 +36,27 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
     handler: async (req) => {
       const { payload } = req
 
-      // Compare against the RAW PAYLOAD_SECRET (what the caller sends).
       const secret = process.env.PAYLOAD_SECRET || ''
       const provided = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-      if (!secret || !provided || !secretsMatch(provided, secret)) {
-        return Response.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+      if (!secret || !provided || !secretsMatch(provided, secret)) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-      // Read the active selection from the `fontSet` global. The shared secret is the trust
-      // boundary → local-API default access override is fine.
       let selection: FontSelection | undefined
       try {
         const fontSetGlobal = (await payload.findGlobal({
-          slug: fontSetGlobalSlug as GlobalSlug,
-          // depth 1 populates each slot's typeface (defaultPopulate: title/family), so the
-          // diagnostics can name the selected typeface.
+          slug: fontSetGlobalSlug as GlobalSlug, //TODO: replace `as` cast with proper typing
           depth: 1,
-          // `as unknown as` — in a project with generated types this resolves to the concrete
-          // fontSet interface, which doesn't structurally overlap a string-keyed record.
-        })) as unknown as FontSelection
+        })) as unknown as FontSelection //TODO: replace `as` cast with proper typing
         selection = Object.fromEntries(families.map((family) => [family, fontSetGlobal?.[family]]))
-      } catch {
-        // no fontSet global in this project
-      }
+      } catch {}
 
       const fonts: Partial<Record<Family, ExportedFont[]>> = {}
       const diagnostics: Partial<Record<Family, ExportFamilyDiagnostics>> = Object.fromEntries(
         families.map((family) => [family, { selected: false, optimizedFiles: 0, readFailures: 0 }]),
       )
       if (selection) {
-        // One typeface per family (tolerate a stray array — take the first); fetch every family's
-        // served files in a single query grouped by typeface, rather than one round-trip per family.
         const familyIds = families
           .map((family) => {
+            //TODO: replace `as` cast with proper typing
             const ref = (Array.isArray(selection[family]) ? (selection[family] as TypefaceRef[])[0] : selection[family]) ?? null
             const title = ref && typeof ref === 'object' && typeof ref.title === 'string' ? ref.title : undefined
             return { family, id: refId(ref), title }
@@ -91,12 +68,13 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           const uniqueIds = [...new Set(familyIds.map((r) => r.id))]
           try {
             const res = await payload.find({
-              collection: fontOptimizedSlug as CollectionSlug,
+              collection: fontOptimizedSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
               where: { font: { in: uniqueIds } },
               depth: 0,
               limit: 1000,
             })
             for (const doc of res.docs as unknown as Array<Record<string, unknown>>) {
+              //TODO: replace `as` cast with proper typing
               const fontId = refId(doc.font)
               if (fontId == null) continue
               const bucket = docsByFont.get(fontId)
@@ -104,7 +82,6 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
               else docsByFont.set(fontId, [doc])
             }
           } catch (err) {
-            // leave docsByFont empty — the response just carries no fonts
             payload.logger.warn({ msg: `[payload-fonts] export: could not query ${fontOptimizedSlug}`, err })
           }
         }
@@ -113,12 +90,11 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
           const docs = docsByFont.get(id) ?? []
           const diag = { selected: true, typeface: title, optimizedFiles: docs.length, readFailures: 0 }
           diagnostics[family] = diag
-          // An explicit italic file always wins over synthesizing italics from an ital-capable
-          // upright — same rule as `expandItalCapableFaces` on the runtime CSS path.
           const hasExplicitItalic = docs.some((doc) => doc.style === 'italic')
           const exported: ExportedFont[] = []
           for (const doc of docs) {
             const filename = typeof doc.filename === 'string' ? doc.filename : null
+            //TODO: replace `as` cast with proper typing
             const bytes = filename
               ? await readUploadBytes(payload, fontOptimizedSlug, doc as { filename?: string | null; url?: string | null })
               : null
@@ -129,10 +105,10 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
             const entry: ExportedFont = {
               filename,
               extension: filename.split('.').pop()?.toLowerCase() || 'woff2',
-              mimeType: (doc.mimeType as string) ?? null,
+              mimeType: (doc.mimeType as string) ?? null, //TODO: replace `as` cast with proper typing
               data: bytes.toString('base64'),
-              weight: (doc.weight as string) ?? null,
-              style: (doc.style as string) ?? null,
+              weight: (doc.weight as string) ?? null, //TODO: replace `as` cast with proper typing
+              style: (doc.style as string) ?? null, //TODO: replace `as` cast with proper typing
             }
             exported.push(entry)
             if (doc.style !== 'italic' && doc.italCapable && !hasExplicitItalic) {
@@ -143,7 +119,6 @@ export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endp
         }
       }
 
-      // no-store: the response carries font bytes behind auth.
       return Response.json({ fonts, diagnostics } satisfies ExportFontsResponse, { headers: { 'Cache-Control': 'no-store' } })
     },
   }

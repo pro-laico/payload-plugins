@@ -1,4 +1,3 @@
-/** Source-identity fields that determine the rendered pixels (independent of size/quality). */
 export interface VersionSource {
   filename?: string | null
   focalX?: number | null

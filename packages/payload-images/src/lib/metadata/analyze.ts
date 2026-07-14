@@ -1,19 +1,12 @@
-/**
- * Upload-time image analysis — the ONE place pixels meet metadata. A single Sharp decode to a
- * tiny raw grid feeds every derived value: the placeholder tiers, the color palette, the alpha
- * flags, and a saliency-based focal suggestion. Shared by the upload hook and the
- * `payload images:backfill` command.
- */
 import type { Sharp } from 'sharp'
 
 import { buildPalette } from './palette'
 import { loadSharp } from '../transform/sharpInstance'
+import type { ImageMetadataAnalysis, LinearGrid } from '../../types'
 import { encodeWebpPlaceholder } from '../placeholders/webpPlaceholder'
 import { encodeCoefficients, encodeLinearGrid, srgbToLinear } from '../placeholders/codec'
 import { BLURHASH_QUALITIES, BLURHASH_TIERS, blurhashFieldName, WEBP_QUALITIES, WEBP_TIERS, webpFieldName } from '../placeholders/qualities'
-import type { ImageMetadataAnalysis, LinearGrid } from '../../types'
 
-/** Longest sampling edge for the raw grid — out-resolves the largest hash tier's 9 components. */
 const SAMPLE_EDGE = 64
 
 export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataAnalysis> => {
@@ -55,12 +48,6 @@ export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataA
   }
 }
 
-/**
- * Map Sharp's `attention` crop saliency center to focal percentages. The strategy only RUNS when
- * the resize actually crops, so the probe requests an extreme-aspect thumbnail, falling back to
- * the opposite aspect for sources extreme enough to make the first probe crop-free. Best-effort:
- * undefined when nothing is reported (older libvips) or anything fails.
- */
 const attentionFocal = async (pipeline: Sharp, dims: { w: number; h: number } | undefined): Promise<{ x: number; y: number } | undefined> => {
   if (!dims) return undefined
   const probe = async (tw: number, th: number): Promise<{ x: number; y: number } | undefined> => {
@@ -78,7 +65,6 @@ const attentionFocal = async (pipeline: Sharp, dims: { w: number; h: number } | 
   }
 }
 
-/** Post-EXIF-rotation source dims (orientations ≥ 5 swap the axes). */
 const sourceDims = (meta: { width?: number; height?: number; orientation?: number }): { w: number; h: number } | undefined => {
   if (!meta.width || !meta.height) return undefined
   const swapped = (meta.orientation ?? 1) >= 5

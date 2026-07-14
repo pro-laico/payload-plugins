@@ -1,44 +1,27 @@
-/**
- * Build-time icon-usage scan — the Node-side entry point. Walks a project's
- * source tree, extracts every literal `<Icon name="…">` (see {@link extractIconUsages}),
- * and aggregates the result into an {@link IconUsageManifest} that the admin
- * "requested icons" panel reads.
- *
- * Zero third-party dependencies: directory walking uses `node:fs` directly so
- * the package adds nothing to a consumer's install for this feature.
- */
-
-import { type Dirent, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { type Dirent, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 
 import { extractIconUsages } from './extract.js'
 import type { IconUsage, IconUsageManifest, ScanOptions, ScanResult } from '../types/index.js'
 
 export { extractIconUsages } from './extract.js'
 export type { ExtractedUsage, ExtractOptions, IconUsage, IconUsageManifest } from '../types/index.js'
-// Manifest path resolution + reading live in ./load (a bundler-safe leaf with no
-// runtime relative imports) so the admin panel can import them without pulling
-// in this CLI/parser module. Re-exported here to keep the `./scan` API in one place.
 export { DEFAULT_MANIFEST_FILENAME, loadIconUsageManifest, MANIFEST_PATH_ENV, resolveManifestPath } from './load.js'
 
-/** Root directories scanned by default. */
 export const DEFAULT_ROOTS = ['src', 'app']
 
-/** File extensions scanned by default — the JSX-bearing source formats. */
 export const DEFAULT_EXTENSIONS = ['tsx', 'jsx', 'ts', 'js', 'mdx']
 
-/** Directory names never descended into. */
 export const DEFAULT_IGNORE = ['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '.turbo']
 
 const toPosix = (p: string): string => p.split(sep).join('/')
 
-/** Recursively collects scannable file paths under `dir`. */
 const walk = (dir: string, exts: Set<string>, ignore: Set<string>, out: string[]): void => {
   let entries: Dirent[]
   try {
     entries = readdirSync(dir, { withFileTypes: true })
   } catch {
-    return // unreadable/non-existent root — skip silently, the caller reports totals
+    return
   }
   for (const entry of entries) {
     const full = join(dir, entry.name)
@@ -51,17 +34,6 @@ const walk = (dir: string, exts: Set<string>, ignore: Set<string>, out: string[]
   }
 }
 
-/**
- * Scans the project for literal icon usages and builds a manifest. Pure with
- * respect to output (writes nothing) — use {@link writeIconUsageManifest} to
- * persist the result.
- *
- * @example
- * ```ts
- * const { manifest } = scanIconUsages({ roots: ['src', 'app'] })
- * console.log(manifest.names) // ['arrow-right', 'chevron', 'x', …]
- * ```
- */
 export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
   const cwd = options.cwd ?? process.cwd()
   const roots = options.roots?.length ? options.roots : DEFAULT_ROOTS
@@ -76,7 +48,7 @@ export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
     try {
       stat = statSync(abs)
     } catch {
-      continue // missing root — skip; the caller checks `rootsScanned`
+      continue
     }
     rootsScanned++
     if (stat.isDirectory()) walk(abs, exts, ignore, files)
@@ -99,7 +71,6 @@ export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
     }
   }
 
-  // Deterministic ordering so the manifest is diff-stable across runs.
   usages.sort((a, b) => a.name.localeCompare(b.name) || a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column)
   const names = [...new Set(usages.map((u) => u.name))].sort((a, b) => a.localeCompare(b))
 
@@ -110,10 +81,6 @@ export const scanIconUsages = (options: ScanOptions = {}): ScanResult => {
   }
 }
 
-/**
- * Writes a manifest to disk as pretty-printed JSON (trailing newline). Returns
- * the absolute path written.
- */
 export const writeIconUsageManifest = (manifest: IconUsageManifest, path: string): string => {
   const abs = isAbsolute(path) ? path : resolve(process.cwd(), path)
   writeFileSync(abs, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')

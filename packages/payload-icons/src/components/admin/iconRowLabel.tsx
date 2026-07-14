@@ -2,11 +2,9 @@
 
 import { Pill, RowLabel, useRowLabel } from '@payloadcms/ui'
 
-import { toTitleCase } from '../../lib/titleCase'
 import type { IconRowData } from '../../types'
+import { toTitleCase } from '../../lib/titleCase'
 
-/** RowLabel for each `iconsArray` entry — shows the row number and the icon's
- *  Title-cased name (or an "Add Name" prompt for an empty row). */
 const IconRowLabel = () => {
   const { data, path, rowNumber } = useRowLabel<IconRowData>()
 

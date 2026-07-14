@@ -1,9 +1,3 @@
-/**
- * The `imagesPrewarm` Payload Jobs task — one job per source. Idempotent by construction: every
- * run recomputes the target list and subtracts already-generated cacheKeys, so retries and
- * duplicate jobs only redo what's missing. Partial failure returns success with counters
- * (retrying wouldn't fix a broken source); total failure throws so the retry policy applies.
- */
 import type { Payload } from 'payload'
 
 import { PREWARM_TASK_SLUG } from '../lib/prewarm/resolveOptions'
@@ -11,7 +5,6 @@ import { prewarmSource, type PrewarmSourceDeps } from '../lib/prewarm/prewarmSou
 
 export { PREWARM_TASK_SLUG }
 
-/** Structurally matches payload's TaskConfig (the plugin can't name its own slug in the app-generated TypedJobs union). */
 export interface PrewarmTaskConfig {
   slug: string
   label: string

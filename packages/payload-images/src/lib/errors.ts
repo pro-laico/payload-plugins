@@ -1,11 +1,6 @@
-/** Driver-agnostic classification of DB write failures the plugin treats as expected. */
-
 const errorCode = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'code' in e ? e.code : undefined)
 const errorCause = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'cause' in e ? e.cause : undefined)
 
-/** Unique-constraint violation on a create: two writers raced the same miss and the loser is
- *  expected, not noise. Arrives as a raw driver error, a wrapper whose `cause` carries the code,
- *  or Payload's ValidationError on the unique field — walk all three. */
 export const isDuplicateKeyError = (err: unknown, uniqueField = 'cacheKey'): boolean => {
   let e: unknown = err
   for (let depth = 0; depth < 4 && e; depth++) {
@@ -24,8 +19,6 @@ export const isDuplicateKeyError = (err: unknown, uniqueField = 'cacheKey'): boo
   })
 }
 
-/** Foreign-key violation on a create: the referenced doc was deleted while the write was in
- *  flight. Dropping the dependent row is correct. */
 export const isForeignKeyError = (err: unknown): boolean => {
   let e: unknown = err
   for (let depth = 0; depth < 4 && e; depth++) {

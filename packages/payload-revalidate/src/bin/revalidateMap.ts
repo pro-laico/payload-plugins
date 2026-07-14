@@ -1,19 +1,9 @@
 import { writeFileSync } from 'node:fs'
 import type { SanitizedConfig } from 'payload'
 
-import { buildStaticInspection } from '../lib/map/build'
 import { renderRevalidateMap } from '../lib/map/report'
+import { buildStaticInspection } from '../lib/map/build'
 
-/**
- * Payload custom-bin entry. `revalidatePlugin` registers this under `config.bin` as the
- * `revalidate-map` command, so `payload revalidate-map` prints the project's cache
- * dependency map — no per-project runner script, no server booted. Payload's CLI loads the
- * config and hands it here; the map is derived purely from it (graph + resolved settings +
- * rules), reading the plugin's own options back out of `config.custom.payloadRevalidate`.
- *
- *   payload revalidate-map > REVALIDATION.md   # Markdown (default) to a repo doc
- *   payload revalidate-map --json --out revalidate-map.json
- */
 export const script = async (config: SanitizedConfig): Promise<void> => {
   const argv = process.argv.slice(2)
   const json = argv.includes('--json')

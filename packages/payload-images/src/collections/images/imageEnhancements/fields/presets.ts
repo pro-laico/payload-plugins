@@ -1,8 +1,3 @@
-/**
- * The per-image `presets` array — guaranteed, cap-exempt, eagerly generated variants. Hidden:
- * the presetManager admin component IS its UI. Each entry is a config-template reference
- * (`template`) or a custom inline spec (`name` + dimensions/fit/quality/format).
- */
 import type { ArrayField } from 'payload'
 
 import { FITS, FORMATS } from '../../../../lib/transform/params'

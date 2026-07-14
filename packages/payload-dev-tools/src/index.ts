@@ -11,12 +11,4 @@ export type { Test, TestKind, TestMeta, TestVersion } from './types'
 export { STAGE_COOKIE } from './cookies'
 
 // Response shape of `GET /api/dev`, for typed consumers (scripts, agents, custom panels).
-export type {
-  CollectionCount,
-  DevSnapshot,
-  FontsSnapshot,
-  IconsSnapshot,
-  ImagesSnapshot,
-  MuxSnapshot,
-  SeedSnapshot,
-} from './types'
+export type { CollectionCount, DevSnapshot, FontsSnapshot, IconsSnapshot, ImagesSnapshot, MuxSnapshot, SeedSnapshot } from './types'

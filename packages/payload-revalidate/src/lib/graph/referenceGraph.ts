@@ -5,12 +5,6 @@ import type { GraphSource, ReferenceEdge, ReferenceGraph } from '../../types'
 const targets = (relationTo: string | string[]): { to: string[]; polymorphic: boolean } =>
   Array.isArray(relationTo) ? { to: relationTo, polymorphic: true } : { to: [relationTo], polymorphic: false }
 
-/**
- * Build the static reference graph for a Payload config (or any `{ collections, globals }`
- * subset). Pure — safe at config-build time, in tests with fixture configs, and in the
- * dev map endpoint. Blocks referenced by name (`blockReferences`) resolve against the
- * config-level `blocks` registry when provided.
- */
 export function buildReferenceGraph(config: GraphSource): ReferenceGraph {
   const blockRegistry = new Map((config.blocks ?? []).map((block) => [block.slug, block]))
   const edges: ReferenceEdge[] = []
@@ -68,8 +62,8 @@ export function buildReferenceGraph(config: GraphSource): ReferenceGraph {
     }
   }
 
-  const collections = (config.collections ?? []) as { slug: string; fields: Field[] }[]
-  const globals = (config.globals ?? []) as { slug: string; fields: Field[] }[]
+  const collections = (config.collections ?? []) as { slug: string; fields: Field[] }[] //TODO: replace `as` cast with proper typing
+  const globals = (config.globals ?? []) as { slug: string; fields: Field[] }[] //TODO: replace `as` cast with proper typing
   for (const collection of collections) walkFields(collection.slug, collection.fields, '')
   for (const global of globals) walkFields(`global:${global.slug}`, global.fields, '')
 

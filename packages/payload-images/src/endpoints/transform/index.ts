@@ -1,56 +1,47 @@
-/**
- * The on-demand image transform endpoint (settings in the URL), mounted at `/api/img/...`.
- * Same-origin: streams bytes, never redirects to the storage host. On a miss it transforms with
- * Sharp, responds immediately, and persists the variant after the response. Config-level
- * endpoints are only consulted when the first path segment isn't a collection/global slug — so
- * `/img` is safe as long as no collection is named `img` (the plugin warns at boot).
- */
 import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
-import { asSlug } from '../../lib/asSlug'
 
 import { routeId } from '../routeId'
+import { asSlug } from '../../lib/asSlug'
+import { readSourceDoc } from './sourceDoc'
+import { resolveConstraints } from './config'
+import { createSingleFlight } from './coalesce'
+import { readBytes } from '../../lib/transform/source'
 import { getServerSideURL } from '../../lib/getServerSideURL'
+import { resolveStaticDir } from '../../lib/transform/staticDir'
+import { presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { setTransformConcurrency } from '../../lib/transform/limit'
 import { setSharpConcurrency } from '../../lib/transform/sharpInstance'
+import { buildFallbackHeaders, buildHeaders, toBody } from './response'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
+import { countVariantsForSource } from '../../lib/transform/variantCount'
+import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
+import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
+import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
-import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
-import { countVariantsForSource } from '../../lib/transform/variantCount'
-import { presetQuery, resolvePreset } from '../../lib/presets/resolve'
-import { resolveStaticDir } from '../../lib/transform/staticDir'
-import { readBytes } from '../../lib/transform/source'
-import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
-import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
-
-import { createSingleFlight } from './coalesce'
-import { buildFallbackHeaders, buildHeaders, toBody } from './response'
-import { resolveConstraints } from './config'
-import { readSourceDoc } from './sourceDoc'
 
 export type { TransformEndpointConfig } from '../../types'
 
-/** Prewarm's observation wiring — present only when the plugin's `prewarm` option is on. */
 export interface PrewarmObserveConfig {
   profilesSlug: string
   seedCandidates: RatioCandidate[]
 }
 
-/** GET `/img/:id?w&h&ar&fit&q&fmt` — on-demand transform with focal-aware crop. */
 export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObserve?: PrewarmObserveConfig): Endpoint => {
+  const fallback = cfg.fallback !== false
+  const cdn = cfg.cdnCacheControl !== false
+  const constraints = resolveConstraints(cfg)
   const sourceSlug = asSlug(cfg.sourceSlug || 'images')
   const variantSlug = asSlug(cfg.variantSlug || GENERATED_IMAGES_SLUG)
-  const cdn = cfg.cdnCacheControl !== false
-  const fallback = cfg.fallback !== false
-  const constraints = resolveConstraints(cfg)
-  setTransformConcurrency(cfg.maxConcurrency)
-  setSharpConcurrency(cfg.sharpConcurrency)
 
-  const sourceFlight = createSingleFlight<string, SourceDoc | null>()
-  const genFlight = createSingleFlight<string, GenBytes>()
+  setSharpConcurrency(cfg.sharpConcurrency)
+  setTransformConcurrency(cfg.maxConcurrency)
+
   let recorder: ObservationRecorder | undefined
+  const genFlight = createSingleFlight<string, GenBytes>()
+  const sourceFlight = createSingleFlight<string, SourceDoc | null>()
 
   return {
     path: '/img/:id',
@@ -70,15 +61,12 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
       if (!source || (!source.url && !source.filename)) return new Response('Not found', { status: 404 })
       const src = source
 
-      // Params come from a named preset (the guaranteed, cap-exempt set) or the freeform query.
       let p: ParsedParams
       let isPreset = false
       if (presetName) {
         const spec = resolvePreset(src.presets, cfg.presetTemplates, presetName)
         const query = spec && presetQuery(spec)
         if (!query) return new Response('Unknown preset', { status: 404 })
-        // Presets are a finite, guaranteed set — honor EXACT dimensions (the snap grid is an
-        // anti-DoS measure for freeform requests; an OG preset must stay exactly 1200×630).
         const parsed = parseTransformParams(query, { ...constraints, dimensionStep: 1 })
         if (!parsed.ok) return new Response(parsed.error, { status: 400 })
         p = parsed.params
@@ -106,13 +94,9 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
       }
       let result = await getCachedVariantBytes(engineArgs)
 
-      // Cache miss with a nearby variant ready → serve the stand-in NOW (never cached: no-store)
-      // and generate the exact variant in the background; the next request gets the exact one.
       let standIn: { data: Buffer; mimeType: string } | null = null
       if (!result && fallback && p.w != null) {
         try {
-          // Push the picker's hard predicates into the query and sort by width, so a source with
-          // thousands of variants can't bury a valid stand-in past an arbitrary first-100 page.
           const effectiveW = Math.min(p.w, src.width && src.width > 0 ? src.width : p.w)
           const rows = await payload.find({
             collection: variantSlug,
@@ -141,40 +125,32 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
               prefix: true,
             },
           })
-          const pick = pickFallbackVariant(p, format, src, rows.docs as FallbackCandidate[], constraints) //EXCUSE: docs of a runtime-configured collection are untyped; the picker null-guards every field
+          const pick = pickFallbackVariant(p, format, src, rows.docs as FallbackCandidate[], constraints) //TODO: replace `as` cast with proper typing
           if (pick) {
             const bytes = await readBytes(pick, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
             if (bytes) {
               standIn = { data: bytes, mimeType: pick.mimeType ?? mimeForFormat(format) }
-              const work = (): Promise<unknown> => generateVariantBytes({ ...engineArgs, deferPersist: false }).catch(() => undefined) // the engine logs its own failures
+              const work = (): Promise<unknown> => generateVariantBytes({ ...engineArgs, deferPersist: false }).catch(() => undefined)
               try {
                 after(work)
               } catch {
-                void work() // non-Next runtime (tests/CLI)
+                void work()
               }
             }
-            // unreadable pick → fall through to the inline generate below
           }
-        } catch {
-          // a broken candidates query must never take down the serving path
-        }
+        } catch {}
       }
       if (!result && !standIn) {
-        // Per-image variant cap: past the limit, generate the (correct) variant but DON'T persist —
-        // bounds stored variants without breaking the image. Presets are exempt (guaranteed set).
         const limit = src.variantLimit ?? cfg.variantLimit
         const overCap = !isPreset && limit >= 0 && (await countVariantsForSource(payload, variantSlug, src.id)) >= limit
         result = await generateVariantBytes(overCap ? { ...engineArgs, deferPersist: 'never' } : engineArgs)
       }
 
       if (result && !result.ok) {
-        // 503 = the transform queue shed load; ask the client to retry shortly.
         const headers = result.status === 503 ? { 'Retry-After': '2', 'Cache-Control': 'no-store' } : undefined
         return new Response(result.msg, { status: result.status, headers })
       }
 
-      // Prewarm observation — ground truth of what the site actually serves. Synchronous O(1)
-      // buffer work (the recorder flushes on its own timer); the response never waits on it.
       if (prewarmObserve) {
         recorder ??= createObservationRecorder({
           payload,
@@ -193,7 +169,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
       }
 
       if (standIn) return new Response(toBody(standIn.data), { headers: buildFallbackHeaders(standIn.mimeType, isAuto, cdn) })
-      if (!result) return new Response('Not found', { status: 404 }) // unreachable: !result implies standIn
+      if (!result) return new Response('Not found', { status: 404 })
       return new Response(toBody(result.data), { headers: buildHeaders(result.mimeType, result.key, isAuto, cdn, isPublic) })
     },
   }

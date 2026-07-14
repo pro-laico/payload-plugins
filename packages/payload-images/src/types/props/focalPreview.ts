@@ -1,5 +1,3 @@
-/** Local UI state types for the admin focal/hotspot preview editor. */
-
 export type DisplayMode = 'normal' | 'half' | 'blurhash'
 
 export interface FocalPreviewProps {

@@ -1,6 +1,5 @@
 import type { DefaultCellComponentProps } from 'payload'
 
-/** List-view Cell showing an animated Mux gif preview (the `adminThumbnail: 'gif'` mode). */
 export const MuxVideoGifCell = ({ rowData }: DefaultCellComponentProps) => {
   const playbackOption = rowData?.playbackOptions?.[0]
   if (!playbackOption) return <>Preview not available.</>

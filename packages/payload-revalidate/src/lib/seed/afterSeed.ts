@@ -1,37 +1,17 @@
 import { bust } from '../bust'
 import type { Bust, SeedFlushState, SeedResultLike } from '../../types'
 
-/** The keyed after-seed listener slot `@pro-laico/payload-seed` invokes at the end of
- *  `runSeed`. Shared via `Symbol.for` — no import in either direction, same contract
- *  style as `custom.seedAsset` / `custom.seedDisabled`, just for functions. */
 const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')
 
-/**
- * The post-seed flush: the seed engine writes with `context.disableRevalidate` (per-write
- * hooks stay quiet), leaving the cached surface stale — this busts it once at the end.
- * Per touched collection the list tags (both lanes) and its static `extraTags`, per seeded
- * global its tags, and finally `all`. The `all` bust is what makes a seed CORRECT, not a
- * sledgehammer: a seed run clears and recreates docs with new ids, so doc/alias-keyed
- * entries can't be enumerated — and since every `./cache` entry carries `all`, one tag
- * flushes exactly the plugin-tagged surface and nothing else. The per-slug tags ride along
- * so the event log shows what the run actually touched. `extraTags` must be explicit,
- * though: an entry tagged ONLY through one (a scope inlining icons, tagged `payload-icons`)
- * never went through `./cache`, carries no `all`, and would otherwise survive the reseed.
- *
- * Everything it needs ({@link SeedFlushState}) comes from the plugin factory's closure —
- * no global state, no config resolution at flush time.
- */
 export const seedBusts = (state: SeedFlushState, result: SeedResultLike): Bust[] => {
-  const slugs = new Set<string>([...Object.keys(result.created ?? {}), ...(result.collections ?? [])])
   const { tags, lists, extraTags, rules } = state
+  const slugs = new Set<string>([...Object.keys(result.created ?? {}), ...(result.collections ?? [])])
   const busts: Bust[] = []
   for (const slug of slugs) {
     for (const scope of [undefined, ...(lists[slug] ?? [])]) {
       busts.push({ tag: tags.list(slug, { scope }), reason: 'list' }, { tag: tags.list(slug, { scope, draft: true }), reason: 'list' })
     }
     for (const tag of extraTags[slug] ?? []) busts.push({ tag, reason: 'extra' })
-    // Rule targets, same rationale as extraTags: they tag surfaces outside `./cache`
-    // (no `all` tag), and the reseed recreated every doc the rule watches.
     for (const rule of rules) if (rule.on === slug) busts.push(...rule.bust.map((tag) => ({ tag, reason: 'rule' as const })))
   }
   for (const slug of result.globals ?? []) {
@@ -41,11 +21,9 @@ export const seedBusts = (state: SeedFlushState, result: SeedResultLike): Bust[]
   return busts
 }
 
-/** Called from the plugin factory: register (idempotently — keyed record, HMR-safe) the
- *  listener payload-seed invokes with the run's result. */
 export const registerSeedListener = (state: SeedFlushState): void => {
-  const slot = globalThis as Record<symbol, unknown>
-  const listeners = (slot[AFTER_SEED_SLOT] as Record<string, unknown> | undefined) ?? {}
+  const slot = globalThis as Record<symbol, unknown> //TODO: replace `as` cast with proper typing
+  const listeners = (slot[AFTER_SEED_SLOT] as Record<string, unknown> | undefined) ?? {} //TODO: replace `as` cast with proper typing
   listeners['pro-laico/payload-revalidate'] = async (result: SeedResultLike): Promise<void> => {
     await bust(seedBusts(state, result), { slug: 'seed', operation: 'seed', lane: 'published' }, 'seed', state.observe)
   }

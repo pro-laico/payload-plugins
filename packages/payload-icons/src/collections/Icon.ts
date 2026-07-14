@@ -1,25 +1,16 @@
 import type { CollectionConfig } from 'payload'
+
+import { mergeHooks } from '../lib/mergeHooks'
+import type { IconCollectionOverrides } from '../types'
+import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 import { formatSVGHook } from '../hooks/collection/formatSVG'
 import { defaultAdminAccess, defaultReadAccess } from '../access/defaultAccess'
-import { mergeHooks } from '../lib/mergeHooks'
-import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
-import type { IconCollectionOverrides } from '../types'
 
-/** The default slug for the icon collection. */
 export const ICON_SLUG = 'icon'
 
-/** Admin import-map paths for the theme-aware inline previews (the stored file `<img>`s as black — invisible on the dark theme). */
 const IconPreviewFieldPath = '@pro-laico/payload-icons/admin/iconPreview#IconPreviewField'
 const IconPreviewCellPath = '@pro-laico/payload-icons/admin/iconPreview#IconPreviewCell'
 
-/**
- * Build the `Icon` upload collection: accepts `image/svg+xml` uploads, optimizes + sanitizes
- * each SVG on `beforeChange` (`formatSVGHook`), and stores the result as `svgString` for inline
- * frontend rendering. Public read by default; logged-in-admin writes.
- *
- * Pass {@link IconCollectionOverrides} to append fields/hooks, override access, or rename the slug —
- * additions stack on top of the defaults.
- */
 export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig => {
   const { slug = ICON_SLUG, adminGroup = 'Assets', access, fields = [], hooks, upload } = options
 
@@ -38,13 +29,7 @@ export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig =>
       useAsTitle: 'filename',
       defaultColumns: ['filename', 'svgString', 'filesize', 'updatedAt'],
     },
-    // Data-only marker for @pro-laico/payload-revalidate (no dependency): its hooks bust
-    // the shared icons tag on every icon write, matching the tag `getIconSvg` applies.
     custom: { revalidate: { extraTags: [ICONS_REVALIDATE_TAG] } },
-    // Payload blocks SVG uploads by default (they're on its restricted-types list). This is an
-    // SVG-only collection and `formatSVGHook` sanitizes every file (scripts / on* handlers /
-    // javascript: URLs stripped) before storage, so we opt in. `mimeTypes` still scopes uploads
-    // to SVG, and the opt-in stays overridable via `options.upload`.
     upload: { mimeTypes: ['image/svg+xml'], allowRestrictedFileTypes: true, ...upload },
     fields: [
       {
@@ -59,8 +44,6 @@ export const Icon = (options: IconCollectionOverrides = {}): CollectionConfig =>
         admin: {
           components: { Cell: IconPreviewCellPath },
           language: 'xml',
-          // Read-only: a direct edit would bypass formatSVGHook's sanitization (only runs on file
-          // uploads) and the string is later inlined via dangerouslySetInnerHTML — re-upload to change.
           readOnly: true,
           condition: (data) => Boolean(data?.svgString),
           editorOptions: { wordWrap: 'off', scrollBeyondLastLine: false },

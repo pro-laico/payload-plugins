@@ -1,5 +1,3 @@
-/** The source-identity fields folded into a generated variant's deterministic cache key. */
-
 export interface CacheKeyDoc {
   id: string | number
   filename?: string | null

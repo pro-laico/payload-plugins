@@ -1,24 +1,12 @@
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
-import { CHROME_COOKIES } from '../cookies'
+
 import { parseStage } from '../harness'
+import { CHROME_COOKIES } from '../cookies'
 import type { ChromeSlot, ResolveDevChromeOptions, Test } from '../types'
 
-/** Resolve one slot: its cookie must name a test of the MATCHING kind (a stale or cross-slot
- *  cookie falls back to the real chrome). Exported for the toolbar client to mirror the rule. */
 export const chromeTestsFor = (tests: Test[], slot: ChromeSlot): Test[] => tests.filter((t) => t.kind === slot)
 
-/**
- * The chrome-swap seam for the test harness — one line in your frontend layout:
- *
- *   const { header, footer } = await resolveDevChrome({ tests: devTests, header: <SiteHeader />, footer: <SiteFooter /> })
- *
- * Render `{header}` / `{footer}` where the real ones went. In production (or with no override
- * selected) you get exactly what you passed in; in dev, picking a `header`/`footer`-kind test
- * version in the toolbar's Tests view swaps that variant into the REAL layout, around REAL
- * content, across the whole site — browse every page wearing the candidate chrome, then hit
- * "Real" to reset. Server-only (reads cookies): call it from your layout, not client code.
- */
 export async function resolveDevChrome({
   tests,
   header,
@@ -34,7 +22,7 @@ export async function resolveDevChrome({
     try {
       return await stage.version.render()
     } catch {
-      return real // a throwing variant must never take the whole site down
+      return real
     }
   }
 

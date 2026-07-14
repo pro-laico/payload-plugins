@@ -1,6 +1,3 @@
-/** The toolbar's entire stylesheet, injected by `<DevToolbar>` as one `<style>` tag so the host
- *  app needs no CSS import and no Tailwind. Everything is `.pdt-` prefixed and self-contained
- *  (own dark theme); `--pdt-accent` is the override seam. */
 export const PDT_CSS = `
 .pdt-root { position: fixed; z-index: 999999; color-scheme: dark;
   --pdt-accent: oklch(0.72 0.16 250); --pdt-bg: oklch(0.185 0 0); --pdt-fg: oklch(0.985 0 0);

@@ -9,9 +9,6 @@ export class SeedValidationError extends Error {
   }
 }
 
-/** A write failed mid-run (create / deferred set / global update). `detail` names the seed node
- *  (`collection:_key`) and the deepest driver cause, so the failure tells a meaningful story rather
- *  than surfacing an opaque generated id. */
 export class SeedRunError extends Error {
   constructor(public detail: string) {
     super(`[payload-seed] seed run failed while ${detail}`)
@@ -19,23 +16,13 @@ export class SeedRunError extends Error {
   }
 }
 
-// Keys that are valid on a record but aren't schema fields.
 const ALLOWED_NON_FIELDS = new Set(['_status'])
 
-/**
- * Validate the built model against the declared docs and the live config: every definition's own
- * slug exists in the config (as a collection or global, matching its kind); every `ref()`
- * resolves to a seeded doc and references a real collection; every `_file` sits on a collection
- * that can take one (an upload or `custom.seedAsset` collection); no duplicate `_key` within a collection
- * (across every definition sharing the slug); and (when `fieldNames` is supplied) every record field
- * exists in the schema. Collects ALL issues and throws once. (Cycle detection happens in the graph topo-sort.)
- */
 export function validateModel({ model, collectionSlugs, globalSlugs, fileCollections, fieldNames }: ValidateArgs): void {
   const issues: string[] = []
   const docIds = new Set<string>()
   for (const coll of model.collections) for (const rec of coll.records) docIds.add(docNodeId(coll.slug, rec.key))
 
-  // A definition's own slug must exist in the config, or the run would wipe collections and then die mid-create.
   for (const coll of model.collections) {
     if (!collectionSlugs.has(coll.slug)) {
       issues.push(`defineSeed('${coll.slug}'): no collection '${coll.slug}' in the Payload config - fix the slug or add the collection.`)
@@ -61,7 +48,6 @@ export function validateModel({ model, collectionSlugs, globalSlugs, fileCollect
   for (const coll of model.collections) for (const rec of coll.records) check(`${coll.slug}:${rec.key}`, rec.data)
   for (const g of model.globals) check(`global:${g.slug}`, g.data)
 
-  // A `_file` only makes sense on an upload collection or a `custom.seedAsset` collection.
   for (const coll of model.collections) {
     for (const rec of coll.records) {
       if (rec.file && !fileCollections.has(coll.slug)) {
@@ -70,7 +56,6 @@ export function validateModel({ model, collectionSlugs, globalSlugs, fileCollect
     }
   }
 
-  // Unknown top-level fields (runtime counterpart to the compile-time exactness check).
   const checkFields = (where: string, slug: string, data: Record<string, unknown>) => {
     const valid = fieldNames?.get(slug)
     if (!valid) return
@@ -81,7 +66,6 @@ export function validateModel({ model, collectionSlugs, globalSlugs, fileCollect
   for (const coll of model.collections) for (const rec of coll.records) checkFields(`${coll.slug}:${rec.key}`, coll.slug, rec.data)
   for (const g of model.globals) checkFields(`global:${g.slug}`, `global:${g.slug}`, g.data)
 
-  // Duplicate _key within a collection makes refs ambiguous - checked across every definition sharing the slug.
   const seenBySlug = new Map<string, Set<string>>()
   for (const coll of model.collections) {
     const seen = seenBySlug.get(coll.slug) ?? new Set<string>()

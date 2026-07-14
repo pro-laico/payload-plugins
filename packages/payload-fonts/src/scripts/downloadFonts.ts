@@ -1,10 +1,9 @@
 import fs from 'node:fs'
+import dotenv from 'dotenv'
 import path from 'node:path'
 
-import dotenv from 'dotenv'
-
-import type { ExportFontsResponse, Family, RunDownloadFontsOptions, WeightFile } from '../types'
 import { familyExportName, familyVarSuffix } from '../lib/families'
+import type { ExportFontsResponse, Family, RunDownloadFontsOptions, WeightFile } from '../types'
 
 const colors = {
   blue: (t: string) => `\x1b[34m${t}\x1b[0m`,
@@ -13,19 +12,16 @@ const colors = {
   orange: (t: string) => `\x1b[33m${t}\x1b[0m`,
 }
 
-/** Connection-refused / unreachable host — the DESIGNED `predev` state (server not up yet), never
- *  an error. Node buries the code under `cause` (often an AggregateError), so walk the chain. */
 const DOWN_CODES = /ECONNREFUSED|ENOTFOUND|EHOSTUNREACH/
 const isServerDown = (err: unknown): boolean => {
   if (!err || typeof err !== 'object') return false
+  //TODO: replace `as` cast with proper typing
   const { code, message, cause, errors } = err as { code?: string; message?: string; cause?: unknown; errors?: unknown[] }
   if (DOWN_CODES.test(code ?? '') || DOWN_CODES.test(message ?? '')) return true
   return isServerDown(cause) || (Array.isArray(errors) && errors.some(isServerDown))
 }
 
 function resolveOptions(overrides?: RunDownloadFontsOptions) {
-  // An explicit env file (option or PAYLOAD_FONTS_ENV_FILE) is loaded alone; otherwise follow the
-  // Next convention — `.env.local` first so its values win over `.env` (dotenv keeps the first).
   const explicitEnvFile = overrides?.envFile ?? process.env.PAYLOAD_FONTS_ENV_FILE
   return {
     fontsOutputDir: overrides?.fontsOutputDir ?? process.env.PAYLOAD_FONTS_OUTPUT_DIR ?? './public/fonts',
@@ -47,10 +43,6 @@ export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Pro
   const localPrefix = opts.localFontSrcPrefix.replace(/\/$/, '')
 
   function generateFontDefinitions(familyFiles: Record<Family, WeightFile[]>): void {
-    // One `localFont()` per family with files, each with an array of weighted `src` entries — so
-    // multiple weights collapse into a single CSS variable for that family. The export name +
-    // variable are derived from the family key by the shared convention (`sans` → `fontSans` /
-    // `<prefix>Sans`).
     const configs = Object.entries(familyFiles)
       .filter(([, files]) => files.length > 0)
       .map(([family, files]) => ({ name: familyExportName(family), files, variable: `${opts.cssVariablePrefix}${familyVarSuffix(family)}` }))
@@ -65,8 +57,6 @@ export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Pro
 
     fs.mkdirSync(path.dirname(FONT_DEFINITION_FILE), { recursive: true })
 
-    // No-fonts stub omits the `localFont` import entirely so the generated file
-    // passes any consumer's unused-import lint (eslint or Biome) as-is.
     fs.writeFileSync(
       FONT_DEFINITION_FILE,
       configs.length === 0
@@ -88,28 +78,18 @@ export default fonts
     )
   }
 
-  /**
-   * Reset the generated module to an empty-but-valid stub. Called on EVERY error / skip path so a
-   * failed or partial run never leaves a `definition.ts` that imports font files which aren't on
-   * disk — a gitignored `public/fonts/` on a fresh checkout, or a dir wiped mid-run — which would
-   * break `next build` with "Can't resolve". It ALWAYS overwrites: a stale definition surviving a
-   * failure is the bug we're fixing (the atomic version only wrote this stub when the file was
-   * absent), so a definition is never preserved on error.
-   */
   function writeEmptyDefinitions(): void {
     generateFontDefinitions({})
   }
 
   function wipeFontFiles(): void {
     if (!fs.existsSync(FONT_FILES_DIR)) fs.mkdirSync(FONT_FILES_DIR, { recursive: true })
-    // Only unlink files — a stray subdirectory would make unlinkSync throw EISDIR.
     for (const file of fs.readdirSync(FONT_FILES_DIR)) {
       const filePath = path.join(FONT_FILES_DIR, file)
       if (fs.statSync(filePath).isFile()) fs.unlinkSync(filePath)
     }
   }
 
-  /** Report a failure and reset the definition to empty, so the build still compiles. */
   function warnAndEmpty(message: string, error?: unknown): void {
     console.warn(colors.red(message))
     if (error) {
@@ -120,8 +100,6 @@ export default fonts
     writeEmptyDefinitions()
   }
 
-  // Any failure anywhere in the run resets the definition to empty (via warnAndEmpty on the
-  // handled paths, and the catch below for anything unexpected).
   try {
     console.log(colors.blue('Starting Font Download...\n'))
 
@@ -140,8 +118,6 @@ export default fonts
       return
     }
 
-    // Fetch the active fonts from the plugin's export endpoint, authenticating with the project's
-    // PAYLOAD_SECRET.
     const endpoint = new URL(opts.endpointPath, siteUrl).toString()
     let manifest: ExportFontsResponse
     try {
@@ -156,10 +132,9 @@ export default fonts
         warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}${hint}`)
         return
       }
-      manifest = (await res.json()) as ExportFontsResponse
+      manifest = (await res.json()) as ExportFontsResponse //TODO: replace `as` cast with proper typing
     } catch (err) {
       if (isServerDown(err)) {
-        // The DESIGNED predev state: `predev` runs before the dev server exists. Not an error.
         console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)
         writeEmptyDefinitions()
         return
@@ -172,7 +147,6 @@ export default fonts
 
     wipeFontFiles()
 
-    // Discover the active families from the response keys (the plugin's `families` option drives them).
     const families: Family[] = Object.keys(fonts)
     const familyFiles: Record<Family, WeightFile[]> = {}
     let count = 0
@@ -188,13 +162,8 @@ export default fonts
           const ext = font.extension || font.filename.split('.').pop()?.toLowerCase() || 'woff2'
           const weight = font.weight || '400'
           const isItalic = font.style === 'italic'
-          // A slnt-axis italic declares `oblique <angle>` so the browser drives the axis; a true
-          // italic (explicit file or ital axis) declares plain `italic`.
           const style = isItalic && font.obliqueAngle ? `oblique ${font.obliqueAngle}deg` : font.style || 'normal'
-          // A variable font's weight is a "min max" range; collapse the space for a filename-safe
-          // slug (sans-100-900). The emitted `weight` below keeps the range.
           const weightSlug = weight.replace(/\s+/g, '-')
-          // Distinct filename per weight/style; append the index if two files share one.
           const base = `${family}-${weightSlug}${isItalic ? '-italic' : ''}`
           const fileName = bucket.some((f) => f.path.endsWith(`/${base}.${ext}`)) ? `${base}-${i}` : base
           fs.writeFileSync(path.join(FONT_FILES_DIR, `${fileName}.${ext}`), Buffer.from(font.data, 'base64'))
@@ -213,7 +182,6 @@ export default fonts
 
     if (count === 0) {
       console.log(colors.orange('\nNo active fonts returned — generated an empty definition.'))
-      // Newer servers say WHY each family came back empty (older ones omit `diagnostics`).
       for (const [family, d] of Object.entries(manifest?.diagnostics ?? {})) {
         if (!d) continue
         const name = d.typeface ? `'${d.typeface}'` : 'a typeface'
@@ -234,8 +202,6 @@ export default fonts
       console.log('')
     } else console.log(colors.green(`\n✓ Font definitions generated (${count} font file${count === 1 ? '' : 's'})\n`))
   } catch (err) {
-    // Any unexpected failure → empty definition, so a broken run never leaves a stale one that
-    // imports font files that aren't on disk (the bug this guards against).
     warnAndEmpty('Unexpected error during font download', err)
   }
 }

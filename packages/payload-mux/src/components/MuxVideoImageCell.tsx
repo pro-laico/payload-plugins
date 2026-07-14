@@ -1,6 +1,5 @@
 import type { DefaultCellComponentProps } from 'payload'
 
-/** List-view Cell showing a static Mux poster image (the `adminThumbnail: 'image'` mode). */
 export const MuxVideoImageCell = ({ rowData }: DefaultCellComponentProps) => {
   const playbackOption = rowData?.playbackOptions?.[0]
   if (!playbackOption) return <>Preview not available.</>

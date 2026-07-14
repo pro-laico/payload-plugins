@@ -1,7 +1,5 @@
 import type { PayloadRequest } from 'payload'
 
-/** The readable slice of any upload doc: a local filename and/or a URL (plus the
- *  cloud-storage `prefix` when the adapter stores one). */
 export type UploadDoc = { filename?: string | null; url?: string | null; prefix?: string | null }
 
 export type UploadHandler = (

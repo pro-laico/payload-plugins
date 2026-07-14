@@ -1,15 +1,9 @@
-/**
- * afterChange on the source → enqueue a prewarm job whenever the variant set was invalidated or
- * doesn't exist yet: create, file replace, focal/hotspot edit — the exact trigger set the purge
- * hook uses ({@link detectVariantIdentityChange}), plus the create branch the purge hook skips.
- * Best-effort: a broken jobs setup never blocks or fails the source write.
- */
 import type { CollectionAfterChangeHook } from 'payload'
 
+import type { PrewarmReason } from '../../types'
 import { IMAGE_MIME_TYPES } from '../../lib/transform/params'
 import { enqueuePrewarmJob } from '../../lib/prewarm/enqueue'
 import { detectVariantIdentityChange } from './variantIdentity'
-import type { PrewarmReason } from '../../types'
 
 export interface EnqueuePrewarmOptions {
   taskSlug: string

@@ -2,26 +2,25 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
-import { loadSharp } from './lib/transform/sharpInstance'
-import { createPurgeEndpoint } from './endpoints/purge'
-import { createImagesCollection } from './collections/images'
-import { imageEnhancements } from './collections/images/imageEnhancements'
-import { mergeCollection } from './lib/mergeCollection'
-import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
-import { DEFAULT_PIXEL_STEP, parseAspectRatio } from './lib/transform/params'
-import { createTransformEndpoint, type PrewarmObserveConfig } from './endpoints/transform'
-import { resolveConstraints } from './endpoints/transform/config'
-import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
-import { createRenderProfilesCollection } from './collections/renderProfiles'
-import { resolvePrewarmOptions } from './lib/prewarm/resolveOptions'
-import { DEFAULT_VARIANT_LIMIT, resolvePresetTemplates } from './lib/presets/defaults'
-import { type RatioCandidate, ratioToken } from './lib/prewarm/profileKey'
 import { createPrewarmTask } from './jobs/prewarmTask'
+import { createPurgeEndpoint } from './endpoints/purge'
+import { mergeCollection } from './lib/mergeCollection'
+import { loadSharp } from './lib/transform/sharpInstance'
+import { createImagesCollection } from './collections/images'
+import { resolveConstraints } from './endpoints/transform/config'
+import { resolvePrewarmOptions } from './lib/prewarm/resolveOptions'
+import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
+import { imageEnhancements } from './collections/images/imageEnhancements'
+import { type RatioCandidate, ratioToken } from './lib/prewarm/profileKey'
 import type { ImagesPluginOptions, TransformEndpointConfig } from './types'
+import { DEFAULT_PIXEL_STEP, parseAspectRatio } from './lib/transform/params'
+import { createRenderProfilesCollection } from './collections/renderProfiles'
+import { DEFAULT_VARIANT_LIMIT, resolvePresetTemplates } from './lib/presets/defaults'
+import { createTransformEndpoint, type PrewarmObserveConfig } from './endpoints/transform'
+import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 
 type JobsCfg = NonNullable<Config['jobs']>
 
-/** Compose the prewarm autorun cron onto whatever `config.jobs.autoRun` shape the app already has. */
 const withAutoRun = (existing: JobsCfg['autoRun'], cron: string, queue: string): JobsCfg['autoRun'] => {
   const entry = { cron, queue, limit: 10 }
   if (!existing) return [entry]
@@ -29,22 +28,12 @@ const withAutoRun = (existing: JobsCfg['autoRun'], cron: string, queue: string):
   return async (payload) => [...(await existing(payload)), entry]
 }
 
-/** Absolute path to a bundled bin script, resolving the src→dist swap from this module's own
- *  location so `payload <key>` works both in-workspace and when published. */
 const binScriptPath = (name: string): string => {
   const here = fileURLToPath(import.meta.url)
   const ext = here.endsWith('.ts') ? 'ts' : 'js'
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
-/**
- * Registers the `images` (source) and hidden `generated-images` (variant cache) collections,
- * plus the on-demand transform + purge endpoints. Uploads store only the original; every
- * rendered size is generated on first request (focal-cropped), then cached. Placeholders are a
- * quality-tier ladder stored on the doc at upload; the virtual `placeholder` serves each
- * read a finished, focal-cropped placeholder. The transform endpoint mounts at `/api/img`; do
- * not name a collection `img` or it shadows the endpoint.
- */
 export const imagesPlugin =
   (opts: ImagesPluginOptions = {}): Plugin =>
   (config: Config): Config => {
@@ -117,7 +106,7 @@ export const imagesPlugin =
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
       const ownThumbnail =
         (typeof target.upload === 'object' && !!target.upload.adminThumbnail) ||
-        !!(target.admin as { thumbnail?: unknown } | undefined)?.thumbnail
+        !!(target.admin as { thumbnail?: unknown } | undefined)?.thumbnail //TODO: replace `as` cast with proper typing
       const enh = imageEnhancements({
         focalUI,
         previewRatios,
@@ -135,15 +124,15 @@ export const imagesPlugin =
       const parity: Partial<CollectionConfig> = {
         ...enh,
         defaultPopulate: {
-          ...(enh.defaultPopulate as Record<string, unknown>), //EXCUSE: Payload's per-collection select generics don't exist inside the plugin
-          ...(target.defaultPopulate as Record<string, unknown> | undefined), //EXCUSE: same as above
-        } as CollectionConfig['defaultPopulate'], //EXCUSE: same as above
+          ...(enh.defaultPopulate as Record<string, unknown>), //TODO: replace `as` cast with proper typing
+          ...(target.defaultPopulate as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
+        } as CollectionConfig['defaultPopulate'], //TODO: replace `as` cast with proper typing
         ...(enh.forceSelect || target.forceSelect
           ? {
               forceSelect: {
-                ...(enh.forceSelect as Record<string, unknown> | undefined), //EXCUSE: same as defaultPopulate above
-                ...(target.forceSelect as Record<string, unknown> | undefined), //EXCUSE: same as defaultPopulate above
-              } as CollectionConfig['forceSelect'], //EXCUSE: same as defaultPopulate above
+                ...(enh.forceSelect as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
+                ...(target.forceSelect as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
+              } as CollectionConfig['forceSelect'], //TODO: replace `as` cast with proper typing
             }
           : {}),
       }
@@ -201,7 +190,7 @@ export const imagesPlugin =
         ? {
             jobs: {
               ...config.jobs,
-              tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never], //EXCUSE: TypedJobs task slugs are app-generated; the plugin can't name its own slug in that union
+              tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never], //TODO: replace `as` cast with proper typing
               ...(prewarm.autoRun ? { autoRun: withAutoRun(config.jobs?.autoRun, prewarm.autoRun, prewarm.queue) } : {}),
             },
           }

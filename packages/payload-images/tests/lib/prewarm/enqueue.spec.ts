@@ -9,13 +9,13 @@ const fakeReq = (pending: { input?: unknown }[] = []) => {
   const find = vi.fn().mockResolvedValue({ docs: pending })
   const queue = vi.fn().mockResolvedValue({})
   const logger = { warn: vi.fn(), info: vi.fn(), error: vi.fn() }
-  const payload = { find, jobs: { queue }, logger } as unknown as Payload //EXCUSE: test double — only the members the hook touches
+  const payload = { find, jobs: { queue }, logger } as unknown as Payload
   return { req: { payload }, find, queue, logger }
 }
 
 const doc = { id: 'img1', filename: 'a.jpg', mimeType: 'image/jpeg', focalX: 50, focalY: 50 }
 const hook = enqueuePrewarmAfterChange({ taskSlug: 'imagesPrewarm', queue: 'default' })
-const run = (args: Record<string, unknown>) => hook(args as never) //EXCUSE: hook args are a large payload type; the hook only reads doc/previousDoc/operation/req
+const run = (args: Record<string, unknown>) => hook(args as never)
 
 describe('detectVariantIdentityChange', () => {
   it('mirrors the purge trigger set: file, focal, hotspot — not metadata', () => {

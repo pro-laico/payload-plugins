@@ -1,8 +1,6 @@
-/** Normalizing `prewarm: boolean | PrewarmOptions` into a fully-defaulted internal shape. */
 import { IMAGE_RENDER_PROFILES_SLUG } from '../../collections/renderProfiles'
 import type { ImagesPluginOptions, OutputFormat, ResolvedPrewarmOptions } from '../../types'
 
-/** No colon: the slug feeds Payload's generated `Task${Slug}` interface name. */
 export const PREWARM_TASK_SLUG = 'imagesPrewarm'
 
 export const resolvePrewarmOptions = (opts: ImagesPluginOptions): ResolvedPrewarmOptions | false => {

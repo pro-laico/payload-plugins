@@ -1,24 +1,21 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionConfig, TextField } from 'payload'
+
+import { isAllowed } from '../lib/isAllowed'
+import type { MuxVideoPluginOptions } from '../types'
+import { signableUrlAfterRead } from '../hooks/field/afterRead'
 import { getAfterDeleteHook } from '../hooks/collection/afterDelete'
 import { getBeforeChangeHook } from '../hooks/collection/beforeChange'
 import { getBeforeValidateHook } from '../hooks/collection/beforeValidate'
-import { signableUrlAfterRead } from '../hooks/field/afterRead'
-import { isAllowed } from '../lib/isAllowed'
-import type { MuxVideoPluginOptions } from '../types'
 
 const C = '@pro-laico/payload-mux/components'
 
-/** Resolve the list-view Cell component for the configured `adminThumbnail` mode. */
 const thumbnailCell = (mode: MuxVideoPluginOptions['adminThumbnail']): string | undefined => {
   if (mode === 'image') return `${C}/MuxVideoImageCell#MuxVideoImageCell`
   if (mode === 'none') return undefined
   return `${C}/MuxVideoGifCell#MuxVideoGifCell`
 }
 
-/** Build one virtual, read-only URL field (`playbackUrl` / `posterUrl` / `gifUrl`). Its afterRead
- *  builds the Mux URL from the sibling `playbackId`, stamps the poster `time` for thumbnail/gif,
- *  and signs it when the policy is `signed`. Returns null until a playback id exists. */
 const signableUrlField = (
   mux: Mux,
   options: MuxVideoPluginOptions,
@@ -35,26 +32,17 @@ const signableUrlField = (
   hooks: { afterRead: [signableUrlAfterRead(mux, options, type, buildUrl)] },
 })
 
-/** The Videos collection: an uploader field, identifying metadata Mux fills in, and a
- *  `playbackOptions` array whose virtual fields resolve to signed-or-public Mux URLs. */
 export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
-  slug: (options.extendCollection as string) ?? 'mux-video',
+  slug: (options.extendCollection as string) ?? 'mux-video', //TODO: replace `as` cast with proper typing
   labels: { singular: 'Video', plural: 'Videos' },
-  // Declares this as a `@pro-laico/payload-seed` asset collection: instead of uploading bytes,
-  // the seed engine hands a doc's `_file` to the `source` field below, whose beforeValidate hook
-  // uploads it to Mux. Plain config — payload-mux doesn't import the seed package.
   custom: { seedAsset: { sourceField: 'source' } },
   access: { read: ({ req }) => isAllowed(options, req) },
-  // Grouped with the other asset collections (images/icons/fonts) — but never re-grouping a
-  // collection the plugin merely extends.
   admin: {
     ...(options.extendCollection ? {} : { group: 'Assets' }),
     enableListViewSelectAPI: true,
     useAsTitle: 'title',
     defaultColumns: ['title', 'muxUploader', 'duration'],
   },
-  // The list thumbnail Cell reads `playbackOptions[0].posterUrl/gifUrl` (+ title), none of which are
-  // columns — force-select them so the Select API keeps the preview alive.
   forceSelect: { playbackOptions: true, title: true },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
@@ -68,9 +56,6 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       type: 'ui',
       admin: { components: { Field: `${C}/MuxUploaderField#MuxUploaderField`, Cell: thumbnailCell(options.adminThumbnail) } },
     },
-    // Transient server-side ingest input (a local path / URL, or `{ file|url, playbackPolicy,
-    // posterTimestamp }`). The beforeValidate hook uploads it to Mux and strips it — never
-    // persisted. Lets a video be created from a file without the admin's client-side upload.
     { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
     {
       name: 'title',
@@ -80,14 +65,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       unique: true,
       admin: { description: 'A unique title for this video that will help you identify it later.' },
     },
-    // Not `required`: it's filled by the beforeValidate (server-side ingest) / beforeChange
-    // (admin upload) hooks before the row is written. Marking it required would reject a
-    // create that supplies a `source` instead of an already-resolved `assetId`.
-    // Indexed: the webhook looks a doc up by assetId on every Mux event.
     { name: 'assetId', type: 'text', index: true, admin: { readOnly: true, condition: (data) => data.assetId } },
-    // Encoding lifecycle, hook-written: 'preparing' until Mux reports the asset ready (short
-    // poll or webhook), 'ready' once playable, 'errored' when Mux rejects it (see `error`).
-    // Not required — docs created before this field existed have no status.
     {
       name: 'status',
       type: 'select',
@@ -98,7 +76,6 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       ],
       admin: { position: 'sidebar', readOnly: true, condition: (data) => data.status },
     },
-    // Mux's error messages when `status` is 'errored'; surfaced by the uploader field.
     { name: 'error', type: 'text', admin: { hidden: true, readOnly: true } },
     { name: 'duration', label: 'Duration', type: 'number', admin: { readOnly: true, condition: (data) => data.duration } },
     {
@@ -124,7 +101,6 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
       type: 'array',
       admin: { readOnly: true, condition: (data) => !!data.playbackOptions },
       fields: [
-        // Both required: the pair is always written together, and it tightens the generated types.
         { name: 'playbackId', label: 'Playback ID', type: 'text', required: true, admin: { readOnly: true } },
         {
           name: 'playbackPolicy',

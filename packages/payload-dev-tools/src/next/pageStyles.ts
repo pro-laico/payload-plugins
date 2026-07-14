@@ -1,6 +1,3 @@
-/** The dev pages' stylesheet, injected once by the page shell. Scoped under `.pdtp` and
- *  self-contained (own dark theme) — the pages inherit the host's frontend layout (header,
- *  fonts, globals) but never depend on its utility classes. */
 export const PDTP_CSS = `
 .pdtp { color-scheme: dark;
   --pdtp-accent: oklch(0.72 0.16 250); --pdtp-bg: oklch(0.145 0 0); --pdtp-card: oklch(0.2 0 0);
