@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { CmsIcon } from '@/components/ui/CmsIcon'
+
 import { getSiteSettings } from '@/lib/data'
+import { CmsIcon } from '@/components/ui/CmsIcon'
 
 /** The site footer — brand blurb plus CMS-managed contact details, each with a payload-icons glyph
  *  resolved by name through the active icon set (<CmsIcon name>). */

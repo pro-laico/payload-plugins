@@ -1,11 +1,12 @@
-import { connection } from 'next/server'
 import { Suspense } from 'react'
+import { connection } from 'next/server'
+import { firstPlayback } from '@/lib/mux'
 import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
-import { ProjectCard } from '@/components/ProjectCard'
-import { SectionHeading } from '@/components/SectionHeading'
-import { ServiceCard } from '@/components/ServiceCard'
 import { ButtonLink } from '@/components/ui/Button'
+import { ProjectCard } from '@/components/ProjectCard'
+import { ServiceCard } from '@/components/ServiceCard'
+import { SectionHeading } from '@/components/SectionHeading'
 import {
   getFeaturedProjectId,
   getMuxVideo,
@@ -16,11 +17,7 @@ import {
   getTestimonial,
   getTestimonialIds,
 } from '@/lib/data'
-import { firstPlayback } from '@/lib/mux'
 
-// Cache Components: the page composes at request time from the atomic cache entries the getters
-// materialize — a seed or an admin edit busts exactly the entries it touches, and the next
-// request recomposes from what survived.
 export default function HomePage() {
   return (
     <Suspense fallback={null}>
@@ -39,7 +36,6 @@ async function HomeContent() {
     getTestimonialIds(),
   ])
 
-  // Each reference resolves through its own id-keyed entry — the settings entry holds only ids.
   const [featured, showreelDoc] = await Promise.all([
     featuredId != null ? getProject(featuredId) : null,
     settings.showreel != null ? getMuxVideo(settings.showreel) : null,
@@ -50,7 +46,6 @@ async function HomeContent() {
 
   return (
     <>
-      {/* Hero — a full-bleed payload-images crop (object-fit fill) under an editorial overlay. */}
       <section className="relative h-[80vh] min-h-[540px] w-full overflow-hidden bg-muted">
         {settings.heroImage != null ? (
           <Image id={settings.heroImage} fill sizes="100vw" image={{ quality: 86 }} blur={{ quality: 'md' }} className="object-cover" />
@@ -75,7 +70,6 @@ async function HomeContent() {
         </div>
       </section>
 
-      {/* Services */}
       <section className="mx-auto max-w-6xl px-6 py-20">
         <SectionHeading
           eyebrow="What we do"
@@ -89,7 +83,6 @@ async function HomeContent() {
         </div>
       </section>
 
-      {/* Featured project — a large two-column feature */}
       {featured ? (
         <section className="border-y border-border bg-card">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 lg:grid-cols-2">
@@ -121,7 +114,6 @@ async function HomeContent() {
         </section>
       ) : null}
 
-      {/* Selected work */}
       {others.length > 0 ? (
         <section className="mx-auto max-w-6xl px-6 py-20">
           <div className="flex items-end justify-between gap-6">
@@ -138,7 +130,6 @@ async function HomeContent() {
         </section>
       ) : null}
 
-      {/* Showreel — only when a Mux clip is ingested (credentials present) */}
       {showreel ? (
         <section className="border-y border-border bg-card">
           <div className="mx-auto max-w-5xl px-6 py-20">
@@ -148,7 +139,6 @@ async function HomeContent() {
         </section>
       ) : null}
 
-      {/* Testimonials */}
       {testimonialIds.length > 0 ? (
         <section className="mx-auto max-w-6xl px-6 py-20">
           <SectionHeading eyebrow="Clients" title="In their words" align="center" className="mb-12" />
@@ -160,7 +150,6 @@ async function HomeContent() {
         </section>
       ) : null}
 
-      {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-8">
         <div className="rounded-3xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
           <h2 className="mx-auto max-w-2xl font-serif text-3xl leading-tight tracking-tight sm:text-4xl">

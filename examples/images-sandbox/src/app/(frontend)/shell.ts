@@ -1,4 +1,3 @@
-// Shared <SandboxShell> props — the responsive subpage renders the same chrome as the gallery.
 export const shellProps = {
   title: 'Images Sandbox',
   packageName: '@pro-laico/payload-images',

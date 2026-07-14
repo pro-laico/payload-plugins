@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Image } from '@/components/Image'
+
 import { getProject } from '@/lib/data'
+import { Image } from '@/components/Image'
 
 /** A project tile for the work grid and the home page — cover photo (focal-aware crop) + meta.
  *  Takes the project's ID and self-fetches through the id-keyed getters (the atomic model): the

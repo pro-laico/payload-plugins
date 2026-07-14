@@ -1,22 +1,21 @@
-import config from '@payload-config'
-// The plugin's icon component, seeded once with this app's live Payload session
-// (see src/components/PayloadIcon.ts — packages never resolve Payload themselves).
-import { Icon as PayloadIcon } from '@/components/PayloadIcon'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
+import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+
+import config from '@payload-config'
 import { CmsIcon } from '@/components/ui/CmsIcon'
+import { Icon as PayloadIcon } from '@/components/PayloadIcon'
 import type { IconSize, IconTone, IconVariant } from '@/types'
 
-// The slugs the seed definitions in src/seed/*.ts fill.
 const SEEDED_SLUGS = ['icon', 'iconSet', 'pages']
 
-const VARIANTS: IconVariant[] = ['standalone', 'outline', 'solid', 'ghost']
 const SIZES: IconSize[] = ['xs', 'sm', 'base', 'lg', 'xl']
+const VARIANTS: IconVariant[] = ['standalone', 'outline', 'solid', 'ghost']
 const TONES: IconTone[] = ['current', 'muted', 'primary', 'accent', 'destructive']
 
 const iconName = (filename?: string | null): string => filename?.replace(/\.svg$/i, '') ?? 'icon'
 
+//TODO: extract into its own component
 /** A labeled showcase cell. `span` not `code` — the shell's chip styling would swallow the tiny label. */
 const Cell = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="flex flex-col items-center gap-2">
@@ -25,6 +24,7 @@ const Cell = ({ label, children }: { label: string; children: ReactNode }) => (
   </div>
 )
 
+//TODO: extract into its own component
 /** A titled showcase section. */
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="space-y-3">

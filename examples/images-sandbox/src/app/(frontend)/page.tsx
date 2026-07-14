@@ -1,18 +1,16 @@
 import config from '@payload-config'
+import { getPayload } from 'payload'
+import type { CSSProperties } from 'react'
 import type { AspectRatio } from '@pro-laico/payload-images'
 import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
-import { getPayload } from 'payload'
-import type { CSSProperties } from 'react'
+
+import { shellProps } from './shell'
 import { Image } from '../../components/Image'
 import type { ImageListItem, PageDoc } from '../../types'
-import { shellProps } from './shell'
 
-// The slugs the seed definitions in src/seed/ fill.
 const SEEDED_SLUGS = ['images', 'pages']
 
-// The crops the demo renders for each source — all cut to the image's focal point, so an
-// off-center subject stays in frame whether the box is wide, square, or tall.
 const RATIOS: { label: string; ar?: AspectRatio }[] = [
   { label: 'natural' },
   { label: '16:9', ar: '16:9' },
@@ -22,7 +20,6 @@ const RATIOS: { label: string; ar?: AspectRatio }[] = [
 
 const TILE_SIZES = '(max-width: 920px) 45vw, 200px'
 
-// Demo-only chrome (the focal-crop ratio grid) — everything else rides the shell classes/tokens.
 const ratiosGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }
 const ratioTile: CSSProperties = { border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', background: 'var(--card)' }
 const ratioLabel: CSSProperties = {
@@ -45,8 +42,8 @@ export default async function HomePage() {
       sort: 'createdAt',
       select: { alt: true, width: true, height: true, focalX: true, focalY: true },
     })
-  ).docs as ImageListItem[]
-  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs as PageDoc[]
+  ).docs as ImageListItem[] //TODO: replace `as` cast with proper typing
+  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs as PageDoc[] //TODO: replace `as` cast with proper typing
 
   return (
     <SandboxShell
@@ -78,6 +75,7 @@ export default async function HomePage() {
           ({images.length})
         </small>
       </h2>
+      {/*TODO: extract into its own component */}
       {images.length === 0 ? (
         <EmptyState>No images yet — seed the database above, or upload your own in the admin.</EmptyState>
       ) : (
@@ -114,11 +112,11 @@ export default async function HomePage() {
         Confirms the relationship + seed <code>ref()</code> resolution end to end: a <code>pages</code> doc&apos;s <code>heroImage</code> (an{' '}
         <code>upload</code> field to <code>images</code>) rendered through the same component.
       </p>
+      {/*TODO: extract into its own component */}
       {pages.length === 0 ? (
         <EmptyState>No pages yet — seed the database above.</EmptyState>
       ) : (
         pages.map((page) => {
-          // depth 0 → heroImage is the bare id; <Image> owns fetching what it renders.
           const heroId = typeof page.heroImage === 'object' && page.heroImage ? page.heroImage.id : (page.heroImage ?? undefined)
           return (
             <div className="shell-card" key={String(page.id)}>

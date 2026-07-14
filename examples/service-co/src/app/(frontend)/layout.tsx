@@ -1,15 +1,16 @@
 import config from '@payload-config'
-import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolbar'
-import { extractFonts } from '@pro-laico/payload-fonts'
-import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
 import { type ReactNode, Suspense } from 'react'
+import { extractFonts } from '@pro-laico/payload-fonts'
+import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
+import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolbar'
+
+import { devLinks } from '@/dev/links'
+import { devTests } from '@/dev/tests'
 import definitionFonts from '@/app/definition'
 import { SiteFooter } from '@/components/SiteFooter'
 import { SiteHeader } from '@/components/SiteHeader'
-import { devLinks } from '@/dev/links'
-import { devTests } from '@/dev/tests'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,16 +18,6 @@ export const metadata: Metadata = {
   description: 'A design-build studio working across architecture, interiors, and landscape.',
 }
 
-// The active brand fonts are applied as the `--font-set{Sans,Serif,Mono,Display}` CSS variables two
-// ways that never both fire (see the fonts-sandbox for the full write-up):
-//   • Production — next/font/local. `pnpm prebuild` writes the active fonts to definition.ts;
-//     `extractFonts` puts their classes on <html>.
-//   • Development — <DevFonts /> reads the active selection from Payload and inlines the matching
-//     @font-face + `--font-set*` vars at runtime, so a seed/edit shows on refresh with no build.
-//
-// Cache Components: DevFonts (a runtime Payload read in dev) and the chrome slots (resolveDevChrome
-// reads cookies in dev; the footer resolves icons at request time) are dynamic, so each renders
-// inside its own Suspense boundary while the rest of the shell stays static.
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
@@ -43,7 +34,6 @@ export default function FrontendLayout({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <Chrome slot="footer" />
         </Suspense>
-        {/* Dev-only (renders null in production): the floating dev toolbar + test harness. */}
         <DevToolbar tests={devTests} links={devLinks} />
       </body>
     </html>

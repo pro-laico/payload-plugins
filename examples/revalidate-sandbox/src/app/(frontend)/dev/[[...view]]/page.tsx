@@ -1,10 +1,8 @@
-import config from '@payload-config'
-import { createDevPage } from '@pro-laico/payload-dev-tools/next'
-import { getPayload } from 'payload'
 import { Suspense } from 'react'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createDevPage } from '@pro-laico/payload-dev-tools/next'
 
-// The dev pages (`/dev`, `/dev/revalidate`, …) read live Payload data — dynamic content,
-// so under Cache Components they render inside a Suspense boundary.
 const DevPage = createDevPage({ payload: getPayload({ config }) })
 
 export default function Page(props: Parameters<typeof DevPage>[0]) {

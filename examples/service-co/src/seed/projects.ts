@@ -1,11 +1,5 @@
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// Three portfolio projects — the collection that pulls the most plugins together. Each has a
-// payload-images `coverImage` + `gallery` and a many-relationship to the `services` used, all wired
-// with `ref()` tokens the engine resolves after creating those docs. (The `video` field is left
-// unseeded: Mux needs credentials, and the dev server regenerates the seed-ref types on boot
-// without them, so referencing `mux-video` here isn't type-stable — attach a video in the admin
-// instead. See videos.ts / plugins/index.ts, which ingest a standalone clip when creds are set.)
 export default defineSeed('projects', ({ ref }) => [
   {
     _key: 'cedar-hill-residence',

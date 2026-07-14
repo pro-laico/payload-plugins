@@ -21,7 +21,7 @@ export function SeedPanel({ seeded, counts = {}, note }: SeedPanelProps) {
         location.reload()
         return
       }
-      const body = (await res.json().catch(() => null)) as SeedError | null
+      const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
       setError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
     } catch {
       setError({ error: 'Seed request failed — is the dev server running?' })

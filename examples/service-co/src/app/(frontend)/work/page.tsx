@@ -1,14 +1,12 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
-import { Suspense } from 'react'
+import { getProjectIds } from '@/lib/data'
 import { ProjectCard } from '@/components/ProjectCard'
 import { SectionHeading } from '@/components/SectionHeading'
-import { getProjectIds } from '@/lib/data'
 
 export const metadata: Metadata = { title: 'Work' }
 
-// The atomic list: this page holds an id-list entry (projects:list:work) — membership and the
-// declared sort fields (featured, year) bust it; a title/photo edit re-renders one card instead.
 export default function WorkPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-20">

@@ -1,7 +1,5 @@
-// Presentational types for the CVA-styled `<Icon>` component (src/components/ui/Icon).
-
-export type IconVariant = 'standalone' | 'inline' | 'outline' | 'solid' | 'ghost'
 export type IconSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl'
+export type IconVariant = 'standalone' | 'inline' | 'outline' | 'solid' | 'ghost'
 export type IconTone = 'current' | 'muted' | 'primary' | 'accent' | 'destructive'
 
 export interface IconProps {

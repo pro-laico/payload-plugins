@@ -1,9 +1,9 @@
 import config from '@payload-config'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
+import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+
 import type { VideoDoc } from '@/types'
 
-// The slugs the seed definitions in src/seed/ create.
 const SEEDED_SLUGS = ['mux-video', 'pages']
 
 const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
@@ -12,6 +12,7 @@ export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
+  //TODO: replace `as` cast with proper typing
   const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs as VideoDoc[]
 
   return (
@@ -44,6 +45,7 @@ export default async function HomePage() {
           ({videos.length})
         </small>
       </h2>
+      {/*TODO: extract into its own component */}
       {videos.length === 0 ? (
         <EmptyState>No videos yet — seed the database above, or upload a clip in the admin.</EmptyState>
       ) : (

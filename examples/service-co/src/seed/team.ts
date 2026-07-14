@@ -1,7 +1,5 @@
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// The team. Each `photo` is a payload-images upload, rendered as a square focal-aware crop on the
-// About page. `order` sets the sequence.
 export default defineSeed('team', ({ ref }) => [
   {
     _key: 'elena',

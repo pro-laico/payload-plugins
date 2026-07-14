@@ -1,6 +1,6 @@
 import config from '@payload-config'
-import { createImageFor } from '@pro-laico/payload-images'
 import { getPayload } from 'payload'
+import { createImageFor } from '@pro-laico/payload-images'
 
 /**
  * The project's Sanity-style image getter, seeded ONCE with this app's Payload handle —

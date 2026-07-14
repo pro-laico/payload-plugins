@@ -1,16 +1,12 @@
-import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type GlobalConfig } from 'payload'
+
+import { captureDestination } from './logCapture'
 import { lockMediaDeletesBeforeDelete } from './hooks/collection/mediaBeforeDelete'
 import { failThingUpdatesBeforeChange } from './hooks/collection/thingsBeforeChange'
-import { captureDestination } from './logCapture'
-
-// A config DESIGNED TO FAIL. Every collection here exists to trigger one seed failure path on
-// purpose, so the tests can check the resulting error/warning is legible and identifiable —
-// testing the failure story, not the success story. Data-driven traps use magic values ('boom');
-// runtime traps use the mutable `flags` switches.
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)
@@ -23,9 +19,7 @@ const Users: CollectionConfig = { slug: 'users', auth: true, fields: [] }
 const Things: CollectionConfig = {
   slug: 'things',
   admin: { useAsTitle: 'title' },
-  hooks: {
-    beforeChange: [failThingUpdatesBeforeChange],
-  },
+  hooks: { beforeChange: [failThingUpdatesBeforeChange] },
   fields: [
     { name: 'title', type: 'text', required: true },
     { name: 'status', type: 'text', validate: (v: unknown) => (v === 'boom' ? 'status may not be "boom" (simulated create failure)' : true) },
@@ -34,9 +28,6 @@ const Things: CollectionConfig = {
   ],
 }
 
-// Chickens ⇄ eggs: both relationship fields are REQUIRED, so a mutual ref is an unbreakable
-// dependency cycle (the graph's hard error). Eggs' required `chicken` also drives the
-// required-ref-to-skipped-definition error when the chickens definition is disabled.
 const Chickens: CollectionConfig = {
   slug: 'chickens',
   admin: { useAsTitle: 'name' },
@@ -60,9 +51,7 @@ const Eggs: CollectionConfig = {
 const Media: CollectionConfig = {
   slug: 'media',
   upload: { staticDir: resolve(currentDir, '../media') },
-  hooks: {
-    beforeDelete: [lockMediaDeletesBeforeDelete],
-  },
+  hooks: { beforeDelete: [lockMediaDeletesBeforeDelete] },
   fields: [{ name: 'alt', type: 'text' }],
 }
 
@@ -93,7 +82,6 @@ export default buildConfig({
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URI || 'file:./seed-failures.db' } }),
   editor: lexicalEditor(),
   telemetry: false,
-  // Route ALL logging through the in-memory capture so tests can assert on the exact messages.
   logger: { options: { level: 'info' }, destination: captureDestination },
   collections: [Users, Things, Chickens, Eggs, Media, Flaky],
   globals: [Settings],

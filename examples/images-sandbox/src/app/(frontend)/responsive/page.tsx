@@ -1,16 +1,17 @@
 import config from '@payload-config'
-import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
-import { Image } from '../../../components/Image'
-import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
-import type { ImageDoc } from '../../../types'
+import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
+import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
+
 import { shellProps } from '../shell'
+import type { ImageDoc } from '../../../types'
+import { Image } from '../../../components/Image'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ResponsivePage() {
   const payload = await getPayload({ config })
-  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs[0] as ImageDoc | undefined
+  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs[0] as ImageDoc | undefined //TODO: replace `as` cast with proper typing
 
   if (!img) {
     return (
@@ -25,8 +26,6 @@ export default async function ResponsivePage() {
     )
   }
 
-  // The same srcset <ResponsiveImage> emits below, shown so you know which candidate URLs to
-  // look for in the Network tab.
   const ar = img.width && img.height ? img.width / img.height : undefined
   const srcset = buildSrcset(img, { aspectRatio: ar })?.srcset ?? ''
 
@@ -59,7 +58,6 @@ export default async function ResponsivePage() {
         </li>
       </ol>
 
-      {/* Full-bleed: break out of the centered column so `sizes="100vw"` is honest. */}
       <div style={{ width: '100vw', marginLeft: 'calc(50% - 50vw)', marginTop: 24 }}>
         <Image id={img.id} sizes="100vw" loading="eager" fetchPriority="high" />
       </div>

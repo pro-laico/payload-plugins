@@ -7,8 +7,6 @@ export default defineSeed('services', ({ ref }) => [
     slug: 'consulting',
     summary: 'Strategic guidance tailored to your goals.',
     image: ref('media', 'serviceA'),
-    // Circular: each service references the other. The engine breaks the cycle by deferring one
-    // side's `related` and setting it after both docs exist.
     related: [ref('services', 'implementation')],
   },
   {

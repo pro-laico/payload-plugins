@@ -1,7 +1,5 @@
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// Client testimonials, each tied to the project it's about via ref('projects', …) — the engine
-// creates the projects first, then resolves the relationship.
 export default defineSeed('testimonials', ({ ref }) => [
   {
     _key: 'cedar-hill',

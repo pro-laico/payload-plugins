@@ -1,6 +1,6 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
-import { Suspense } from 'react'
 import { ImageFor } from '@/components/ImageFor'
 import { SectionHeading } from '@/components/SectionHeading'
 import { getSiteSettings, getTeamIds, getTeamMember } from '@/lib/data'

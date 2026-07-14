@@ -9,7 +9,6 @@ export const Posts: CollectionConfig = {
     { name: 'slug', type: 'text', required: true, unique: true },
     { name: 'excerpt', type: 'textarea' },
     { name: 'heroImage', type: 'upload', relationTo: 'media' },
-    // References a Services doc — exercised via ref('services', …) in the seed.
     { name: 'relatedService', type: 'relationship', relationTo: 'services' },
   ],
 }

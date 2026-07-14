@@ -1,4 +1,5 @@
 import Link from 'next/link'
+
 import { getSiteSettings } from '@/lib/data'
 
 const NAV = [

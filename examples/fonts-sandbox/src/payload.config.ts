@@ -1,22 +1,18 @@
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { sqliteAdapter } from '@payloadcms/db-sqlite'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type SharpDependency } from 'payload'
 import sharp from 'sharp'
-import { Users } from './collections/Users'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
+import { buildConfig, type SharpDependency } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+
 import { plugins } from './plugins'
+import { Users } from './collections/Users'
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)
 
 export default buildConfig({
-  admin: {
-    user: Users.slug,
-    importMap: { baseDir: resolve(currentDir) },
-  },
-  // The `font` typeface collection + its hidden `fontOriginal`/`fontOptimized` upload
-  // collections + the `fontSet` global come from fontsPlugin (see ./plugins).
+  admin: { user: Users.slug, importMap: { baseDir: resolve(currentDir) } },
   collections: [Users],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',

@@ -1,38 +1,21 @@
 import config from '@payload-config'
+import { getPayload, type Payload } from 'payload'
 import { type ActiveFace, getActiveFontFaces } from '@pro-laico/payload-fonts'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
-import { getPayload, type Payload } from 'payload'
+
 import type { ActiveEntry } from '@/types'
 
-// The slugs src/seed/ fills (the seed also sets the `fontSet` global, but getSeedStatus counts
-// collections — the global's effect shows up as the specimens themselves).
 const SEEDED_SLUGS = ['fontOriginal', 'font']
-
+const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 const FAMILY_LABEL: Record<string, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-const familyVar = (family: string) => `var(--font-set${cap(family)})`
 
-/** The active typefaces (family, title, served faces) — the fonts the layout makes available as
- *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */
-async function getActive(payload: Payload): Promise<ActiveEntry[]> {
-  const faces = await getActiveFontFaces(payload)
-
-  const titleByFamily = new Map<string, string>()
-  try {
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1 })) as unknown as Partial<Record<string, { title?: string } | null>>
-    for (const family of ['sans', 'serif', 'mono', 'display']) {
-      const doc = fontSet?.[family]
-      if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)
-    }
-  } catch {
-    // no fontSet global
-  }
-
-  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, faces: f.faces }))
+const rangeLabel = (faces: ActiveFace[]) => {
+  const variable = faces.find((f) => f.weight.includes(' '))
+  const italic = faces.find((f) => f.style === 'italic')
+  const base = variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
+  return italic ? `${base} + italic${italic.obliqueAngle ? ` (oblique ${italic.obliqueAngle}°)` : ''}` : base
 }
 
-// A variable face carries a 'min max' range in one file — sample a spread across it. Static faces
-// get one sample per served upright weight.
 const sampleWeights = (faces: ActiveFace[]): number[] => {
   const upright = faces.filter((f) => f.style === 'normal')
   const variable = upright.find((f) => f.weight.includes(' '))
@@ -43,18 +26,27 @@ const sampleWeights = (faces: ActiveFace[]): number[] => {
   return [...new Set(upright.map((f) => Number(f.weight)))].sort((a, b) => a - b)
 }
 
-const rangeLabel = (faces: ActiveFace[]) => {
-  const variable = faces.find((f) => f.weight.includes(' '))
-  const italic = faces.find((f) => f.style === 'italic')
-  const base = variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
-  return italic ? `${base} + italic${italic.obliqueAngle ? ` (oblique ${italic.obliqueAngle}°)` : ''}` : base
-}
-
-// An italic face rides `font-style: italic` (a true italic / `ital` axis) or, when it carries an
-// oblique angle, the `oblique <angle>` that maps onto the file's `slnt` axis — same as the served CSS.
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const familyVar = (family: string) => `var(--font-set${cap(family)})`
 const italicFontStyle = (face: ActiveFace) => (face.obliqueAngle ? `oblique ${face.obliqueAngle}deg` : 'italic')
 
-const SAMPLE = 'The quick brown fox jumps over the lazy dog'
+/** The active typefaces (family, title, served faces) — the fonts the layout makes available as
+ *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */
+async function getActive(payload: Payload): Promise<ActiveEntry[]> {
+  const faces = await getActiveFontFaces(payload)
+
+  const titleByFamily = new Map<string, string>()
+  try {
+    //TODO: replace `as` cast with proper typing
+    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1 })) as unknown as Partial<Record<string, { title?: string } | null>>
+    for (const family of ['sans', 'serif', 'mono', 'display']) {
+      const doc = fontSet?.[family]
+      if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)
+    }
+  } catch {}
+
+  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, faces: f.faces }))
+}
 
 export default async function Home() {
   const payload = await getPayload({ config })
@@ -85,6 +77,7 @@ export default async function Home() {
           Inter, a two-weight Lora, and an ital-capable Recursive), subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
         </EmptyState>
       ) : (
+        //TODO: extract into its own component
         active.map((entry) => (
           <section key={entry.family} className="shell-card">
             <div className="specimen__head">
@@ -122,7 +115,6 @@ export default async function Home() {
   )
 }
 
-// Specimen-specific type styles only — cards, buttons, and colors come from the shell.
 const SPECIMEN_CSS = `
   .specimen__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
   .specimen__name { font-size: 1.5rem; font-weight: 600; }

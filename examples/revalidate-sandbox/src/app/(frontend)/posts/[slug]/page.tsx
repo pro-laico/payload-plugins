@@ -1,12 +1,9 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
+import { notFound } from 'next/navigation'
+
 import { getMedia, getPostBySlug, getService } from '@/lib/getters'
 
-// Atomic composition: the post is fetched depth: 0, so heroImage / relatedService are
-// IDS. Each reference renders through its own id-keyed cached getter — editing the
-// image's alt re-materializes ONLY the <HeroInfo> entry; this page's entry (holding just
-// the id) survives untouched.
 export default function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 24 }}>

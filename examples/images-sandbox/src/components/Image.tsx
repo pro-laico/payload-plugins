@@ -1,4 +1,5 @@
 import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
 import { imageFor } from '../lib/imageFor'
 
 /**

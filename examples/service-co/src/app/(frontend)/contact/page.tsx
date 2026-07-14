@@ -1,10 +1,10 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
-import { Suspense } from 'react'
-import { SectionHeading } from '@/components/SectionHeading'
-import { ButtonLink } from '@/components/ui/Button'
-import { CmsIcon } from '@/components/ui/CmsIcon'
 import { getSiteSettings } from '@/lib/data'
+import { CmsIcon } from '@/components/ui/CmsIcon'
+import { ButtonLink } from '@/components/ui/Button'
+import { SectionHeading } from '@/components/SectionHeading'
 
 export const metadata: Metadata = { title: 'Contact' }
 
@@ -32,7 +32,7 @@ async function ContactDetails() {
     c.email ? { icon: 'mail', label: c.email, href: `mailto:${c.email}` } : null,
     c.phone ? { icon: 'phone', label: c.phone, href: `tel:${c.phone.replace(/[^+\d]/g, '')}` } : null,
     c.address ? { icon: 'map-pin', label: c.address, href: undefined } : null,
-  ].filter(Boolean) as { icon: string; label: string; href?: string }[]
+  ].filter(Boolean) as { icon: string; label: string; href?: string }[] //TODO: replace `as` cast with proper typing
 
   return (
     <>

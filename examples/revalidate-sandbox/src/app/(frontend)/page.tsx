@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { connection } from 'next/server'
 import { Suspense } from 'react'
-import { Icon } from '@/components/PayloadIcon'
-import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { connection } from 'next/server'
 import { SandboxShell } from '@pro-laico/sandbox-shell'
+import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
+
+import { Icon } from '@/components/PayloadIcon'
 import { getFeaturedPostIds, getImage, getImageIds, getPost, getPostIds, getService, getServiceIds } from '@/lib/getters'
 
 export default function HomePage() {
@@ -29,8 +30,6 @@ export default function HomePage() {
 }
 
 async function Content() {
-  // Request-time shell: the page composes at request time from the CACHED getter entries
-  // below (that's the atomic model), and the build never queries the database.
   await connection()
   const [postIds, featuredIds, serviceIds, imageIds] = await Promise.all([getPostIds(), getFeaturedPostIds(), getServiceIds(), getImageIds()])
   return (

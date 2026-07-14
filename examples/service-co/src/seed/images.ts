@@ -1,11 +1,5 @@
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// Every photo on the site, seeded as native uploads into the payload-images `images` collection.
-// Only the original is stored; each rendered size is generated + cropped on first request. `focalX`
-// / `focalY` (percent from top-left) mark each subject so the focal-aware crops keep it in frame
-// across aspect ratios. Each image also files into a Payload folder (seed/folders.ts) — how a real
-// library stays organized as it grows. Reference any of these from a doc's upload field via
-// ref('images', <_key>). Files live in `seed-assets/images/`.
 export default defineSeed('images', ({ file, ref }) => [
   {
     _key: 'hero',

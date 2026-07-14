@@ -1,24 +1,22 @@
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { sqliteAdapter } from '@payloadcms/db-sqlite'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type SharpDependency } from 'payload'
 import sharp from 'sharp'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
+import { buildConfig, type SharpDependency } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+
+import { plugins } from './plugins'
 import { Media } from './collections/Media'
 import { Posts } from './collections/Posts'
-import { Services } from './collections/Services'
 import { Users } from './collections/Users'
+import { Services } from './collections/Services'
 import { SiteSettings } from './globals/SiteSettings'
-import { plugins } from './plugins'
 
 const filename = fileURLToPath(import.meta.url)
 const currentDir = dirname(filename)
 
 export default buildConfig({
-  admin: {
-    user: Users.slug,
-    importMap: { baseDir: resolve(currentDir) },
-  },
+  admin: { user: Users.slug, importMap: { baseDir: resolve(currentDir) } },
   collections: [Users, Media, Services, Posts],
   globals: [SiteSettings],
   editor: lexicalEditor(),

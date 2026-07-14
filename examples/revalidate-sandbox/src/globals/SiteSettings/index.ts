@@ -6,7 +6,6 @@ export const SiteSettings: GlobalConfig = {
   fields: [
     { name: 'siteName', type: 'text' },
     { name: 'logo', type: 'upload', relationTo: 'media' },
-    // A global referencing a collection doc — exercises ref() from a global seed.
     { name: 'featuredService', type: 'relationship', relationTo: 'services' },
   ],
 }

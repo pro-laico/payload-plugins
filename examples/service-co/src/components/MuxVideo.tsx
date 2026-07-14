@@ -1,5 +1,6 @@
 'use client'
 import MuxPlayer from '@mux/mux-player-react'
+
 import type { MuxPlayback } from '@/types'
 
 /** The payload-mux frontend: play a video from its virtual playback fields. The plugin ships no
@@ -12,8 +13,6 @@ export function MuxVideo({ playback, title, className }: { playback: MuxPlayback
     <MuxPlayer
       className={className}
       playbackId={playback.playbackId}
-      // Under a signed policy these virtual URLs arrive JWT-signed; passing them lets the player
-      // use them directly. Public playback works from the id alone.
       src={playback.playbackUrl ?? undefined}
       poster={playback.posterUrl ?? undefined}
       metadata={{ video_title: title ?? undefined }}

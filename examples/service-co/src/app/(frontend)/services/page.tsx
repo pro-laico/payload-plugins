@@ -1,9 +1,9 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
-import { Suspense } from 'react'
+import { Icon } from '@/components/ui/Icon'
 import { ImageFor } from '@/components/ImageFor'
 import { SectionHeading } from '@/components/SectionHeading'
-import { Icon } from '@/components/ui/Icon'
 import { getIcon, getService, getServiceIds } from '@/lib/data'
 
 export const metadata: Metadata = { title: 'Services' }

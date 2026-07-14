@@ -1,20 +1,12 @@
 import config from '@payload-config'
-import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
-import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
 import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
+
 import type { Image, Media, Post, Service, SiteSetting } from '@/payload-types'
 
-// The ONE live Payload session (getPayload memoizes) — seeds the cache helpers and every
-// getter below, so the session that fetches a doc is the session that tags it.
 const db = getPayload({ config })
 const { cacheDoc, cacheGlobal, cacheIds } = createCacheHelpers(db)
-
-// The atomic pattern @pro-laico/payload-revalidate is built around:
-// - lists fetch IDS ONLY (cacheIds) — their entries change on membership/order, never on content
-// - every doc renders through an id-keyed getter (cacheDoc) — ITS entry is the only thing a
-//   content edit re-materializes
-// - references stay ids (depth: 0); the component that renders a reference self-fetches
-// The result: edit a media alt → exactly one entry (getMedia's) re-renders, everywhere it's used.
 
 export async function getPostIds(): Promise<(string | number)[]> {
   'use cache'
@@ -43,7 +35,7 @@ export async function getFeaturedPostIds(): Promise<(string | number)[]> {
 export async function getPost(id: string | number): Promise<Post | null> {
   'use cache'
   const payload = await db
-  const doc = (await payload.findByID({ collection: 'posts', id, depth: 0, disableErrors: true, overrideAccess: false })) as Post | null
+  const doc = (await payload.findByID({ collection: 'posts', id, depth: 0, disableErrors: true, overrideAccess: false })) as Post | null //TODO: replace `as` cast with proper typing
   return cacheDoc(doc, 'posts', { label: 'post-by-id' })
 }
 
@@ -51,7 +43,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
   'use cache'
   const payload = await db
   const res = await payload.find({ collection: 'posts', where: { slug: { equals: slug } }, limit: 1, depth: 0, overrideAccess: false })
-  return cacheDoc((res.docs[0] as Post | undefined) ?? null, 'posts', { as: slug, label: 'post-by-slug' })
+  return cacheDoc((res.docs[0] as Post | undefined) ?? null, 'posts', { as: slug, label: 'post-by-slug' }) //TODO: replace `as` cast with proper typing
 }
 
 export async function getServiceIds(): Promise<(string | number)[]> {
@@ -65,7 +57,7 @@ export async function getServiceIds(): Promise<(string | number)[]> {
 export async function getService(id: string | number): Promise<Service | null> {
   'use cache'
   const payload = await db
-  const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true, overrideAccess: false })) as Service | null
+  const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true, overrideAccess: false })) as Service | null //TODO: replace `as` cast with proper typing
   return cacheDoc(doc, 'services', { label: 'service-by-id' })
 }
 
@@ -87,7 +79,7 @@ export async function getImage(id: string | number, render?: ImageRenderContext)
     context: { ...render },
     disableErrors: true,
     overrideAccess: false,
-  })) as Image | null
+  })) as Image | null //TODO: replace `as` cast with proper typing
   return cacheDoc(doc, 'images', { label: 'image-by-id' })
 }
 
@@ -102,12 +94,12 @@ export async function getImageIds(): Promise<(string | number)[]> {
 export async function getMedia(id: string | number): Promise<Media | null> {
   'use cache'
   const payload = await db
-  const doc = (await payload.findByID({ collection: 'media', id, depth: 0, disableErrors: true, overrideAccess: false })) as Media | null
+  const doc = (await payload.findByID({ collection: 'media', id, depth: 0, disableErrors: true, overrideAccess: false })) as Media | null //TODO: replace `as` cast with proper typing
   return cacheDoc(doc, 'media', { label: 'media-by-id' })
 }
 
 export async function getSettings(): Promise<SiteSetting> {
   'use cache'
   const payload = await db
-  return cacheGlobal((await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as SiteSetting, 'site-settings')
+  return cacheGlobal((await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as SiteSetting, 'site-settings') //TODO: replace `as` cast with proper typing
 }

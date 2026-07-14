@@ -3,13 +3,9 @@ import type { ReactNode } from 'react'
 import '@pro-laico/sandbox-shell/styles.css'
 import './globals.css'
 
-// Dynamic: the page reads live Payload data (seed status + icons) on every request.
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'Icons Sandbox',
-  description: 'CVA + Tailwind showcase for @pro-laico/payload-icons',
-}
+export const metadata: Metadata = { title: 'Icons Sandbox', description: 'CVA + Tailwind showcase for @pro-laico/payload-icons' }
 
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (

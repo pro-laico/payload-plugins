@@ -1,8 +1,5 @@
 import { defineSeed } from '@pro-laico/payload-seed'
 
-// The four services. Each references a payload-icons `icon` (by the same name the active set maps)
-// and a payload-images photo — both resolved from tokens: the engine creates the icons + images
-// first, then fills these relationships. Reference a service elsewhere via ref('services', <_key>).
 export default defineSeed('services', ({ ref }) => [
   {
     _key: 'architecture',

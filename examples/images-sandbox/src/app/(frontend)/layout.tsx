@@ -1,7 +1,7 @@
 import type React from 'react'
+
 import '@pro-laico/sandbox-shell/styles.css'
 
-// Dynamic: the demo reads live Payload data (seed status + seeded images) on every request.
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
@@ -9,8 +9,6 @@ export const metadata = {
   description: 'An example app for @pro-laico/payload-images.',
 }
 
-// A second root layout (alongside the Payload admin's own at (payload)/layout.tsx) — route
-// groups let each top-level section own its <html>.
 export default function FrontendLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">

@@ -1,29 +1,21 @@
-import 'server-only'
 import config from '@payload-config'
-import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
-import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
 import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+import { type ImageRenderContext, RESPONSIVE_IMAGE_SELECT } from '@pro-laico/payload-images'
+
 import type { IconDoc, MediaImage, MuxVideoDoc, Project, Service, SiteSettings, TeamMember, Testimonial } from '@/types'
+
+import 'server-only'
 
 // The ONE live Payload session (getPayload memoizes) — seeds the cache helpers and every
 // getter below, so the session that fetches a doc is the session that tags it.
 const db = getPayload({ config })
 const { cacheDoc, cacheGlobal, cacheIds } = createCacheHelpers(db)
 
-// The read side of @pro-laico/payload-revalidate — the atomic model:
-//   • lists fetch IDS ONLY (`cacheIds`, `select: {}`) — their entries change on membership/order
-//     events, never on content. Each declared scope (see src/plugins) names the fields that can
-//     reorder it, so e.g. editing a service `order` busts services:list:ordered and nothing else.
-//   • every doc renders through an id-keyed getter (`cacheDoc`, depth 0) — ITS entry is the only
-//     thing a content edit re-materializes, at every usage site at once.
-//   • references stay ids; the page awaits the referenced doc's own getter (getImage, getIcon,
-//     getMuxVideo), so an image alt edit busts images:{id} and exactly one entry refreshes.
-// Reads rely on the local API's default access override (server-side, trusted; public read access
-// is also set on the content collections, so this is belt-and-suspenders). Watch it all live at /dev/revalidate.
-
 export const getSiteSettings = async (): Promise<SiteSettings> => {
   'use cache'
   const payload = await db
+  //TODO: replace `as` cast with proper typing
   const settings = (await payload.findGlobal({ slug: 'site-settings', depth: 0 })) as unknown as SiteSettings
   return cacheGlobal(settings, 'site-settings')
 }
@@ -39,6 +31,7 @@ export const getServiceIds = async (): Promise<(string | number)[]> => {
 export const getService = async (id: string | number): Promise<Service | null> => {
   'use cache'
   const payload = await db
+  //TODO: replace `as` cast with proper typing
   const doc = (await payload.findByID({ collection: 'services', id, depth: 0, disableErrors: true })) as Service | null
   return cacheDoc(doc, 'services', { label: 'service-by-id' })
 }
@@ -47,13 +40,7 @@ export const getService = async (id: string | number): Promise<Service | null> =
 export const getProjectIds = async (): Promise<(string | number)[]> => {
   'use cache'
   const payload = await db
-  const res = await payload.find({
-    collection: 'projects',
-    sort: ['-featured', '-year'],
-    limit: 50,
-    depth: 0,
-    select: {},
-  })
+  const res = await payload.find({ collection: 'projects', sort: ['-featured', '-year'], limit: 50, depth: 0, select: {} })
   await cacheIds(res, 'projects', { list: 'work', label: 'project-ids' })
   return res.docs.map((doc) => doc.id)
 }
@@ -61,13 +48,7 @@ export const getProjectIds = async (): Promise<(string | number)[]> => {
 export const getFeaturedProjectId = async (): Promise<string | number | null> => {
   'use cache'
   const payload = await db
-  const res = await payload.find({
-    collection: 'projects',
-    where: { featured: { equals: true } },
-    limit: 1,
-    depth: 0,
-    select: {},
-  })
+  const res = await payload.find({ collection: 'projects', where: { featured: { equals: true } }, limit: 1, depth: 0, select: {} })
   await cacheIds(res, 'projects', { list: 'featured', label: 'featured-project-id' })
   return res.docs[0]?.id ?? null
 }
@@ -75,6 +56,7 @@ export const getFeaturedProjectId = async (): Promise<string | number | null> =>
 export const getProject = async (id: string | number): Promise<Project | null> => {
   'use cache'
   const payload = await db
+  //TODO: replace `as` cast with proper typing
   const doc = (await payload.findByID({ collection: 'projects', id, depth: 0, disableErrors: true })) as Project | null
   return cacheDoc(doc, 'projects', { label: 'project-by-id' })
 }
@@ -84,6 +66,7 @@ export const getProjectBySlug = async (slug: string): Promise<Project | null> =>
   'use cache'
   const payload = await db
   const res = await payload.find({ collection: 'projects', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
+  //TODO: replace `as` cast with proper typing
   return cacheDoc((res.docs[0] as unknown as Project | undefined) ?? null, 'projects', { as: slug, label: 'project-by-slug' })
 }
 
@@ -98,6 +81,7 @@ export const getTeamIds = async (): Promise<(string | number)[]> => {
 export const getTeamMember = async (id: string | number): Promise<TeamMember | null> => {
   'use cache'
   const payload = await db
+  //TODO: replace `as` cast with proper typing
   const doc = (await payload.findByID({ collection: 'team', id, depth: 0, disableErrors: true })) as TeamMember | null
   return cacheDoc(doc, 'team', { label: 'team-member-by-id' })
 }
@@ -113,12 +97,8 @@ export const getTestimonialIds = async (): Promise<(string | number)[]> => {
 export const getTestimonial = async (id: string | number): Promise<Testimonial | null> => {
   'use cache'
   const payload = await db
-  const doc = (await payload.findByID({
-    collection: 'testimonials',
-    id,
-    depth: 0,
-    disableErrors: true,
-  })) as Testimonial | null
+  //TODO: replace `as` cast with proper typing
+  const doc = (await payload.findByID({ collection: 'testimonials', id, depth: 0, disableErrors: true })) as Testimonial | null
   return cacheDoc(doc, 'testimonials', { label: 'testimonial-by-id' })
 }
 
@@ -138,7 +118,7 @@ export const getImage = async (id: string | number, render?: ImageRenderContext)
     select: RESPONSIVE_IMAGE_SELECT,
     context: { ...render },
     disableErrors: true,
-  })) as MediaImage | null
+  })) as MediaImage | null //TODO: replace `as` cast with proper typing
   return cacheDoc(doc, 'images', { label: 'image-by-id' })
 }
 
@@ -147,6 +127,7 @@ export const getImage = async (id: string | number, render?: ImageRenderContext)
 export const getIcon = async (id: string | number): Promise<IconDoc | null> => {
   'use cache'
   const payload = await db
+  //TODO: replace `as` cast with proper typing
   const doc = (await payload.findByID({ collection: 'icon', id, depth: 0, disableErrors: true })) as IconDoc | null
   return cacheDoc(doc, 'icon', { label: 'icon-by-id' })
 }
@@ -156,11 +137,7 @@ export const getIcon = async (id: string | number): Promise<IconDoc | null> => {
 export const getMuxVideo = async (id: string | number): Promise<MuxVideoDoc | null> => {
   'use cache'
   const payload = await db
-  const doc = (await payload.findByID({
-    collection: 'mux-video',
-    id,
-    depth: 0,
-    disableErrors: true,
-  })) as MuxVideoDoc | null
+  //TODO: replace `as` cast with proper typing
+  const doc = (await payload.findByID({ collection: 'mux-video', id, depth: 0, disableErrors: true })) as MuxVideoDoc | null
   return cacheDoc(doc, 'mux-video', { label: 'mux-video-by-id' })
 }

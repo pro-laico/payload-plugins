@@ -33,6 +33,6 @@ export default defineSeed('posts', ({ ref }) => [
     excerpt: 'Announcing our new consulting practice.',
     heroImage: ref('media', 'post'),
     relatedService: ref('services', 'consulting'),
-    body: body(ref('media', 'serviceA')) as never,
+    body: body(ref('media', 'serviceA')) as never, //TODO: replace `as` cast with proper typing
   },
 ])

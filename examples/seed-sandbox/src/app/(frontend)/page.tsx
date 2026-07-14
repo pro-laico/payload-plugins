@@ -1,19 +1,18 @@
 import config from '@payload-config'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 import { getPayload } from 'payload'
+import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+
 import type { Media, Post, Service } from '@/payload-types'
 
-// The slugs the seed definitions in src/collections/*/seed.ts + src/seed/media.ts create
-// (the site-settings global also seeds, but status is counted per collection).
 const SEEDED_SLUGS = ['media', 'services', 'posts']
 
 export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs as Media[]
-  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs as Service[]
-  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs as Post[]
+  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs as Post[] //TODO: replace `as` cast with proper typing
+  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs as Media[] //TODO: replace `as` cast with proper typing
+  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs as Service[] //TODO: replace `as` cast with proper typing
 
   return (
     <SandboxShell
@@ -30,6 +29,7 @@ export default async function HomePage() {
     >
       <SeedPanel seeded={status.seeded} counts={status.counts} />
 
+      {/*TODO: extract into its own component */}
       <h2>
         Media{' '}
         <small className="shell-muted" style={{ fontWeight: 400 }}>
@@ -48,6 +48,7 @@ export default async function HomePage() {
         </div>
       )}
 
+      {/*TODO: extract into its own component */}
       <h2>
         Services{' '}
         <small className="shell-muted" style={{ fontWeight: 400 }}>
@@ -69,6 +70,7 @@ export default async function HomePage() {
         </div>
       )}
 
+      {/*TODO: extract into its own component */}
       <h2>
         Posts{' '}
         <small className="shell-muted" style={{ fontWeight: 400 }}>

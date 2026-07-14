@@ -10,7 +10,6 @@ export const SiteSettings: GlobalConfig = {
     { name: 'tagline', type: 'text' },
     { name: 'description', type: 'textarea' },
     { name: 'heroImage', label: 'Hero image', type: 'upload', relationTo: 'images' },
-    // Optional — needs Mux credentials. The home hero plays this over the hero image when present.
     { name: 'showreel', label: 'Showreel', type: 'relationship', relationTo: 'mux-video' },
     { name: 'featuredProject', type: 'relationship', relationTo: 'projects' },
     {

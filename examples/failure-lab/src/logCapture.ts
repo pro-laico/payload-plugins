@@ -5,10 +5,8 @@ export const logs: CapturedLog[] = []
 export const captureDestination = {
   write(line: string): void {
     try {
-      logs.push(JSON.parse(line) as CapturedLog)
-    } catch {
-      // Non-JSON lines aren't ours to capture.
-    }
+      logs.push(JSON.parse(line) as CapturedLog) //TODO: replace `as` cast with proper typing
+    } catch {}
   },
 }
 

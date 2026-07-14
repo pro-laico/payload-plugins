@@ -1,11 +1,12 @@
-import { randomUUID } from 'node:crypto'
-import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { rm } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { buildConfig, getPayload, type CollectionConfig, type Config, type GlobalConfig, type Plugin } from 'payload'
-import { captureDestination } from './logCapture'
+
 import type { LabBoot } from './types'
+import { captureDestination } from './logCapture'
 
 export type { LabBoot } from './types'
 
@@ -33,15 +34,11 @@ export async function bootLab(opts: {
     ...(opts.sharp ? { sharp: opts.sharp } : {}),
     typescript: { autoGenerate: false },
   })
-  // getPayload caches instances per `key` (default 'default') — without a unique key, a SECOND
-  // boot in the same process returns the FIRST instance (its onInit never runs, and cleaning it
-  // up destroys the shared adapter under the other tests' feet).
   const payload = await getPayload({ config, key: `lab-${id}` })
   return {
     payload,
     cleanup: async () => {
-      await (payload as unknown as { db?: { destroy?: () => Promise<void> } }).db?.destroy?.()
-      // Windows can hold the handle briefly after destroy (EBUSY) — the OS temp dir cleans up.
+      await (payload as unknown as { db?: { destroy?: () => Promise<void> } }).db?.destroy?.() //TODO: replace `as` cast with proper typing
       await rm(dbPath, { force: true }).catch(() => {})
     },
   }
@@ -60,7 +57,7 @@ export async function expectBootError(plugins: Plugin[], collections: Collection
       typescript: { autoGenerate: false },
     })
   } catch (e) {
-    return e as Error
+    return e as Error //TODO: replace `as` cast with proper typing
   }
   throw new Error('expected buildConfig to fail, but it succeeded')
 }

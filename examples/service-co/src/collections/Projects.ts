@@ -22,7 +22,6 @@ export const Projects: CollectionConfig = {
       labels: { singular: 'Photo', plural: 'Gallery' },
       fields: [{ name: 'image', type: 'upload', relationTo: 'images', required: true }],
     },
-    // Optional — needs Mux credentials to ingest. The project detail page plays it when present.
     { name: 'video', label: 'Video', type: 'relationship', relationTo: 'mux-video' },
     { name: 'services', type: 'relationship', relationTo: 'services', hasMany: true },
     { name: 'featured', type: 'checkbox', defaultValue: false },

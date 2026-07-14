@@ -1,17 +1,12 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
+import { firstPlayback } from '@/lib/mux'
 import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
 import { ButtonLink } from '@/components/ui/Button'
 import { getMuxVideo, getProjectBySlug, getService } from '@/lib/data'
-import { firstPlayback } from '@/lib/mux'
-
-// Atomic composition: the project is fetched depth 0, so the cover, gallery photos, video, and
-// related services are IDS — each renders through its own id-keyed cached entry. Editing a
-// gallery photo's alt or crop re-materializes exactly that image's entry; the project entry
-// (holding just the id) survives untouched.
 
 type Params = { params: Promise<{ slug: string }> }
 
@@ -21,7 +16,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: project?.title ?? 'Project', description: project?.summary ?? undefined }
 }
 
-// Params are request data → the detail renders inside a Suspense boundary.
 export default function ProjectPage({ params }: Params) {
   return (
     <Suspense fallback={null}>
@@ -45,7 +39,6 @@ async function ProjectDetail({ params }: Params) {
 
   return (
     <article>
-      {/* Cover */}
       <div className="relative h-[62vh] min-h-[420px] w-full overflow-hidden bg-muted">
         {project.coverImage != null ? (
           <Image id={project.coverImage} fill sizes="100vw" image={{ quality: 86 }} blur={{ quality: 'md' }} className="object-cover" />
@@ -63,7 +56,6 @@ async function ProjectDetail({ params }: Params) {
       </div>
 
       <div className="mx-auto max-w-5xl px-6 py-16">
-        {/* Intro + services */}
         <div className="grid gap-10 lg:grid-cols-[1fr_260px]">
           <div>
             {project.summary ? <p className="font-serif text-2xl leading-snug tracking-tight text-foreground">{project.summary}</p> : null}
@@ -87,14 +79,12 @@ async function ProjectDetail({ params }: Params) {
           ) : null}
         </div>
 
-        {/* Video (only with an ingested Mux clip) */}
         {video ? (
           <div className="mt-14">
             <MuxVideo playback={video} title={project.title} />
           </div>
         ) : null}
 
-        {/* Gallery */}
         {gallery.length > 0 ? (
           <div className="mt-14 grid gap-5 sm:grid-cols-2">
             {gallery.map((imageId, i) => (

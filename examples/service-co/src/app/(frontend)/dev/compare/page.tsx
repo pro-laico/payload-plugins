@@ -1,13 +1,9 @@
-import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
+import { notFound } from 'next/navigation'
+import { getSiteSettings } from '@/lib/data'
 import { ImageCompare } from '@/components/ImageCompare'
 import { SectionHeading } from '@/components/SectionHeading'
-import { getSiteSettings } from '@/lib/data'
 
-// A static app-specific lab page beside the catch-all /dev/[[...view]] route (static wins):
-// the site's hero image rendered through BOTH image components at two declared renders. The
-// columns should be pixel-identical — the comparison is the data code, not the output. Dev-only,
-// same guard as createDevPage.
 export default function ComparePage() {
   if (process.env.NODE_ENV !== 'development') notFound()
   return (

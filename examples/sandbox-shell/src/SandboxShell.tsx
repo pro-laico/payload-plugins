@@ -1,11 +1,16 @@
 import type { CSSProperties } from 'react'
+
 import type { SandboxShellProps } from './types'
 
 const REPO_URL = 'https://github.com/pro-laico/payload-plugins'
 
 export function SandboxShell({ title, packageName, docsHref, accent, lead, children }: SandboxShellProps) {
   return (
-    <div className="sandbox-shell" data-accent={accent} style={accent ? ({ '--accent': accent } as CSSProperties) : undefined}>
+    <div
+      className="sandbox-shell"
+      data-accent={accent}
+      style={accent ? ({ '--accent': accent } as CSSProperties) : undefined} //TODO: replace `as` cast with proper typing
+    >
       <header className="shell-header">
         <div>
           <h1>{title}</h1>
