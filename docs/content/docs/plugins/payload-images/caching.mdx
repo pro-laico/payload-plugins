@@ -100,7 +100,11 @@ it's genuinely heavily art-directed, and put a CDN in front so repeat traffic ne
 
 Some variants must **always exist and always be servable** — an OG image a crawler hits cold, a
 fixed social card — independent of the cap or on-demand timing. Presets are those: named,
-cap-exempt, and eagerly pre-generated on upload.
+cap-exempt, and eagerly pre-generated on upload. The **Presets & variants** panel on every image
+manages the whole surface — preset toggles, queued prewarm renders, the cached-variant list with
+per-variant purge, and the per-image cap:
+
+![The Presets & variants panel: preset toggles (og, thumbnail), planned prewarm renders, the cached-variant list with per-variant purge, Run now / Purge buttons, and the variant limit input](/screenshots/presets-n-variants.png)
 
 Define reusable **templates** in config. Two ship out of the box — `og` (1200×630 cover jpeg)
 and `thumbnail` (160×160 cover webp, backing the admin list thumbnail) — and your entries merge

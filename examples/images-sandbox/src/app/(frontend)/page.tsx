@@ -141,30 +141,36 @@ export default async function HomePage() {
       )}
 
       <h2>How it works</h2>
-      <pre className="shell-code">{`// Seed the Sanity-style getter ONCE with the app's Payload handle (src/lib/imageFor.ts) —
-// createImageFor takes the getPayload promise as-is; only fetch() awaits it:
-export const imageFor = createImageFor(getPayload({ config }))
-
-// Then anywhere on the server, chain the declared render and fetch the render-ready doc:
-const img = await imageFor(imageId).aspectRatio('16:9').quality(80).blur('md').fetch()
-if (img) return <ResponsiveImage {...img} sizes="50vw" />   // { id, alt, src, srcset, placeholder }
-
-// Under the hood that is ONE findByID declaring the render on the read — the raw contract
-// stays available for access-scoped or cached getters:
-const doc = await payload.findByID({
+      <p className="shell-lead" style={{ marginBottom: 12 }}>
+        Seed the Sanity-style getter <strong>once</strong> with the app&apos;s Payload handle (<code>src/lib/imageFor.ts</code>) —{' '}
+        <code>createImageFor</code> takes the <code>getPayload</code> promise as-is; only <code>fetch()</code> awaits it:
+      </p>
+      <pre className="shell-code">{`export const imageFor = createImageFor(getPayload({ config }))`}</pre>
+      <p className="shell-lead" style={{ margin: '16px 0 12px' }}>
+        Then anywhere on the server, chain the declared render and fetch the render-ready doc — it comes back as{' '}
+        <code>{'{ id, alt, src, srcset, placeholder }'}</code>:
+      </p>
+      <pre className="shell-code">{`const img = await imageFor(imageId).aspectRatio('16:9').quality(80).blur('md').fetch()
+if (img) return <ResponsiveImage {...img} sizes="50vw" />`}</pre>
+      <p className="shell-lead" style={{ margin: '16px 0 12px' }}>
+        Under the hood that is <strong>one</strong> <code>findByID</code> declaring the render on the read — the raw contract stays available
+        for access-scoped or cached getters:
+      </p>
+      <pre className="shell-code">{`const doc = await payload.findByID({
   id,
   collection: 'images',
   depth: 0,
   select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
   context: { image, blur },        // the declared render, verbatim
-})
-
-// The doc carries a finished srcset for THIS render (v= busts immutable caches on file/focal
-// edits) and a focal-cropped placeholder — <ResponsiveImage> just paints a plain <img>:
-//   <img
-//     srcset="/api/img/<id>?w=320&h=180&fit=cover&q=80&fmt=auto&v=1a2b3c 320w, … "
-//     style="aspect-ratio: 16 / 9; background-image: url(data:image/png;base64,…)"
-//   />`}</pre>
+})`}</pre>
+      <p className="shell-lead" style={{ margin: '16px 0 12px' }}>
+        The doc carries a finished <code>srcset</code> for <strong>this</strong> render (<code>v=</code> busts immutable caches on file/focal
+        edits) and a focal-cropped placeholder — <code>&lt;ResponsiveImage&gt;</code> just paints a plain <code>&lt;img&gt;</code>:
+      </p>
+      <pre className="shell-code">{`<img
+  srcset="/api/img/<id>?w=320&h=180&fit=cover&q=80&fmt=auto&v=1a2b3c 320w, … "
+  style="aspect-ratio: 16 / 9; background-image: url(data:image/png;base64,…)"
+/>`}</pre>
 
       {images.length > 0 && (
         <div className="shell-card">

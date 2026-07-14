@@ -30,11 +30,11 @@
   box-sizing: border-box;
 }
 
-.sandbox-shell a {
+.sandbox-shell a:not(.shell-btn) {
   color: var(--accent);
   text-decoration: none;
 }
-.sandbox-shell a:hover {
+.sandbox-shell a:not(.shell-btn):hover {
   text-decoration: underline;
 }
 

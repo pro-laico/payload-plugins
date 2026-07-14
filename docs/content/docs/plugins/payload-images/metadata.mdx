@@ -11,10 +11,9 @@ This page walks each field and how reads consume it.
 
 No pop-in: a blurred preview paints from the first render, covered when the real image loads.
 
-The upload hook stores the image as a ladder of placeholder tiers — two formats, one knob. The
-low tiers are **[BlurHash](https://github.com/woltapp/blurhash)** strings (cosine **components**,
-not pixels, so a hash renders at any size); above 9×9 components blurhash spends bytes far less
-efficiently than a real image, so the top tiers store a **micro-webp**:
+The upload hook stores the image as a ladder of placeholder tiers — two formats behind one
+quality knob ([why below](#why-two-formats)): the low tiers are
+**[BlurHash](https://github.com/woltapp/blurhash)** strings, the top two a **micro-webp**:
 
 | Tier | Stored as | Size | Looks like |
 | --- | --- | --- | --- |
@@ -25,6 +24,38 @@ efficiently than a real image, so the top tiers store a **micro-webp**:
 | `xl` | blurhash 9×9 | 166 chars | maximum blurhash detail — still very much a blur |
 | `xxl` | webp 32px | ~0.5–1 KB | shapes and light read clearly |
 | `x3` | webp 64px | ~1–3 KB | a heavily blurred thumbnail |
+
+The **Focus & crop** component's half & half preview shows any tier against the real pixels,
+cropped to the same render. `sm` — 28 characters — reads as pure atmosphere:
+
+![Half & half preview at the sm tier: real image left, the 28-character blurhash placeholder right, both cropped to the same 3:2 render](/screenshots/half-n-half-sm.png)
+
+`x3` — a ~1–3 KB micro-webp — already carries the composition:
+
+![Half & half preview at the x3 tier: real image left, the 64px micro-webp placeholder right, the lighthouse clearly legible](/screenshots/half-n-half-3xl.png)
+
+### Why two formats
+
+Because neither format spans the whole quality range — their strengths are opposites, so the
+ladder switches codecs at the point where one stops earning its bytes:
+
+- **BlurHash is performance-shaped.** A placeholder is a handful of cosine **components**, not
+  pixels — 12–166 characters that render at any size and crop in coefficient space (pure string
+  math, microseconds, no image decode). But that's also its ceiling: past ~9×9 components,
+  extra bytes buy almost no extra detail — blurhash never resolves beyond soft blobs, no matter
+  how much you spend.
+- **webp is quality-shaped.** Real pixels carry real composition — at 64px the subject is
+  already legible — but it costs real bytes (~0.5–3 KB vs. tens of characters), and every read
+  that declares a webp-tier blur crops it with a Sharp decode on your server (milliseconds, not
+  microseconds — [the placeholder virtual](#the-placeholder-virtual) does the crop per read).
+  Stretched over the render box, the browser's upscaling smooths the micro-image into the blur
+  you see.
+
+So the ladder runs blurhash from `xs` to `xl` — its `9×9` best — and switches to micro-webp for
+`xxl`/`x3`, exactly where more quality stops being possible in blurhash. Consumers never pick a
+codec: one quality knob, and the tier you ask for determines the format, its cost, and its crop
+path. Reads that want near-free placeholders stay in the blurhash tiers; reads that want a
+recognizable preview pay ~1–3 KB of HTML for `xxl`/`x3` — a choice per read, not per project.
 
 ### The `placeholder` virtual
 
@@ -84,7 +115,11 @@ format decisions (e.g. don't JPEG-flatten a transparent logo).
 ## Focal point, hotspot & crop
 
 Optimization is only half the job: a 16:9 hero and a 1:1 thumbnail of the same photo need
-different crops, and a naive center-crop lops off heads. Three stored, **non-destructive**
+different crops, and a naive center-crop lops off heads.
+
+![One square upload rendered at natural, 16:9, 1:1, and 9:16 — the focal point (28%/72%, on the apple) keeps the subject in frame at every ratio](/screenshots/square-sample.png)
+
+Three stored, **non-destructive**
 layers (Sanity's model) shape every crop — the original file is never modified, unlike
 Payload's built-in destructive "Edit image" crop:
 
@@ -108,7 +143,7 @@ Payload's built-in destructive "Edit image" crop:
   bump its `v` token, so anything already served refetches —
   [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) has the full story.
 
-![Custom focal point setter component](/screenshots/images-back-end.png)
+![The Focus & crop component: the hotspot circle with its zoom handle over the image, crop corner handles, and live ratio preview tiles with normal/placeholder modes](/screenshots/focus-n-crop.png)
 
 ## Backfilling an existing library
 
