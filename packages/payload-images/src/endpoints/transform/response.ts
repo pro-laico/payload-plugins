@@ -1,7 +1,8 @@
 const IMMUTABLE = 'public, max-age=31536000, immutable'
 const PRIVATE_IMMUTABLE = 'private, max-age=31536000, immutable'
 
-export const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit //TODO: replace `as` cast with proper typing
+//EXCUSE: a Node Buffer is a valid fetch body at runtime, but lib.dom's BodyInit type doesn't include it
+export const toBody = (buf: Buffer): BodyInit => buf as unknown as BodyInit
 
 export const buildHeaders = (mime: string, key: string, isAuto: boolean, cdn: boolean, isPublic: boolean): Record<string, string> => {
   const h: Record<string, string> = {

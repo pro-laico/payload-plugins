@@ -7,7 +7,12 @@ import { parseTransformParams } from '../../lib/transform/params'
 import { resolveConstraints } from '../../endpoints/transform/config'
 import { getOrCreateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { presetEntryName, presetQuery, resolvePreset } from '../../lib/presets/resolve'
+import { isRecord } from '../../lib/isRecord'
 import type { PresetEntry, PresetSpec, SourceDoc, TransformConstraints, VariantSourceDoc } from '../../types'
+
+// The plugin owns the image collection's schema but can't name its app-generated type.
+const isPresetEntry = (v: unknown): v is PresetEntry => isRecord(v)
+const isSourceDoc = (v: unknown): v is SourceDoc => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 
 export interface GeneratePresetsOptions {
   sourceSlug: string
@@ -17,7 +22,7 @@ export interface GeneratePresetsOptions {
 }
 
 const generateActivePresets = async (payload: Payload, src: SourceDoc, opts: GeneratePresetsOptions): Promise<void> => {
-  const entries = Array.isArray(src.presets) ? (src.presets as PresetEntry[]) : [] //TODO: replace `as` cast with proper typing
+  const entries = Array.isArray(src.presets) ? src.presets.filter(isPresetEntry) : []
   if (!entries.length || (!src.filename && !src.url)) return
   const base = payload.config.serverURL || getServerSideURL()
   for (const entry of entries) {
@@ -32,7 +37,7 @@ const generateActivePresets = async (payload: Payload, src: SourceDoc, opts: Gen
     try {
       await getOrCreateVariantBytes({
         payload,
-        source: src as VariantSourceDoc, //TODO: replace `as` cast with proper typing
+        source: src,
         params: parsed.params,
         format,
         sourceSlug: opts.sourceSlug,
@@ -52,8 +57,9 @@ export const generatePresetsAfterChange = (opts: GeneratePresetsOptions): Collec
     try {
       const presetsChanged = JSON.stringify(previousDoc?.presets ?? null) !== JSON.stringify(doc?.presets ?? null)
       const fire = operation === 'create' || presetsChanged || detectVariantIdentityChange(previousDoc, doc).any
-      if (!fire) return doc
-      const work = (): Promise<void> => generateActivePresets(req.payload, doc as SourceDoc, opts) //TODO: replace `as` cast with proper typing
+      const src = isSourceDoc(doc) ? doc : null
+      if (!fire || !src) return doc
+      const work = (): Promise<void> => generateActivePresets(req.payload, src, opts)
       try {
         after(work)
       } catch {

@@ -1,8 +1,13 @@
 import { getPayload, type SanitizedConfig } from 'payload'
 
 import { asSlug } from '../lib/asSlug'
+import { isRecord } from '../lib/isRecord'
 import type { UploadDocLike } from '../types'
 import { readBytes } from '../lib/transform/source'
+
+// The plugin owns the collection schema but can't name its app-generated type; an id check confirms a real row.
+const isBackfillDoc = (v: unknown): v is UploadDocLike & Record<string, unknown> & { id: string | number } =>
+  isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 import { readPluginMarker } from '../lib/pluginMarker'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { resolveStaticDir } from '../lib/transform/staticDir'
@@ -33,7 +38,8 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     for (;;) {
       const res = await payload.find({ collection: slug, limit: 50, page, depth: 0, sort: 'id' })
       for (const raw of res.docs) {
-        const doc = raw as UploadDocLike & Record<string, unknown> & { id: string | number } //TODO: replace `as` cast with proper typing
+        if (!isBackfillDoc(raw)) continue
+        const doc = raw
         processed++
         const wantsFocal = focal && doc.focalX === 50 && doc.focalY === 50
         if (!force && !wantsFocal && hasAllMetadata(doc)) {
@@ -62,7 +68,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
           await payload.update({
             collection: slug,
             id: doc.id,
-            data: data as never, //TODO: replace `as` cast with proper typing
+            data,
             ...(settingFocal ? {} : { context: { disableRevalidate: true } }),
           })
           stamped++

@@ -21,10 +21,7 @@ export const mergeCollection = (base: CollectionConfig, override?: Partial<Colle
           : {}),
         ...(base.forceSelect || override.forceSelect
           ? {
-              forceSelect: mergeSelect(
-                base.forceSelect as CollectionConfig['defaultPopulate'], //TODO: replace `as` cast with proper typing
-                override.forceSelect as CollectionConfig['defaultPopulate'], //TODO: replace `as` cast with proper typing
-              ) as CollectionConfig['forceSelect'], //TODO: replace `as` cast with proper typing
+              forceSelect: mergeSelect(base.forceSelect, override.forceSelect),
             }
           : {}),
       }

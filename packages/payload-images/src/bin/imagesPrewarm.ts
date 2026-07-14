@@ -26,7 +26,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const payload = await getPayload({ config })
   try {
     const deps = {
-      sourceSlug: slug as string, //TODO: replace `as` cast with proper typing
+      sourceSlug: slug,
       variantSlug: marker.variantSlug ?? 'generated-images',
       profilesSlug: prewarm.profilesSlug,
       seeds: prewarm.seeds,

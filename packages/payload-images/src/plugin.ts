@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
+import { isRecord } from './lib/isRecord'
 import { createPrewarmTask } from './jobs/prewarmTask'
 import { createPurgeEndpoint } from './endpoints/purge'
 import { mergeCollection } from './lib/mergeCollection'
@@ -106,7 +107,7 @@ export const imagesPlugin =
       if (!target.upload) throw new Error(`[payload-images] extendCollection: collection '${extendCollection}' is not an upload collection`)
       const ownThumbnail =
         (typeof target.upload === 'object' && !!target.upload.adminThumbnail) ||
-        !!(target.admin as { thumbnail?: unknown } | undefined)?.thumbnail //TODO: replace `as` cast with proper typing
+        !!(target.admin && 'thumbnail' in target.admin && target.admin.thumbnail)
       const enh = imageEnhancements({
         focalUI,
         previewRatios,
@@ -123,16 +124,18 @@ export const imagesPlugin =
       // Re-merge the target's own populate/select on top so the enhancements never clobber them.
       const parity: Partial<CollectionConfig> = {
         ...enh,
+        //EXCUSE: merges select objects for a runtime-configured collection; TS won't accept a {field: true} map as Payload's discriminated SelectType
         defaultPopulate: {
-          ...(enh.defaultPopulate as Record<string, unknown>), //TODO: replace `as` cast with proper typing
-          ...(target.defaultPopulate as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
-        } as CollectionConfig['defaultPopulate'], //TODO: replace `as` cast with proper typing
+          ...(isRecord(enh.defaultPopulate) ? enh.defaultPopulate : {}),
+          ...(isRecord(target.defaultPopulate) ? target.defaultPopulate : {}),
+        } as CollectionConfig['defaultPopulate'],
         ...(enh.forceSelect || target.forceSelect
           ? {
+              //EXCUSE: same runtime-collection select gap as defaultPopulate above
               forceSelect: {
-                ...(enh.forceSelect as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
-                ...(target.forceSelect as Record<string, unknown> | undefined), //TODO: replace `as` cast with proper typing
-              } as CollectionConfig['forceSelect'], //TODO: replace `as` cast with proper typing
+                ...(isRecord(enh.forceSelect) ? enh.forceSelect : {}),
+                ...(isRecord(target.forceSelect) ? target.forceSelect : {}),
+              } as CollectionConfig['forceSelect'],
             }
           : {}),
       }
@@ -190,7 +193,8 @@ export const imagesPlugin =
         ? {
             jobs: {
               ...config.jobs,
-              tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never], //TODO: replace `as` cast with proper typing
+              //EXCUSE: TypedJobs task slugs are app-generated; the plugin can't name its own task slug in that union
+              tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never],
               ...(prewarm.autoRun ? { autoRun: withAutoRun(config.jobs?.autoRun, prewarm.autoRun, prewarm.queue) } : {}),
             },
           }

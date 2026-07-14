@@ -1,6 +1,7 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 
 import { analyzeImageMetadata } from '../../lib/metadata/analyze'
+import { isRecord } from '../../lib/isRecord'
 
 const isUnsetFocal = (x: unknown, y: unknown): boolean => (x == null && y == null) || (x === 50 && y === 50)
 
@@ -11,7 +12,8 @@ export const generateImageMetadataBeforeChange = (): CollectionBeforeChangeHook 
 
     try {
       const analysis = await analyzeImageMetadata(file.data)
-      const doc = data as Record<string, unknown> //TODO: replace `as` cast with proper typing
+      if (!isRecord(data)) return data
+      const doc = data
       Object.assign(doc, analysis.placeholderFields)
       doc.palette = analysis.palette
       doc.hasAlpha = analysis.hasAlpha

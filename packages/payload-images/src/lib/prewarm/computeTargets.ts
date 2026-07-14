@@ -28,8 +28,9 @@ const topWidths = (hist: WidthHistogram | null | undefined): number[] | undefine
 
 const asFit = (fit: string | undefined): Fit => FITS.find((f) => f === fit) ?? 'cover'
 
-const concreteFormat = (format: string): OutputFormat | undefined =>
-  format !== 'auto' && FORMATS.some((f) => f === format) ? (format as OutputFormat) : undefined //TODO: replace `as` cast with proper typing
+const isOutputFormat = (value: string): value is OutputFormat => FORMATS.some((f) => f === value)
+
+const concreteFormat = (format: string): OutputFormat | undefined => (format !== 'auto' && isOutputFormat(format) ? format : undefined)
 
 export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[] => {
   const { source, seeds, formats, constraints, existingKeys, maxVariantsPerImage } = args

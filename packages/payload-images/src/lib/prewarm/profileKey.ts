@@ -6,7 +6,7 @@ export interface RatioCandidate {
   ratio: number
 }
 
-export const ratioToken = (ratio: number): RatioToken => `${Math.round(ratio * 1000) / 1000}` as RatioToken //TODO: replace `as` cast with proper typing
+export const ratioToken = (ratio: number): RatioToken => `${Math.round(ratio * 1000) / 1000}`
 
 export const canonicalProfileKey = (parts: ProfileParts): string => `${parts.ratio}|${parts.fit}|${parts.quality}|${parts.format}`
 

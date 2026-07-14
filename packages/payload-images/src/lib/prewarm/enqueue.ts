@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 
+import { isRecord } from '../isRecord'
 import type { PrewarmReason } from '../../types'
 
 const ENQUEUE_DELAY_MS = 30_000
@@ -30,8 +31,8 @@ export const enqueuePrewarmJob = async (payload: Payload, args: EnqueuePrewarmAr
         depth: 0,
       })
       const dupe = pending.docs.some((doc) => {
-        const input = (doc as { input?: unknown }).input //TODO: replace `as` cast with proper typing
-        return typeof input === 'object' && input !== null && 'sourceId' in input && String(input.sourceId) === sourceId
+        const input = isRecord(doc) ? doc.input : undefined
+        return isRecord(input) && 'sourceId' in input && String(input.sourceId) === sourceId
       })
       if (dupe) return
     } catch {}
@@ -41,7 +42,7 @@ export const enqueuePrewarmJob = async (payload: Payload, args: EnqueuePrewarmAr
       input: { sourceId, reason: args.reason },
       queue: args.queue,
       ...(args.waitUntil === false ? {} : { waitUntil: args.waitUntil ?? new Date(Date.now() + ENQUEUE_DELAY_MS) }),
-    } as never) //TODO: replace `as` cast with proper typing
+    })
   } catch (err) {
     payload.logger.warn(`[payload-images] prewarm: failed to enqueue job for source ${sourceId}: ${String(err)}`)
   }

@@ -7,9 +7,12 @@ import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 import { cropBlurhashCoefficients } from '../../lib/placeholders/cropCoefficients'
 import { cropWindow, storedHash, storedWebp } from '../../lib/placeholders/stored'
 import { DEFAULT_BLURHASH_QUALITY, isBlurhashQuality, isWebpQuality } from '../../lib/placeholders/qualities'
+import { isRecord } from '../../lib/isRecord'
+
+const isImageDoc = (v: unknown): v is ImageDocLike => isRecord(v)
 
 export const placeholderAfterRead: FieldHook = async ({ data, req }) => {
-  const doc = (data ?? {}) as ImageDocLike //TODO: replace `as` cast with proper typing
+  const doc: ImageDocLike = isImageDoc(data) ? data : {}
   const wanted = readRequest(req)
 
   if (!wanted.declared && wanted.ar === undefined && wanted.quality === undefined && wanted.format === undefined)

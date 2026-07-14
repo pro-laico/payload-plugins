@@ -1,6 +1,7 @@
 import type { CollectionSlug, Payload } from 'payload'
 
 import { asSlug } from '../asSlug'
+import { isRecord } from '../isRecord'
 import { readBytes } from '../transform/source'
 import { getServerSideURL } from '../getServerSideURL'
 import { IMAGE_MIME_TYPES } from '../transform/params'
@@ -28,6 +29,11 @@ export interface PrewarmSourceDeps {
 
 type SourceRow = VariantSourceDoc & { width?: number | null; height?: number | null; mimeType?: string | null }
 
+// The plugin owns these collections' schemas but can't name their app-generated types; a light id check
+// confirms a real row, and the local shape describes the fields the plugin wrote.
+const isSourceRow = (v: unknown): v is SourceRow => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
+const isRenderProfileDoc = (v: unknown): v is RenderProfileDoc => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
+
 const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, sourceId: string | number): Promise<Set<string>> => {
   const keys = new Set<string>()
   let page = 1
@@ -41,7 +47,7 @@ const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, 
       depth: 0,
     })
     for (const doc of res.docs) {
-      const key = (doc as { cacheKey?: unknown }).cacheKey //TODO: replace `as` cast with proper typing
+      const key = isRecord(doc) ? doc.cacheKey : undefined
       if (typeof key === 'string' && key) keys.add(key)
     }
     if (!res.hasNextPage) break
@@ -56,13 +62,12 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   const profilesSlug = asSlug(deps.profilesSlug)
 
   const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, disableErrors: true })
-  const source = (raw ?? null) as SourceRow | null //TODO: replace `as` cast with proper typing
+  const source = isSourceRow(raw) ? raw : null
   if (!source || (!source.filename && !source.url)) return { targets: 0, generated: 0, failed: 0, skipped: 'missing' }
   if (typeof source.mimeType === 'string' && !IMAGE_MIME_TYPES.includes(source.mimeType))
     return { targets: 0, generated: 0, failed: 0, skipped: 'non-raster' }
 
-  const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 }))
-    .docs as unknown as RenderProfileDoc[] //TODO: replace `as` cast with proper typing
+  const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 })).docs.filter(isRenderProfileDoc)
 
   const targets = computePrewarmTargets({
     source,

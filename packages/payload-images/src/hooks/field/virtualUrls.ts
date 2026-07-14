@@ -6,6 +6,7 @@ import { getImageUrl } from '../../lib/urls/getImageUrl'
 import { readImageIntent } from '../../lib/renderIntent'
 import { readPluginMarker } from '../../lib/pluginMarker'
 import { buildVariantUrl } from '../../lib/urls/variantUrl'
+import { isRecord } from '../../lib/isRecord'
 import type { ImageDocLike, ParsedRenderIntent } from '../../types'
 
 export const naturalAspectRatio = (d: ImageDocLike): number | undefined => (d.width && d.height ? d.width / d.height : undefined)
@@ -18,18 +19,22 @@ interface ComputeContext {
 
 type SavedImageDoc = ImageDocLike & { id: string | number }
 
+// The plugin owns the image collection's schema but can't name its app-generated type; these
+// guards confirm a real row and describe the fields the plugin declared.
+const isImageDoc = (v: unknown): v is ImageDocLike => isRecord(v)
+const isSavedImageDoc = (v: unknown): v is SavedImageDoc => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
+
 const urlHook =
   (compute: (doc: SavedImageDoc, ctx: ComputeContext) => string | null): FieldHook =>
   ({ data, req }) => {
-    const doc = (data ?? {}) as ImageDocLike //TODO: replace `as` cast with proper typing
-    if (doc.id == null || !doc.filename) return null
+    if (!isSavedImageDoc(data) || !data.filename) return null
     const cfg = req?.payload?.config
     const ctx = { baseUrl: cfg?.serverURL || '', pixelStep: readPluginMarker(cfg).pixelStep, intent: readImageIntent(req) }
-    return compute(doc as SavedImageDoc, ctx) //TODO: replace `as` cast with proper typing
+    return compute(data, ctx)
   }
 
 export const aspectRatioAfterRead: FieldHook = ({ data, req }) => {
-  const doc = (data ?? {}) as ImageDocLike //TODO: replace `as` cast with proper typing
+  const doc: ImageDocLike = isImageDoc(data) ? data : {}
   return readImageIntent(req).aspectRatio ?? naturalAspectRatio(doc) ?? null
 }
 

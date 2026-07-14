@@ -41,7 +41,8 @@ export const createImageFor = (payload: Payload | Promise<Payload>): ImageFor =>
         ...(state.blur ? { blur: state.blur } : {}),
       } satisfies ImageRenderContext
       const doc = await p.findByID({ id, collection, depth: 0, select: RESPONSIVE_IMAGE_SELECT, context, disableErrors: true })
-      return (doc as ResponsiveImageDoc | null) ?? null //TODO: replace `as` cast with proper typing
+      //EXCUSE: findByID projects exactly RESPONSIVE_IMAGE_SELECT, so the row is a ResponsiveImageDoc — but TS can't tie a runtime `select` to the returned shape
+      return (doc as ResponsiveImageDoc | null) ?? null
     },
   })
   return (source, render) =>

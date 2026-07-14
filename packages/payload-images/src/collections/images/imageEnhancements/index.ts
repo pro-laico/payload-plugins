@@ -116,8 +116,10 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       ],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
-    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'], //TODO: replace `as` cast with proper typing
-    forceSelect: forceSelect as CollectionConfig['forceSelect'], //TODO: replace `as` cast with proper typing
+    //EXCUSE: the plugin builds these select objects for a runtime-configured collection; TS won't accept a {field: true} map as Payload's discriminated SelectType
+    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
+    //EXCUSE: same runtime-collection select gap as defaultPopulate above
+    forceSelect: forceSelect as CollectionConfig['forceSelect'],
     upload: { focalPoint: true, ...(adminThumbnail ? { adminThumbnail } : {}) },
     ...(folders ? { folders: true } : {}),
   }

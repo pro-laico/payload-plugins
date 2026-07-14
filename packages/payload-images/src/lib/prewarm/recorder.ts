@@ -1,9 +1,12 @@
 import type { Payload } from 'payload'
 
 import { asSlug } from '../asSlug'
+import { isRecord } from '../isRecord'
 import { isDuplicateKeyError } from '../errors'
 import type { ProfileParts, RenderProfileDoc, WidthHistogram } from '../../types'
 import { canonicalProfileKey, type RatioCandidate, ratioToken } from './profileKey'
+
+const isRenderProfileDoc = (v: unknown): v is RenderProfileDoc => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 
 const FLUSH_MS = Number(process.env.IMAGES_PREWARM_FLUSH_MS) || 30_000
 const HIT_FLUSH_MS = 15 * 60_000
@@ -44,10 +47,10 @@ export const createObservationRecorder = (deps: {
     if (dbRatiosLoading || Date.now() - dbRatiosLoadedAt < RATIO_REFRESH_MS) return
     dbRatiosLoading = true
     void payload
-      .find({ collection: slug, limit: 100, depth: 0, select: { ratio: true } as never }) //TODO: replace `as` cast with proper typing
+      .find({ collection: slug, limit: 100, depth: 0, select: { ratio: true } })
       .then((res) => {
         dbRatios = res.docs.flatMap((doc) => {
-          const ratio = Number((doc as { ratio?: string }).ratio) //TODO: replace `as` cast with proper typing
+          const ratio = Number(isRecord(doc) ? doc.ratio : undefined)
           return Number.isFinite(ratio) && ratio > 0 ? [{ token: ratioToken(ratio), ratio }] : []
         })
         dbRatiosLoadedAt = Date.now()
@@ -84,12 +87,12 @@ export const createObservationRecorder = (deps: {
 
     const update = async (): Promise<boolean> => {
       const found = await payload.find({ collection: slug, where: { profileKey: { equals: key } }, limit: 1, depth: 0 })
-      const existing = found.docs[0] as unknown as RenderProfileDoc | undefined //TODO: replace `as` cast with proper typing
+      const existing = found.docs.find(isRenderProfileDoc)
       if (!existing) return false
       await payload.update({
         collection: slug,
         id: existing.id,
-        data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) } as never, //TODO: replace `as` cast with proper typing
+        data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) },
       })
       return true
     }
@@ -107,7 +110,7 @@ export const createObservationRecorder = (deps: {
             hitCount: entry.hits,
             lastSeenAt: nowIso,
             widths: mergeWidths(null),
-          } as never, //TODO: replace `as` cast with proper typing
+          },
         })
       } catch (err) {
         if (!isDuplicateKeyError(err, 'profileKey')) throw err

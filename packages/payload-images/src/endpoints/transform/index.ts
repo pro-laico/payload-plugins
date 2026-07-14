@@ -125,7 +125,8 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
               prefix: true,
             },
           })
-          const pick = pickFallbackVariant(p, format, src, rows.docs as FallbackCandidate[], constraints) //TODO: replace `as` cast with proper typing
+          //EXCUSE: rows come from a projected find on a runtime-configured collection; their fields type as unknown so TS won't narrow them to FallbackCandidate
+          const pick = pickFallbackVariant(p, format, src, rows.docs as FallbackCandidate[], constraints)
           if (pick) {
             const bytes = await readBytes(pick, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
             if (bytes) {

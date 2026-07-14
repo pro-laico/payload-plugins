@@ -4,9 +4,9 @@ import type { LinearGrid, ParsedBlurhash } from '../../types'
 
 const SAMPLE_EDGE = 64
 
-const MAX_COMPONENTS = Object.values(BLURHASH_QUALITIES).reduce(
-  (acc, [cx, cy]) => [Math.max(acc[0], cx), Math.max(acc[1], cy)] as [number, number], //TODO: replace `as` cast with proper typing
-  [1, 1] as [number, number], //TODO: replace `as` cast with proper typing
+const MAX_COMPONENTS = Object.values(BLURHASH_QUALITIES).reduce<[number, number]>(
+  (acc, [cx, cy]) => [Math.max(acc[0], cx), Math.max(acc[1], cy)],
+  [1, 1],
 )
 
 export const encodeBlurhashFromImageSource = async (src: string, cx = MAX_COMPONENTS[0], cy = MAX_COMPONENTS[1]): Promise<ParsedBlurhash> => {

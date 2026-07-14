@@ -1,6 +1,7 @@
 import { after } from 'next/server'
 
 import { asSlug } from '../asSlug'
+import { isRecord } from '../isRecord'
 import { readBytes } from './source'
 import { transformImage } from './sharp'
 import { variantCacheKey } from './variantKey'
@@ -46,7 +47,16 @@ export const getCachedVariantBytes = async (args: GetVariantBytesArgs): Promise<
       limit: 1,
       depth: 0,
     })
-    const variant = hit?.docs?.[0] as (UploadDocLike & { id: string | number }) | undefined //TODO: replace `as` cast with proper typing
+    const hitDoc = hit?.docs?.[0]
+    const variant =
+      isRecord(hitDoc) && (typeof hitDoc.id === 'string' || typeof hitDoc.id === 'number')
+        ? {
+            id: hitDoc.id,
+            filename: typeof hitDoc.filename === 'string' ? hitDoc.filename : null,
+            url: typeof hitDoc.url === 'string' ? hitDoc.url : null,
+            prefix: typeof hitDoc.prefix === 'string' ? hitDoc.prefix : null,
+          }
+        : undefined
     if (variant) {
       const bytes = await readBytes(variant, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
       if (bytes) return { ok: true, data: bytes, mimeType: mimeForFormat(format), key }
@@ -108,7 +118,7 @@ export const generateVariantBytes = async (args: GetVariantBytesArgs): Promise<V
           collection: asSlug(variantSlug),
           file: { data: out.data, mimetype: out.mimeType, name: `${key}.${extForFormat(format)}`, size: out.data.byteLength },
           data: {
-            source: src.id as never, //TODO: replace `as` cast with proper typing
+            source: src.id,
             cacheKey: key,
             fit: p.fit,
             format,

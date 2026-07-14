@@ -2,6 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { createLocalReq, type Payload } from 'payload'
 
+import { isRecord } from '../isRecord'
 import type { UploadDocLike, UploadHandler } from '../../types'
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024
@@ -29,8 +30,8 @@ const isAllowedFetchTarget = (target: URL, trusted: URL | null): boolean => {
 }
 
 const readViaStorageHandlers = async (payload: Payload, slug: string, doc: UploadDocLike): Promise<Buffer | null> => {
-  const collections = payload.collections as Record<string, { config?: { upload?: { handlers?: UploadHandler[] } } }> //TODO: replace `as` cast with proper typing
-  const handlers = collections?.[slug]?.config?.upload?.handlers
+  //EXCUSE: the plugin invokes storage handlers with a light UploadDocLike for a runtime-configured collection; Payload's handler type demands that collection's full generated doc (with id)
+  const handlers = payload.collections[slug]?.config?.upload?.handlers as UploadHandler[] | undefined
   if (!handlers?.length || !doc.filename) return null
   try {
     const req = await createLocalReq({}, payload)
@@ -55,7 +56,7 @@ export const readBytes = async (
       try {
         return await fs.readFile(filePath)
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err //TODO: replace `as` cast with proper typing
+        if (!(isRecord(err) && err.code === 'ENOENT')) throw err
       }
     }
   }

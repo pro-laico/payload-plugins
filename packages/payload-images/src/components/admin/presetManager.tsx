@@ -151,10 +151,13 @@ const draftToEntry = (d: Draft): PresetEntry => ({
   name: d.name.trim(),
   ...(d.width.trim() ? { width: Number(d.width) } : {}),
   ...(d.height.trim() ? { height: Number(d.height) } : {}),
-  ...(d.aspectRatio.trim() ? { aspectRatio: d.aspectRatio.trim() as PresetEntry['aspectRatio'] } : {}), //TODO: replace `as` cast with proper typing
-  ...(d.fit ? { fit: d.fit as PresetEntry['fit'] } : {}), //TODO: replace `as` cast with proper typing
+  //EXCUSE: a text field stores the "16:9" template-literal aspectRatio as a plain string; the reducer already constrains valid input
+  ...(d.aspectRatio.trim() ? { aspectRatio: d.aspectRatio.trim() as PresetEntry['aspectRatio'] } : {}),
+  //EXCUSE: a select field carries the fit option union as a plain string
+  ...(d.fit ? { fit: d.fit as PresetEntry['fit'] } : {}),
   ...(d.quality.trim() ? { quality: Number(d.quality) } : {}),
-  ...(d.format ? { format: d.format as PresetEntry['format'] } : {}), //TODO: replace `as` cast with proper typing
+  //EXCUSE: a select field carries the format option union as a plain string
+  ...(d.format ? { format: d.format as PresetEntry['format'] } : {}),
 })
 
 export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) => {
@@ -167,18 +170,25 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
   const rowCount = fields?.presets?.rows?.length ?? 0
   const entries: RowEntry[] = Array.from({ length: rowCount }, (_, rowIndex) => {
     const leaf = (key: string): unknown => fields[`presets.${rowIndex}.${key}`]?.value
-    const str = (key: string): string | null => (typeof leaf(key) === 'string' && leaf(key) !== '' ? (leaf(key) as string) : null) //TODO: replace `as` cast with proper typing
-    const num = (key: string): number | undefined => (typeof leaf(key) === 'number' ? (leaf(key) as number) : undefined) //TODO: replace `as` cast with proper typing
+    const str = (key: string): string | null => {
+      const v = leaf(key)
+      return typeof v === 'string' && v !== '' ? v : null
+    }
+    const num = (key: string): number | undefined => {
+      const v = leaf(key)
+      return typeof v === 'number' ? v : undefined
+    }
     return {
       rowIndex,
       template: str('template'),
       name: str('name'),
       width: num('width'),
       height: num('height'),
-      aspectRatio: (str('aspectRatio') as PresetEntry['aspectRatio']) ?? undefined, //TODO: replace `as` cast with proper typing
-      fit: (str('fit') as PresetEntry['fit']) ?? undefined, //TODO: replace `as` cast with proper typing
+      //EXCUSE: form-state strings carry the aspectRatio/fit/format field unions as plain strings for a runtime-configured collection
+      aspectRatio: (str('aspectRatio') as PresetEntry['aspectRatio']) ?? undefined,
+      fit: (str('fit') as PresetEntry['fit']) ?? undefined,
       quality: num('quality'),
-      format: (str('format') as PresetEntry['format']) ?? undefined, //TODO: replace `as` cast with proper typing
+      format: (str('format') as PresetEntry['format']) ?? undefined,
     }
   })
 
@@ -192,7 +202,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
   const fieldErr = (k: keyof Draft | 'geometry'): string | undefined => (showErrors ? errors[k] : undefined)
 
   const addEntry = (entry: PresetEntry): void =>
-    addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) as never }) //TODO: replace `as` cast with proper typing
+    //EXCUSE: addFieldRow's subFieldState wants a full Payload FormState; the reducer only reads value/initialValue/valid, which toSubFieldState provides
+    addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) as never })
   const addTemplate = (name: string): void => addEntry({ template: name })
   const removeEntry = (entry: RowEntry): void => removeFieldRow({ path: 'presets', rowIndex: entry.rowIndex })
 
