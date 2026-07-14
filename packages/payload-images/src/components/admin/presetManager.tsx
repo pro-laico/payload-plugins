@@ -5,7 +5,12 @@ import { useState } from 'react'
 import { useAllFormFields, useForm } from '@payloadcms/ui'
 
 import { ENCODABLE_FORMATS, FITS } from '../../lib/transform/params'
-import type { PresetEntry, PresetManagerProps, PresetSpec } from '../../types'
+import type { Fit, OutputFormat, PresetEntry, PresetManagerProps, PresetSpec } from '../../types'
+
+// Form fields store these unions as plain strings; validate before narrowing to the field type.
+const isFit = (v: string): v is Fit => FITS.some((f) => f === v)
+const isFormat = (v: string): v is OutputFormat => ENCODABLE_FORMATS.some((f) => f === v)
+const isRatio = (v: string): v is `${number}:${number}` => /^\d+(\.\d+)?:\d+(\.\d+)?$/.test(v)
 
 // ——— styles (Payload admin theme vars, matching the focalPreview card) ———
 const card: React.CSSProperties = {
@@ -147,18 +152,18 @@ const validateDraft = (d: Draft, takenNames: Set<string>): Partial<Record<keyof 
   return errs
 }
 
-const draftToEntry = (d: Draft): PresetEntry => ({
-  name: d.name.trim(),
-  ...(d.width.trim() ? { width: Number(d.width) } : {}),
-  ...(d.height.trim() ? { height: Number(d.height) } : {}),
-  //EXCUSE: a text field stores the "16:9" template-literal aspectRatio as a plain string; the reducer already constrains valid input
-  ...(d.aspectRatio.trim() ? { aspectRatio: d.aspectRatio.trim() as PresetEntry['aspectRatio'] } : {}),
-  //EXCUSE: a select field carries the fit option union as a plain string
-  ...(d.fit ? { fit: d.fit as PresetEntry['fit'] } : {}),
-  ...(d.quality.trim() ? { quality: Number(d.quality) } : {}),
-  //EXCUSE: a select field carries the format option union as a plain string
-  ...(d.format ? { format: d.format as PresetEntry['format'] } : {}),
-})
+const draftToEntry = (d: Draft): PresetEntry => {
+  const ar = d.aspectRatio.trim()
+  return {
+    name: d.name.trim(),
+    ...(d.width.trim() ? { width: Number(d.width) } : {}),
+    ...(d.height.trim() ? { height: Number(d.height) } : {}),
+    ...(isRatio(ar) ? { aspectRatio: ar } : {}),
+    ...(isFit(d.fit) ? { fit: d.fit } : {}),
+    ...(d.quality.trim() ? { quality: Number(d.quality) } : {}),
+    ...(isFormat(d.format) ? { format: d.format } : {}),
+  }
+}
 
 export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) => {
   const [fields] = useAllFormFields()
@@ -178,17 +183,19 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
       const v = leaf(key)
       return typeof v === 'number' ? v : undefined
     }
+    const ar = str('aspectRatio')
+    const fit = str('fit')
+    const fmt = str('format')
     return {
       rowIndex,
       template: str('template'),
       name: str('name'),
       width: num('width'),
       height: num('height'),
-      //EXCUSE: form-state strings carry the aspectRatio/fit/format field unions as plain strings for a runtime-configured collection
-      aspectRatio: (str('aspectRatio') as PresetEntry['aspectRatio']) ?? undefined,
-      fit: (str('fit') as PresetEntry['fit']) ?? undefined,
+      aspectRatio: ar && isRatio(ar) ? ar : undefined,
+      fit: fit && isFit(fit) ? fit : undefined,
       quality: num('quality'),
-      format: (str('format') as PresetEntry['format']) ?? undefined,
+      format: fmt && isFormat(fmt) ? fmt : undefined,
     }
   })
 
@@ -201,9 +208,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({ templates = {} }) 
   const errors = validateDraft(draft, takenNames)
   const fieldErr = (k: keyof Draft | 'geometry'): string | undefined => (showErrors ? errors[k] : undefined)
 
-  const addEntry = (entry: PresetEntry): void =>
-    //EXCUSE: addFieldRow's subFieldState wants a full Payload FormState; the reducer only reads value/initialValue/valid, which toSubFieldState provides
-    addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) as never })
+  const addEntry = (entry: PresetEntry): void => addFieldRow({ path: 'presets', schemaPath: 'presets', subFieldState: toSubFieldState(entry) })
   const addTemplate = (name: string): void => addEntry({ template: name })
   const removeEntry = (entry: RowEntry): void => removeFieldRow({ path: 'presets', rowIndex: entry.rowIndex })
 

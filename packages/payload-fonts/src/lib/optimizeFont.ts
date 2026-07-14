@@ -1,5 +1,5 @@
 import { isRecord } from './isRecord'
-import type { Charset, FontFileMetadata, FontkitFont, SubsetFontFn } from '../types'
+import type { Charset, FontFileMetadata, FontkitFont } from '../types'
 
 const CHARSET_PRESETS: Record<string, Array<[number, number]>> = {
   latin: [
@@ -83,8 +83,7 @@ export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata |
 }
 
 export async function subsetToWoff2(buffer: Buffer, charsetText: string): Promise<Buffer> {
-  //EXCUSE: subset-font's default export is an untyped/mismatched function shape versus our SubsetFontFn
-  const subsetFont = (await import('subset-font')).default as unknown as SubsetFontFn
+  const subsetFont = (await import('subset-font')).default
   return subsetFont(buffer, charsetText, { targetFormat: 'woff2' })
 }
 

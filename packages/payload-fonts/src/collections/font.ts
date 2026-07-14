@@ -80,16 +80,17 @@ export const createFontCollection = (opts: CreateFontCollectionOptions = {}): Co
         description: d.weights,
         condition: (data) => !hasVariable(isRecord(data) ? data : undefined),
       },
-      validate: ((rows: Array<{ weight?: string; style?: string }> | null | undefined) => {
+      validate: (value) => {
         const seen = new Set<string>()
-        for (const r of Array.isArray(rows) ? rows : []) {
-          const key = `${r?.weight ?? ''}|${r?.style ?? ''}`
-          if (seen.has(key)) return `Two files share weight ${r?.weight ?? '?'} ${r?.style ?? 'normal'}. Each weight + style must be unique.`
+        for (const r of Array.isArray(value) ? value : []) {
+          const weight = isRecord(r) && typeof r.weight === 'string' ? r.weight : ''
+          const style = isRecord(r) && typeof r.style === 'string' ? r.style : ''
+          const key = `${weight}|${style}`
+          if (seen.has(key)) return `Two files share weight ${weight || '?'} ${style || 'normal'}. Each weight + style must be unique.`
           seen.add(key)
         }
         return true
-        //EXCUSE: the row validator reads only { weight, style }, but ArrayField['validate'] types its value as the full generated field-value union
-      }) as ArrayField['validate'],
+      },
       fields: [
         {
           type: 'row',

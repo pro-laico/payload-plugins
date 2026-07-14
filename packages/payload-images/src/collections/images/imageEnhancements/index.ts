@@ -1,4 +1,4 @@
-import type { CollectionConfig, GetAdminThumbnail, JoinField, NumberField, UIField } from 'payload'
+import type { CollectionConfig, GetAdminThumbnail, JoinField, NumberField, SelectType, UIField } from 'payload'
 
 import { asSlug } from '../../../lib/asSlug'
 import { presetsField } from './fields/presets'
@@ -83,12 +83,19 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   // With the virtuals on, a populated image carries exactly what <ResponsiveImage> renders;
   // without them the component builds URLs itself — so the identity fields buildSrcset /
   // getImageUrl / deriveVersion and the placeholder crop need must ride along in EITHER mode.
-  const defaultPopulate = virtualFields
+  const defaultPopulate: SelectType = virtualFields
     ? RESPONSIVE_IMAGE_SELECT
-    : { alt: true, url: true, palette: true, hasAlpha: true, isOpaque: true, ...Object.fromEntries(VIRTUAL_URL_INPUTS.map((f) => [f, true])) }
+    : {
+        alt: true,
+        url: true,
+        palette: true,
+        hasAlpha: true,
+        isOpaque: true,
+        ...Object.fromEntries(VIRTUAL_URL_INPUTS.map((f): [string, true] => [f, true])),
+      }
   // VIRTUAL_URL_INPUTS already includes the hotspot fields; always force the crop/version inputs so
   // the placeholder virtual and the build-URLs-yourself mode have their inputs regardless of virtualFields.
-  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, 'presets'].map((f) => [f, true]))
+  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, 'presets'].map((f): [string, true] => [f, true]))
 
   const presetGen = opts.presetGen && endpointsEnabled ? generatePresetsAfterChange(opts.presetGen) : null
 
@@ -116,10 +123,8 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       ],
       beforeDelete: [purgeVariantsBeforeDelete({ variantSlug })],
     },
-    //EXCUSE: the plugin builds these select objects for a runtime-configured collection; TS won't accept a {field: true} map as Payload's discriminated SelectType
-    defaultPopulate: defaultPopulate as CollectionConfig['defaultPopulate'],
-    //EXCUSE: same runtime-collection select gap as defaultPopulate above
-    forceSelect: forceSelect as CollectionConfig['forceSelect'],
+    defaultPopulate,
+    forceSelect,
     upload: { focalPoint: true, ...(adminThumbnail ? { adminThumbnail } : {}) },
     ...(folders ? { folders: true } : {}),
   }

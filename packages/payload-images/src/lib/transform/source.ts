@@ -30,7 +30,7 @@ const isAllowedFetchTarget = (target: URL, trusted: URL | null): boolean => {
 }
 
 const readViaStorageHandlers = async (payload: Payload, slug: string, doc: UploadDocLike): Promise<Buffer | null> => {
-  //EXCUSE: the plugin invokes storage handlers with a light UploadDocLike for a runtime-configured collection; Payload's handler type demands that collection's full generated doc (with id)
+  //EXCUSE: the plugin reads a runtime-configured collection's storage handlers with a light UploadDocLike (no guaranteed id, since URL/file paths don't need one); Payload's handler type demands the full doc with id
   const handlers = payload.collections[slug]?.config?.upload?.handlers as UploadHandler[] | undefined
   if (!handlers?.length || !doc.filename) return null
   try {

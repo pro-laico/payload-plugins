@@ -20,7 +20,10 @@ import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transfo
 import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
+import { isRecord } from '../../lib/isRecord'
 import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
+
+const isFallbackCandidate = (v: unknown): v is FallbackCandidate => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 
 export type { TransformEndpointConfig } from '../../types'
 
@@ -125,8 +128,8 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
               prefix: true,
             },
           })
-          //EXCUSE: rows come from a projected find on a runtime-configured collection; their fields type as unknown so TS won't narrow them to FallbackCandidate
-          const pick = pickFallbackVariant(p, format, src, rows.docs as FallbackCandidate[], constraints)
+          const candidates = rows.docs.flatMap((d) => (isFallbackCandidate(d) ? [d] : []))
+          const pick = pickFallbackVariant(p, format, src, candidates, constraints)
           if (pick) {
             const bytes = await readBytes(pick, resolveStaticDir(payload, variantSlug), base, { payload, slug: variantSlug })
             if (bytes) {

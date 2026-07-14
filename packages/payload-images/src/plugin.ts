@@ -2,9 +2,9 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
-import { isRecord } from './lib/isRecord'
 import { createPrewarmTask } from './jobs/prewarmTask'
 import { createPurgeEndpoint } from './endpoints/purge'
+import { mergeSelect } from './lib/mergeCollection/mergeSelect'
 import { mergeCollection } from './lib/mergeCollection'
 import { loadSharp } from './lib/transform/sharpInstance'
 import { createImagesCollection } from './collections/images'
@@ -124,20 +124,8 @@ export const imagesPlugin =
       // Re-merge the target's own populate/select on top so the enhancements never clobber them.
       const parity: Partial<CollectionConfig> = {
         ...enh,
-        //EXCUSE: merges select objects for a runtime-configured collection; TS won't accept a {field: true} map as Payload's discriminated SelectType
-        defaultPopulate: {
-          ...(isRecord(enh.defaultPopulate) ? enh.defaultPopulate : {}),
-          ...(isRecord(target.defaultPopulate) ? target.defaultPopulate : {}),
-        } as CollectionConfig['defaultPopulate'],
-        ...(enh.forceSelect || target.forceSelect
-          ? {
-              //EXCUSE: same runtime-collection select gap as defaultPopulate above
-              forceSelect: {
-                ...(isRecord(enh.forceSelect) ? enh.forceSelect : {}),
-                ...(isRecord(target.forceSelect) ? target.forceSelect : {}),
-              } as CollectionConfig['forceSelect'],
-            }
-          : {}),
+        defaultPopulate: mergeSelect(enh.defaultPopulate, target.defaultPopulate),
+        ...(enh.forceSelect || target.forceSelect ? { forceSelect: mergeSelect(enh.forceSelect, target.forceSelect) } : {}),
       }
       const enhanced = mergeCollection(mergeCollection(target, parity), imagesOverrides)
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]

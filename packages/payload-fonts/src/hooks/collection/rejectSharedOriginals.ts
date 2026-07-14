@@ -1,4 +1,4 @@
-import { APIError, type CollectionBeforeValidateHook } from 'payload'
+import { APIError, type CollectionBeforeValidateHook, type Where } from 'payload'
 
 import { originalIdsFromDoc } from '../../lib/fontDoc'
 import { isRecord } from '../../lib/isRecord'
@@ -13,12 +13,11 @@ export const makeRejectSharedOriginals =
     const ids = originalIdsFromDoc(isRecord(data) ? data : {})
     if (ids.length === 0) return data
     const selfId = idOf(originalDoc) ?? idOf(data)
-    const refs = [{ 'variable.upright': { in: ids } }, { 'variable.italic': { in: ids } }, { 'weights.file': { in: ids } }]
-    const where = selfId != null ? { and: [{ id: { not_equals: selfId } }, { or: refs }] } : { or: refs }
+    const refs: Where[] = [{ 'variable.upright': { in: ids } }, { 'variable.italic': { in: ids } }, { 'weights.file': { in: ids } }]
+    const where: Where = selfId != null ? { and: [{ id: { not_equals: selfId } }, { or: refs }] } : { or: refs }
     const res = await req.payload.find({
       collection: fontSlug,
-      //EXCUSE: dotted field paths (variable.upright, weights.file) on a runtime-configured collection aren't statically expressible in Payload's Where type
-      where: where as never,
+      where,
       depth: 0,
       limit: 1,
       req,

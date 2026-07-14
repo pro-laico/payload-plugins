@@ -240,9 +240,8 @@ export async function ImagesView({
 
 export function RevalidateView({ snapshot }: { snapshot: DevSnapshot }) {
   const meta = snapshot.revalidate
-  //EXCUSE: reads payload-revalidate's Symbol.for inspect slot cross-package without importing it; globalThis has no symbol index type
-  const slot = globalThis as Record<symbol, unknown>
-  const inspect = slot[Symbol.for('pro-laico.payload-revalidate.inspect')]
+  // Reads payload-revalidate's Symbol.for inspect slot cross-package without importing it.
+  const inspect = Reflect.get(globalThis, Symbol.for('pro-laico.payload-revalidate.inspect'))
   const data = typeof inspect === 'function' ? inspect() : undefined
   if (!meta || !data) return <p className="pdtp-muted">payload-revalidate isn't active in this process.</p>
 

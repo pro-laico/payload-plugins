@@ -4,11 +4,10 @@ import type { CollectionAfterChangeHook, Payload } from 'payload'
 import { getServerSideURL } from '../../lib/getServerSideURL'
 import { detectVariantIdentityChange } from './variantIdentity'
 import { parseTransformParams } from '../../lib/transform/params'
-import { resolveConstraints } from '../../endpoints/transform/config'
 import { getOrCreateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { presetEntryName, presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { isRecord } from '../../lib/isRecord'
-import type { PresetEntry, PresetSpec, SourceDoc, TransformConstraints, VariantSourceDoc } from '../../types'
+import type { PresetEntry, PresetSpec, SourceDoc, TransformConstraints } from '../../types'
 
 // The plugin owns the image collection's schema but can't name its app-generated type.
 const isPresetEntry = (v: unknown): v is PresetEntry => isRecord(v)

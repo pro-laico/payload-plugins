@@ -1,15 +1,12 @@
-import { isRecord } from '../isRecord'
-
-export const mergeHooks = <T>(base: T, extra?: T): T => {
+// Merges hook objects: concatenates the array-valued phases of `extra` onto a copy of `base`.
+// Spreading the generic T keeps the return type; Reflect handles the dynamic keys without a cast.
+export const mergeHooks = <T extends object>(base: T, extra?: T): T => {
   if (!extra) return base
-  const b: Record<string, unknown> = isRecord(base) ? base : {}
-  const e: Record<string, unknown> = isRecord(extra) ? extra : {}
-  const out: Record<string, unknown> = { ...b }
-  for (const key of Object.keys(e)) {
-    const bv = Array.isArray(b[key]) ? b[key] : []
-    const ev = Array.isArray(e[key]) ? e[key] : []
-    out[key] = [...bv, ...ev]
+  const out = { ...base }
+  for (const [key, extraValue] of Object.entries(extra)) {
+    if (!Array.isArray(extraValue)) continue
+    const baseValue = Reflect.get(base, key)
+    Reflect.set(out, key, [...(Array.isArray(baseValue) ? baseValue : []), ...extraValue])
   }
-  //EXCUSE: merges the hook-array object generically; TS can't prove the rebuilt Record matches the caller's generic T
-  return out as unknown as T
+  return out
 }

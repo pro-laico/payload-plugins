@@ -3,20 +3,19 @@ import type { Payload, PayloadRequest } from 'payload'
 import { isRecord } from './lib/isRecord'
 import type { AfterSeedListener, SeedResult } from './types'
 
+// A Symbol.for slot on globalThis is the decoupled cross-package channel (payload-revalidate
+// registers here without importing us); Reflect reads/writes it without an untyped-global cast.
 const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')
 
-//EXCUSE: globalThis has no symbol index type; a Symbol.for slot is the decoupled cross-package channel (payload-revalidate registers here without importing us), and a named global would collide across two independently-typed packages
-const slot = globalThis as Record<symbol, unknown>
-
 export const registerAfterSeedListener = (key: string, listener: AfterSeedListener): void => {
-  const existing = slot[AFTER_SEED_SLOT]
+  const existing = Reflect.get(globalThis, AFTER_SEED_SLOT)
   const listeners = isRecord(existing) ? existing : {}
   listeners[key] = listener
-  slot[AFTER_SEED_SLOT] = listeners
+  Reflect.set(globalThis, AFTER_SEED_SLOT, listeners)
 }
 
 export const afterSeedListeners = (): Record<string, unknown> => {
-  const existing = slot[AFTER_SEED_SLOT]
+  const existing = Reflect.get(globalThis, AFTER_SEED_SLOT)
   return isRecord(existing) ? existing : {}
 }
 

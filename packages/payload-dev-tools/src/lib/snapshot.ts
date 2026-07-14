@@ -12,7 +12,6 @@ import type {
   ImagesSnapshot,
   MuxMarker,
   MuxSnapshot,
-  RevalidateInspection,
   RevalidateMarker,
   RevalidateSnapshot,
   SeedMarker,
@@ -141,9 +140,8 @@ const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnap
 }
 
 const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
-  //EXCUSE: reads payload-revalidate's Symbol.for inspect slot cross-package without importing it; globalThis has no symbol index type
-  const slot = globalThis as Record<symbol, unknown>
-  const inspect = slot[Symbol.for('pro-laico.payload-revalidate.inspect')]
+  // Reads payload-revalidate's Symbol.for inspect slot cross-package without importing it.
+  const inspect = Reflect.get(globalThis, Symbol.for('pro-laico.payload-revalidate.inspect'))
   const data = typeof inspect === 'function' ? inspect() : undefined
   return {
     endpointPath: marker.endpointPath ?? null,
