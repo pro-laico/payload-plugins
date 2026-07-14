@@ -62,8 +62,8 @@ export function buildReferenceGraph(config: GraphSource): ReferenceGraph {
     }
   }
 
-  const collections = (config.collections ?? []) as { slug: string; fields: Field[] }[] //TODO: replace `as` cast with proper typing
-  const globals = (config.globals ?? []) as { slug: string; fields: Field[] }[] //TODO: replace `as` cast with proper typing
+  const collections = config.collections ?? []
+  const globals = config.globals ?? []
   for (const collection of collections) walkFields(collection.slug, collection.fields, '')
   for (const global of globals) walkFields(`global:${global.slug}`, global.fields, '')
 

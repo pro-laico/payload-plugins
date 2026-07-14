@@ -1,6 +1,7 @@
 import type { Field, Where } from 'payload'
 
 import { isId } from '../values'
+import { isRecord } from '../isRecord'
 import type { JoinMembership } from '../../types'
 
 export const whereFields = (where: Where | undefined): string[] => {
@@ -67,21 +68,20 @@ export const extractOnValues = (data: unknown, on: string): (string | number)[] 
   let current: unknown = data
   for (const key of on.split('.')) {
     if (Array.isArray(current)) break
-    if (typeof current !== 'object' || current === null) {
+    if (!isRecord(current)) {
       current = undefined
       break
     }
-    current = (current as Record<string, unknown>)[key] //TODO: replace `as` cast with proper typing
+    current = current[key]
   }
   const out: (string | number)[] = []
   const push = (value: unknown): void => {
     if (value == null) return
     if (isId(value)) {
       out.push(value)
-    } else if (typeof value === 'object') {
-      const record = value as Record<string, unknown> //TODO: replace `as` cast with proper typing
-      if ('relationTo' in record && 'value' in record) push(record.value)
-      else if (isId(record.id)) out.push(record.id)
+    } else if (isRecord(value)) {
+      if ('relationTo' in value && 'value' in value) push(value.value)
+      else if (isId(value.id)) out.push(value.id)
     }
   }
   for (const item of Array.isArray(current) ? current : [current]) push(item)

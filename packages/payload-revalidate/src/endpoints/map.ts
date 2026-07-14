@@ -1,6 +1,7 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
 import { bust } from '../lib/bust'
+import { isRecord } from '../lib/isRecord'
 import { getInspection } from '../lib/inspect'
 
 export const MAP_ENDPOINT_PATH = '/revalidate-map'
@@ -30,9 +31,8 @@ export function createMapEndpoints({ observe }: { observe: boolean }): Endpoint[
       handler: async (req) => {
         const blocked = gate(req)
         if (blocked) return blocked
-        const body = req.json ? await req.json().catch(() => null) : null
-        //TODO: replace `as` casts with proper typing
-        const tag = typeof (body as { tag?: unknown } | null)?.tag === 'string' ? (body as { tag: string }).tag : null
+        const body: unknown = req.json ? await req.json().catch(() => null) : null
+        const tag = isRecord(body) && typeof body.tag === 'string' ? body.tag : null
         if (!tag) return Response.json({ error: 'Body must be JSON: { "tag": "..." }' }, { status: 400 })
         await bust([{ tag, reason: 'manual' }], { slug: tag, operation: 'manual', lane: 'published' }, 'manual', observe)
         return Response.json({ busted: tag })

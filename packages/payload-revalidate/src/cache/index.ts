@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 
 import { isId } from '../lib/values'
+import { isRecord } from '../lib/isRecord'
 import { createManualBusters } from './manual'
 import { readRevalidateMarker } from '../lib/marker'
 import { recordRead } from '../lib/observe/registry'
@@ -10,9 +11,7 @@ import type { CacheDocOptions, CacheHelpers, CacheIdsOptions, PayloadRevalidateM
 
 import 'server-only'
 
-//TODO: replace `as` casts with proper typing
-const docId = (doc: unknown): string | number | undefined =>
-  typeof doc === 'object' && doc !== null && isId((doc as { id?: unknown }).id) ? (doc as { id: string | number }).id : undefined
+const docId = (doc: unknown): string | number | undefined => (isRecord(doc) && isId(doc.id) ? doc.id : undefined)
 
 interface ReadCtx {
   payload: Payload
@@ -54,8 +53,7 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
 
   async function cacheIds<T>(result: T, collection: string, options: CacheIdsOptions = {}): Promise<T> {
     const { marker, tags, observe } = await ctx()
-    //TODO: replace `as` cast with proper typing
-    const items: unknown[] = Array.isArray(result) ? result : ((result as { docs?: unknown[] } | null)?.docs ?? [])
+    const items: unknown[] = Array.isArray(result) ? result : isRecord(result) && Array.isArray(result.docs) ? result.docs : []
     const name = options.label ?? `ids:${collection}${options.list ? `:${options.list}` : ''}`
 
     const uploadMeta = ['filename', 'filesize', 'mimeType', 'width', 'height', 'focalX', 'focalY', 'url', 'thumbnailURL', 'sizes']

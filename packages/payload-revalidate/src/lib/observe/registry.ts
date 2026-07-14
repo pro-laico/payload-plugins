@@ -3,12 +3,17 @@ import type { ObservedRead, Registry, RevalidateEvent } from '../../types'
 const MAX_READS = 500
 const MAX_EVENTS = 200
 
-const REGISTRY_SLOT = Symbol.for('pro-laico.payload-revalidate.observer')
+// Internal, single-package slot: a named global survives dev HMR without a cross-package collision.
+declare global {
+  var __payloadRevalidateObserver: Registry | undefined
+}
 
 const registry = (): Registry => {
-  const slot = globalThis as Record<symbol, unknown> //TODO: replace `as` cast with proper typing
-  if (!slot[REGISTRY_SLOT]) slot[REGISTRY_SLOT] = { reads: new Map(), events: [] } satisfies Registry
-  return slot[REGISTRY_SLOT] as Registry //TODO: replace `as` cast with proper typing
+  const existing = globalThis.__payloadRevalidateObserver
+  if (existing) return existing
+  const created: Registry = { reads: new Map(), events: [] }
+  globalThis.__payloadRevalidateObserver = created
+  return created
 }
 
 export const recordRead = (observe: boolean, read: Omit<ObservedRead, 'firstAt' | 'lastAt' | 'count'>): void => {

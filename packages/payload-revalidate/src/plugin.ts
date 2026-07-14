@@ -74,8 +74,7 @@ export const revalidatePlugin =
     let graph: ReferenceGraph | null = null
     let bootedConfig: SanitizedConfig | null = null
     stashInspect(() => {
-      //TODO: replace `as` cast with proper typing
-      const booted = (bootedConfig ?? undefined) as Parameters<typeof buildReferenceGraph>[0] | undefined
+      const booted = bootedConfig ?? undefined
       if (!graph || (!graphFromBootedConfig && booted)) {
         graphFromBootedConfig = Boolean(booted)
         const source = booted ?? { collections, globals, blocks: config.blocks }

@@ -1,6 +1,7 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
 import { createOnce } from './once'
+import { isRecord } from './isRecord'
 import { findTopLevelField } from './fields'
 import type {
   CollectionRevalidateConfig,
@@ -31,7 +32,7 @@ const shapeWarn = (slug: string, key: string, expected: string): void => {
 }
 
 export function resolveCollectionSettings(collection: CollectionConfig, resolved: ResolvedRevalidateOptions): CollectionSettings | null {
-  const marker = (collection.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate //TODO: replace `as` cast with proper typing
+  const marker = collection.custom?.revalidate
   const override = resolved.collections[collection.slug]
   if (override === false) return null
   if (marker === false && override === undefined) return null
@@ -50,9 +51,8 @@ export function resolveCollectionSettings(collection: CollectionConfig, resolved
     shapeWarn(collection.slug, 'lists', 'an object of { [scope]: { fields: string[] } }')
   } else {
     for (const [scope, config] of Object.entries(rawLists ?? {})) {
-      //TODO: replace `as` cast with proper typing
-      if (typeof config === 'object' && config !== null && isStringArray((config as { fields?: unknown }).fields)) {
-        lists[scope] = (config as { fields: string[] }).fields //TODO: replace `as` cast with proper typing
+      if (isRecord(config) && isStringArray(config.fields)) {
+        lists[scope] = config.fields
       } else {
         shapeWarn(collection.slug, `lists.${scope}`, '{ fields: string[] }')
       }
@@ -69,6 +69,6 @@ export function resolveCollectionSettings(collection: CollectionConfig, resolved
 }
 
 export function globalEnabled(global: GlobalConfig, resolved: ResolvedRevalidateOptions): boolean {
-  const marker = (global.custom as { revalidate?: RevalidateMarker } | undefined)?.revalidate //TODO: replace `as` cast with proper typing
+  const marker = global.custom?.revalidate
   return resolved.globals[global.slug] !== false && marker !== false
 }

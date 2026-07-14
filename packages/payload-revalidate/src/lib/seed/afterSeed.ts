@@ -1,4 +1,5 @@
 import { bust } from '../bust'
+import { isRecord } from '../isRecord'
 import type { Bust, SeedFlushState, SeedResultLike } from '../../types'
 
 const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')
@@ -22,8 +23,10 @@ export const seedBusts = (state: SeedFlushState, result: SeedResultLike): Bust[]
 }
 
 export const registerSeedListener = (state: SeedFlushState): void => {
-  const slot = globalThis as Record<symbol, unknown> //TODO: replace `as` cast with proper typing
-  const listeners = (slot[AFTER_SEED_SLOT] as Record<string, unknown> | undefined) ?? {} //TODO: replace `as` cast with proper typing
+  //EXCUSE: registers into payload-seed's Symbol.for afterSeed slot without importing it (decoupled cross-package channel); globalThis has no symbol index type and a named global would collide across the two packages
+  const slot = globalThis as Record<symbol, unknown>
+  const existing = slot[AFTER_SEED_SLOT]
+  const listeners = isRecord(existing) ? existing : {}
   listeners['pro-laico/payload-revalidate'] = async (result: SeedResultLike): Promise<void> => {
     await bust(seedBusts(state, result), { slug: 'seed', operation: 'seed', lane: 'published' }, 'seed', state.observe)
   }

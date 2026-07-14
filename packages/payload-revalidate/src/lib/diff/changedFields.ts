@@ -1,19 +1,19 @@
+import { isRecord } from '../isRecord'
 import type { ChangeDetectionSchema } from '../../types'
 
 const normalizeRelation = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(normalizeRelation)
-  if (typeof value === 'object' && value !== null) {
-    const record = value as Record<string, unknown> //TODO: replace `as` cast with proper typing
-    if ('relationTo' in record && 'value' in record) return `${String(record.relationTo)}:${String(normalizeRelation(record.value))}`
-    if ('id' in record) return record.id
+  if (isRecord(value)) {
+    if ('relationTo' in value && 'value' in value) return `${String(value.relationTo)}:${String(normalizeRelation(value.value))}`
+    if ('id' in value) return value.id
   }
   return value
 }
 
 export const changedFields = (doc: unknown, previousDoc: unknown, schema: ChangeDetectionSchema = {}): Set<string> | null => {
-  if (typeof doc !== 'object' || doc === null || typeof previousDoc !== 'object' || previousDoc === null) return null
-  const a = doc as Record<string, unknown> //TODO: replace `as` cast with proper typing
-  const b = previousDoc as Record<string, unknown> //TODO: replace `as` cast with proper typing
+  if (!isRecord(doc) || !isRecord(previousDoc)) return null
+  const a = doc
+  const b = previousDoc
   const changed = new Set<string>()
   for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
     if (key === 'updatedAt' || key === 'createdAt') continue
@@ -30,8 +30,8 @@ const valueAt = (data: unknown, path: string[]): unknown => {
   let current = data
   for (const key of path) {
     if (Array.isArray(current)) return current
-    if (typeof current !== 'object' || current === null) return undefined
-    current = (current as Record<string, unknown>)[key] //TODO: replace `as` cast with proper typing
+    if (!isRecord(current)) return undefined
+    current = current[key]
   }
   return current
 }

@@ -20,8 +20,7 @@ const NEXT_MAX_TAGS = 128
 export const applyCacheTags = async (allTags: string[]): Promise<void> => {
   if (allTags.length === 0) return
   try {
-    //TODO: replace `as` cast with proper typing
-    const { cacheTag } = (await import('next/cache')) as unknown as { cacheTag: (...tags: string[]) => void }
+    const { cacheTag } = await import('next/cache')
     cacheTag(...allTags)
   } catch (err) {
     alertOnce(
@@ -50,13 +49,18 @@ export const finish = async ({
   slug,
   options,
 }: FinishInput): Promise<void> => {
-  //TODO: replace `as` cast with proper typing
-  const index = options.walk === false || value == null ? null : indexSchema(payload.config as unknown as IndexSource)
+  const indexSource: IndexSource = {
+    collections: payload.config.collections,
+    globals: payload.config.globals,
+    blocks: payload.config.blocks,
+    localization: payload.config.localization,
+  }
+  const index = options.walk === false || value == null ? null : indexSchema(indexSource)
   const entity = index ? (kind === 'global' ? index.global(slug) : index.collection(slug)) : undefined
-  const walked =
+  const walked: ReturnType<typeof collectDepTags> =
     index && entity
       ? collectDepTags(value, entity.fields, index, options.walk === false ? undefined : options.walk, tags)
-      : { tags: [], embeds: [] as BakedEmbed[], capped: false } //TODO: replace `as` cast with proper typing
+      : { tags: [], embeds: [], capped: false }
 
   const name = options.label ?? `${kind}:${slug}${as !== undefined ? `:${as}` : ''}`
   if (walked.capped)

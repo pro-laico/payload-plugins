@@ -10,7 +10,7 @@ export const extractGetterCalls = (source: string): ScannedCall[] => {
   const out: ScannedCall[] = []
   CALL_RE.lastIndex = 0
   for (let match = CALL_RE.exec(source); match; match = CALL_RE.exec(source)) {
-    const helper = `cache${match[1]}` as ScannedCall['helper'] //TODO: replace `as` cast with proper typing
+    const helper: ScannedCall['helper'] = match[1] === 'Doc' ? 'cacheDoc' : match[1] === 'Ids' ? 'cacheIds' : 'cacheGlobal'
     const tail = source.slice(match.index, match.index + 500)
     const slug = SLUG_RE.exec(tail)?.[1]
     if (!slug) continue

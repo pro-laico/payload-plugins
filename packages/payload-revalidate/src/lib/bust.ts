@@ -1,4 +1,5 @@
 import { createOnce } from './once'
+import { isRecord } from './isRecord'
 import { recordEvent } from './observe/registry'
 import type { Bust, RevalidateEvent } from '../types'
 
@@ -18,17 +19,24 @@ const withoutSingleArgNag = <T>(fn: () => T): T => {
 }
 
 export const safeRevalidate = async (tag: string): Promise<void> => {
-  let mod: { updateTag?: (tag: string) => void; revalidateTag: (tag: string, profile?: string) => void }
+  let mod: unknown
   try {
-    mod = (await import('next/cache')) as typeof mod //TODO: replace `as` cast with proper typing
+    mod = await import('next/cache')
   } catch {
     return
   }
+  if (!isRecord(mod)) return
   try {
-    if (typeof mod.updateTag === 'function') return mod.updateTag(tag)
+    const updateTag = mod.updateTag
+    if (typeof updateTag === 'function') {
+      updateTag(tag)
+      return
+    }
   } catch {}
+  const revalidateTag = mod.revalidateTag
+  if (typeof revalidateTag !== 'function') return
   try {
-    withoutSingleArgNag(() => mod.revalidateTag(tag))
+    withoutSingleArgNag(() => revalidateTag(tag))
   } catch (err) {
     if (warnOutsideRequestOnce('outside-request')) {
       console.warn(
