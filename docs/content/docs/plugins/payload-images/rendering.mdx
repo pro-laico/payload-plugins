@@ -121,7 +121,7 @@ runtime, no proxy — the `srcset` already points at [the transform endpoint](/d
   fetchpriority="auto"
   decoding="async"
   style="display:block; width:100%; height:auto; aspect-ratio:1.7777777777777778; object-fit:cover;
-         background-image:url(data:image/png;base64,iVBOR…); background-size:cover; background-position:center" />
+         background-image:url(data:image/png;base64,iVBOR…); background-size:cover; background-position:center; background-repeat:no-repeat" />
 ```
 
 </Tab>
@@ -233,7 +233,7 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 
 <Callout type="info">
   **For the OG image itself, prefer a [preset](/docs/plugins/payload-images/caching#guaranteed-presets):**
-  `getImageUrl(page.heroImage, { preset: 'og' })` → `/api/img/<id>?preset=og`. A preset is
+  `getImageUrl(page.heroImage, { preset: 'og' })` → `https://<site>/api/img/<id>?preset=og&v=…`. A preset is
   guaranteed to exist (eagerly pre-generated, cap-exempt) and honors exact 1200×630 — so a cold
   social crawler never races generation. A default `og` template ships out of the box.
 </Callout>

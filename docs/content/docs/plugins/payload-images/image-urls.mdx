@@ -59,8 +59,9 @@ Output never upscales past the source.
 
 With `fmt=auto` the endpoint picks the best format the browser's `Accept` header allows. WebP is
 the default modern target; AVIF only wins when `transform.preferAvif` is on (AVIF encodes far
-slower, so `auto` keeps the cold path fast — explicit `fmt=avif` always works). Responses carry
-`Vary: Accept` so caches keep per-format copies straight.
+slower, so `auto` keeps the cold path fast — explicit `fmt=avif` always works). `fmt=auto`
+responses carry `Vary: Accept` so caches keep per-format copies straight (explicit-format
+responses don't need it).
 
 ## The virtual URL fields
 

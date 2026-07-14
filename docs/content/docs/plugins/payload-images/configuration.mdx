@@ -34,7 +34,7 @@ export const options = [
       { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
     ],
   },
-  { name: 'focalUI', type: 'boolean | { previewRatios?: string[] }', default: 'true', description: `Render the focal-point picker + ratio-preview field and the Purge variants button. The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']).` },
+  { name: 'focalUI', type: 'boolean | { previewRatios?: string[] }', default: 'true', description: `Render the focal-point picker + ratio-preview field and the preset manager panel (preset toggles, cached-variant list, purge button, per-image variant cap). The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']).` },
   { name: 'virtualFields', type: 'boolean', default: 'true (false when transform: false)', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population. Defaults off when the transform endpoint is disabled (the URLs would 404); pass true explicitly to force them anyway.` },
   { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
@@ -42,7 +42,7 @@ export const options = [
   { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
   { name: 'prewarm', type: 'boolean | PrewarmOptions', default: 'false', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. true = zero-config defaults; the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue. Default off — enabling adds the hidden image-render-profiles collection (a schema change), the imagesPrewarm jobs task, and the images:prewarm CLI.` },
   { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
-  { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og: 1200×630 }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. A default og (1200×630 cover jpeg) ships unless overridden. See Caching & prewarming → Guaranteed presets.` },
+  { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg) and thumbnail (160×160 cover webp — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
 ]
 
 The **Reference** tab is the interactive view (`transform` expands to its nested options);
@@ -88,6 +88,12 @@ imagesPlugin({
   folders: false,
   // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
   prewarm: false,
+  variantLimit: 200,
+  presetTemplates: {
+    // both ship by default; your own entries merge on top
+    og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
+    thumbnail: { width: 160, height: 160, fit: 'cover', quality: 70, format: 'webp' },
+  },
 })
 ```
 
@@ -123,12 +129,15 @@ is **public**; writes are logged-in-admin only.
     alt: { description: "Required. Screen-reader / SEO text; the admin title and list-search field. Localizable.", type: "text" },
     focalPoint: { description: "Payload's native upload.focalPoint, surfaced by the picker below.", type: "built-in" },
     focalPreview: { description: "Focal-point picker + ratio preview. Only with focalUI.", type: "ui" },
-    purgeVariants: { description: "The Purge variants button. Only with focalUI.", type: "ui" },
-    variants: { description: "Lists this image's cached generated-images. Only with focalUI.", type: "join" },
+    presetManager: { description: "The preset manager panel: preset toggles, cached-variant list, purge button, and the per-image variant cap. Only with focalUI and the transform endpoint.", type: "ui" },
+    variants: { description: "Data/API join to this image's cached generated-images. Hidden in the admin (the preset manager panel lists variants itself). Only with focalUI and the transform endpoint.", type: "join" },
+    presets: { description: "Guaranteed public variants toggled onto this image — a presetTemplates name or a custom spec. Cap-exempt, pre-generated, served via ?preset=<name>. Managed by the preset manager panel; hidden in the admin.", type: "array" },
+    variantLimit: { description: "Per-image cap on cached variants; blank uses the plugin's variantLimit default. Presets never count against it. Hidden in the admin (edited via the preset manager panel).", type: "number" },
     src: { description: "Default-width optimized URL, computed on read and hidden in admin. Only with virtualFields.", type: "virtual" },
     srcset: { description: "Responsive srcset of optimized URLs. Only with virtualFields.", type: "virtual" },
     placeholderURL: { description: "Tiny 32px blurred image URL (URL form, for non-React consumers). Only with virtualFields.", type: "virtual" },
     thumbnailURL: { description: "160px focal-cropped thumbnail URL. Only with virtualFields.", type: "virtual" },
+    aspectRatio: { description: "The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one. Only with virtualFields.", type: "virtual" },
     variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields. Only with virtualFields.", type: "virtual" },
     "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
     "placeholderXxl / placeholderX3": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
@@ -136,6 +145,7 @@ is **public**; writes are logged-in-admin only.
     palette: { description: "Sanity-style color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }. Hidden in the admin.", type: "json" },
     hasAlpha: { description: "The file carries an alpha channel.", type: "checkbox" },
     isOpaque: { description: "No sampled pixel is actually transparent.", type: "checkbox" },
+    "focalSize / cropLeft … cropBottom": { description: "The hotspot & crop layer: hotspot circle diameter (% of the crop region's shorter side) and four non-destructive edge trims (%), edited via the focal picker. Hidden in the admin.", type: "number ×5" },
   }}
 />
 
@@ -146,6 +156,7 @@ is **public**; writes are logged-in-admin only.
     generateImageMetadataBeforeChange: { description: "When a save carries a new file, one decode stores the placeholder tiers (five BlurHash strings + the micro-webp data URIs), the color palette, the alpha flags, and — when the editor hasn't picked one — a saliency-based focal point, all in the same write (payload images:backfill covers pre-existing images).", type: "beforeChange" },
     purgeStaleVariantsAfterChange: { description: "Purges this image's stale cached variants when its file or focal point changes.", type: "afterChange" },
     enqueuePrewarmAfterChange: { description: "Queues the imagesPrewarm job on create / file replace / focal edit. Only with prewarm on; best-effort — never blocks the write.", type: "afterChange" },
+    generatePresetsAfterChange: { description: "Regenerates this image's guaranteed presets on create / file replace / focal or hotspot edits, after the stale-variant purge. Only with the transform endpoint on.", type: "afterChange" },
     purgeVariantsBeforeDelete: { description: "Purges all of this image's cached variants before the doc is deleted.", type: "beforeDelete" },
   }}
 />

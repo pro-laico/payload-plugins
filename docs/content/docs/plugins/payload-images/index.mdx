@@ -74,8 +74,8 @@ export default nextConfig
 <Step>
 **Generate the admin import map**
 
-The plugin registers custom admin components (the focal-point picker and **Purge variants**
-button), so regenerate the import map:
+The plugin registers custom admin components (the focal-point picker and the **Preset manager**
+panel), so regenerate the import map:
 
 ```bash
 pnpm payload generate:importmap
@@ -140,8 +140,9 @@ covers everything it just did.
 | `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
 | `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image (an id or a populated doc — a doc also supplies the width cap and cache-busting token). |
 | `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `focalUI` is on). |
-| `PurgeVariants` | `@pro-laico/payload-images/admin/purgeVariants` | Admin **Purge variants** button (wired via the import map when `focalUI` is on). |
+| `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `focalUI` is on). |
 | `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
+| `PresetSpec` / `PresetEntry` | `@pro-laico/payload-images` | The presets types: a `presetTemplates` spec and a per-image `presets` array entry. |
 | `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm jobs task slug (`imagesPrewarm`) — for queueing/running the job yourself. |
 
 The plugin also registers two Payload CLI commands: **`payload images:backfill`** stamps
