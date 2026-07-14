@@ -18,6 +18,7 @@ describe('createImageFor', () => {
   it('runs the read contract in one call: RESPONSIVE_IMAGE_SELECT, depth 0, disableErrors, chained context', async () => {
     const { payload, findByID } = fakePayload()
     const imageFor = createImageFor(payload)
+    // biome-ignore lint/suspicious/noFocusedTests: false positive — `.fit()` is the fluent builder method, not Jasmine's focused `fit()`.
     await expect(imageFor('1').aspectRatio('16:9').quality(60).fit('contain').format('webp').blur('md').fetch()).resolves.toBe(doc)
     expect(findByID).toHaveBeenCalledExactlyOnceWith({
       id: '1',

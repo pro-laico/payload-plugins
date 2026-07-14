@@ -1,6 +1,8 @@
 import type { ArrayField } from 'payload'
 
+import type { PresetSpec } from '../../../../types'
 import { FITS, FORMATS } from '../../../../lib/transform/params'
+import { validatePresetEntries } from '../../../../lib/presets/validateEntries'
 
 const d = {
   presets:
@@ -9,9 +11,10 @@ const d = {
   name: 'Name for a custom preset (used when no template is chosen).',
 }
 
-export const presetsField = (): ArrayField => ({
+export const presetsField = (templates: Record<string, PresetSpec>): ArrayField => ({
   name: 'presets',
   type: 'array',
+  validate: (value) => validatePresetEntries(value, templates),
   admin: { hidden: true, description: d.presets },
   fields: [
     {

@@ -9,6 +9,7 @@ savePrefix: ''
 nodeLinker: isolated
 hoistWorkspacePackages: false
 allowBuilds:
+  '@parcel/watcher': false
   '@swc/core': true
   esbuild: true
   sharp: true

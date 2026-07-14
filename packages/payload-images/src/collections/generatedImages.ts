@@ -41,6 +41,6 @@ export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptio
         ],
       },
     ],
-    upload: { mimeTypes: IMAGE_MIME_TYPES },
+    upload: { mimeTypes: IMAGE_MIME_TYPES, displayPreview: false },
   }
 }

@@ -6,6 +6,7 @@ import { hotspotFields } from './fields/hotspot'
 import type { CreateImagesOptions } from '../../../types'
 import { GENERATED_IMAGES_SLUG } from '../../generatedImages'
 import { RESPONSIVE_IMAGE_SELECT } from '../../../lib/renderIntent'
+import { resolvePresetTemplates } from '../../../lib/presets/defaults'
 import { PLACEHOLDER_FIELD_NAMES } from '../../../lib/placeholders/qualities'
 import { placeholderField, placeholderStorageFields } from './fields/placeholder'
 import { hasAlphaField, isOpaqueField, paletteField } from './fields/mediaMetadata'
@@ -30,17 +31,22 @@ const d = {
 }
 
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
-export const PurgeVariantsFieldPath = '@pro-laico/payload-images/admin/purgeVariants'
 export const PresetManagerFieldPath = '@pro-laico/payload-images/admin/presetManager'
 
 export const resolveAdminThumbnail = (adminThumbnail: number | false | undefined, apiRoute = '/api'): GetAdminThumbnail | undefined => {
   if (adminThumbnail === false) return undefined
-  const w = typeof adminThumbnail === 'number' ? adminThumbnail : 160
-  return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?w=${w}&h=${w}&fit=cover&fmt=auto` : null)
+  // A custom size keeps the dimension URL; the default rides the always-servable `thumbnail`
+  // preset template — stable spec, pre-generatable, exempt from the variant cap.
+  if (typeof adminThumbnail === 'number') {
+    const w = adminThumbnail
+    return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?w=${w}&h=${w}&fit=cover&fmt=auto` : null)
+  }
+  return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?preset=thumbnail` : null)
 }
 
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true, presetTemplates } = opts
+  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true } = opts
+  const presetTemplates = resolvePresetTemplates(opts.presetTemplates)
   const variantSlug = asSlug(opts.variantSlug || GENERATED_IMAGES_SLUG)
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
@@ -51,34 +57,42 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
     type: 'ui',
     admin: { components: { Field: { path: FocalPreviewFieldPath, ...(previewRatios ? { clientProps: { previewRatios } } : {}) } } },
   }
+  // The preset manager panel owns the whole variant surface: preset table, folded-in variants
+  // list, purge button, and the variantLimit input (driven via useField against the hidden field).
   const presetManager: UIField = {
     name: 'presetManager',
     type: 'ui',
-    admin: { components: { Field: { path: PresetManagerFieldPath, clientProps: { templates: presetTemplates ?? {} } } } },
-  }
-  const purgeVariants: UIField = {
-    name: 'purgeVariants',
-    type: 'ui',
-    admin: { components: { Field: { path: PurgeVariantsFieldPath, ...(purgePath ? { clientProps: { purgePath } } : {}) } } },
+    admin: {
+      components: {
+        Field: {
+          path: PresetManagerFieldPath,
+          clientProps: {
+            templates: presetTemplates,
+            variantSlug,
+            ...(purgePath ? { purgePath } : {}),
+            ...(opts.prewarmPath ? { prewarmPath: opts.prewarmPath } : {}),
+            ...(opts.presetsPath ? { presetsPath: opts.presetsPath } : {}),
+          },
+        },
+      },
+    },
   }
   const variantLimit: NumberField = {
     name: 'variantLimit',
     type: 'number',
     min: 0,
     ...(opts.variantLimit != null ? { defaultValue: opts.variantLimit } : {}),
-    admin: { description: d.variantLimit },
+    admin: { hidden: true, description: d.variantLimit },
   }
+  // Data/API surface only — the panel lists variants itself (paginated REST) so the join never renders.
   const variants: JoinField = {
     name: 'variants',
     type: 'join',
     collection: variantSlug,
     on: 'source',
-    admin: { defaultColumns: ['filename', 'width', 'height', 'format'], allowCreate: false },
+    admin: { hidden: true, allowCreate: false },
   }
-  // The limit sits above the variants join it governs when that UI renders; otherwise it's
-  // appended after the data fields so it always exists.
-  const limitInUI = focalUI && endpointsEnabled
-  const adminUIFields = focalUI ? [focalPreview, ...(endpointsEnabled ? [presetManager, purgeVariants, variantLimit, variants] : [])] : []
+  const adminUIFields = focalUI ? [focalPreview, ...(endpointsEnabled ? [presetManager, variants] : [])] : []
 
   // With the virtuals on, a populated image carries exactly what <ResponsiveImage> renders;
   // without them the component builds URLs itself — so the identity fields buildSrcset /
@@ -109,8 +123,8 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
       hasAlphaField,
       isOpaqueField,
       ...hotspotFields,
-      presetsField(),
-      ...(limitInUI ? [] : [variantLimit]),
+      presetsField(presetTemplates),
+      variantLimit,
     ],
     hooks: {
       beforeChange: [generateImageMetadataBeforeChange()],

@@ -79,6 +79,7 @@ export interface Config {
     testimonials: Testimonial;
     images: Image;
     'generated-images': GeneratedImage;
+    'image-render-profiles': ImageRenderProfile;
     icon: Icon;
     iconSet: IconSet;
     iconRequest: IconRequest;
@@ -109,6 +110,7 @@ export interface Config {
     testimonials: TestimonialsSelect<false> | TestimonialsSelect<true>;
     images: ImagesSelect<false> | ImagesSelect<true>;
     'generated-images': GeneratedImagesSelect<false> | GeneratedImagesSelect<true>;
+    'image-render-profiles': ImageRenderProfilesSelect<false> | ImageRenderProfilesSelect<true>;
     icon: IconSelect<false> | IconSelect<true>;
     iconSet: IconSetSelect<false> | IconSetSelect<true>;
     iconRequest: IconRequestSelect<false> | IconRequestSelect<true>;
@@ -142,6 +144,7 @@ export interface Config {
   user: User;
   jobs: {
     tasks: {
+      imagesPrewarm: TaskImagesPrewarm;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -241,10 +244,6 @@ export interface Image {
    * Describe the image for screen readers and SEO.
    */
   alt: string;
-  /**
-   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
-   */
-  variantLimit?: number | null;
   variants?: {
     docs?: (number | GeneratedImage)[];
     hasNextPage?: boolean;
@@ -346,6 +345,10 @@ export interface Image {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
+   */
+  variantLimit?: number | null;
   folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
@@ -504,6 +507,40 @@ export interface Testimonial {
   author: string;
   company?: string | null;
   project?: (number | null) | Project;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles".
+ */
+export interface ImageRenderProfile {
+  id: number;
+  /**
+   * Canonical render shape: ratio|fit|quality|format. One doc per distinct shape the transform endpoint has served.
+   */
+  profileKey: string;
+  ratio: string;
+  fit: string;
+  quality: number;
+  format: string;
+  /**
+   * Approximate total serves (flushed from per-process buffers, throttled).
+   */
+  hitCount?: number | null;
+  lastSeenAt?: string | null;
+  /**
+   * Per-width observation histogram: { "640": { n, last } }. Capped; the least-requested widths are evicted.
+   */
+  widths?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -697,7 +734,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'schedulePublish';
+        taskSlug: 'inline' | 'imagesPrewarm' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -730,7 +767,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'imagesPrewarm' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -771,6 +808,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'generated-images';
         value: number | GeneratedImage;
+      } | null)
+    | ({
+        relationTo: 'image-render-profiles';
+        value: number | ImageRenderProfile;
       } | null)
     | ({
         relationTo: 'icon';
@@ -938,7 +979,6 @@ export interface TestimonialsSelect<T extends boolean = true> {
  */
 export interface ImagesSelect<T extends boolean = true> {
   alt?: T;
-  variantLimit?: T;
   variants?: T;
   aspectRatio?: T;
   variantVersion?: T;
@@ -974,6 +1014,7 @@ export interface ImagesSelect<T extends boolean = true> {
         format?: T;
         id?: T;
       };
+  variantLimit?: T;
   folder?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1008,6 +1049,22 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles_select".
+ */
+export interface ImageRenderProfilesSelect<T extends boolean = true> {
+  profileKey?: T;
+  ratio?: T;
+  fit?: T;
+  quality?: T;
+  format?: T;
+  hitCount?: T;
+  lastSeenAt?: T;
+  widths?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1314,6 +1371,22 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskImagesPrewarm".
+ */
+export interface TaskImagesPrewarm {
+  input: {
+    sourceId: string;
+    reason: 'create' | 'replace' | 'focal' | 'manual';
+  };
+  output: {
+    targets?: number | null;
+    generated?: number | null;
+    failed?: number | null;
+    skipped?: string | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

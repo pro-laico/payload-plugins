@@ -9,7 +9,7 @@ import { resolveStaticDir } from './staticDir'
 import { TransformOverloadError } from './limit'
 import { extForFormat, mimeForFormat } from './params'
 import { isDuplicateKeyError, isForeignKeyError } from '../errors'
-import type { GenBytes, GetVariantBytesArgs, TransformOutput, UploadDocLike, VariantBytes } from '../../types'
+import type { GenBytes, GetVariantBytesArgs, TransformOutput, VariantBytes } from '../../types'
 
 const errorCode = (e: unknown): unknown => (typeof e === 'object' && e !== null && 'code' in e ? e.code : undefined)
 

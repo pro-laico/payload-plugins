@@ -72,7 +72,7 @@ export const seedOptions = {
 export const plugins: Plugin[] = [
   // `folders: true` opts the images collection into Payload's native folder organization — the
   // seed files the photos into Site/Services/Projects/Team folders (see seed/folders.ts).
-  imagesPlugin({ folders: true }),
+  imagesPlugin({ folders: true, prewarm: true }),
   iconsPlugin(),
   muxVideoPlugin(),
   fontsPlugin(),

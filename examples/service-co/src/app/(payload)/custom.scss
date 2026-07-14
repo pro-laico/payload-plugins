@@ -1,0 +1,43 @@
+/*
+ * Payload's header breadcrumb doesn't truncate on narrow screens: a long doc title stretches the
+ * page wider than the viewport, and mobile browsers then zoom/pan to fit — which strands
+ * position:fixed overlays (e.g. the focus & crop preview dialog) off the visible screen.
+ * Clamp the step-nav so the admin never overflows horizontally.
+ */
+
+/* Belt and braces: the admin page itself must never scroll sideways — any stray wide element
+   would re-trigger the mobile pan/zoom that misplaces fixed overlays. Wide content scrolls
+   inside its own container (e.g. the presets/variants table), never at page level. */
+html {
+  overflow-x: clip;
+}
+.app-header__step-nav-wrapper {
+  min-width: 0;
+  overflow: hidden;
+}
+.step-nav {
+  min-width: 0;
+}
+.step-nav__last {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Same failure in the upload field's file details: a long filename refuses to shrink and
+   stretches the page. Let the meta column shrink and ellipsize the filename link. */
+.file-details__main-detail {
+  min-width: 0;
+  overflow: hidden;
+}
+.file-meta__url {
+  min-width: 0;
+}
+.file-meta__url a {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}

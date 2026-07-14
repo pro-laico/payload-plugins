@@ -4,6 +4,8 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { createPrewarmTask } from './jobs/prewarmTask'
 import { createPurgeEndpoint } from './endpoints/purge'
+import { createPrewarmStatusEndpoint, createPrewarmTriggerEndpoint } from './endpoints/prewarm'
+import { createPresetStatusEndpoint } from './endpoints/presets'
 import { mergeSelect } from './lib/mergeCollection/mergeSelect'
 import { mergeCollection } from './lib/mergeCollection'
 import { loadSharp } from './lib/transform/sharpInstance'
@@ -60,6 +62,8 @@ export const imagesPlugin =
     const sourceSlug = extendCollection || 'images'
     const basePath = '/img'
     const purgePath = `${basePath}/purge`
+    const prewarmPath = `${basePath}/prewarm`
+    const presetsPath = `${basePath}/presets`
     const apiRoute = config.routes?.api ?? '/api'
     const endpointsEnabled = transform !== false
     const virtualFields = opts.virtualFields ?? endpointsEnabled
@@ -119,6 +123,8 @@ export const imagesPlugin =
         endpointsEnabled,
         adminThumbnail: !endpointsEnabled || ownThumbnail ? false : undefined,
         prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
+        ...(prewarm && endpointsEnabled ? { prewarmPath } : {}),
+        ...(endpointsEnabled ? { presetsPath } : {}),
         ...imageOpts,
       })
       // Re-merge the target's own populate/select on top so the enhancements never clobber them.
@@ -145,6 +151,8 @@ export const imagesPlugin =
           endpointsEnabled,
           adminThumbnail: endpointsEnabled ? undefined : false,
           prewarm: prewarm ? { taskSlug: prewarm.taskSlug, queue: prewarm.queue } : false,
+          ...(prewarm && endpointsEnabled ? { prewarmPath } : {}),
+          ...(endpointsEnabled ? { presetsPath } : {}),
           ...imageOpts,
         }),
         imagesOverrides,
@@ -159,6 +167,13 @@ export const imagesPlugin =
         : [
             ...(config.endpoints ?? []),
             createPurgeEndpoint({ variantSlug, sourceSlug }),
+            createPresetStatusEndpoint({ sourceSlug, variantSlug, templates: presetTemplates, constraints }),
+            ...(prewarm && prewarmDeps
+              ? [
+                  createPrewarmStatusEndpoint({ deps: prewarmDeps, taskSlug: prewarm.taskSlug, queue: prewarm.queue }),
+                  createPrewarmTriggerEndpoint({ deps: prewarmDeps, taskSlug: prewarm.taskSlug, queue: prewarm.queue }),
+                ]
+              : []),
             createTransformEndpoint({ ...transformCfg, ...snapping, variantSlug, sourceSlug, variantLimit, presetTemplates }, prewarmObserve),
           ]
 

@@ -2,6 +2,7 @@
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
 import config from '@payload-config'
 import '@payloadcms/next/css'
+
 import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
 import { DevToolbar } from '@pro-laico/payload-dev-tools/toolbar'
 import type { ServerFunctionClient } from 'payload'
@@ -9,6 +10,7 @@ import type React from 'react'
 import { devLinks } from '@/dev/links'
 import { devTests } from '@/dev/tests'
 import { importMap } from './admin/importMap.js'
+import './custom.scss'
 
 type Args = {
   children: React.ReactNode

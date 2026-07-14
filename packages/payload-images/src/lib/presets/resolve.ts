@@ -16,11 +16,12 @@ export const resolvePreset = (
   templates: Record<string, PresetSpec> | undefined,
   name: string,
 ): PresetSpec | null => {
-  if (!name || !Array.isArray(entries)) return null
-  const entry = entries.find((e) => presetEntryName(e) === name)
-  if (!entry) return null
-  if (entry.template) return templates?.[entry.template] ?? null
-  return inlineSpec(entry)
+  if (!name) return null
+  const entry = Array.isArray(entries) ? entries.find((e) => presetEntryName(e) === name) : undefined
+  if (entry) return entry.template ? (templates?.[entry.template] ?? null) : inlineSpec(entry)
+  // Config templates are always servable for every image — the per-image entry only opts into
+  // eager pre-generation on save. This is what lets ?preset=thumbnail work with zero setup.
+  return templates?.[name] ?? null
 }
 
 export const presetQuery = (spec: PresetSpec): QuerySource | null => {

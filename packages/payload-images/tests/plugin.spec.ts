@@ -15,6 +15,13 @@ const variantSourceRelTo = (c: Config, variantSlug = 'generated-images'): string
   const source = (gen?.fields ?? []).find((f) => 'name' in f && f.name === 'source')
   return (source as { relationTo?: string } | undefined)?.relationTo
 }
+const presetManagerClientProps = (c: Config, slug = 'images'): { prewarmPath?: string; presetsPath?: string } | undefined => {
+  const images = (c.collections ?? []).find((col) => col.slug === slug)
+  const field = byName(images?.fields ?? [], 'presetManager') as
+    | { admin?: { components?: { Field?: { clientProps?: { prewarmPath?: string; presetsPath?: string } } } } }
+    | undefined
+  return field?.admin?.components?.Field?.clientProps
+}
 
 describe('imagesPlugin — default (creates the images collection)', () => {
   const out = run()
@@ -27,9 +34,10 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(variantSourceRelTo(out)).toBe('images')
   })
 
-  it('registers the transform + purge endpoints', () => {
+  it('registers the transform + purge + preset-status endpoints', () => {
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
-    expect(paths).toEqual(expect.arrayContaining(['get /img/:id', 'post /img/purge/:id']))
+    expect(paths).toEqual(expect.arrayContaining(['get /img/:id', 'post /img/purge/:id', 'get /img/presets/:id']))
+    expect(presetManagerClientProps(out)?.presetsPath).toBe('/img/presets')
   })
 
   it('stashes the resolved config on config.custom for external tooling', () => {
@@ -143,6 +151,23 @@ describe('imagesPlugin — prewarm (default off, opt-in registers the whole surf
     expect((out.bin ?? []).map((b) => b.key)).not.toContain('images:prewarm')
     const marker = (out.custom as { payloadImages?: { prewarm?: unknown } }).payloadImages
     expect(marker?.prewarm).toBeUndefined()
+    const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
+    expect(paths).not.toContain('get /img/prewarm/:id')
+    expect(paths).not.toContain('post /img/prewarm/:id')
+    expect(presetManagerClientProps(out)?.prewarmPath).toBeUndefined()
+  })
+
+  it('prewarm: true registers the status + trigger endpoints and hands the panel the path', () => {
+    const out = run({ prewarm: true })
+    const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
+    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
+    expect(presetManagerClientProps(out)?.prewarmPath).toBe('/img/prewarm')
+  })
+
+  it('prewarm + transform: false registers no endpoints and no panel path', () => {
+    const out = run({ prewarm: true, transform: false })
+    expect(out.endpoints ?? []).toHaveLength(0)
+    expect(presetManagerClientProps(out)?.prewarmPath).toBeUndefined()
   })
 
   it('prewarm: true registers the registry collection, jobs task, bin script, hook, and marker', () => {
@@ -202,6 +227,12 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
     expect(variantSourceRelTo(out)).toBe('media')
   })
 
+  it('hands the extended target the prewarm panel path when prewarm is on', () => {
+    const warmed = run({ extendCollection: 'media', prewarm: true }, [media])
+    expect(presetManagerClientProps(warmed, 'media')?.prewarmPath).toBe('/img/prewarm')
+    expect(presetManagerClientProps(out, 'media')?.prewarmPath).toBeUndefined()
+  })
+
   it('applies folders to the extended target', () => {
     const withFolders = run({ extendCollection: 'media', folders: true }, [media])
     const m = (withFolders.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig & { folders?: unknown }
@@ -222,7 +253,7 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
   it('adds the on-demand admin thumbnail only when the target has not set its own', () => {
     const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
     const thumb = (m.upload as { adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null }).adminThumbnail
-    expect(thumb?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?w=160&h=160&fit=cover&fmt=auto')
+    expect(thumb?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?preset=thumbnail')
     const own: CollectionConfig = { ...media, upload: { adminThumbnail: 'card' } }
     const kept = (run({ extendCollection: 'media' }, [own]).collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
     expect((kept.upload as { adminThumbnail?: unknown }).adminThumbnail).toBe('card')

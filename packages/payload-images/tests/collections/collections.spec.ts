@@ -29,8 +29,13 @@ describe('createImagesCollection', () => {
   it('serves a focal-cropped admin thumbnail via /api/img (no full-res originals in the list)', () => {
     const upload = createImagesCollection().upload as { adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null }
     expect(typeof upload.adminThumbnail).toBe('function')
-    expect(upload.adminThumbnail?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?w=160&h=160&fit=cover&fmt=auto')
+    // Default rides the always-servable `thumbnail` preset template; a custom size keeps the dimension URL.
+    expect(upload.adminThumbnail?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?preset=thumbnail')
     expect(upload.adminThumbnail?.({ doc: {} })).toBeNull()
+    const sized = createImagesCollection({ adminThumbnail: 200 }).upload as {
+      adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null
+    }
+    expect(sized.adminThumbnail?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?w=200&h=200&fit=cover&fmt=auto')
   })
 
   it('omits the admin thumbnail when adminThumbnail is false', () => {
@@ -89,16 +94,21 @@ describe('createImagesCollection', () => {
     expect(ph?.virtual).toBe(true)
   })
 
-  it('renders the focal + purge UI and the variants join only when focalUI is on', () => {
+  it('renders the focal UI + preset panel and the variants join only when focalUI is on', () => {
     const on = createImagesCollection({ focalUI: true })
     expect(byName(on.fields, 'focalPreview')).toBeTruthy()
-    expect(byName(on.fields, 'purgeVariants')).toBeTruthy()
+    expect(byName(on.fields, 'presetManager')).toBeTruthy()
     expect(byName(on.fields, 'variants')).toBeTruthy()
+    // The panel owns purge/limit/variants UI — the join is data/API only, never rendered.
+    expect((byName(on.fields, 'variants') as { admin?: { hidden?: boolean } } | undefined)?.admin?.hidden).toBe(true)
+    expect(byName(on.fields, 'purgeVariants')).toBeUndefined()
     // focalUI:false → a clean upload (just alt + the file); no admin extras, no import map needed.
     const off = createImagesCollection({ focalUI: false })
     expect(byName(off.fields, 'focalPreview')).toBeUndefined()
-    expect(byName(off.fields, 'purgeVariants')).toBeUndefined()
+    expect(byName(off.fields, 'presetManager')).toBeUndefined()
     expect(byName(off.fields, 'variants')).toBeUndefined()
+    // The variantLimit data field always exists so seed-generated types stay stable.
+    expect(byName(off.fields, 'variantLimit')).toBeTruthy()
   })
 })
 

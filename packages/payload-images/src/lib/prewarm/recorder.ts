@@ -80,7 +80,9 @@ export const createObservationRecorder = (deps: {
         keys
           .sort((a, b) => (merged[a]?.n ?? 0) - (merged[b]?.n ?? 0))
           .slice(0, keys.length - MAX_WIDTH_ENTRIES)
-          .forEach((k) => delete merged[k])
+          .forEach((k) => {
+            delete merged[k]
+          })
       }
       return merged
     }

@@ -1,12 +1,13 @@
 'use client'
 
 import type React from 'react'
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocumentInfo, useField, useForm, useUploadEdits } from '@payloadcms/ui'
 
 import { BlurhashTile, WebpTile } from './tiles'
 import { clamp, windowCss } from '../../../lib/transform/geometry'
-import { chipStyle, handleStyle, note, selectStyle, tileLabelStyle } from './styles'
+import { handleStyle, hotspotTextStyle, note, selectStyle, tileLabelStyle } from './styles'
 import { encodeBlurhashFromImageSource } from '../../../lib/placeholders/encodeFromCanvas'
 import type { DisplayMode, DragMode, FocalPreviewProps, HotspotOpts, ParsedBlurhash } from '../../../types'
 import {
@@ -286,27 +287,11 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         <strong style={{ fontSize: '0.95rem' }}>Focus &amp; crop</strong>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <span style={chipStyle} title="Hotspot circle diameter — smaller zooms in">
+          <span style={hotspotTextStyle} title="Hotspot circle diameter — smaller zooms in">
             Hotspot {Math.round(focalSize)}%
           </span>
           {modeSelect}
           {qualitySelect}
-          {!readOnly && (hasCrop || focalSize < 100) && (
-            <button
-              type="button"
-              onClick={() => {
-                focalSizeField.setValue(100)
-                cropLeftField.setValue(0)
-                cropTopField.setValue(0)
-                cropRightField.setValue(0)
-                cropBottomField.setValue(0)
-                setModified(true)
-              }}
-              style={{ ...selectStyle, cursor: 'pointer' }}
-            >
-              Reset
-            </button>
-          )}
         </div>
       </div>
       <p style={{ ...note, margin: '0.35rem 0 0.6rem' }}>
@@ -482,72 +467,76 @@ export const FocalPreview: React.FC<FocalPreviewProps> = ({ previewRatios = DEFA
         </div>
       </div>
 
-      {dialogRatio && (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: Escape is handled globally while open
-        // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-close supplements Escape and the ✕ button
-        <div
-          role="presentation"
-          onClick={() => setDialogRatio(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem 1rem',
-          }}
-        >
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: the click handler only stops backdrop-close propagation */}
+      {/* Portaled to <body>: a transformed admin ancestor would otherwise re-anchor position:fixed
+          and shove the overlay off-center (visible on mobile layouts). */}
+      {dialogRatio &&
+        createPortal(
+          // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-close supplements Escape and the ✕ button
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${dialogRatio} preview`}
-            onClick={(e) => e.stopPropagation()}
+            role="presentation"
+            onClick={() => setDialogRatio(null)}
             style={{
-              background: 'var(--theme-elevation-50)',
-              border: '1px solid var(--theme-elevation-150)',
-              borderRadius: 'var(--style-radius-m, 4px)',
-              padding: '0.75rem',
-              maxWidth: 'min(920px, 94vw)',
-              width: parseRatio(dialogRatio) >= 1 ? 'min(920px, 94vw)' : 'auto',
-              maxHeight: '92vh',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(0,0,0,0.7)',
               display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '2rem 1rem',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <strong style={{ fontSize: '0.9rem' }}>{dialogRatio}</strong>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                {modeSelect}
-                {qualitySelect}
-                <button
-                  type="button"
-                  onClick={() => setDialogRatio(null)}
-                  aria-label="Close preview"
-                  style={{ ...selectStyle, cursor: 'pointer' }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: the click handler only stops backdrop-close propagation */}
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${dialogRatio} preview`}
+              onClick={(e) => e.stopPropagation()}
               style={{
-                position: 'relative',
-                overflow: 'hidden',
-                aspectRatio: String(parseRatio(dialogRatio)),
-                ...(parseRatio(dialogRatio) >= 1 ? { width: '100%' } : { height: 'min(78vh, 720px)' }),
-                borderRadius: 'var(--style-radius-s, 3px)',
-                border: '1px solid var(--theme-elevation-100)',
+                background: 'var(--theme-elevation-50)',
+                border: '1px solid var(--theme-elevation-150)',
+                borderRadius: 'var(--style-radius-m, 4px)',
+                padding: '0.75rem',
+                maxWidth: 'min(920px, 94vw)',
+                maxHeight: '92vh',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
               }}
             >
-              {tileSurface(dialogRatio)}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: '0.9rem' }}>{dialogRatio}</strong>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {modeSelect}
+                  {qualitySelect}
+                  <button
+                    type="button"
+                    onClick={() => setDialogRatio(null)}
+                    aria-label="Close preview"
+                    style={{ ...selectStyle, cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              {/* One width expression fits both axes: the viewport width, the dialog cap, and the
+                ratio-scaled height budget — so portrait ratios can't push past a phone screen. */}
+              <div
+                style={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  aspectRatio: String(parseRatio(dialogRatio)),
+                  width: `min(880px, 88vw, calc(min(78vh, 720px) * ${parseRatio(dialogRatio)}))`,
+                  borderRadius: 'var(--style-radius-s, 3px)',
+                  border: '1px solid var(--theme-elevation-100)',
+                }}
+              >
+                {tileSurface(dialogRatio)}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

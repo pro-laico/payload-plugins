@@ -19,11 +19,16 @@ describe('resolvePreset', () => {
     expect(resolvePreset(entries, templates, 'hero')).toMatchObject({ width: 1920, aspectRatio: '21:9', quality: 70 })
   })
 
-  it('returns null for an unknown name, an inactive template, or a dangling template ref', () => {
-    expect(resolvePreset([{ template: 'og' }], templates, 'square')).toBeNull() // not toggled on
-    expect(resolvePreset([], templates, 'og')).toBeNull() // no entries
+  it('falls back to config templates without an entry — templates are always servable, entries only opt into eager gen', () => {
+    expect(resolvePreset([{ template: 'og' }], templates, 'square')).toEqual(templates.square) // not toggled on, still servable
+    expect(resolvePreset([], templates, 'og')).toEqual(templates.og)
+    expect(resolvePreset(null, templates, 'og')).toEqual(templates.og)
+  })
+
+  it('returns null for an unknown name or a dangling template ref', () => {
+    expect(resolvePreset([], templates, 'nope')).toBeNull()
     expect(resolvePreset([{ template: 'gone' }], templates, 'gone')).toBeNull() // template deleted from config
-    expect(resolvePreset(null, templates, 'og')).toBeNull()
+    expect(resolvePreset([{ name: 'hero', width: 1920 }], templates, 'other')).toBeNull()
   })
 
   it('names an entry by its template ref, else its custom name', () => {

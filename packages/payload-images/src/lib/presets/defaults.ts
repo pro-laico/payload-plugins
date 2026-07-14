@@ -4,6 +4,8 @@ export const DEFAULT_VARIANT_LIMIT = 200
 
 export const DEFAULT_PRESET_TEMPLATES: Record<string, PresetSpec> = {
   og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
+  // Backs the admin thumbnail (?preset=thumbnail) — always servable, cap-exempt, one spec everywhere.
+  thumbnail: { width: 160, height: 160, fit: 'cover', quality: 70, format: 'webp' },
 }
 
 export const resolvePresetTemplates = (user?: Record<string, PresetSpec>): Record<string, PresetSpec> => ({

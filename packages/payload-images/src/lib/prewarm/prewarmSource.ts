@@ -11,6 +11,7 @@ import { getOrCreateVariantBytes } from '../transform/getVariantBytes'
 import type {
   OutputFormat,
   PrewarmSourceResult,
+  PrewarmTarget,
   RenderProfileDoc,
   RenderProfileSeed,
   TransformConstraints,
@@ -27,7 +28,10 @@ export interface PrewarmSourceDeps {
   constraints: TransformConstraints
 }
 
-type SourceRow = VariantSourceDoc & { width?: number | null; height?: number | null; mimeType?: string | null }
+export type SourceRow = VariantSourceDoc & { width?: number | null; height?: number | null; mimeType?: string | null }
+
+/** The dry-run half of a prewarm: which variants WOULD be generated. Shared by the job handler and the status endpoint. */
+export type PrewarmPlan = { ok: true; source: SourceRow; targets: PrewarmTarget[] } | { ok: false; skipped: 'missing' | 'non-raster' }
 
 // The plugin owns these collections' schemas but can't name their app-generated types; a light id check
 // confirms a real row, and the local shape describes the fields the plugin wrote.
@@ -56,16 +60,15 @@ const existingCacheKeys = async (payload: Payload, variantSlug: CollectionSlug, 
   return keys
 }
 
-export const prewarmSource = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmSourceResult> => {
+export const loadPrewarmPlan = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmPlan> => {
   const sourceSlug = asSlug(deps.sourceSlug)
   const variantSlug = asSlug(deps.variantSlug)
   const profilesSlug = asSlug(deps.profilesSlug)
 
   const raw = await payload.findByID({ collection: sourceSlug, id: sourceId, depth: 0, disableErrors: true })
   const source = isSourceRow(raw) ? raw : null
-  if (!source || (!source.filename && !source.url)) return { targets: 0, generated: 0, failed: 0, skipped: 'missing' }
-  if (typeof source.mimeType === 'string' && !IMAGE_MIME_TYPES.includes(source.mimeType))
-    return { targets: 0, generated: 0, failed: 0, skipped: 'non-raster' }
+  if (!source || (!source.filename && !source.url)) return { ok: false, skipped: 'missing' }
+  if (typeof source.mimeType === 'string' && !IMAGE_MIME_TYPES.includes(source.mimeType)) return { ok: false, skipped: 'non-raster' }
 
   const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 })).docs.filter(isRenderProfileDoc)
 
@@ -78,6 +81,14 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
     existingKeys: await existingCacheKeys(payload, variantSlug, source.id),
     maxVariantsPerImage: deps.maxVariantsPerImage,
   })
+  return { ok: true, source, targets }
+}
+
+export const prewarmSource = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmSourceResult> => {
+  const plan = await loadPrewarmPlan(payload, sourceId, deps)
+  if (!plan.ok) return { targets: 0, generated: 0, failed: 0, skipped: plan.skipped }
+  const { source, targets } = plan
+  const sourceSlug = asSlug(deps.sourceSlug)
 
   const base = payload.config.serverURL || getServerSideURL()
   const originalBytes = targets.length

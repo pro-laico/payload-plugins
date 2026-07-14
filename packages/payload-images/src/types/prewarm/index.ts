@@ -1,4 +1,5 @@
 export type * from './job'
 export type * from './options'
 export type * from './profile'
+export type * from './status'
 export type * from './targets'

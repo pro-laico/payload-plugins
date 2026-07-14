@@ -2,11 +2,8 @@ import type React from 'react'
 
 export const note: React.CSSProperties = { color: 'var(--theme-elevation-500)', fontSize: '0.8rem', margin: 0 }
 
-export const chipStyle: React.CSSProperties = {
-  padding: '0.2rem 0.5rem',
+export const hotspotTextStyle: React.CSSProperties = {
   fontSize: '0.72rem',
-  borderRadius: 999,
-  background: 'var(--theme-elevation-100)',
   color: 'var(--theme-elevation-650)',
   whiteSpace: 'nowrap',
 }
@@ -32,13 +29,15 @@ export const handleStyle: React.CSSProperties = {
   zIndex: 3,
 }
 
+// Kept minimal — on narrow screens the tiles shrink and the label must not swallow the preview.
 export const tileLabelStyle: React.CSSProperties = {
   position: 'absolute',
-  left: 4,
-  bottom: 4,
-  padding: '0.05rem 0.35rem',
-  fontSize: '0.65rem',
-  borderRadius: 3,
+  left: 2,
+  bottom: 2,
+  padding: '0 0.25rem',
+  fontSize: '0.58rem',
+  lineHeight: 1.5,
+  borderRadius: 2,
   background: 'rgba(0,0,0,0.55)',
   color: 'rgba(255,255,255,0.9)',
   pointerEvents: 'none',
