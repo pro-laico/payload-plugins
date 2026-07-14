@@ -60,36 +60,36 @@
     }
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./src/index.ts",
-      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./components/Icon": {
+      "types": "./dist/components/Icon.d.ts",
       "import": "./src/components/Icon.tsx",
-      "types": "./src/components/Icon.tsx",
       "default": "./src/components/Icon.tsx"
     },
     "./cache": {
+      "types": "./dist/cache/index.d.ts",
       "import": "./src/cache/index.ts",
-      "types": "./src/cache/index.ts",
       "default": "./src/cache/index.ts"
     },
     "./admin/iconRowLabel": {
+      "types": "./dist/components/admin/iconRowLabel.d.ts",
       "import": "./src/components/admin/iconRowLabel.tsx",
-      "types": "./src/components/admin/iconRowLabel.tsx",
       "default": "./src/components/admin/iconRowLabel.tsx"
     },
     "./admin/iconUsagePanel": {
+      "types": "./dist/components/admin/iconUsagePanel.d.ts",
       "import": "./src/components/admin/iconUsagePanel.tsx",
-      "types": "./src/components/admin/iconUsagePanel.tsx",
       "default": "./src/components/admin/iconUsagePanel.tsx"
     },
     "./admin/iconPreview": {
+      "types": "./dist/components/admin/iconPreview.d.ts",
       "import": "./src/components/admin/iconPreview.tsx",
-      "types": "./src/components/admin/iconPreview.tsx",
       "default": "./src/components/admin/iconPreview.tsx"
     }
   },

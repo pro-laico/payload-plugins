@@ -45,24 +45,24 @@
     }
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "bin": {
     "payload-fonts-download": "./dist/scripts/cli.js"
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./src/index.ts",
-      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./admin/FontOriginalUpload": {
+      "types": "./dist/components/admin/FontOriginalUpload.d.ts",
       "import": "./src/components/admin/FontOriginalUpload.tsx",
-      "types": "./src/components/admin/FontOriginalUpload.tsx",
       "default": "./src/components/admin/FontOriginalUpload.tsx"
     },
     "./DevFonts": {
+      "types": "./dist/components/DevFonts.d.ts",
       "import": "./src/components/DevFonts.tsx",
-      "types": "./src/components/DevFonts.tsx",
       "default": "./src/components/DevFonts.tsx"
     }
   },

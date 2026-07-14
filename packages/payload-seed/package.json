@@ -36,16 +36,16 @@
     }
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./src/index.ts",
-      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./components/SeedButton": {
+      "types": "./dist/components/SeedButton.d.ts",
       "import": "./src/components/SeedButton.tsx",
-      "types": "./src/components/SeedButton.tsx",
       "default": "./src/components/SeedButton.tsx"
     }
   },

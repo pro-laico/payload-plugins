@@ -49,26 +49,26 @@
     }
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./src/index.ts",
-      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./components/MuxUploaderField": {
+      "types": "./dist/components/MuxUploaderField.d.ts",
       "import": "./src/components/MuxUploaderField.tsx",
-      "types": "./src/components/MuxUploaderField.tsx",
       "default": "./src/components/MuxUploaderField.tsx"
     },
     "./components/MuxVideoGifCell": {
+      "types": "./dist/components/MuxVideoGifCell.d.ts",
       "import": "./src/components/MuxVideoGifCell.tsx",
-      "types": "./src/components/MuxVideoGifCell.tsx",
       "default": "./src/components/MuxVideoGifCell.tsx"
     },
     "./components/MuxVideoImageCell": {
+      "types": "./dist/components/MuxVideoImageCell.d.ts",
       "import": "./src/components/MuxVideoImageCell.tsx",
-      "types": "./src/components/MuxVideoImageCell.tsx",
       "default": "./src/components/MuxVideoImageCell.tsx"
     }
   },

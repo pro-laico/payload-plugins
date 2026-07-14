@@ -38,16 +38,16 @@
     }
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./src/index.ts",
-      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./cache": {
+      "types": "./dist/cache/index.d.ts",
       "import": "./src/cache/index.ts",
-      "types": "./src/cache/index.ts",
       "default": "./src/cache/index.ts"
     }
   },
