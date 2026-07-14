@@ -1,10 +1,11 @@
 import Link from 'next/link'
-import type { CollectionSlug, GlobalSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
 
 import { facesToStyles } from './specimen'
 import { RevalidatePanel } from './revalidatePanel'
 import { FontSpecimen, IconSetSwitcher } from './client'
-import type { DevSnapshot, OptimizedFace, RevalidateInspection } from '../types'
+import { isRecord } from '../lib/isRecord'
+import type { DevSnapshot, OptimizedFace } from '../types'
 
 export async function IconsView({ payload, snapshot }: { payload: Payload; snapshot: DevSnapshot }) {
   const icons = snapshot.icons
@@ -13,26 +14,20 @@ export async function IconsView({ payload, snapshot }: { payload: Payload; snaps
   }
 
   const res = await payload.find({
-    collection: icons.iconSetSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+    collection: icons.iconSetSlug,
     depth: 1,
     limit: 50,
     pagination: false,
   })
-  //TODO: replace `as` cast with proper typing
-  const sets = (
-    res.docs as {
-      id: string | number
-      title?: string
-      active?: boolean
-      iconsArray?: { name?: string; icon?: { svgString?: string } | string | number | null }[]
-    }[]
-  ).map((doc) => ({
+  const sets = res.docs.map((doc) => ({
     id: doc.id,
-    title: doc.title ?? String(doc.id),
-    active: !!doc.active,
-    rows: (doc.iconsArray ?? []).flatMap((row) => {
-      const svg = row.icon && typeof row.icon === 'object' ? row.icon.svgString : undefined
-      return row.name && svg ? [{ name: row.name, svg }] : []
+    title: typeof doc.title === 'string' ? doc.title : String(doc.id),
+    active: Boolean(doc.active),
+    rows: (Array.isArray(doc.iconsArray) ? doc.iconsArray : []).flatMap((row) => {
+      if (!isRecord(row)) return []
+      const name = typeof row.name === 'string' ? row.name : undefined
+      const svg = isRecord(row.icon) && typeof row.icon.svgString === 'string' ? row.icon.svgString : undefined
+      return name && svg ? [{ name, svg }] : []
     }),
   }))
   const active = sets.find((s) => s.active)
@@ -91,8 +86,7 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
   const slotIds: Record<string, string | number | null> = {}
   if (fonts.fontSetSlug) {
     try {
-      //TODO: replace `as` cast with proper typing
-      const set = (await payload.findGlobal({ slug: fonts.fontSetSlug as GlobalSlug, depth: 0 })) as unknown as Record<string, unknown>
+      const set = await payload.findGlobal({ slug: fonts.fontSetSlug, depth: 0 })
       for (const key of fonts.familyKeys) {
         const value = set[key]
         slotIds[key] = typeof value === 'string' || typeof value === 'number' ? value : null
@@ -105,13 +99,19 @@ export async function FontsView({ payload, snapshot }: { payload: Payload; snaps
   if (fonts.fontOptimizedSlug && ids.length) {
     try {
       const res = await payload.find({
-        collection: fonts.fontOptimizedSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        collection: fonts.fontOptimizedSlug,
         where: { font: { in: ids } },
         depth: 0,
         limit: 200,
         pagination: false,
       })
-      faces = res.docs as OptimizedFace[] //TODO: replace `as` cast with proper typing
+      faces = res.docs.map((d) => ({
+        font: typeof d.font === 'string' || typeof d.font === 'number' ? d.font : null,
+        weight: typeof d.weight === 'string' ? d.weight : null,
+        style: d.style === 'normal' || d.style === 'italic' ? d.style : null,
+        isVariable: typeof d.isVariable === 'boolean' ? d.isVariable : null,
+        italCapable: typeof d.italCapable === 'boolean' ? d.italCapable : null,
+      }))
     } catch {}
   }
 
@@ -154,7 +154,7 @@ export async function ImagesView({
   if (!images) return <p className="pdtp-muted">payload-images isn't installed.</p>
 
   const base = snapshot.devRoute
-  const sourceSlug = images.sourceSlug as CollectionSlug //TODO: replace `as` cast with proper typing
+  const sourceSlug = images.sourceSlug
 
   let unfiled = 0
   const foldersConfig = payload.config.folders
@@ -162,12 +162,10 @@ export async function ImagesView({
   const foldersSlug = foldersConfig ? (foldersConfig.slug ?? 'payload-folders') : null
   if (foldersSlug) {
     try {
-      //TODO: replace `as` cast with proper typing
-      const res = await payload.find({ collection: foldersSlug as CollectionSlug, depth: 0, limit: 100, sort: 'name' })
-      //TODO: replace `as` cast with proper typing
-      for (const doc of res.docs as { id: string | number; name?: string }[]) {
+      const res = await payload.find({ collection: foldersSlug, depth: 0, limit: 100, sort: 'name' })
+      for (const doc of res.docs) {
         const { totalDocs } = await payload.count({ collection: sourceSlug, where: { folder: { equals: doc.id } } })
-        if (totalDocs > 0) folders.push({ id: doc.id, name: doc.name ?? String(doc.id), count: totalDocs })
+        if (totalDocs > 0) folders.push({ id: doc.id, name: typeof doc.name === 'string' ? doc.name : String(doc.id), count: totalDocs })
       }
       unfiled = (await payload.count({ collection: sourceSlug, where: UNFILED_WHERE })).totalDocs
     } catch {}
@@ -188,7 +186,11 @@ export async function ImagesView({
     sort: '-createdAt',
     ...(where ? { where } : {}),
   })
-  const docs = res.docs as { id: string | number; filename?: string; alt?: string }[] //TODO: replace `as` cast with proper typing
+  const docs = res.docs.map((d) => ({
+    id: d.id,
+    filename: typeof d.filename === 'string' ? d.filename : undefined,
+    alt: typeof d.alt === 'string' ? d.alt : undefined,
+  }))
 
   return (
     <>
@@ -238,11 +240,10 @@ export async function ImagesView({
 
 export function RevalidateView({ snapshot }: { snapshot: DevSnapshot }) {
   const meta = snapshot.revalidate
-  //TODO: replace `as` cast with proper typing
-  const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
-    | (() => RevalidateInspection)
-    | undefined
-  const data = inspect?.()
+  //EXCUSE: reads payload-revalidate's Symbol.for inspect slot cross-package without importing it; globalThis has no symbol index type
+  const slot = globalThis as Record<symbol, unknown>
+  const inspect = slot[Symbol.for('pro-laico.payload-revalidate.inspect')]
+  const data = typeof inspect === 'function' ? inspect() : undefined
   if (!meta || !data) return <p className="pdtp-muted">payload-revalidate isn't active in this process.</p>
 
   return <RevalidatePanel data={data} endpointPath={meta.endpointPath} />
@@ -259,10 +260,13 @@ export async function MuxView({ payload, snapshot }: { payload: Payload; snapsho
   const mux = snapshot.mux
   if (!mux) return <p className="pdtp-muted">payload-mux isn't installed.</p>
 
-  //TODO: replace `as` cast with proper typing
-  const res = await payload.find({ collection: mux.slug as CollectionSlug, depth: 0, limit: 50, sort: '-createdAt' })
-  //TODO: replace `as` cast with proper typing
-  const docs = res.docs as { id: string | number; title?: string; status?: string; duration?: number }[]
+  const res = await payload.find({ collection: mux.slug, depth: 0, limit: 50, sort: '-createdAt' })
+  const docs = res.docs.map((d) => ({
+    id: d.id,
+    title: typeof d.title === 'string' ? d.title : undefined,
+    status: typeof d.status === 'string' ? d.status : undefined,
+    duration: typeof d.duration === 'number' ? d.duration : undefined,
+  }))
 
   return (
     <>

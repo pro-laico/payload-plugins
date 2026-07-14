@@ -1,5 +1,6 @@
-import type { CollectionSlug, GlobalSlug, Payload, Where } from 'payload'
+import type { Payload, Where } from 'payload'
 
+import { isRecord } from './isRecord'
 import type {
   CollectionCount,
   DevSnapshot,
@@ -20,8 +21,7 @@ import type {
 
 const countDocs = async (payload: Payload, slug: string, where?: Where): Promise<number | null> => {
   try {
-    //TODO: replace `as` cast with proper typing
-    return (await payload.count({ collection: slug as CollectionSlug, ...(where ? { where } : {}) })).totalDocs
+    return (await payload.count({ collection: slug, ...(where ? { where } : {}) })).totalDocs
   } catch {
     return null
   }
@@ -63,14 +63,14 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
   if (iconSetSlug) {
     try {
       const res = await payload.find({
-        collection: iconSetSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        collection: iconSetSlug,
         where: { active: { equals: true } },
         limit: 1,
         depth: 0,
         pagination: false,
       })
-      const doc = res.docs[0] as { title?: string } | undefined //TODO: replace `as` cast with proper typing
-      activeSet = doc?.title ?? null
+      const title = res.docs[0]?.title
+      activeSet = typeof title === 'string' ? title : null
     } catch {}
   }
 
@@ -78,16 +78,23 @@ const iconsSnapshot = async (payload: Payload, marker: IconsMarker): Promise<Ico
   if (marker.iconRequestSlug) {
     try {
       const res = await payload.find({
-        collection: marker.iconRequestSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
+        collection: marker.iconRequestSlug,
         sort: '-count',
         limit: 20,
         depth: 0,
         pagination: false,
       })
-      //TODO: replace `as` cast with proper typing
-      misses = (res.docs as { name?: string; count?: number; lastRequestedAt?: string }[]).flatMap((d) =>
-        d.name ? [{ name: d.name, count: d.count ?? 1, lastRequestedAt: d.lastRequestedAt ?? null }] : [],
-      )
+      misses = res.docs.flatMap((d) => {
+        const name = typeof d.name === 'string' ? d.name : undefined
+        if (!name) return []
+        return [
+          {
+            name,
+            count: typeof d.count === 'number' ? d.count : 1,
+            lastRequestedAt: typeof d.lastRequestedAt === 'string' ? d.lastRequestedAt : null,
+          },
+        ]
+      })
     } catch {}
   }
 
@@ -103,13 +110,10 @@ const fontsSnapshot = async (payload: Payload, marker: FontsMarker): Promise<Fon
   for (const key of familyKeys) slots[key] = null
   if (fontSetSlug && familyKeys.length) {
     try {
-      // Through `unknown`: in an app context `findGlobal` returns the app's generated global type.
-      //TODO: replace `as` cast with proper typing
-      const set = (await payload.findGlobal({ slug: fontSetSlug as GlobalSlug, depth: 1 })) as unknown as Record<string, unknown>
+      const set = await payload.findGlobal({ slug: fontSetSlug, depth: 1 })
       for (const key of familyKeys) {
         const value = set[key]
-        //TODO: replace `as` cast with proper typing
-        slots[key] = value && typeof value === 'object' && 'title' in value ? ((value as { title?: string }).title ?? null) : null
+        slots[key] = isRecord(value) && typeof value.title === 'string' ? value.title : null
       }
     } catch {}
   }
@@ -137,11 +141,10 @@ const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnap
 }
 
 const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
-  //TODO: replace `as` cast with proper typing
-  const inspect = (globalThis as Record<symbol, unknown>)[Symbol.for('pro-laico.payload-revalidate.inspect')] as
-    | (() => RevalidateInspection)
-    | undefined
-  const data = inspect?.()
+  //EXCUSE: reads payload-revalidate's Symbol.for inspect slot cross-package without importing it; globalThis has no symbol index type
+  const slot = globalThis as Record<symbol, unknown>
+  const inspect = slot[Symbol.for('pro-laico.payload-revalidate.inspect')]
+  const data = typeof inspect === 'function' ? inspect() : undefined
   return {
     endpointPath: marker.endpointPath ?? null,
     prefix: data?.prefix ?? '',
@@ -153,8 +156,7 @@ const revalidateSnapshot = (marker: RevalidateMarker): RevalidateSnapshot => {
 }
 
 export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
-  //TODO: replace `as` cast with proper typing
-  const custom = (payload.config.custom ?? {}) as Record<string, Record<string, unknown> | undefined>
+  const custom = payload.config.custom ?? {}
   const muxMarker = custom.payloadMux
   const seedMarker = custom.payloadSeed
   const iconsMarker = custom.payloadIcons
@@ -169,7 +171,7 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
     generatedAt: new Date().toISOString(),
     env: { nodeEnv: process.env.NODE_ENV ?? 'development', nodeVersion: process.version },
     adminRoute: payload.config.routes?.admin ?? '/admin',
-    devRoute: (custom.payloadDevTools?.devRoute as string | undefined) ?? '/dev', //TODO: replace `as` cast with proper typing
+    devRoute: typeof custom.payloadDevTools?.devRoute === 'string' ? custom.payloadDevTools.devRoute : '/dev',
     plugins: {
       seed: !!seedMarker,
       images: !!imagesMarker,

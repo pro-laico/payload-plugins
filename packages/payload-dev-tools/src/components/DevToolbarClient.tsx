@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
+import { isRecord } from '../lib/isRecord'
 import type { ChromeSlot, Corner, DevLink, DevSnapshot, SeedError, Settings, Size, StageSelection, TestMeta, View } from '../types'
 
 const STORE_KEY = 'pdt-settings'
@@ -75,7 +76,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     try {
       const res = await fetch('/api/dev', { headers: { accept: 'application/json' }, credentials: 'include' })
       if (!res.ok) throw new Error(String(res.status))
-      setSnapshot((await res.json()) as DevSnapshot) //TODO: replace `as` cast with proper typing
+      setSnapshot(await res.json())
       setSnapshotError(false)
     } catch {
       setSnapshotError(true)
@@ -88,9 +89,12 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
 
   useEffect(() => {
     if (!open) return
-    //TODO: replace `as` cast with proper typing
     void fetch('/api/dev/draft', { credentials: 'include' })
-      .then(async (res) => (res.ok ? setDraft(((await res.json()) as { enabled: boolean }).enabled) : setDraft(null)))
+      .then(async (res) => {
+        if (!res.ok) return setDraft(null)
+        const raw: unknown = await res.json()
+        setDraft(isRecord(raw) && typeof raw.enabled === 'boolean' ? raw.enabled : null)
+      })
       .catch(() => setDraft(null))
   }, [open])
 
@@ -100,7 +104,8 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     try {
       const res = await fetch(`/api/dev/draft?enable=${draft ? 0 : 1}`, { credentials: 'include' })
       if (!res.ok) throw new Error(String(res.status))
-      setDraft(((await res.json()) as { enabled: boolean }).enabled) //TODO: replace `as` cast with proper typing
+      const raw: unknown = await res.json()
+      setDraft(isRecord(raw) && typeof raw.enabled === 'boolean' ? raw.enabled : null)
       router.refresh()
     } catch {
       setDraft(null)
@@ -157,8 +162,12 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
         router.refresh()
         return
       }
-      const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
-      setSeedError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
+      const raw: unknown = await res.json().catch(() => null)
+      const body: SeedError | null =
+        isRecord(raw) && typeof raw.error === 'string'
+          ? { error: raw.error, ...(Array.isArray(raw.issues) ? { issues: raw.issues.filter((i): i is string => typeof i === 'string') } : {}) }
+          : null
+      setSeedError(body ?? { error: `Seed failed (HTTP ${res.status}).` })
     } catch {
       setSeedError({ error: 'Seed request failed — is the dev server running?' })
     }

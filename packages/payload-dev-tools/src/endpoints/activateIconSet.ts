@@ -1,5 +1,6 @@
-import type { CollectionSlug, Endpoint } from 'payload'
+import type { Endpoint } from 'payload'
 
+import { isRecord } from '../lib/isRecord'
 import { devToolsEnabled } from '../options'
 
 export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
@@ -9,21 +10,19 @@ export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
     handler: async (req) => {
       if (!devToolsEnabled(enabled)) return Response.json({ error: 'Not found' }, { status: 404 })
 
-      //TODO: replace `as` cast with proper typing
-      const marker = req.payload.config.custom?.payloadIcons as { iconSetSlug?: string | null } | undefined
-      if (!marker?.iconSetSlug)
-        return Response.json({ error: 'payload-icons (with its iconSet collection) is not installed.' }, { status: 400 })
+      const marker = req.payload.config.custom?.payloadIcons
+      const iconSetSlug = isRecord(marker) && typeof marker.iconSetSlug === 'string' ? marker.iconSetSlug : undefined
+      if (!iconSetSlug) return Response.json({ error: 'payload-icons (with its iconSet collection) is not installed.' }, { status: 400 })
 
-      const body = (await req.json?.().catch(() => null)) as { id?: string | number } | null //TODO: replace `as` cast with proper typing
-      if (!body?.id) return Response.json({ error: 'Missing icon set `id`.' }, { status: 400 })
+      const raw: unknown = await req.json?.().catch(() => null)
+      const id = isRecord(raw) && (typeof raw.id === 'string' || typeof raw.id === 'number') ? raw.id : undefined
+      if (!id) return Response.json({ error: 'Missing icon set `id`.' }, { status: 400 })
 
       try {
         await req.payload.update({
-          collection: marker.iconSetSlug as CollectionSlug, //TODO: replace `as` cast with proper typing
-          id: body.id,
-          // Through `never`: the app's generated update-data union only knows the app's own
-          // collections — hosts without payload-icons' iconSet can't type `active`.
-          data: { active: true, _status: 'published' } as never, //TODO: replace `as` cast with proper typing
+          collection: iconSetSlug,
+          id,
+          data: { active: true, _status: 'published' },
           draft: false,
         })
         return Response.json({ success: true })

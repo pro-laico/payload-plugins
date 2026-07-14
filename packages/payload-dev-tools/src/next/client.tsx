@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { isRecord } from '../lib/isRecord'
 import type { SeedError, SeedSnapshot, SpecimenStyle } from '../types'
 
 export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute: string }) {
@@ -20,8 +21,15 @@ export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute:
         setConfirming(false)
         router.refresh()
       } else {
-        const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
-        setError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
+        const raw: unknown = await res.json().catch(() => null)
+        const body: SeedError | null =
+          isRecord(raw) && typeof raw.error === 'string'
+            ? {
+                error: raw.error,
+                ...(Array.isArray(raw.issues) ? { issues: raw.issues.filter((i): i is string => typeof i === 'string') } : {}),
+              }
+            : null
+        setError(body ?? { error: `Seed failed (HTTP ${res.status}).` })
         setConfirming(false)
       }
     } catch {
@@ -167,9 +175,11 @@ export function IconSetSwitcher({ sets }: { sets: { id: string | number; title: 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id }),
       })
-      //TODO: replace `as` cast with proper typing
       if (res.ok) router.refresh()
-      else setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Failed (HTTP ${res.status}).`)
+      else {
+        const raw: unknown = await res.json().catch(() => null)
+        setError(isRecord(raw) && typeof raw.error === 'string' ? raw.error : `Failed (HTTP ${res.status}).`)
+      }
     } catch {
       setError('Request failed — is the dev server running?')
     }
@@ -214,11 +224,13 @@ export function BustTagCard({ endpointPath }: { endpointPath: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ tag: tag.trim() }),
       })
-      //TODO: replace `as` cast with proper typing
       if (res.ok) {
         setTag('')
         router.refresh()
-      } else setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Failed (HTTP ${res.status}).`)
+      } else {
+        const raw: unknown = await res.json().catch(() => null)
+        setError(isRecord(raw) && typeof raw.error === 'string' ? raw.error : `Failed (HTTP ${res.status}).`)
+      }
     } catch {
       setError('Request failed — is the dev server running?')
     }
