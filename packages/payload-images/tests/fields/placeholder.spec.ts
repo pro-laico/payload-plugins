@@ -18,23 +18,28 @@ const run = (context?: Record<string, unknown>) =>
     req: context ? { context } : {},
   })
 
-describe('placeholder afterRead — declared vs undeclared reads', () => {
-  it('returns the raw sm hash for a read that declared nothing (light admin/API reads)', async () => {
-    expect(await run()).toBe(doc.blurHashSm)
+describe('placeholder afterRead — blur is opt-in', () => {
+  it('returns null for a read that declared nothing (no unrequested data-URI bloat)', async () => {
+    expect(await run()).toBeNull()
   })
 
-  it('returns a finished data URI for a declared but EMPTY render (natural ratio) — never a raw hash', async () => {
-    const out = await run({ image: {} })
-    expect(out).toMatch(/^data:image\/png;base64,/)
-  })
-
-  it('returns a finished data URI for a declared ratio', async () => {
-    const out = await run({ image: { aspectRatio: '1:1' } })
-    expect(out).toMatch(/^data:image\/png;base64,/)
+  it('returns null for a declared image render without a blur intent', async () => {
+    expect(await run({ image: {} })).toBeNull()
+    expect(await run({ image: { aspectRatio: '1:1' } })).toBeNull()
   })
 
   it('returns a finished data URI for a declared blur tier alone', async () => {
     const out = await run({ blur: { quality: 'md' } })
+    expect(out).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('returns a finished data URI for an empty blur intent (default tier)', async () => {
+    const out = await run({ blur: {} })
+    expect(out).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('crops to the declared image ratio when a blur is requested alongside it', async () => {
+    const out = await run({ image: { aspectRatio: '1:1' }, blur: { quality: 'md' } })
     expect(out).toMatch(/^data:image\/png;base64,/)
   })
 

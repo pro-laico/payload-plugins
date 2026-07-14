@@ -32,7 +32,10 @@ export async function Hero({ id }: { id: string }) {
 
 The doc comes back as `{ id, alt, src, srcset, placeholder }` — a full responsive `srcset`, a
 focal-cropped placeholder data URI, everything built for exactly the render you declared — and
-spreads straight into the component.
+spreads straight into the component. The placeholder is **opt-in**: it's only built when the
+read asks for one (`.blur(tier)` / `context.blur`); skip the call and `placeholder` is `null`,
+keeping data-URI weight out of the HTML for images that don't need it (thumbnails, icons, tiny
+cards).
 
 ## The read contract
 
@@ -76,8 +79,9 @@ off the plugin config (`extendCollection` setups included).
 </Callout>
 
 Populated relationships carry the same fields for free: a `page.heroImage` upload field arrives
-with `src`/`srcset`/`placeholder` already computed (the collection's `defaultPopulate`), so you
-can spread it into the component without a second fetch.
+with `src`/`srcset` already computed (the collection's `defaultPopulate`), so you can spread it
+into the component without a second fetch. `placeholder` rides along as `null` unless the parent
+read declared a blur (`context: { blur: { quality: 'md' } }` on the page fetch).
 
 ## `<ResponsiveImage>`
 

@@ -15,7 +15,7 @@ export default defineSeed('images', ({ file }) => [
     focalY: 32,
     // The `og` template is toggled on; a custom `card` preset is constructed inline. Both are
     // guaranteed (cap-exempt) and eagerly generated on upload.
-    presets: [{ template: 'og' }, { name: 'card', width: 600, aspectRatio: '4:3', fit: 'cover', quality: 70 }],
+    presets: [{ template: 'og' }, { name: 'card', width: 600, aspectRatio: '4:3', fit: 'cover', quality: 70, format: 'webp' }],
   },
   { _key: 'balloon', _file: file('balloon.png'), alt: 'Portrait sample', focalX: 50, focalY: 22, variantLimit: 12 },
   { _key: 'apple', _file: file('apple.png'), alt: 'Square sample', focalX: 28, focalY: 72 },

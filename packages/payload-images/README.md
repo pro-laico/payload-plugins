@@ -22,10 +22,11 @@ actually serves, pre-generating exactly those variants for new/replaced images v
 Payload Job — the first visitor never pays the transform.
 
 Placeholders are a **quality-tier ladder** stored on the doc at upload time: five BlurHash
-strings (`xs`…`xl`) plus two micro-webp data URIs (`xxl`/`x3`). A read that declares what it's
-rendering (`context: { image, blur }`) gets a **finished, focal-cropped data URI** back from the
-virtual `placeholder` field — the processing happens in the field hook, and `<ResponsiveImage>`
-just paints it. The same upload-time decode also stores a Sanity-style color **palette**,
+strings (`xs`…`xl`) plus two micro-webp data URIs (`xxl`/`x3`). They're **opt-in per read**: a
+read that requests a blur (`.blur('md')` / `context: { blur }`) gets a **finished, focal-cropped
+data URI** back from the virtual `placeholder` field — the processing happens in the field hook,
+and `<ResponsiveImage>` just paints it. Reads that don't ask get `null`, so small images never
+carry inline data-URI weight in the HTML. The same upload-time decode also stores a Sanity-style color **palette**,
 `hasAlpha`/`isOpaque` flags, and a saliency-based initial **focal point** (applied only when the
 editor hasn't picked one).
 

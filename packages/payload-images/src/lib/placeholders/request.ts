@@ -24,12 +24,13 @@ const parseHeader = (h: string): BlurhashRequest => {
   return out
 }
 
+// A placeholder is opt-in: only an explicit blur intent (or an X-Blurhash header) requests one.
+// A declared image render alone only contributes its aspect ratio to the crop.
 export const readRequest = (
   req: { context?: Record<string, unknown>; headers?: { get?: (k: string) => string | null } } | undefined,
 ): BlurhashRequest => {
-  const image = readImageIntent(req)
   const blur = readBlurIntent(req)
-  if (image.declared || blur.declared) return { declared: true, ar: image.aspectRatio, quality: blur.quality, format: blur.format }
+  if (blur.declared) return { declared: true, ar: readImageIntent(req).aspectRatio, quality: blur.quality, format: blur.format }
   const header = req?.headers?.get?.('x-blurhash')
   return header ? { declared: true, ...parseHeader(header) } : {}
 }

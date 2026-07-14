@@ -132,7 +132,7 @@ is **public**; writes are logged-in-admin only.
     variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields. Only with virtualFields.", type: "virtual" },
     "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
     "placeholderXxl / placeholderX3": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
-    placeholder: { description: "The placeholder every read carries: a finished data URI focal-cropped to the render the read declares (context: { image, blur } / X-Blurhash header); the raw sm tier hash when nothing is declared.", type: "virtual" },
+    placeholder: { description: "Opt-in placeholder: a finished data URI focal-cropped to the declared render, returned only when the read requests a blur (context.blur / X-Blurhash header); null otherwise.", type: "virtual" },
     palette: { description: "Sanity-style color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }. Hidden in the admin.", type: "json" },
     hasAlpha: { description: "The file carries an alpha channel.", type: "checkbox" },
     isOpaque: { description: "No sampled pixel is actually transparent.", type: "checkbox" },

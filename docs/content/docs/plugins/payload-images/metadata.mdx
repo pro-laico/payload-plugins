@@ -29,8 +29,8 @@ efficiently than a real image, so the top tiers store a **micro-webp**:
 ### The `placeholder` virtual
 
 On read, the virtual `placeholder` field does **all the placeholder work in the field hook**,
-next to the data — consumers select one field and paint what they get back. Declare what the read
-is rendering and a **finished, focal-cropped data URI** comes back: blurhash tiers crop in
+next to the data — consumers select one field and paint what they get back. The field is
+**opt-in**: request a blur on the read and a **finished, focal-cropped data URI** comes back: blurhash tiers crop in
 coefficient space (pure string math, microseconds); webp tiers crop the stored micro-image (a
 ~1 KB Sharp decode, milliseconds). The same crop the transform endpoint makes, applied to the
 placeholder — no files, no extra cache rows:
@@ -48,8 +48,9 @@ const image = await payload.findByID({
 ([`imageFor(...).blur('sm')`](/docs/plugins/payload-images/rendering) declares the same thing for you.)
 `<ResponsiveImage>` is passive here: it paints the string it was handed as its own
 `background-image` — zero network, zero client JS, native swap when the real pixels load. A read
-that declares nothing gets the raw `sm` tier hash (28 chars, so admin and API reads stay light),
-and a doc with no stored tiers simply renders without a placeholder.
+that requests no blur gets `null` — no unasked-for data URI bloating admin reads, API responses,
+or the HTML of images too small to need one — and a doc with no stored tiers simply renders
+without a placeholder.
 
 <Callout type="info">
   **Non-React consumers** get the same placeholder: send `X-Blurhash: 16:9; q=md` on a REST read

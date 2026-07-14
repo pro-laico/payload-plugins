@@ -19,7 +19,7 @@ pnpm add @pro-laico/payload-images
 - **Focal-point cropping, subject-aware by default:** every upload gets a saliency-detected focal point automatically; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
-- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); every read gets a finished placeholder focal-cropped to the exact ratio being rendered.
+- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered — reads that don't stay lean.
 - **Self-busting cache, smart prewarming, instant fallbacks:** content-addressed URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/caching#smart-prewarm) generates what your site actually serves before anyone asks, and the residual cold path serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
 
 ![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)

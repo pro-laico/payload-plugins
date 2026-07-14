@@ -166,17 +166,24 @@ describe('payload-images wiring', () => {
     expect(doc.focalX).toBe(40)
     expect(doc.focalY).toBe(60)
 
-    // No request info → placeholder defaults to the raw sm tier hash, uncropped (the
-    // cheap path for reads that never render a placeholder).
-    expect(doc.placeholder).toBe(doc.blurHashSm)
+    // Blur is opt-in: a read that requests none gets null — no unasked-for data-URI weight.
+    expect(doc.placeholder).toBeNull()
 
-    // Declare the render (context.image.aspectRatio) → a FINISHED placeholder data URI, cropped
-    // to that ratio in the field hook — no variant rows, nothing written.
+    // An image intent alone still doesn't request one; only context.blur does.
+    const imageOnly = (await payload.findByID({
+      collection: 'images',
+      id: sourceId,
+      context: { image: { aspectRatio: '16:9' } },
+    })) as { placeholder?: string | null }
+    expect(imageOnly.placeholder).toBeNull()
+
+    // Request the blur → a FINISHED placeholder data URI, cropped to the declared ratio in the
+    // field hook — no variant rows, nothing written.
     const before = await countVariants(payload, sourceId)
     const cropped = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      context: { image: { aspectRatio: '16:9' } },
+      context: { image: { aspectRatio: '16:9' }, blur: { quality: 'sm' } },
     })) as { placeholder?: string | null }
     expect(cropped.placeholder).toMatch(/^data:image\/png;base64,/)
     expect(await countVariants(payload, sourceId)).toBe(before) // read-side crop touches no files
@@ -246,7 +253,7 @@ describe('payload-images wiring', () => {
       id: sourceId,
       depth: 0,
       select: RESPONSIVE_IMAGE_SELECT,
-      context: { image: { aspectRatio: '16:9', quality: 80 } },
+      context: { image: { aspectRatio: '16:9', quality: 80 }, blur: { quality: 'sm' } },
     })) as { id: string | number; alt?: string; src?: string; srcset?: string; placeholder?: string }
 
     // The doc arrives render-ready: srcset for THIS render, v= baked in, placeholder finished.

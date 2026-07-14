@@ -15,8 +15,8 @@ export const placeholderAfterRead: FieldHook = async ({ data, req }) => {
   const doc: ImageDocLike = isImageDoc(data) ? data : {}
   const wanted = readRequest(req)
 
-  if (!wanted.declared && wanted.ar === undefined && wanted.quality === undefined && wanted.format === undefined)
-    return storedHash(doc, DEFAULT_BLURHASH_QUALITY) ?? null
+  // No explicit blur request → no placeholder; an unrequested data URI only bloats the payload.
+  if (!wanted.declared) return null
 
   const quality = wanted.quality ?? DEFAULT_BLURHASH_QUALITY
 

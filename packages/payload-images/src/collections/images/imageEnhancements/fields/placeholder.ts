@@ -5,7 +5,7 @@ import { PLACEHOLDER_FIELD_NAMES } from '../../../../lib/placeholders/qualities'
 
 const d = {
   placeholder:
-    'Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.',
+    'Placeholder for the read — opt-in: a finished data URI focal-cropped to the declared render, returned only when the read declares a blur (context.blur = { quality, format } or an X-Blurhash header); null otherwise so undeclared reads carry no data-URI weight.',
 }
 
 export const placeholderField: TextField = {

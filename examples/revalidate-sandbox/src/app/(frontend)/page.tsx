@@ -138,7 +138,7 @@ async function PostCard({ id }: { id: string | number }) {
  *  exact box — an alt or focal-point edit re-materializes exactly this entry (with fresh `v=`
  *  tokens, so the derived binary variants refresh too). */
 async function ImageCard({ id }: { id: string | number }) {
-  const image = await getImage(id, { image: { aspectRatio: '16:9' } })
+  const image = await getImage(id, { image: { aspectRatio: '16:9' }, blur: { quality: 'sm' } })
   if (!image) return null
   return (
     <div style={{ margin: '4px 0', maxWidth: 420 }}>
