@@ -33,6 +33,26 @@ context: { image: { aspectRatio, quality, fit, format } }
 
 The `srcset` follows the project-wide `pixelStep` ladder (default `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) up to the source width — the source's native width is always the top rung. A numeric `pixelStep` steps densely instead.
 
+export const virtualNodes = [
+  { id: 'read', kind: 'start', label: 'Any read of an image doc', detail: 'REST, GraphQL, Local API — or a populated page.heroImage', x: 300, y: 0 },
+  { id: 'hook', label: 'afterRead computes the virtual fields', detail: 'on every read, never stored — srcset follows the pixelStep ladder up to the source width', x: 300, y: 150 },
+  { id: 'ctx', kind: 'check', label: 'Render declared in context?', detail: 'context: { image: { aspectRatio, quality, fit, format } }', x: 300, y: 340 },
+  { id: 'tailored', label: 'src/srcset built for that render', detail: 'geometry pinned to your aspect ratio, fit, quality, and format', x: 40, y: 530 },
+  { id: 'natural', label: 'Natural-ratio URLs', detail: 'the default — plus placeholderURL and thumbnailURL', x: 560, y: 530 },
+  { id: 'ready', kind: 'result', label: 'The doc arrives render-ready', detail: 'read the doc, use the URL — flows through population, no second query, no JS client', x: 300, y: 710 },
+]
+
+export const virtualEdges = [
+  { from: 'read', to: 'hook' },
+  { from: 'hook', to: 'ctx' },
+  { from: 'ctx', to: 'tailored', label: 'yes', fromSide: 'left' },
+  { from: 'ctx', to: 'natural', label: 'no', fromSide: 'right' },
+  { from: 'tailored', to: 'ready' },
+  { from: 'natural', to: 'ready' },
+]
+
+<Flow nodes={virtualNodes} edges={virtualEdges} height={820} />
+
 <Callout type="warn">
   A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
   several KB of string on every read and population, and a much larger stored-variant space.

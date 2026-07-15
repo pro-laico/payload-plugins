@@ -14,6 +14,27 @@ See the [Quickstart](/docs/plugins/payload-seed#quickstart) for setting `ENABLE_
   it on purpose. Leave `ENABLE_SEED` unset in production.
 </Callout>
 
+export const runNodes = [
+  { id: 'trigger', kind: 'start', label: 'Trigger a seed', detail: 'admin button, POST /api/seed, or the CLI — seed() in code skips the gate', x: 300, y: 0 },
+  { id: 'gate', kind: 'check', label: "ENABLE_SEED === 'true'?", x: 300, y: 170 },
+  { id: 'refuse', kind: 'result', label: '403 — nothing runs', detail: 'leave it unset in production and the surface is inert', x: 20, y: 330 },
+  { id: 'validate', label: 'Build + validate the model', detail: 'every ref resolves, files exist, no duplicate _key — issues collected and thrown at once (400)', x: 300, y: 330 },
+  { id: 'clear', label: 'Clear the seeded collections', detail: 'destructive — delete hooks fire so external assets clean up', x: 300, y: 520 },
+  { id: 'create', label: 'Create docs in dependency order', detail: 'topo-sorted by ref() edges — cycles broken via deferred fields', x: 300, y: 690 },
+  { id: 'finish', kind: 'store', label: 'Globals last, then one revalidation flush', detail: 'returns { created, order, deferred, skipped }', x: 300, y: 860 },
+]
+
+export const runEdges = [
+  { from: 'trigger', to: 'gate' },
+  { from: 'gate', to: 'refuse', label: 'no', fromSide: 'left' },
+  { from: 'gate', to: 'validate', label: 'yes' },
+  { from: 'validate', to: 'clear' },
+  { from: 'clear', to: 'create' },
+  { from: 'create', to: 'finish' },
+]
+
+<Flow nodes={runNodes} edges={runEdges} height={860} />
+
 ## The four entry points
 
 | Entry point | How you trigger it | `ENABLE_SEED` gate | Needs a user |

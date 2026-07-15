@@ -15,6 +15,25 @@ The name it matches is the *set entry's* name, not the uploaded filename. That i
 
 A name the active set doesn't cover renders the fallback warning glyph instead of nothing. The miss is recorded for the [Requested icons](/docs/plugins/payload-icons/collections#icon-use-detection) panel.
 
+export const resolveNodes = [
+  { id: 'req', kind: 'start', label: '<Icon name="arrow-right" />', detail: 'renders in a page, block, or component', x: 300, y: 0 },
+  { id: 'lookup', label: 'Look up the active, published iconSet', detail: 'payload.find — memoized per request, one query per page', x: 300, y: 150 },
+  { id: 'match', kind: 'check', label: 'Name in the active set?', x: 300, y: 320 },
+  { id: 'inline', kind: 'result', label: 'Inline the stored svgString', detail: 'a real <svg> — recolors via currentColor, sized by your classes', x: 40, y: 480 },
+  { id: 'fallback', kind: 'result', label: 'Render the fallback glyph', detail: 'a visible warning mark — never nothing', x: 560, y: 480 },
+  { id: 'record', kind: 'store', label: 'Miss recorded to iconRequest', detail: 'feeds the Requested icons panel', x: 560, y: 640 },
+]
+
+export const resolveEdges = [
+  { from: 'req', to: 'lookup' },
+  { from: 'lookup', to: 'match' },
+  { from: 'match', to: 'inline', label: 'yes', fromSide: 'left' },
+  { from: 'match', to: 'fallback', label: 'no', fromSide: 'right' },
+  { from: 'fallback', to: 'record', dashed: true },
+]
+
+<Flow nodes={resolveNodes} edges={resolveEdges} height={760} />
+
 ## Revalidation
 
 On its own the plugin does no revalidation. `<Icon>` reads via `payload.find`, memoized per request. A **statically rendered** page bakes the SVG at build time. It won't reflect an edit or an active-set swap until the route revalidates.

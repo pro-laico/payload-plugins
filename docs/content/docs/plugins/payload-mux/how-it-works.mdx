@@ -8,6 +8,26 @@ This page traces that lifecycle, then covers revalidation and seeding.
 
 ## The asset lifecycle
 
+export const lifecycleNodes = [
+  { id: 'upload', kind: 'start', label: 'Upload', detail: 'the admin field posts the bytes straight to Mux — never through your server', x: 300, y: 0 },
+  { id: 'save', label: 'Doc saves with its assetId', x: 300, y: 150 },
+  { id: 'poll', kind: 'check', label: 'Encoded within the ~6s poll?', detail: 'beforeChange polls the new asset', x: 300, y: 270 },
+  { id: 'inline', label: 'Metadata saved inline', detail: 'fast encodes return playback metadata immediately', x: 40, y: 430 },
+  { id: 'webhook', label: 'Webhook fills it in', detail: 'video.asset.ready → payload.update — fires the same hooks as an admin save', x: 560, y: 430 },
+  { id: 'urls', kind: 'result', label: 'Playback URLs compute on read', detail: 'playbackUrl / posterUrl / gifUrl — derived from the playback id, signed on the fly, never stored', x: 300, y: 600 },
+]
+
+export const lifecycleEdges = [
+  { from: 'upload', to: 'save' },
+  { from: 'save', to: 'poll' },
+  { from: 'poll', to: 'inline', label: 'yes', fromSide: 'left' },
+  { from: 'poll', to: 'webhook', label: 'no — encode still running', dashed: true, fromSide: 'right' },
+  { from: 'inline', to: 'urls' },
+  { from: 'webhook', to: 'urls' },
+]
+
+<Flow nodes={lifecycleNodes} edges={lifecycleEdges} height={680} />
+
 When you upload, the admin field posts the bytes **straight to Mux**. The video never
 passes through your server. The doc saves with just its `assetId`.
 

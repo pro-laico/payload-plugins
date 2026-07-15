@@ -15,6 +15,27 @@ Keeping the untouched originals is deliberate. The served output is lossy: it's 
 
 A delete cascades through both derived layers. The whole flow runs in the `font` collection's hooks (`optimizeFromOriginals` on save, `cleanupFontAssets` on delete), so there's no separate build step to run and nothing to keep in sync by hand.
 
+export const pipelineNodes = [
+  { id: 'save', kind: 'start', label: 'Save the font typeface', detail: 'the only collection you ever edit', x: 300, y: 0 },
+  { id: 'originals', kind: 'store', label: 'Originals stored raw in fontOriginal', detail: 'the archive of truth — lossless source bytes', x: 300, y: 150 },
+  { id: 'subset', label: 'optimizeFromOriginals re-subsets', detail: 'every save — down to your charset, italics synthesized from ital/slnt axes', x: 300, y: 320 },
+  { id: 'optimized', kind: 'store', label: 'Served WOFF2s in fontOptimized', detail: 're-derivable any time: widen charset, save again', x: 300, y: 500 },
+  { id: 'download', label: 'prebuild: payload-fonts-download', detail: 'pulls GET /api/fonts/export (Bearer PAYLOAD_SECRET) → writes public/fonts/*.woff2 + definition.ts', x: 40, y: 690 },
+  { id: 'build', kind: 'result', label: 'next build self-hosts via next/font/local', detail: 'extractFonts puts the --font-set* classes on <html> — rebuild to publish a fontSet change', x: 40, y: 880 },
+  { id: 'dev', kind: 'result', label: 'Development: read live', detail: 'DevFonts inlines @font-face at runtime — edit, then refresh', x: 560, y: 690 },
+]
+
+export const pipelineEdges = [
+  { from: 'save', to: 'originals' },
+  { from: 'originals', to: 'subset' },
+  { from: 'subset', to: 'optimized' },
+  { from: 'optimized', to: 'download', label: 'build time', fromSide: 'left' },
+  { from: 'download', to: 'build' },
+  { from: 'optimized', to: 'dev', label: 'per render', fromSide: 'right' },
+]
+
+<Flow nodes={pipelineNodes} edges={pipelineEdges} height={900} />
+
 ## One file, both styles
 
 Some variable fonts carry their italics **inside the upright file** — a true `ital` axis, or a `slnt` (slant) axis like Recursive's `0…-15`. Upload one of those to the `variable.upright` slot and the optimize hook reads the axes (via fontkit) and flags the served file `italCapable`, plus `obliqueAngle` for slant-based ones.

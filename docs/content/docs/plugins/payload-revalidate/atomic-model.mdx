@@ -35,6 +35,30 @@ the walk finds it, including inside Lexical richText. It's flagged in dev (conso
 candidate, with the exact field paths.
 </Callout>
 
+How an entry's tags are generated — the walk runs inside the finder, on whatever you fetched:
+
+export const walkNodes = [
+  { id: 'fetch', kind: 'start', label: 'A finder returns your result', detail: 'cacheDoc / cacheIds / cacheGlobal receive exactly what you fetched', x: 300, y: 0 },
+  { id: 'own', label: 'The entry tags its identity', detail: 'posts:{id} + the alias tag — always, before any walk', x: 300, y: 150 },
+  { id: 'walk', label: 'The walk visits every populated field', detail: 'arrays, blocks, groups, tabs, joins — Lexical richText included', x: 300, y: 320 },
+  { id: 'baked', kind: 'check', label: 'Baked-in doc found?', detail: 'a reference populated past depth 0', x: 300, y: 490 },
+  { id: 'extra', label: 'Tagged for correctness', detail: 'media:{id} joins the entry — and dev flags the exact field path as a refactor candidate', x: 40, y: 670 },
+  { id: 'clean', label: 'References stayed ids', detail: 'nothing extra to tag — freshness lives in each doc’s own entry', x: 560, y: 670 },
+  { id: 'stamp', kind: 'result', label: 'cacheTag stamps the entry', detail: 'bounded: walk.maxTags (64) and depth 6 — capped reads are flagged in the dev map', x: 300, y: 850 },
+]
+
+export const walkEdges = [
+  { from: 'fetch', to: 'own' },
+  { from: 'own', to: 'walk' },
+  { from: 'walk', to: 'baked' },
+  { from: 'baked', to: 'extra', label: 'yes', fromSide: 'left' },
+  { from: 'baked', to: 'clean', label: 'no — the atomic ideal', fromSide: 'right' },
+  { from: 'extra', to: 'stamp' },
+  { from: 'clean', to: 'stamp' },
+]
+
+<Flow nodes={walkNodes} edges={walkEdges} height={860} />
+
 ## The tag vocabulary
 
 Tags are id-based and colon-joined. You never spell these — the helpers and hooks build
@@ -57,7 +81,32 @@ For the rare raw-tag need, `tagsFor(payload)` builds prefix-correct tags. See th
 
 ## What busts when
 
-The write side computes each bust from which fields changed. This is the full map:
+The write side computes each bust from which fields changed:
+
+export const bustNodes = [
+  { id: 'edit', kind: 'start', label: 'You edit a document', detail: 'admin save, payload.update, a webhook — all the same hooks', x: 300, y: 0 },
+  { id: 'diff', label: 'The write hook diffs the fields', detail: 'auto-attached afterChange / afterDelete', x: 300, y: 150 },
+  { id: 'what', kind: 'check', label: 'What changed?', x: 300, y: 300 },
+  { id: 'content', kind: 'result', label: 'posts:{id} + alias', detail: 'the overwhelmingly common case — one entry re-materializes', x: 20, y: 460 },
+  { id: 'membership', kind: 'result', label: 'doc + bare list + all scopes', detail: 'create / delete / publish / unpublish / trash', x: 300, y: 460 },
+  { id: 'draft', kind: 'result', label: 'the :draft variants only', detail: 'draft saves never touch the published surface', x: 580, y: 460 },
+  { id: 'recompose', label: 'Next recomposes from surviving entries', detail: 'only what went stale re-fetches on the next request', x: 300, y: 640 },
+]
+
+export const bustEdges = [
+  { from: 'edit', to: 'diff' },
+  { from: 'diff', to: 'what' },
+  { from: 'what', to: 'content', label: 'content field', fromSide: 'left' },
+  { from: 'what', to: 'membership', label: 'membership' },
+  { from: 'what', to: 'draft', label: 'draft-only doc', fromSide: 'right' },
+  { from: 'content', to: 'recompose' },
+  { from: 'membership', to: 'recompose' },
+  { from: 'draft', to: 'recompose' },
+]
+
+<Flow nodes={bustNodes} edges={bustEdges} height={760} />
+
+The full field-by-field map:
 
 | You change… | Busts |
 | --- | --- |

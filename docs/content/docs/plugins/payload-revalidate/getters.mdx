@@ -56,6 +56,28 @@ async function PostCard({ id }: { id: string | number }) {
   The finders refuse `user` / `req`. A `'use cache'` entry is keyed by its arguments and shared across requesters, so a user-scoped read would serve one user's view to everyone. Run those outside the cache boundary with `payload.find` directly.
 </Callout>
 
+At runtime every call runs the same loop — the [write side](/docs/plugins/payload-revalidate/atomic-model#what-busts-when) is what busts the tag:
+
+export const readNodes = [
+  { id: 'render', kind: 'start', label: 'A page renders PostCard', detail: 'every usage site calls the same getter', x: 300, y: 0 },
+  { id: 'getter', label: "getPost(id) — 'use cache'", detail: 'the entry is keyed by its arguments, shared across requesters', x: 300, y: 150 },
+  { id: 'live', kind: 'check', label: 'Cache entry live?', x: 300, y: 320 },
+  { id: 'serve', kind: 'result', label: 'Served from cache', detail: 'no Payload query runs', x: 40, y: 480 },
+  { id: 'finder', label: 'findDocByID runs payload.find', detail: 'depth 0, access-checked, null on error', x: 560, y: 480 },
+  { id: 'tag', kind: 'store', label: 'Entry cached + tagged posts:{id}', detail: 'live until a write to that doc busts the tag', x: 560, y: 640 },
+]
+
+export const readEdges = [
+  { from: 'render', to: 'getter' },
+  { from: 'getter', to: 'live' },
+  { from: 'live', to: 'serve', label: 'yes', fromSide: 'left' },
+  { from: 'live', to: 'finder', label: 'no — first hit, or busted', fromSide: 'right' },
+  { from: 'finder', to: 'tag' },
+  { from: 'tag', to: 'serve', label: 'later requests', dashed: true, fromSide: 'left', toSide: 'bottom' },
+]
+
+<Flow nodes={readNodes} edges={readEdges} height={760} />
+
 ## The finders
 
 Each finder runs `payload.find` (or `findGlobal`) and tags the entry. All remaining local-API options pass through (`where`, `sort`, `locale`, `select`, `populate`, `context`, …).

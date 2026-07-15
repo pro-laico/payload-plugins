@@ -7,6 +7,7 @@ import { TypeTable } from 'fumadocs-ui/components/type-table'
 import defaultMdxComponents from 'fumadocs-ui/mdx'
 import type { MDXComponents } from 'mdx/types'
 import { ConfigOptions } from './config-options'
+import { Flow } from './flow/flow'
 
 // Shared components registered globally so docs pages use them without per-page
 // imports. `Callout` is already part of the Fumadocs defaults.
@@ -35,6 +36,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Accordions,
     Accordion,
     ConfigOptions,
+    Flow,
     ...components,
   } satisfies MDXComponents
 }
