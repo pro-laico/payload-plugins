@@ -7,6 +7,33 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Added
+
+- `@pro-laico/payload-revalidate` — cached finders on `createCacheHelpers`: `findDoc`,
+  `findDocByID`, `findIds`, `findGlobal` run the Payload query AND tag the entry in one call
+  inside your `'use cache'` getter, so a getter body shrinks to one line and the collection is
+  typed once. Atomic defaults are baked in — `depth: 0`, `overrideAccess: false`, errors → `null`,
+  and `findIds` forces `select: {}` so an id-list can never accidentally cache content — with full
+  local-API passthrough (`where`, `sort`, `locale`, `select`, `populate`, `context`, …), returns
+  typed from your generated `payload-types`, a single `draft` flag driving both the fetch and the
+  `:draft` tag variants, and pagination meta returned by `findIds` without a second query.
+  `user`/`req` are refused (types + runtime) — a shared cache entry must never hold a
+  requester-scoped read. The low-level `cacheDoc` / `cacheIds` / `cacheGlobal` primitives stay
+  exported for getters the finders can't express.
+
+- `@pro-laico/payload-revalidate` — declared list scopes accept a `string[]` shorthand:
+  `lists: { featured: ['featured', 'publishedAt'] }`. The `{ fields: [...] }` object form still
+  works and remains the extension slot.
+
+### Removed
+
+- **BREAKING** `@pro-laico/payload-revalidate` — internal shapes are no longer exported from the
+  package root: `createTags`, `readRevalidateMarker`, and the types `PayloadRevalidateMarker`,
+  `ResolvedRevalidateOptions`, `CollectionSettings`. Build raw tags with `tagsFor(payload)`
+  (prefix-safe) — though the `revalidateDoc`/`revalidateList`/`revalidateGlobal` busters are
+  lane-aware and almost always the better tool. _Migration: replace `createTags(prefix)` with
+  `tagsFor(payload)`; nothing else had a supported use._
+
 ### Changed
 
 - **BREAKING** `@pro-laico/payload-images` — the default `pixelStep` is now a conventional width

@@ -205,3 +205,45 @@ describe('sibling-plugin markers (icons, images)', () => {
     expect(tags).not.toContain('images')
   })
 })
+
+// The getters run the package's cached finders end-to-end against the real DB —
+// 'use cache' is an inert directive outside Next's compiler, so calling them here
+// exercises the fetch defaults + observed tagging, not the cache layer itself.
+describe('read-side finders (through src/lib/getters)', () => {
+  const reads = () => getInspection()?.reads ?? []
+
+  it('findIds getter returns the seeded ids and records a membership-only read', async () => {
+    const { getPostIds } = await import('@/lib/getters')
+    const ids = await getPostIds()
+    const seeded = await payload.find({ collection: 'posts', depth: 0, select: {} })
+    expect(ids.length).toBeGreaterThan(0)
+    expect(ids.sort()).toEqual(seeded.docs.map((d) => d.id).sort())
+    const read = reads().find((r) => r.kind === 'ids' && r.collection === 'posts' && r.list === undefined)
+    expect(read).toMatchObject({ kind: 'ids', collection: 'posts', staticTags: expect.arrayContaining(['posts']) })
+  })
+
+  it('findDoc getter resolves by slug, tags the alias, and respects access control by default', async () => {
+    const { getPostBySlug } = await import('@/lib/getters')
+    const post = await getPostBySlug('we-launched')
+    expect(post?.slug).toBe('we-launched')
+    const read = reads().find((r) => r.kind === 'doc' && r.as === 'we-launched')
+    expect(read).toMatchObject({
+      kind: 'doc',
+      collection: 'posts',
+      as: 'we-launched',
+      staticTags: expect.arrayContaining([`posts:${post?.id}`, 'posts:we-launched']),
+    })
+  })
+
+  it('findDocByID getter returns null for a missing id instead of throwing', async () => {
+    const { getPost } = await import('@/lib/getters')
+    await expect(getPost(999999)).resolves.toBeNull()
+  })
+
+  it('findGlobal getter returns the seeded global and records the read', async () => {
+    const { getSettings } = await import('@/lib/getters')
+    const settings = await getSettings()
+    expect(settings.siteName).toBeTruthy()
+    expect(getInspection()?.reads.find((r) => r.kind === 'global' && r.global === 'site-settings')).toBeTruthy()
+  })
+})

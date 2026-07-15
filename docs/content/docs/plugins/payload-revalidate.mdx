@@ -27,9 +27,9 @@ const nextConfig = { cacheComponents: true }
 
 Three rules, one consequence each:
 
-1. **Every doc renders through an id-keyed getter** (`cacheDoc`) → a content edit busts
+1. **Every doc renders through an id-keyed getter** (`findDocByID`) → a content edit busts
    `posts:{id}` and re-materializes exactly that entry, at every usage site at once.
-2. **Lists cache ids only** (`cacheIds`) → list entries change on membership/order
+2. **Lists cache ids only** (`findIds`) → list entries change on membership/order
    events, never on content. A title edit re-renders one card, not the archive.
 3. **References stay ids** (`depth: 0`) → an entry never bakes in another doc's content,
    so it never needs to purge when that doc changes. The id is stable; freshness lives in
@@ -55,8 +55,8 @@ export default buildConfig({
       collections: {
         posts: {
           lists: {
-            recent: { fields: ['publishedAt'] },              // order determinant
-            featured: { fields: ['featured', 'publishedAt'] }, // filter + order
+            recent: ['publishedAt'],              // order determinant
+            featured: ['featured', 'publishedAt'], // filter + order
           },
         },
       },
@@ -67,30 +67,52 @@ export default buildConfig({
 
 Zero-config works too (`revalidatePlugin()`): every collection/global gets hooks, doc
 tags flow automatically. Declared `lists` are the one thing worth configuring — they give
-each list surface its own tag and tell the write side which fields can reorder it.
+each list surface its own tag and tell the write side which fields can reorder it. (A
+scope is just `name: [fields]`; the longer `name: { fields: [...] }` form is accepted too.)
 
 ## The getters
 
+Seed the helpers **once** with your app's live Payload session, then write each getter as
+`'use cache'` + one finder call. The finder runs the query AND tags the entry — collection
+typed once, atomic defaults baked in (`depth: 0`, `overrideAccess: false`, errors → `null`,
+id-lists forced to `select: {}`):
+
 ```ts
 // src/lib/getters.ts
-import { cacheDoc, cacheIds, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+
+const { findDoc, findDocByID, findIds, findGlobal } = createCacheHelpers(getPayload({ config }))
 
 /** The id-list: membership/order only. Content edits never touch this entry. */
 export async function getRecentPostIds(page = 1) {
   'use cache'
-  const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'posts', page, limit: 12, sort: '-publishedAt', select: {}, depth: 0 })
-  await cacheIds(res, 'posts', { list: 'recent' })
-  return res.docs.map((doc) => doc.id)
+  return (await findIds('posts', { page, limit: 12, sort: '-publishedAt', list: 'recent' })).ids
 }
 
 /** THE atomic unit: one doc, one entry, shared by every usage site. */
 export async function getPost(id: string | number) {
   'use cache'
-  const payload = await getPayloadClient()
-  return cacheDoc(await payload.findByID({ collection: 'posts', id, depth: 0, disableErrors: true }), 'posts')
+  return findDocByID('posts', id)
 }
 ```
+
+Returns are fully typed from your generated `payload-types` (`Post | null`,
+select-narrowed when you pass `select`). `findIds` returns `{ ids, page, totalPages,
+totalDocs, hasNextPage, hasPrevPage }` — pagination meta without a second query. All
+remaining local-API options pass through (`where`, `sort`, `locale`, `select`,
+`populate`, `context`, …), and a single `draft` flag drives both the fetch and the
+`:draft` tag variants.
+
+One thing the finders refuse: `user` / `req`. A `'use cache'` entry is keyed by arguments
+and shared across requesters — a user-scoped read would serve one user's view to
+everyone. Run those outside the cache boundary with `payload.find` directly.
+
+The underlying primitives — `cacheDoc`, `cacheIds`, `cacheGlobal` — stay exported from
+the same factory for getters the finders can't express (multiple reads in one entry,
+post-processed queries, non-Payload data in the same scope). A finder is exactly
+`payload.find` + the matching primitive, nothing more.
 
 ```tsx
 // The list renders ids; each card self-fetches — one entry per card.
@@ -108,7 +130,8 @@ async function PostCard({ id }: { id: string | number }) {
 
 ## The tag vocabulary
 
-Id-based, colon-joined; never hand-spell one — build with the exported `tags` helper.
+Id-based, colon-joined; you never spell these — the helpers and hooks build them. (For
+the rare raw-tag need, `tagsFor(payload)` builds prefix-correct tags.)
 
 | Tag | Meaning | Busted when |
 | --- | --- | --- |
@@ -179,9 +202,7 @@ that slug is created. References stay ids and render through their own getters.
 ```ts
 export async function getPostBySlug(slug: string) {
   'use cache'
-  const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'posts', where: { slug: { equals: slug } }, limit: 1, depth: 0 })
-  return cacheDoc(res.docs[0] ?? null, 'posts', { as: slug })
+  return findDoc('posts', { where: { slug: { equals: slug } }, as: slug })
 }
 ```
 
@@ -223,9 +244,9 @@ revalidatePlugin({
   collections: {
     posts: {
       lists: {
-        recent: { fields: ['publishedAt'] },
-        featured: { fields: ['featured', 'publishedAt'] },
-        byCategory: { fields: ['category'] },
+        recent: ['publishedAt'],
+        featured: ['featured', 'publishedAt'],
+        byCategory: ['category'],
       },
     },
   },
@@ -242,8 +263,7 @@ dev map warns when a scope is observed but undeclared).
 ```ts
 export async function getHeader() {
   'use cache'
-  const payload = await getPayloadClient()
-  return cacheGlobal(await payload.findGlobal({ slug: 'header', depth: 0 }), 'header')
+  return findGlobal('header')
 }
 ```
 
@@ -258,9 +278,7 @@ Runtime APIs (`draftMode()`) can't run inside `'use cache'` — read them outsid
 ```ts
 export async function getPagePreviewable(slug: string, draft: boolean) {
   'use cache'
-  const payload = await getPayloadClient()
-  const res = await payload.find({ collection: 'pages', where: { slug: { equals: slug } }, limit: 1, depth: 0, draft })
-  return cacheDoc(res.docs[0] ?? null, 'pages', { as: slug, draft })
+  return findDoc('pages', { where: { slug: { equals: slug } }, as: slug, draft })
 }
 
 // caller (dynamic, under Suspense):
@@ -275,15 +293,17 @@ surface. (Simplest alternative: leave preview reads uncached — they're dynamic
 
 A sitemap renders every doc's slug — content, not just membership — so it's the one
 classic surface that wants collection-wide field coverage. The atomic answer is a
-declared scope over the slug field:
+declared scope over the slug field. It's also the classic **low-level** case: the entry
+deliberately carries content (`slug`), which `findIds` makes unrepresentable, so drop to
+`cacheIds` and the raw local API:
 
 ```ts
-revalidatePlugin({ collections: { posts: { lists: { sitemap: { fields: ['slug'] } } } } })
+revalidatePlugin({ collections: { posts: { lists: { sitemap: ['slug'] } } } })
 
 export async function getSitemapEntries() {
   'use cache'
-  const payload = await getPayloadClient()
-  const posts = await payload.find({ collection: 'posts', limit: 0, select: { slug: true, updatedAt: true }, depth: 0 })
+  const payload = await db // the same handle createCacheHelpers was seeded with
+  const posts = await payload.find({ collection: 'posts', limit: 0, select: { slug: true, updatedAt: true }, depth: 0, overrideAccess: false })
   await cacheIds(posts, 'posts', { list: 'sitemap' })
   return posts.docs
 }
@@ -316,7 +336,7 @@ integrates them with zero config:
 | Plugin | What its collections declare |
 | --- | --- |
 | [payload-icons](/docs/plugins/payload-icons) | `icon` + `iconSet` carry `extraTags: ['payload-icons']` — and `<Icon>` applies the same tag via `cacheTag` inside your `'use cache'` scopes, so baked-in SVGs self-heal. `iconRequest` opts out. |
-| [payload-images](/docs/plugins/payload-images) | `images` gets the standard hooks (fetch it with an id-keyed `cacheDoc` getter); the internal `generated-images` variant cache opts out, so on-demand variant writes stay silent. |
+| [payload-images](/docs/plugins/payload-images) | `images` gets the standard hooks (fetch it with an id-keyed `findDocByID` getter); the internal `generated-images` variant cache opts out, so on-demand variant writes stay silent. |
 | [payload-mux](/docs/plugins/payload-mux) | `mux-video` gets the standard hooks — webhook writes go through `payload.update`, so a "processing" page heals itself when the asset goes ready. |
 | [payload-fonts](/docs/plugins/payload-fonts) | Derived `fontOriginal` / `fontOptimized` opt out (fonts are build-baked; nothing at runtime to bust). |
 | [payload-seed](/docs/plugins/payload-seed) | A seed run flushes once at the end: list tags + declared scopes + `extraTags` per touched slug, then `all`. |
@@ -338,15 +358,9 @@ export async function importProducts(rows: ProductRow[]) {
 }
 ```
 
-Or hand-build a tag — never spell the string:
-
-```ts
-import { revalidateTag } from 'next/cache'
-import { tags } from '@pro-laico/payload-revalidate'
-
-revalidateTag(tags.doc('products', 42))
-revalidateTag(tags.list('posts', { scope: 'recent' }))
-```
+The busters are lane-aware (published + `:draft`) and prefix-aware — prefer them over
+hand-spelling a tag string into `revalidateTag`. If you truly need a raw tag (e.g. an
+extra tag for `cacheTag`), build it with `tagsFor(payload)` so the app prefix is applied.
 
 ### Migrating from `unstable_cache`
 
@@ -357,7 +371,7 @@ const getPost = unstable_cache(async (slug: string) => fetchPost(slug), ['post-b
 // AFTER — keys automatic, entry-precise tags derived from the data itself:
 async function getPost(slug: string) {
   'use cache'
-  return cacheDoc(await fetchPost(slug), 'posts', { as: slug })
+  return findDoc('posts', { where: { slug: { equals: slug } }, as: slug })
 }
 ```
 
@@ -377,13 +391,13 @@ taken to its logical end.
   to be quiet about.
 - With `observe: true` forced on in production, the map endpoints additionally require an
   authenticated Payload user.
-- The cache helpers resolve your Payload config from a `globalThis` stash filled when
-  Payload boots. If a helper runs before anything has called `getPayload()` in that
-  process, add `'@pro-laico/payload-revalidate'` to `transpilePackages`.
+- The cache helpers never resolve Payload or your config themselves — no `globalThis`
+  stashes, no `@payload-config` alias tricks, no `transpilePackages` requirement. The
+  handle you seed into `createCacheHelpers` is the session that runs and tags every read.
 - A draft save **over a published doc** is indistinguishable from an unpublish in the
   hook signature, so both lanes bust — a harmless over-bust that keeps unpublish correct.
 - Collections without a slug field get no alias tag — id-keyed reads only.
 - The bake-in walk is capped (`walk.maxTags`, default 64; Next allows 128 tags/entry);
   capped reads are flagged in the map.
-- Bare `posts` list tags bust on membership only — an unscoped `cacheIds` read that
+- Bare `posts` list tags bust on membership only — an unscoped `findIds` read that
   depends on sort/filter fields should declare a scope instead.

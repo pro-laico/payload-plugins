@@ -1,8 +1,9 @@
 import type { Payload } from 'payload'
 
-import { isId } from '../lib/values'
+import { docId } from '../lib/values'
 import { isRecord } from '../lib/isRecord'
 import { createManualBusters } from './manual'
+import { createCacheFinders } from './finders'
 import { readRevalidateMarker } from '../lib/marker'
 import { recordRead } from '../lib/observe/registry'
 import { createTags, riskyAliasReason } from '../lib/tags'
@@ -10,8 +11,6 @@ import { alertOnce, applyCacheTags, finish, warnOnce, withDraftVariants } from '
 import type { CacheDocOptions, CacheHelpers, CacheIdsOptions, PayloadRevalidateMarker, Tags, WalkOptions } from '../types'
 
 import 'server-only'
-
-const docId = (doc: unknown): string | number | undefined => (isRecord(doc) && isId(doc.id) ? doc.id : undefined)
 
 interface ReadCtx {
   payload: Payload
@@ -72,7 +71,7 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     if (undeclared)
       warnOnce(
         `scope:${name}`,
-        `${name} carries undeclared list scope '${options.list}' — reorders won't bust it. Declare it: revalidatePlugin({ collections: { ${collection}: { lists: { ${options.list}: { fields: ['<sort/filter fields>'] } } } } }).`,
+        `${name} carries undeclared list scope '${options.list}' — reorders won't bust it. Declare it: revalidatePlugin({ collections: { ${collection}: { lists: { ${options.list}: ['<sort/filter fields>'] } } } }).`,
       )
 
     const statics = withDraftVariants(
@@ -112,7 +111,14 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     return doc
   }
 
-  return { cacheDoc, cacheIds, cacheGlobal, ...createManualBusters(handle) }
+  return {
+    cacheDoc,
+    cacheIds,
+    cacheGlobal,
+    ...createCacheFinders(handle, { cacheDoc, cacheGlobal, cacheIds }),
+    ...createManualBusters(handle),
+  }
 }
 
 export type { CacheDocOptions, CacheHelpers, CacheIdsOptions, WalkOptions }
+export type { CacheFinders, FindDocByIDOptions, FindDocOptions, FindGlobalOptions, FindIdsOptions, IdsResult } from '../types'

@@ -46,9 +46,9 @@ export const plugins: Plugin[] = [
   devToolsPlugin(),
   revalidatePlugin({
     collections: {
-      services: { lists: { ordered: { fields: ['order'] } } },
-      projects: { lists: { work: { fields: ['featured', 'year'] }, featured: { fields: ['featured'] } } },
-      team: { lists: { ordered: { fields: ['order'] } } },
+      services: { lists: { ordered: ['order'] } },
+      projects: { lists: { work: ['featured', 'year'], featured: ['featured'] } },
+      team: { lists: { ordered: ['order'] } },
     },
   }),
 ]

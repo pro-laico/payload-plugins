@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       '@payload-config': resolve(dir, 'src/payload.config.ts'),
       '@': resolve(dir, 'src'),
+      'server-only': resolve(dir, 'tests/stubs/server-only.ts'),
     },
   },
 })

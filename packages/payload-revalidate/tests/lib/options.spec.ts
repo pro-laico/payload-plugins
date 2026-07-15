@@ -30,9 +30,11 @@ describe('resolveCollectionSettings', () => {
     expect(withoutSlug?.idField).toBe(false)
   })
 
-  it('normalizes declared list scopes to scope → fields', () => {
-    const resolved = resolveOptions({ collections: { posts: { lists: { recent: { fields: ['publishedAt'] } } } } })
-    expect(resolveCollectionSettings(posts(), resolved)?.lists).toEqual({ recent: ['publishedAt'] })
+  it('normalizes declared list scopes to scope → fields, accepting the string[] shorthand and the { fields } form', () => {
+    const resolved = resolveOptions({
+      collections: { posts: { lists: { recent: ['publishedAt'], featured: { fields: ['featured', 'publishedAt'] } } } },
+    })
+    expect(resolveCollectionSettings(posts(), resolved)?.lists).toEqual({ recent: ['publishedAt'], featured: ['featured', 'publishedAt'] })
   })
 
   it('finds the slug field through presentational wrappers but not named tabs', () => {
@@ -74,7 +76,7 @@ describe('resolveCollectionSettings', () => {
       const malformed = resolveCollectionSettings(
         posts({
           revalidate: {
-            lists: { recent: ['publishedAt'], ok: { fields: ['order'] }, alsoBad: { fields: 'order' } },
+            lists: { recent: [42], ok: { fields: ['order'] }, alsoBad: { fields: 'order' } },
             extraTags: 'sitemap',
             idField: 42,
           } as never,

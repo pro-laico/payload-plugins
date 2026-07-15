@@ -2,11 +2,11 @@
 
 A minimal Payload + Next.js (Cache Components) app exercising `@pro-laico/payload-revalidate` end to end:
 
-- **Read side (atomic)** — `src/lib/getters.ts`: id-lists via `cacheIds` (bare `posts` + the declared `featured` scope), id-keyed doc getters via `cacheDoc`, `cacheGlobal` — every card/reference self-fetches its own entry.
+- **Read side (atomic)** — `src/lib/getters.ts`: every getter is `'use cache'` + one cached finder call — id-lists via `findIds` (bare `posts` + the declared `featured` scope), id-keyed doc getters via `findDoc`/`findDocByID`, `findGlobal` — every card/reference self-fetches its own entry.
 - **Write side** — zero-config hooks from `revalidatePlugin()` (added LAST in `src/plugins/index.ts`): edit a doc in the admin and exactly the touched tags bust.
 - **Visibility** — `/dev/revalidate` (via `@pro-laico/payload-dev-tools`) shows the dependency graph, observed reads, and the bust-event log; `GET /api/revalidate-map` serves the same as JSON.
 - **Seed integration** — the after-seed listener flushes the seeded surface once (`payload-seed` writes stay hook-quiet via `context.disableRevalidate`).
-- **Sibling plugins, zero config** — `iconsPlugin()` + `imagesPlugin()` are registered with no revalidation wiring: their collections ship data-only `custom.revalidate` markers (`icon`/`iconSet` carry the shared `payload-icons` extra tag, `iconRequest` and `generated-images` opt out) that `revalidatePlugin()` picks up. The home page renders a `'use cache'` panel of inlined `<Icon>`s and a `<ResponsiveImage>` fed by an id-keyed `cacheDoc` getter.
+- **Sibling plugins, zero config** — `iconsPlugin()` + `imagesPlugin()` are registered with no revalidation wiring: their collections ship data-only `custom.revalidate` markers (`icon`/`iconSet` carry the shared `payload-icons` extra tag, `iconRequest` and `generated-images` opt out) that `revalidatePlugin()` picks up. The home page renders a `'use cache'` panel of inlined `<Icon>`s and a `<ResponsiveImage>` fed by an id-keyed `findDocByID` getter.
 
 ## Try it
 

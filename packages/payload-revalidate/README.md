@@ -11,12 +11,16 @@ a live dependency map showing what revalidates when.
   create/delete/reassign of a member surgically busts only the affected parent's membership
   (`{child}:join:{on}:{parentId}`) — the parent whose "all my posts" list actually moved,
   never the others.
-- **Atomic read side** — inside your `'use cache'` getters: `cacheDoc` (one doc = one
-  entry, id-keyed, shared by every usage site), `cacheIds` (lists cache ids only, with
-  declared scopes like `posts:list:featured`), `cacheGlobal`. References stay ids —
-  "edit image 123 → only its own entry re-materializes, everywhere it's used." Baked-in
-  populated content is still tagged for correctness and flagged in dev as a refactor
-  candidate.
+- **Atomic read side** — inside your `'use cache'` getters, one finder call fetches AND
+  tags: `findDoc` / `findDocByID` (one doc = one entry, id-keyed, shared by every usage
+  site), `findIds` (lists cache ids only — `select: {}` forced — with declared scopes
+  like `posts:list:featured`), `findGlobal`. Atomic defaults baked in (`depth: 0`,
+  `overrideAccess: false`, errors → `null`), full local-API passthrough, returns typed
+  from your generated `payload-types`, and `user`/`req` refused (a shared cache entry
+  must not hold a requester-scoped read). References stay ids — "edit image 123 → only
+  its own entry re-materializes, everywhere it's used." The low-level `cacheDoc` /
+  `cacheIds` / `cacheGlobal` primitives stay exported for getters the finders can't
+  express.
 - **Visibility** — a schema-derived reference graph + observed reads + a bust-event log
   at `GET /api/revalidate-map`, rendered by `@pro-laico/payload-dev-tools` at
   `/dev/revalidate`, or dumped as a Markdown doc with `payload revalidate-map`.
@@ -33,20 +37,21 @@ import config from '@payload-config'
 import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
 import { getPayload } from 'payload'
 
-export const { cacheDoc, cacheIds, cacheGlobal } = createCacheHelpers(getPayload({ config }))
+export const { findDoc, findDocByID, findIds, findGlobal } = createCacheHelpers(getPayload({ config }))
 ```
 
 ```ts
-// a getter
-import config from '@payload-config'
-import { getPayload } from 'payload'
-import { cacheDoc } from '@/lib/cache'
+// getters — 'use cache' + one finder call each
+import { findDoc, findIds } from '@/lib/cache'
 
 export async function getPost(slug: string) {
   'use cache'
-  const payload = await getPayload({ config })
-  const res = await payload.find({ collection: 'posts', where: { slug: { equals: slug } }, limit: 1, depth: 2 })
-  return cacheDoc(res.docs[0] ?? null, 'posts', { as: slug })
+  return findDoc('posts', { where: { slug: { equals: slug } }, as: slug })
+}
+
+export async function getRecentPostIds() {
+  'use cache'
+  return (await findIds('posts', { sort: '-publishedAt', limit: 12, list: 'recent' })).ids
 }
 ```
 

@@ -3,13 +3,7 @@ import type { CollectionConfig, GlobalConfig } from 'payload'
 import { createOnce } from './once'
 import { isRecord } from './isRecord'
 import { findTopLevelField } from './fields'
-import type {
-  CollectionRevalidateConfig,
-  CollectionSettings,
-  ResolvedRevalidateOptions,
-  RevalidateMarker,
-  RevalidatePluginOptions,
-} from '../types'
+import type { CollectionRevalidateConfig, CollectionSettings, ResolvedRevalidateOptions, RevalidatePluginOptions } from '../types'
 
 export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedRevalidateOptions {
   return {
@@ -48,13 +42,15 @@ export function resolveCollectionSettings(collection: CollectionConfig, resolved
   const lists: Record<string, string[]> = {}
   const rawLists = merged.lists
   if (rawLists !== undefined && (typeof rawLists !== 'object' || rawLists === null || Array.isArray(rawLists))) {
-    shapeWarn(collection.slug, 'lists', 'an object of { [scope]: { fields: string[] } }')
+    shapeWarn(collection.slug, 'lists', 'an object of { [scope]: string[] | { fields: string[] } }')
   } else {
     for (const [scope, config] of Object.entries(rawLists ?? {})) {
-      if (isRecord(config) && isStringArray(config.fields)) {
+      if (isStringArray(config)) {
+        lists[scope] = config
+      } else if (isRecord(config) && isStringArray(config.fields)) {
         lists[scope] = config.fields
       } else {
-        shapeWarn(collection.slug, `lists.${scope}`, '{ fields: string[] }')
+        shapeWarn(collection.slug, `lists.${scope}`, 'string[] or { fields: string[] }')
       }
     }
   }

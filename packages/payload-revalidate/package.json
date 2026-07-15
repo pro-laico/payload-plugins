@@ -1,7 +1,7 @@
 {
   "name": "@pro-laico/payload-revalidate",
   "version": "0.2.0",
-  "description": "Surgical Next.js cache revalidation for Payload CMS: auto-attached hooks that bust exactly the tags a change touches, cacheTag helpers that auto-collect embedded-doc dependency tags inside 'use cache' getters, and a dependency map showing what revalidates when.",
+  "description": "Surgical Next.js cache revalidation for Payload CMS: auto-attached hooks that bust exactly the tags a change touches, cached finders that fetch AND tag in one call inside 'use cache' getters, and a dependency map showing what revalidates when.",
   "license": "MIT",
   "repository": {
     "type": "git",

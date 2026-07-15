@@ -2,6 +2,7 @@ import type { Payload } from 'payload'
 
 import type { Tags } from './tagOptions'
 import type { WalkOptions } from './walk'
+import type { CacheFinders } from './finders'
 
 interface BaseOptions {
   draft?: boolean
@@ -32,7 +33,7 @@ export interface FinishInput {
   options: CacheDocOptions
 }
 
-export interface CacheHelpers {
+export interface CacheHelpers extends CacheFinders {
   cacheDoc: <T>(doc: T, collection: string, options?: CacheDocOptions) => Promise<T>
   cacheIds: <T>(result: T, collection: string, options?: CacheIdsOptions) => Promise<T>
   cacheGlobal: <T>(doc: T, slug: string, options?: CacheDocOptions) => Promise<T>

@@ -16,9 +16,9 @@ export default function HomePage() {
       accent="oklch(0.72 0.15 160)"
       lead={
         <>
-          Atomic revalidation: the lists below cache <em>ids only</em> (<code>cacheIds</code>); every card self-fetches through an id-keyed{' '}
-          <code>cacheDoc</code> getter. Edit a post's title and exactly one card entry re-materializes — the lists and every other card survive.
-          Watch it at <Link href="/dev/revalidate">/dev/revalidate</Link>.
+          Atomic revalidation: the lists below cache <em>ids only</em> (<code>findIds</code>); every card self-fetches through an id-keyed{' '}
+          <code>findDocByID</code> getter. Edit a post's title and exactly one card entry re-materializes — the lists and every other card
+          survive. Watch it at <Link href="/dev/revalidate">/dev/revalidate</Link>.
         </>
       }
     >
@@ -81,7 +81,8 @@ async function Content() {
       <h2>
         Images{' '}
         <small className="shell-muted" style={{ fontWeight: 400 }}>
-          (@pro-laico/payload-images) — each doc an id-keyed cacheDoc entry; an alt/focal edit busts images:&#123;id&#125; and only that entry
+          (@pro-laico/payload-images) — each doc an id-keyed findDocByID entry; an alt/focal edit busts images:&#123;id&#125; and only that
+          entry
         </small>
       </h2>
       <div className="shell-card">
