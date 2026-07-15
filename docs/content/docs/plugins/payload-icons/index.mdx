@@ -101,10 +101,19 @@ An `iconSet` maps lookup names to icons. In order:
 <Step>
 **Render it**
 
-The active set is now resolvable. Drop the component into any server component or page:
+The active set is now resolvable. Build the component once from the `createIcon` factory — pass it a
+Payload handle — then render it in any server component or page:
+
+```tsx title="src/components/Icon.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createIcon } from '@pro-laico/payload-icons/components/Icon'
+
+export const Icon = createIcon(getPayload({ config }))
+```
 
 ```tsx
-import { Icon } from '@pro-laico/payload-icons/components/Icon'
+import { Icon } from '@/components/Icon'
 
 // resolves `arrow-right` through the active set and inlines a real <svg>
 <Icon name="arrow-right" className="size-6 text-primary" />

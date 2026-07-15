@@ -76,7 +76,7 @@ The `payload-fonts-download` CLI reads these. Only the first two are required:
 | `PAYLOAD_FONTS_SRC_PREFIX` | `../../public/fonts` | `src` path in the generated `localFont()` calls, relative to the definition file. |
 | `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | Prefix for the emitted CSS family variables; must match `<DevFonts cssVarPrefix>`. |
 | `PAYLOAD_FONTS_ENDPOINT` | `/api/fonts/export` | Export endpoint path, resolved against the site URL. |
-| `PAYLOAD_FONTS_ENV_FILE` | `./.env` | Dotenv file loaded before reading env. |
+| `PAYLOAD_FONTS_ENV_FILE` | `./.env.local, ./.env` | Dotenv file(s) loaded before reading env. Unset, both are loaded; set, only the named file. |
 | `PAYLOAD_FONTS_VERBOSE` | `false` | Print the full error on failure (also the `--verbose` / `-v` flag). |
 
 ## CLI commands

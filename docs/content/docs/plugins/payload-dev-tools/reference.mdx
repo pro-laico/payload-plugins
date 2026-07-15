@@ -37,9 +37,10 @@ interface DevToolsPluginOptions {
 
 </Tabs>
 
-`createDevPage({ tests, enabled })` and `<DevToolbar tests links enabled />` take the same
-`enabled` override and the same `tests` array (from `defineTest`). The toolbar's `links` adds
-extra rows to its Pages view; point them at your own labs.
+`createDevPage({ payload, tests, enabled })` and `<DevToolbar tests links enabled />` take the same
+`enabled` override and the same `tests` array (from `defineTest`). `createDevPage` also requires a
+`payload` handle (`getPayload({ config })`); `tests` and `enabled` are optional. The toolbar's
+`links` adds extra rows to its Pages view; point them at your own labs.
 
 ## Environment variables
 

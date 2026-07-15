@@ -19,6 +19,7 @@ open as you browse. Views light up based on which plugins are installed:
 | `/dev/fonts` | Interactive specimen per family slot. Click through only the weights and styles the typeface actually serves. |
 | `/dev/images` | Originals rendered through `/api/img/:id?w=320`, exercising the transform + cache end-to-end. Payload folders render as filter chips. |
 | `/dev/mux` | Videos with their persisted ingest `status`. |
+| `/dev/revalidate` | payload-revalidate's tag graph, tracked reads, and recent revalidation events (when payload-revalidate is installed). |
 | `/dev/tests/<key>` | One page per test, showing the toolbar-selected version. No added chrome, so you see the component exactly as it would ship. See [The test harness](/docs/plugins/payload-dev-tools/test-harness). |
 
 Your own labs coexist: a static route like `app/(frontend)/dev/blocks/page.tsx` always beats the
@@ -35,7 +36,7 @@ curl -s localhost:3000/api/dev | jq '.seed.seeded, .icons.misses'
 ```jsonc
 {
   "env": { "nodeEnv": "development", "nodeVersion": "v22.x" },
-  "plugins": { "seed": true, "images": true, "icons": true, "fonts": true, "mux": true },
+  "plugins": { "seed": true, "images": true, "icons": true, "fonts": true, "mux": true, "revalidate": true },
   "seed": { "enabled": true, "seeded": true, "totalDocs": 42, "counts": { "services": 4 }, "definitions": [/* … */] },
   "images": { "sourceSlug": "images", "basePath": "/api/img", "sourceCount": 12, "variantCount": 96 },
   "icons": { "iconCount": 9, "activeSet": "Brand icons", "misses": [{ "name": "sparkles", "count": 7 }] },

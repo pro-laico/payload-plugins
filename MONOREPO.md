@@ -9,9 +9,11 @@ structure, local development, and publishing.
 payload-plugins/
 ├── packages/                  # published Payload plugins (@pro-laico/payload-*)
 ├── examples/                  # minimal Payload + Next.js test apps (private)
-├── docs/                      # documentation site (fumadocs, port 42120)
+├── docs/                      # documentation site (fumadocs, port 43210)
 ├── tools/
-│   └── releaser/              # lockstep versioning + npm publish tooling
+│   ├── releaser/              # lockstep versioning + npm publish tooling
+│   ├── sandbox-shell/         # shared example frontend shell
+│   └── failure-lab/           # Payload integration-test rig
 ├── tsconfig.base.json         # shared TS config every package extends
 ├── biome.json                 # formatter + linter (144-col, organizeImports off)
 ├── .swcrc                     # package build config (src -> dist)
@@ -26,7 +28,7 @@ payload-plugins/
 | `packages/*` | yes        | yes                    | The plugins, published to npm under `@pro-laico/*`. |
 | `examples/*` | no         | yes                    | Minimal test apps that consume a plugin.            |
 | `docs`       | no         | no                     | The documentation site.                             |
-| `tools/*`    | no         | no                     | Internal tooling (the releaser).                    |
+| `tools/*`    | no         | no                     | Internal tooling (releaser, sandbox-shell, failure-lab). |
 
 ## Commands
 

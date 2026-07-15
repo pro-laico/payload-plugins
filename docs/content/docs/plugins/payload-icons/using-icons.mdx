@@ -5,25 +5,32 @@ description: "Drop `<Icon name>` into any server component to inline a recolorab
 
 ## `<Icon>`
 
-`<Icon name="…" />` is the frontend surface — one import, no wrapper file.
-It resolves `name` through the **active set** and inlines the matched icon as a real `<svg>`.
-Your `className` and props win over the SVG's intrinsic attributes, and the glyph inherits CSS `color` through `currentColor`.
+`<Icon name="…" />` is the frontend surface. It resolves `name` through the **active set** and
+inlines the matched icon as a real `<svg>`. Your `className` and props win over the SVG's intrinsic
+attributes, and the glyph inherits CSS `color` through `currentColor`.
 
-Import it from the `components/Icon` subpath:
+Build the component once from the `createIcon` factory — passing it a Payload handle — then import
+that wherever you render icons:
+
+```tsx title="src/components/Icon.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createIcon } from '@pro-laico/payload-icons/components/Icon'
+
+export const Icon = createIcon(getPayload({ config }))
+```
 
 ```tsx
-import { Icon } from '@pro-laico/payload-icons/components/Icon'
+import { Icon } from '@/components/Icon'
 
 <Icon name="arrow-right" className="size-6 text-primary" />
 ```
 
 <Callout type="info">
   It's an async **server component** (it queries Payload), so render it in a server component / page.
-  It resolves your config from the plugin itself (stashed when Payload boots), so there's nothing to
-  wire. Only if it can render before *anything* has initialized Payload does it fall back to the
-  `@payload-config` alias — which, from a published package, needs
-  `transpilePackages: ['@pro-laico/payload-icons']` in next.config. When `name` isn't in the active
-  set it renders the `fallback` you pass (or a small built-in warning glyph), never nothing.
+  You pass the Payload handle when you build the component with `createIcon(getPayload({ config }))` —
+  the package never self-resolves your config. When `name` isn't in the active set it renders the
+  `fallback` you pass (or a small built-in warning glyph), never nothing.
 </Callout>
 
 <Callout type="info">
@@ -51,7 +58,7 @@ export const iconProps = [
 <Tab value="TypeScript">
 
 ```tsx
-import { Icon } from '@pro-laico/payload-icons/components/Icon'
+import { Icon } from '@/components/Icon' // built with createIcon(getPayload({ config }))
 
 // `name` is the only required prop; it resolves through the active set.
 <Icon
@@ -137,7 +144,7 @@ const iconClass = cva('inline-block shrink-0', {
 <Tab value="Usage">
 
 ```tsx
-import { Icon } from '@pro-laico/payload-icons/components/Icon'
+import { Icon } from '@/components/Icon' // built with createIcon(getPayload({ config }))
 
 // One source SVG, every variant; the cva className recolors and resizes it.
 <Icon name="star" className={iconClass({ size: 'sm' })} />

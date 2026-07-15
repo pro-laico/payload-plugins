@@ -64,14 +64,17 @@ Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /a
 **Drop in the dev pages**
 
 ```tsx title="app/(frontend)/dev/[[...view]]/page.tsx"
+import config from '@payload-config'
+import { getPayload } from 'payload'
 import { createDevPage } from '@pro-laico/payload-dev-tools/next'
 
 export const dynamic = 'force-dynamic'
-export default createDevPage()
+export default createDevPage({ payload: getPayload({ config }) })
 ```
 
 One file, all views. It lives in your `(frontend)` group, so the pages inherit your layout,
-fonts, and styles. `createDevPage` resolves Payload itself; no props required.
+fonts, and styles. Pass `createDevPage` a Payload handle — `getPayload({ config })` from your
+app's `@payload-config`.
 
 <Callout type="info">
 The Seed view needs the seed plugin's preconditions: `ENABLE_SEED=true` in `.env.local` and a
@@ -137,8 +140,8 @@ export const devTests = [heroTest, headerTest]
 Pass the same `devTests` array to both frontend pieces:
 
 ```tsx
-export default createDevPage({ tests: devTests })   // → the page: /dev/tests/hero
-<DevToolbar tests={devTests} />                      // → the controls: open it, toggle versions
+export default createDevPage({ payload: getPayload({ config }), tests: devTests })   // → the page: /dev/tests/hero
+<DevToolbar tests={devTests} />                                                      // → the controls: open it, toggle versions
 ```
 
 Each `page` test is one page. The toolbar's chips set a cookie that picks the version: click Bold,

@@ -118,12 +118,13 @@ Two additions to your root layout, each a no-op in the other environment:
 
 ```tsx
 import config from '@payload-config'
+import { getPayload } from 'payload'
 import definitionFonts from '@/app/definition'
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 
 <html className={extractFonts(definitionFonts)}>
-  <head><DevFonts config={config} definition={definitionFonts} /></head>
+  <head><DevFonts payload={getPayload({ config })} definition={definitionFonts} /></head>
 </html>
 ```
 

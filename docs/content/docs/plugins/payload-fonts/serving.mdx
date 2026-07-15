@@ -16,13 +16,14 @@ development. Wire both into your root layout. Each is a no-op in the other envir
 
 ```tsx
 import config from '@payload-config'
+import { getPayload } from 'payload'
 import definitionFonts from '@/app/definition'
 import { extractFonts } from '@pro-laico/payload-fonts'
 import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 
 <html className={extractFonts(definitionFonts)}>   {/* production: next/font */}
   <head>
-    <DevFonts config={config} definition={definitionFonts} />   {/* development: runtime */}
+    <DevFonts payload={getPayload({ config })} definition={definitionFonts} />   {/* development: runtime */}
   </head>
 </html>
 ```
@@ -75,12 +76,13 @@ step.
 It renders nothing in production, and stands down in dev once `definition.ts` is populated. So running
 `payload-fonts-download` against your dev server previews the exact production path locally.
 
-`<DevFonts>` is a server component. Pass it your `@payload-config`.
+`<DevFonts>` is a server component. Pass it a Payload instance via the `payload` prop, e.g.
+`payload={getPayload({ config })}`.
 
 ## `DevFonts` props
 
 export const devFontsProps = [
-  { name: 'config', type: 'SanitizedConfig', required: true, description: `Your Payload config, the same @payload-config import you pass to getPayload.` },
+  { name: 'payload', type: 'Payload | Promise<Payload>', required: true, description: `The Payload instance (or its promise), e.g. getPayload({ config }).` },
   { name: 'definition', type: 'Record<string, { variable?: string }>', description: `The generated next/font definition. When it already has fonts, DevFonts stands down and lets next/font take over; omit it and DevFonts always renders in dev.` },
   { name: 'cssVarPrefix', type: 'string', default: "'--font-set'", description: `CSS family-variable prefix; must match the download CLI cssVariablePrefix.` },
   { name: 'fontSetSlug', type: 'string', default: "'fontSet'", description: `Slug of the font-selection global.` },

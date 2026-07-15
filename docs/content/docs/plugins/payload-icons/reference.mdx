@@ -90,7 +90,7 @@ None public. Icon-set activation happens in the admin, or through the companion
 | `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point. |
 | `extractSvgContent` | `@pro-laico/payload-icons` | Pull the inner markup out of an `svgString` to inline it in your own `<svg>`. |
 | `extractSvgProps` | `@pro-laico/payload-icons` | Parse an `svgString`'s root attributes (viewBox, etc.) onto your own `<svg>`. |
-| `Icon` | `@pro-laico/payload-icons/components/Icon` | The drop-in `<Icon name="…" />` server component (resolves through the active set). |
+| `createIcon` | `@pro-laico/payload-icons/components/Icon` | Factory that takes a Payload handle and returns the `<Icon name="…" />` server component — `const Icon = createIcon(getPayload({ config }))` (resolves through the active set). |
 | `getIconSvg` | `@pro-laico/payload-icons/cache` | Resolve one icon name to its `svgString` through the active set (server-only, memoized). |
 | `payload-icons-scan` | `@pro-laico/payload-icons` | CLI that scans source for `<Icon name>` and writes the usage manifest. |
 

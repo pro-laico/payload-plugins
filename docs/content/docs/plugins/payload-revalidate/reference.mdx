@@ -11,12 +11,33 @@ Every option is optional. Zero-config (`revalidatePlugin()`) gives every collect
 
 export const revalidateOptions = [
   {
+    name: 'enabled',
+    type: 'boolean',
+    default: 'true',
+    required: false,
+    description: 'Master switch. Set `false` to register no hooks or endpoints at all.',
+  },
+  {
+    name: 'prefix',
+    type: 'string',
+    default: "''",
+    required: false,
+    description: 'Namespaces every emitted tag (e.g. `prefix: "app:"` → `app:posts:my-slug`). Use it to isolate tags when two Payload apps share a cache.',
+  },
+  {
     name: 'collections',
-    type: 'Record<string, { lists?: Record<string, string[] | { fields: string[] }> }>',
+    type: 'Record<string, { idField?: string | false; lists?: Record<string, string[] | { fields: string[] }>; extraTags?: string[] } | false>',
     default: '{}',
     required: false,
     description:
-      "Per-collection list scopes. Each scope gives a list surface its own tag and declares which fields reorder or filter it. A scope is `name: [fields]`; the longer `name: { fields: [...] }` form is accepted too. Omit it and every collection still gets doc tags — you just get one bare list tag per collection instead of scoped ones.",
+      "Per-collection config. `lists` declares list scopes — each scope gives a list surface its own tag and names the fields that reorder or filter it (`name: [fields]`, or the longer `name: { fields: [...] }`). `idField` (default `'slug'` when a `slug` field exists, otherwise id-keyed only) sets the field for the alias doc tag (`posts:my-slug`). `extraTags` adds fixed tags to every doc. Set a slug to `false` to opt the collection out entirely. Omit it and every collection still gets doc tags — just one bare list tag per collection instead of scoped ones.",
+  },
+  {
+    name: 'globals',
+    type: 'Partial<Record<string, false>>',
+    default: '{}',
+    required: false,
+    description: 'Opt a global out of revalidation by setting its slug to `false`. Every global is tracked by default.',
   },
   {
     name: 'rules',
@@ -35,24 +56,19 @@ export const revalidateOptions = [
       "Force the dependency-map observation and dev warnings on in production. By default they run in development only. With `observe: true` in production, the map endpoints additionally require an authenticated Payload user.",
   },
   {
-    name: 'walk.maxTags',
-    type: 'number',
-    default: '64',
+    name: 'endpoint',
+    type: 'boolean',
+    default: 'true',
     required: false,
-    description:
-      'Caps how many tags the bake-in walk may add to one entry (Next.js allows 128 tags per entry). Capped reads are flagged in the dev map.',
-  },
-  {
-    name: 'idField',
-    type: 'string',
-    default: 'slug',
-    required: false,
-    description:
-      'Field used for the alias doc tag (`posts:my-slug`). A collection with no such field gets id-keyed tags only.',
+    description: 'Registers the dependency-map endpoints at `/api/revalidate-map`. Set `false` to skip them.',
   },
 ]
 
 <ConfigOptions items={revalidateOptions} />
+
+<Callout type="info">
+  **`idField` is per-collection, not top-level.** Set it under `collections: { posts: { idField: 'uid' } }` (or on the collection's `custom.revalidate`), not as a `revalidatePlugin()` option. Likewise **`walk.maxTags`** (default `64` — caps how many tags the bake-in walk adds to one entry; Next.js allows 128) is a **per-read** option you pass to a finder / `cacheDoc`, not a plugin option. Capped reads are flagged in the dev map.
+</Callout>
 
 <Callout type="info">
   Finder defaults, baked in so you never repeat them: `depth: 0` (references stay

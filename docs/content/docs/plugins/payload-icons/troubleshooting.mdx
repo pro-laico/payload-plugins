@@ -9,17 +9,20 @@ Most `payload-icons` problems come down to a set that isn't active, a stroke-dra
 | --- | --- | --- |
 | **Fallback warning glyph instead of your icon** | The active set doesn't resolve the `name` you passed. | Check three things in order: (1) a set is **active**, (2) it's **published** (not just saved as a draft), (3) the row **name** exactly matches the `name` you pass to `<Icon>` (both are kebab-cased). A name with no match always renders the fallback, never nothing. |
 | **Icon renders as a solid blob** (an outline fills in — a circle becomes a disk) | The uploaded SVG is stroke-drawn (`fill="none" stroke="…"`, Lucide/Feather-style). The optimizer themes filled glyphs by rewriting their colors to `currentColor`, so a stroke icon's enclosed shapes fill solid. | Upload solid **fill-based** glyphs instead (Noun Project-style filled paths). The upload detects the stroke signature and flags it in the doc's `optimized` report — check that field on the `icon` doc. |
-| **`@payload-config` resolution error at build**, from a published package | `<Icon>` fell back to the `@payload-config` alias because it rendered before anything initialized Payload, and the alias isn't transpiled from an installed package. | Add `transpilePackages: ['@pro-laico/payload-icons']` to `next.config`. |
 | **Blank admin icon preview** (icon-preview component missing) | The preview components register by string path and the import map is stale. | Run `pnpm payload generate:importmap`, then restart the dev server. |
 | **Requested icons panel is empty in production** | The static scan reads your source, which isn't on disk at runtime. | Run `payload-icons-scan` in your build to write `icon-usage-manifest.json` for the panel to read. |
 | **SVG upload rejected** | Payload blocks SVG uploads by default (they're on its restricted-file-types list). | Nothing to do — the `icon` collection sanitizes every file and opts in automatically via `upload.allowRestrictedFileTypes`. If you overrode `upload`, keep that flag set. |
 
-## `@payload-config` resolution, in detail
+## Building the `<Icon>` component
 
-`<Icon>` resolves your config from the plugin itself, stashed when Payload boots — normally there's nothing to wire. It only reaches for the `@payload-config` alias when it can render before *anything* has initialized Payload. From a published package that alias needs transpiling:
+`<Icon>` is created from the `createIcon` factory, which takes a live Payload handle — the package never self-resolves your config. Build it once and import that module wherever you render icons:
 
-```ts title="next.config.ts"
-transpilePackages: ['@pro-laico/payload-icons']
+```ts title="src/components/Icon.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createIcon } from '@pro-laico/payload-icons/components/Icon'
+
+export const Icon = createIcon(getPayload({ config }))
 ```
 
 See [`<Icon>`](/docs/plugins/payload-icons/using-icons#icon) for the full component contract.

@@ -11,9 +11,9 @@ You don't need any of this to use the plugin — it's here for when you're curio
   options on `config.custom` (`payloadSeed`, `payloadImages`, `payloadIcons`, `payloadFonts`,
   `payloadMux`). The snapshot builder reads those markers off `payload.config`. No plugin imports,
   so nothing else is a dependency; third-party setups just show fewer panels.
-- **The dev pages resolve Payload themselves.** `createDevPage` reads the config from a
-  `globalThis` stash the plugin's `onInit` fills (falling back to the `@payload-config` alias),
-  so the drop-in file passes no config.
+- **The dev page file passes Payload in.** `createDevPage({ payload })` takes an app-supplied
+  Payload handle (e.g. `getPayload({ config })`) — the plugin registers no `onInit` and stashes no
+  config on `globalThis`.
 - **Seeding goes through the seed plugin's own endpoint.** The seed card and toolbar POST to
   `/api/seed`: same gate (`ENABLE_SEED=true` + a logged-in user), same `{ error, issues }`
   responses, surfaced inline.
