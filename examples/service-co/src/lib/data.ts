@@ -16,9 +16,9 @@ const { cacheDoc, cacheGlobal, cacheIds } = createCacheHelpers(db)
 // Every getter reads at depth 0, so relationship values are ids at runtime — but the generated
 // types stay depth-agnostic (`number | Doc`). These projections are the one honest boundary
 // between the two: they narrow each doc to the app's slim contract types field by field.
-function relId(v: RelId | { id: RelId }): RelId
-function relId(v: RelId | { id: RelId } | null | undefined): RelId | null
-function relId(v: RelId | { id: RelId } | null | undefined): RelId | null {
+function extractID(v: RelId | { id: RelId }): RelId
+function extractID(v: RelId | { id: RelId } | null | undefined): RelId | null
+function extractID(v: RelId | { id: RelId } | null | undefined): RelId | null {
   return typeof v === 'object' && v !== null ? v.id : (v ?? null)
 }
 
@@ -28,8 +28,8 @@ const toService = (doc: ServiceDoc): Service => ({
   slug: doc.slug,
   summary: doc.summary,
   order: doc.order,
-  icon: relId(doc.icon),
-  image: relId(doc.image),
+  icon: extractID(doc.icon),
+  image: extractID(doc.image),
 })
 
 const toProject = (doc: ProjectDoc): Project => ({
@@ -42,10 +42,10 @@ const toProject = (doc: ProjectDoc): Project => ({
   summary: doc.summary,
   description: doc.description,
   featured: doc.featured,
-  coverImage: relId(doc.coverImage),
-  gallery: doc.gallery?.map((item) => ({ image: relId(item.image) })) ?? null,
-  video: relId(doc.video),
-  services: doc.services?.map((service) => relId(service)) ?? null,
+  coverImage: extractID(doc.coverImage),
+  gallery: doc.gallery?.map((item) => ({ image: extractID(item.image) })) ?? null,
+  video: extractID(doc.video),
+  services: doc.services?.map((service) => extractID(service)) ?? null,
 })
 
 const toTeamMember = (doc: Team): TeamMember => ({
@@ -54,7 +54,7 @@ const toTeamMember = (doc: Team): TeamMember => ({
   role: doc.role,
   bio: doc.bio,
   order: doc.order,
-  photo: relId(doc.photo),
+  photo: extractID(doc.photo),
 })
 
 const toTestimonial = (doc: TestimonialDoc): Testimonial => ({
@@ -62,16 +62,16 @@ const toTestimonial = (doc: TestimonialDoc): Testimonial => ({
   quote: doc.quote,
   author: doc.author,
   company: doc.company,
-  project: relId(doc.project),
+  project: extractID(doc.project),
 })
 
 const toSiteSettings = (doc: SiteSetting): SiteSettings => ({
   companyName: doc.companyName,
   tagline: doc.tagline,
   description: doc.description,
-  heroImage: relId(doc.heroImage),
-  showreel: relId(doc.showreel),
-  featuredProject: relId(doc.featuredProject),
+  heroImage: extractID(doc.heroImage),
+  showreel: extractID(doc.showreel),
+  featuredProject: extractID(doc.featuredProject),
   contact: doc.contact ?? null,
 })
 
