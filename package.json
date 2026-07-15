@@ -1,6 +1,6 @@
 {
   "name": "payload-plugins",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "A monorepo of composable @pro-laico/* Payload CMS plugins, test apps, and documentation.",
   "license": "MIT",

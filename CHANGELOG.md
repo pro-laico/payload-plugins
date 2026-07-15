@@ -7,47 +7,125 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-15
+
+A `@pro-laico/payload-images` release. The plugin gains a read-side render contract — you
+declare the render on the fetch and get a paintable placeholder and ready-to-spread doc back —
+plus named presets, a per-image variant cap, smart prewarming, and an instant nearby-quality
+fallback that together make a public transform endpoint both fast and bounded. Its public surface
+is cut roughly in half. `@pro-laico/payload-revalidate` adds one-call cached finders. Several
+breaking changes; all are pre-1.0 minor and every one has a migration path — see **Upgrade notes**.
+
+### Highlights
+
+#### payload-images: the read-side render contract
+
+Declare the render where you fetch, and the plugin does the rest. `createImageFor` seeds a
+fetch helper once with your app's Payload handle (`createImageFor(getPayload({ config }))` — the
+promise is fine as-is); then `imageFor(id).aspectRatio('16:9').blur('md').fetch()` runs the
+declared read and resolves a render-ready doc (`{ id, alt, src, srcset, placeholder }`) that
+spreads straight into `<ResponsiveImage>`. A whole render can seed the chain in one go
+(`imageFor(id, { image, blur })`), and chains are immutable, so a partially-applied one can be
+shared and branched. The virtual placeholder field it feeds is now named `placeholder` (was
+`croppedBlurHash`) and always answers a declared render with a finished, paintable data URI.
+
+#### payload-images: presets, a per-image variant cap, and eager generation
+
+A per-image `variantLimit` (default 200; project default via `imagesPlugin({ variantLimit })`)
+closes the public endpoint's unbounded-storage vector — past the cap a new freeform size is served
+from a nearby existing variant or generated-but-not-stored, so a public URL can't accumulate
+unbounded files. **Presets** are the exemption: named, cap-exempt variants
+(`imagesPlugin({ presetTemplates })`, a default `og` 1200×630 ships) that editors toggle onto
+images by name in a new admin panel, seed as plain data, and serve via
+`/api/img/:id?preset=<name>` (or `getImageUrl(doc, { preset: 'og' })`). Presets honor exact
+dimensions and are pre-generated on upload / file / focal change, so a cold social crawler never
+races generation. New `./admin/presetManager` export.
+
+#### payload-images: prewarming + instant nearby-quality fallback
+
+Two features that make transform cache misses rare, then instant. **Smart prewarming**
+(`prewarm: true | {...}`, default off) learns which renders the site actually serves — browser-chosen
+widths, real fit/quality/format, recorded off the serving path into a hidden
+`image-render-profiles` collection — and pre-generates exactly those variants for new /
+file-replaced / re-focused images via a deferred, idempotent `imagesPrewarm` Payload Job (budgeted,
+deduped against organic traffic, enqueued 30s out so purges land first). Ships an opt-in `autoRun`
+cron and a `payload images:prewarm` CLI (`--now` for runner-less bulk warms). The **nearby-quality
+fallback** (default on) covers the residual misses: a miss with a same-geometry variant already
+generated (identical crop, any quality/width/format) serves those bytes instantly with
+`Cache-Control: no-store` while the exact variant generates in the background, so the accurate
+image takes over on the very next request. Disable with `transform: { fallback: false }`.
+
+#### payload-revalidate: one-call cached finders
+
+`createCacheHelpers` gains `findDoc`, `findDocByID`, `findIds`, and `findGlobal` — each runs the
+Payload query AND tags the entry in one call inside your `'use cache'` getter, shrinking a getter
+body to a line and typing the collection once. Atomic defaults are baked in (`depth: 0`,
+`overrideAccess: false`, errors → `null`; `findIds` forces `select: {}` so an id-list can never
+cache content) with full local-API passthrough, results typed from your generated `payload-types`,
+one `draft` flag driving both fetch and `:draft` tag variants, and pagination meta from `findIds`
+without a second query. `user`/`req` are refused (types + runtime) — a shared cache entry must
+never hold a requester-scoped read. The low-level `cacheDoc` / `cacheIds` / `cacheGlobal`
+primitives stay exported for getters the finders can't express.
+
 ### Added
 
-- `@pro-laico/payload-revalidate` — cached finders on `createCacheHelpers`: `findDoc`,
-  `findDocByID`, `findIds`, `findGlobal` run the Payload query AND tag the entry in one call
-  inside your `'use cache'` getter, so a getter body shrinks to one line and the collection is
-  typed once. Atomic defaults are baked in — `depth: 0`, `overrideAccess: false`, errors → `null`,
-  and `findIds` forces `select: {}` so an id-list can never accidentally cache content — with full
-  local-API passthrough (`where`, `sort`, `locale`, `select`, `populate`, `context`, …), returns
-  typed from your generated `payload-types`, a single `draft` flag driving both the fetch and the
-  `:draft` tag variants, and pagination meta returned by `findIds` without a second query.
-  `user`/`req` are refused (types + runtime) — a shared cache entry must never hold a
-  requester-scoped read. The low-level `cacheDoc` / `cacheIds` / `cacheGlobal` primitives stay
-  exported for getters the finders can't express.
-
+- `@pro-laico/payload-images` — `createImageFor` fetch helper, per-image `variantLimit` +
+  cap-exempt named presets (`./admin/presetManager`), smart prewarming (`prewarm`, `autoRun`
+  cron, `payload images:prewarm` CLI), and the nearby-quality transform fallback. See Highlights.
+- `@pro-laico/payload-revalidate` — one-call cached finders (`findDoc` / `findDocByID` /
+  `findIds` / `findGlobal`) on `createCacheHelpers`. See Highlights.
 - `@pro-laico/payload-revalidate` — declared list scopes accept a `string[]` shorthand:
   `lists: { featured: ['featured', 'publishedAt'] }`. The `{ fields: [...] }` object form still
   works and remains the extension slot.
 
-### Removed
-
-- **BREAKING** `@pro-laico/payload-revalidate` — internal shapes are no longer exported from the
-  package root: `createTags`, `readRevalidateMarker`, and the types `PayloadRevalidateMarker`,
-  `ResolvedRevalidateOptions`, `CollectionSettings`. Build raw tags with `tagsFor(payload)`
-  (prefix-safe) — though the `revalidateDoc`/`revalidateList`/`revalidateGlobal` busters are
-  lane-aware and almost always the better tool. _Migration: replace `createTags(prefix)` with
-  `tagsFor(payload)`; nothing else had a supported use._
-
 ### Changed
+
+- **BREAKING** `@pro-laico/payload-images` — the public surface is cut roughly in half. What
+  examples and docs teach is untouched (`imagesPlugin`, `createImageFor`, `RESPONSIVE_IMAGE_SELECT`,
+  `<ResponsiveImage>`, `getImageUrl`, `buildSrcset`); the removed names were internals leaking out:
+  - `transform` config loses its duplicate/dead knobs — `transform.presetTemplates` (silently
+    ignored; the top-level option always won), `transform.variantLimit` (duplicated the top-level
+    option), `transform.sourceSlug` (a near-alias of `extendCollection`), and `transform.variantSlug`
+    (renamed an internal cache collection). Use the top-level `variantLimit` / `presetTemplates` /
+    `extendCollection`; the cache collection is always `generated-images`.
+  - `buildSrcset` now takes an id **or a populated doc** and derives the width cap + cache-busting
+    `v` token itself — `buildSrcset(doc, { aspectRatio: '16:9' })` is the whole call (returns `null`
+    for an empty resource). The `sourceWidth` option and the lower-level pieces it made you thread
+    (`buildVariantUrl`, `deriveVersion`, `stepWidths`, `DEFAULT_TRANSFORM_API_PATH`, `VersionSource`)
+    leave `/utils/urls`.
+  - `focalUI` absorbs `previewRatios` (`focalUI: { previewRatios: [...] }` replaces the top-level
+    option); an array `pixelStep`'s widths now pass the endpoint's snap exactly, dropping the
+    "multiples of 50" caveat and the `transform.dimensionStep` escape hatch.
+  - The main entry stops exporting placeholder/preset internals nobody consumed (`coverCropWindow`,
+    `cropBlurhashCoefficients`, `blurhashToPngDataUri`, `BLURHASH_QUALITIES`, `WEBP_QUALITIES`,
+    `DEFAULT_BLURHASH_QUALITY`, `DEFAULT_PRESET_TEMPLATES`, `DEFAULT_VARIANT_LIMIT`,
+    `IMAGE_RENDER_PROFILES_SLUG`, and the types `CropWindow`, `BlurhashRequest`, `BlurhashQuality`,
+    `WebpQuality`, `PrewarmReason`, `ImageGetter`, `PresetTemplate` — use `PresetSpec`). The render
+    contract + palette types (`PlaceholderQuality` / `PlaceholderFormat` / `ImagePalette` /
+    `PaletteSwatch`) and `PREWARM_TASK_SLUG` stay; `ResponsiveImage` is now a named export only.
+
+    _Migrate by:_ replacing any use of the removed knobs/exports with the top-level options and
+    `PresetSpec` above, and importing `ResponsiveImage` by name.
+
+- **BREAKING** `@pro-laico/payload-images` — the virtual `croppedBlurHash` field is now
+  `placeholder` (the old name matched neither what it returns — a finished data URI for declared
+  renders — nor the `<ResponsiveImage>` prop it feeds). The field is virtual, so nothing is stored
+  under the old name. _Migrate by:_ updating any code reading `doc.croppedBlurHash` (selects via
+  `RESPONSIVE_IMAGE_SELECT` already carry the new name), then regenerating your payload types.
 
 - **BREAKING** `@pro-laico/payload-images` — the default `pixelStep` is now a conventional width
   ladder (`[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`, next/image's deviceSizes) instead of a
-  dense 50px grid: a wide original now emits ~8 `srcset` URLs per read instead of ~82 (~8KB of
-  string), and the stored-variant space per image shrinks accordingly. Freeform widths still snap
-  to the 50px anti-DoS grid. Pass `pixelStep: 50` to restore the old dense behavior.
-  _Migration: none required — old variant files remain valid; new reads simply request ladder widths._
+  dense 50px grid: a wide original emits ~8 `srcset` URLs per read instead of ~82, and the
+  stored-variant space per image shrinks accordingly. Freeform widths still snap to the 50px
+  anti-DoS grid. _Migrate by:_ nothing required — old variant files remain valid; pass
+  `pixelStep: 50` to restore the old dense behavior.
 
 - **BREAKING** `@pro-laico/payload-images` — replacing an image's bytes under the same filename
   (`overwriteExistingFiles`, the admin crop tool) now purges stale variants and busts caches:
   `filesize`/`width`/`height` participate in the variant identity, the cache key, and the `v=`
-  version token in lockstep. _Migration: existing cache keys and version tokens change once on
-  upgrade — variants regenerate on first request (or next prewarm) and CDN caches bust once._
+  version token in lockstep. _Migrate by:_ nothing required — existing cache keys and version
+  tokens change once on upgrade; variants regenerate on first request (or next prewarm) and CDN
+  caches bust once.
 
 - `@pro-laico/payload-images` — `generated-images` read access now requires an authenticated user
   AND defers to the source collection's read access (re-rooted through the `source` relationship),
@@ -55,130 +133,67 @@ packages share one lockstep version.
   previously any logged-in user could read every variant. Override stays available via
   `generatedImagesOverrides.access.read`.
 
-### Fixed
+### Removed
 
-- `@pro-laico/payload-images` — full audit-findings pass (item-by-item record mirrored in the
-  project-management findings): the fallback picker no longer serves cross-crop-family or
-  hotspot-mismatched stand-ins (ratio-drift gate, persisted `windowed` render path, webp only for
-  webp-capable clients, achievable-width floor for cropped sources, png-quality tie-break);
-  transform cache misses no longer hold original Buffers while queued (read moved inside the Sharp
-  gate) and same-key requests coalesce across the endpoint AND the prewarm job, staying coalesced
-  through the deferred-persist window; the prewarm recorder no longer drops or double-counts
-  observations under concurrent flushes; a save landing while a pending prewarm job is being picked
-  up re-defers that job instead of stranding the new identity; `prewarm.formats` is validated
-  against `transform.formats` (unservable entries warn at boot, explicit `[]` honored);
-  `buildVariantUrl` accepts numeric ids and never emits `h=0`; `imagesOverrides`/
-  `generatedImagesOverrides` can no longer desync internals via `slug`; `extendCollection` throws a
-  plugin-attributed error on field-name collisions; `imageFor()` resolves `null` instead of
-  rejecting when the plugin isn't registered; the SSRF guard catches IPv4 addresses smuggled in
-  IPv6 literals (`::ffff:169.254.169.254` and hex/compat forms); `readPluginMarker`, the marker
-  types, and both collection slugs are now exported.
-
-### Added
-
-- `@pro-laico/payload-images` — per-image variant cap + guaranteed presets, closing the public
-  endpoint's unbounded-storage vector. Each image has a `variantLimit` (default 200, project
-  default via `imagesPlugin({ variantLimit })`): past the cap a new freeform size is served from
-  a nearby existing variant, or generated correctly but not stored, so a public URL can't
-  accumulate unbounded files/rows. **Presets** are the exemption — named, cap-exempt variants
-  (`imagesPlugin({ presetTemplates })`, a default `og` 1200×630 ships) that editors toggle onto
-  images by name (or add custom ones) in a new admin panel, seed as plain data, and serve via
-  `/api/img/:id?preset=<name>` (or `getImageUrl(doc, { preset: 'og' })`). Presets honor exact
-  dimensions (no snap grid) and are eagerly pre-generated on upload / file / focal change, so a
-  cold social crawler never races generation. New `./admin/presetManager` export.
-
-- `@pro-laico/payload-images` — nearby-quality fallback (default on): a transform cache miss
-  with a same-geometry variant already generated (same fit + aspect ratio — identical crop —
-  any quality/width/format) serves those bytes instantly instead of blocking on Sharp, while
-  the exact variant generates in the background. The stand-in is served with
-  `Cache-Control: no-store` (browser and CDN alike never cache it, and it is never persisted
-  under the exact key), so the accurate image takes over on the very next request. Disable
-  with `transform: { fallback: false }`. Pairs with prewarming: prewarm makes misses rare,
-  the fallback makes the residual ones instant.
-
-- `@pro-laico/payload-images` — smart prewarming (`prewarm: true | {...}`, default off): the
-  transform endpoint learns which renders the site actually serves (browser-chosen widths,
-  real fit/quality/format — recorded off the serving path into a hidden
-  `image-render-profiles` collection, buffered and throttled), and new / file-replaced /
-  re-focused images get exactly those variants pre-generated by a deferred, idempotent
-  `imagesPrewarm` Payload Job — budgeted (`maxVariantsPerImage`, top observed widths per
-  profile), deduped by cache key against organic traffic, enqueued 30s out so purges land
-  first. Running jobs stays the app's business (plus an opt-in `autoRun` cron and a
-  `payload images:prewarm` CLI with `--now` for runner-less bulk warms). Config `seeds` cover
-  cold start; a broken jobs setup never blocks an upload.
-
-- `@pro-laico/payload-images` — `createImageFor`, a Sanity-style fetch helper: seed it once
-  with your app's Payload handle (`createImageFor(getPayload({ config }))` — the promise is
-  fine as-is), then `imageFor(id).aspectRatio('16:9').blur('md').fetch()` runs the declared
-  read for you and resolves the render-ready doc (`{ id, alt, src, srcset, placeholder }`),
-  ready to spread into `<ResponsiveImage>`. A whole render can seed the chain in one go
-  (`imageFor(id, { image, blur })`), and chains are immutable, so partially-applied ones can
-  be shared and branched.
-
-### Changed
-
-- **BREAKING** `@pro-laico/payload-images` — the public surface is cut roughly in half so the
-  package is easier to hold in your head. What examples and docs actually teach is untouched
-  (`imagesPlugin`, `createImageFor`, `RESPONSIVE_IMAGE_SELECT`, `<ResponsiveImage>`,
-  `getImageUrl`, `buildSrcset`); everything else was internals leaking out:
-
-  - `transform` config loses its duplicate/dead knobs. `transform.presetTemplates` was silently
-    ignored (the top-level option always won — a misconfig trap, now impossible),
-    `transform.variantLimit` duplicated the top-level option, `transform.sourceSlug` was a
-    confusing near-alias of `extendCollection`, and `transform.variantSlug` renamed an internal
-    cache collection nobody needs to rename. Use the top-level `variantLimit` / `presetTemplates`
-    / `extendCollection`; the cache collection is always `generated-images`.
-  - An **array `pixelStep`'s widths now pass the endpoint's snap exactly** (the snap considers
-    the ladder alongside the 50px grid — the variant space stays finite). The "keep ladder widths
-    on multiples of 50" caveat and the `transform.dimensionStep` escape hatch are gone; a numeric
-    `pixelStep` still sets the grid directly.
-  - `focalUI` absorbs `previewRatios`: `focalUI: { previewRatios: [...] }` replaces the
-    top-level option.
-  - `buildSrcset` now takes an id **or a populated doc** (like `getImageUrl`) and derives the
-    width cap + cache-busting `v` token itself — `buildSrcset(doc, { aspectRatio: '16:9' })` is
-    the whole call (returns `null` for an empty resource). The `sourceWidth` option is gone, and
-    the lower-level pieces it made you thread (`buildVariantUrl`, `deriveVersion`, `stepWidths`,
-    `DEFAULT_TRANSFORM_API_PATH`, `VersionSource`) leave `/utils/urls`.
-  - The main entry stops exporting placeholder/preset internals nobody consumed:
-    `coverCropWindow`, `cropBlurhashCoefficients`, `blurhashToPngDataUri`, `BLURHASH_QUALITIES`,
-    `WEBP_QUALITIES`, `DEFAULT_BLURHASH_QUALITY`, `DEFAULT_PRESET_TEMPLATES`,
-    `DEFAULT_VARIANT_LIMIT`, `IMAGE_RENDER_PROFILES_SLUG`, and the types `CropWindow`,
-    `BlurhashRequest`, `BlurhashQuality`, `WebpQuality`, `PrewarmReason`, `ImageGetter`,
-    `PresetTemplate` (use `PresetSpec` — it was an alias). The virtual `placeholder` field
-    already serves every declared render, so hand-rolling with these was never needed.
-    `PREWARM_TASK_SLUG` stays (for queueing the job yourself), as do `PlaceholderQuality` /
-    `PlaceholderFormat` / `ImagePalette` / `PaletteSwatch` (the render contract + stored palette
-    types). `ResponsiveImage` is a named export only (the default export is gone).
+- **BREAKING** `@pro-laico/payload-revalidate` — internal shapes are no longer exported from the
+  package root: `createTags`, `readRevalidateMarker`, and the types `PayloadRevalidateMarker`,
+  `ResolvedRevalidateOptions`, `CollectionSettings`. _Migrate by:_ replacing `createTags(prefix)`
+  with `tagsFor(payload)` (prefix-safe); the lane-aware `revalidateDoc` / `revalidateList` /
+  `revalidateGlobal` busters are almost always the better tool, and nothing else had a supported use.
 
 ### Fixed
+
+- `@pro-laico/payload-images` — full audit-findings pass: the fallback picker no longer serves
+  cross-crop-family or hotspot-mismatched stand-ins (ratio-drift gate, persisted `windowed` render
+  path, webp only for webp-capable clients, achievable-width floor for cropped sources, png-quality
+  tie-break); transform cache misses no longer hold original Buffers while queued and same-key
+  requests coalesce across the endpoint AND the prewarm job through the deferred-persist window;
+  the prewarm recorder no longer drops or double-counts observations under concurrent flushes; a
+  save landing while a pending prewarm job is picked up re-defers that job instead of stranding the
+  new identity; `prewarm.formats` is validated against `transform.formats`; `buildVariantUrl`
+  accepts numeric ids and never emits `h=0`; `imagesOverrides` / `generatedImagesOverrides` can no
+  longer desync internals via `slug`; `extendCollection` throws a plugin-attributed error on
+  field-name collisions; `imageFor()` resolves `null` instead of rejecting when the plugin isn't
+  registered; the SSRF guard catches IPv4 addresses smuggled in IPv6 literals
+  (`::ffff:169.254.169.254` and hex/compat forms); `readPluginMarker`, the marker types, and both
+  collection slugs are now exported.
 
 - `@pro-laico/payload-images` — a read that declared an **empty** render (`context: { image: {} }`,
-  or a natural-ratio render with no `blur`) got the raw `sm` blurhash as its `placeholder`
-  instead of a finished data URI; `<ResponsiveImage>` then painted the hash as a CSS `url()`,
-  firing a garbage request per image (`GET /LJJtSD~p…` → 404). Any declared render now always
-  answers with a paintable data URI (the raw hash stays for truly undeclared reads and
-  `blur: { format: 'hash' }`), and `<ResponsiveImage>` refuses to paint a non-URI placeholder.
+  or a natural-ratio render with no `blur`) got the raw `sm` blurhash as its `placeholder` instead
+  of a data URI; `<ResponsiveImage>` then painted the hash as a CSS `url()`, firing a garbage
+  request per image (`GET /LJJtSD~p…` → 404). Any declared render now answers with a paintable data
+  URI, and `<ResponsiveImage>` refuses to paint a non-URI placeholder.
 
 - `@pro-laico/payload-images` — the admin Presets panel read the `presets` array through
-  `useField(path)`, whose value on a loaded doc is the row *count*, not the rows: saved presets
-  were invisible after reload (impossible to remove, easy to double-add). The panel now reads
-  and mutates rows through the form's rows API (`useAllFormFields` + `addFieldRow` /
-  `removeFieldRow`), so the add → save → reload → remove loop round-trips.
+  `useField(path)`, whose value on a loaded doc is the row *count*, not the rows: saved presets were
+  invisible after reload. The panel now reads and mutates rows through the form's rows API
+  (`useAllFormFields` + `addFieldRow` / `removeFieldRow`), so add → save → reload → remove
+  round-trips.
 
 - All packages — every editor-facing collection (Images, Icons, Icon sets, Fonts, Mux videos) and
-  the internal asset caches (`generated-images`, `image-render-profiles`, optimized/original fonts,
-  icon-request telemetry) now set `admin.enableListViewSelectAPI: true`, so the list view queries
+  the internal asset caches now set `admin.enableListViewSelectAPI: true`, so the list view queries
   only the columns it renders instead of whole documents — a real win on the large variant-cache
-  tables. Custom thumbnail cells that read non-column fields keep working via `forceSelect`
-  (`@pro-laico/payload-mux` force-selects `playbackOptions`; upload thumbnails are handled by
-  Payload automatically).
+  tables. Custom thumbnail cells that read non-column fields keep working via `forceSelect`.
 
-- **BREAKING** `@pro-laico/payload-images` — the virtual `croppedBlurHash` field is now
-  `placeholder` (the old name matched neither what it returns — a finished data URI for
-  declared renders — nor the `<ResponsiveImage>` prop it feeds; the read-contract doc now
-  spreads straight into the component). The field is virtual, so nothing is stored under the
-  old name: update selects (`RESPONSIVE_IMAGE_SELECT` already carries the new name) and any
-  code reading `doc.croppedBlurHash`, then regenerate your payload types.
+### Docs
+
+- New docs-wide `<Flow>` process diagrams — a read-only React Flow canvas (data-driven nodes/edges,
+  themed light/dark, pan/pinch-zoom) with 10 flows across 6 plugins where the docs narrate a
+  process (transform pipeline, revalidate read/write loops, font subsetting, seed sequence, …).
+- Readability refactor — split the plugin docs into focused pages with a per-plugin Reference and a
+  shared Conventions page.
+- Accuracy audit — fixed 22 doc/source mismatches across 5 plugins.
+
+### Upgrade notes
+
+1. Run `pnpm install` (or your package manager's equivalent) to pull the new versions.
+2. `@pro-laico/payload-images`: rename any `doc.croppedBlurHash` reads to `doc.placeholder`, import
+   `ResponsiveImage` as a named export, and swap the removed `transform`/`buildSrcset` knobs and
+   internal exports for the top-level options and `PresetSpec` (see Changed), then **regenerate your
+   payload types**.
+3. `@pro-laico/payload-revalidate`: replace `createTags(prefix)` with `tagsFor(payload)`.
+4. No data migration is required — existing image variants stay valid; a byte-replaced image's
+   caches bust once and its variants regenerate on first request.
 
 ## [0.2.0] - 2026-07-09
 
