@@ -1,118 +1,14 @@
 ---
-title: "Configuration"
-description: "Every plugin option, the collections payload-images registers, extending an existing upload collection, and seeding."
+title: "Collections"
+description: "The collections the plugin registers, how to extend your own upload collection, and how images seed natively."
 ---
-
-`imagesPlugin(options?)` is the single entry point: one call registers the collections, the
-transform + purge endpoints, and the admin UI. It's zero-config — everything below is a knob you
-can turn later.
-
-## Plugin options
-
-export const options = [
-  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, registers nothing. This is "not installed", not "paused": on SQL adapters, turning it off for an existing project produces a migration that drops the image tables and their data.` },
-  { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection (you own its upload config).` },
-  { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key, not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
-  { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
-  { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
-  {
-    name: 'transform',
-    type: 'TransformEndpointConfig | false',
-    default: '{}',
-    description: `Config for the on-demand transform + purge endpoints. Pass false to register neither.`,
-    options: [
-      { name: 'cdnCacheControl', type: 'boolean', default: 'true', description: `Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).` },
-      { name: 'maxDimension', type: 'number', default: '4096', description: `Hard ceiling on either output dimension.` },
-      { name: 'defaultQuality', type: 'number', default: '75', description: `Encode quality used when a request omits q.` },
-      { name: 'qualityRange', type: '[number, number]', default: '[40, 95]', description: `Allowed quality range; requested values clamp into it.` },
-      { name: 'defaultFormat', type: 'Format', default: "'auto'", description: `Output format when a request omits fmt (auto negotiates from Accept).` },
-      { name: 'formats', type: 'Format[]', default: "['auto','avif','webp','jpeg','png']", description: `Output formats the endpoint may emit.` },
-      { name: 'preferAvif', type: 'boolean', default: 'false', description: `Auto-negotiate AVIF when accepted. Off by default: AVIF encodes far slower, so fmt=auto serves WebP for a fast cold path (AVIF stays available on explicit fmt=avif).` },
-      { name: 'maxInputPixels', type: 'number', default: '100000000', description: `Max source pixels Sharp will decode: a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).` },
-      { name: 'maxConcurrency', type: 'number', default: 'cpus - 1', description: `Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY).` },
-      { name: 'sharpConcurrency', type: 'number', default: '1', description: `Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.` },
-      { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
-    ],
-  },
-  { name: 'focalUI', type: 'boolean | { previewRatios?: string[] }', default: 'true', description: `Render the focal-point picker + ratio-preview field and the preset manager panel (preset toggles, cached-variant list, purge button, per-image variant cap). The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']).` },
-  { name: 'virtualFields', type: 'boolean', default: 'true (false when transform: false)', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population. Defaults off when the transform endpoint is disabled (the URLs would 404); pass true explicitly to force them anyway.` },
-  { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
-  { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
-  { name: 'folders', type: 'boolean', default: 'false', description: `Enable Payload's native folder organization on the managed collection (the created images, or the extendCollection target) so editors can organize a large library.` },
-  { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
-  { name: 'prewarm', type: 'boolean | PrewarmOptions', default: 'false', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. true = zero-config defaults; the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue. Default off — enabling adds the hidden image-render-profiles collection (a schema change), the imagesPrewarm jobs task, and the images:prewarm CLI.` },
-  { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
-  { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg) and thumbnail (160×160 cover webp — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
-]
-
-The **Reference** tab is the interactive view (`transform` expands to its nested options);
-**TypeScript** is the same shape in code, every option at its default.
-
-<Tabs items={['Reference', 'TypeScript']}>
-
-<Tab value="Reference" className="p-0!">
-
-<ConfigOptions items={options} />
-
-</Tab>
-
-<Tab value="TypeScript">
-
-```ts
-import { imagesPlugin } from '@pro-laico/payload-images'
-
-// Every option at its default. This is the zero-config behaviour, written out.
-imagesPlugin({
-  enabled: true,
-  // extendCollection: 'media',           // optional, no default: add the pipeline to an existing collection instead of creating `images`
-  // imagesOverrides: { /* … */ },          // optional, no default: deep-merged onto the images collection
-  // generatedImagesOverrides: { /* … */ }, // optional, no default: merged onto the variant-cache collection
-  pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // or a number, e.g. 50, for a dense grid
-  transform: {
-    cdnCacheControl: true,
-    maxDimension: 4096,
-    defaultQuality: 75,
-    qualityRange: [40, 95],
-    defaultFormat: 'auto',
-    formats: ['auto', 'avif', 'webp', 'jpeg', 'png'],
-    preferAvif: false,
-    maxInputPixels: 100_000_000,
-    // maxConcurrency: cpus - 1,  // default (or IMAGES_TRANSFORM_CONCURRENCY)
-    sharpConcurrency: 1,
-    fallback: true,
-  },
-  focalUI: true, // or { previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'] }
-  virtualFields: true,
-  localizeAlt: false,
-  mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],
-  folders: false,
-  // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
-  prewarm: false,
-  variantLimit: 200,
-  presetTemplates: {
-    // both ship by default; your own entries merge on top
-    og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
-    thumbnail: { width: 160, height: 160, fit: 'cover', quality: 70, format: 'webp' },
-  },
-})
-```
-
-</Tab>
-
-</Tabs>
-
-<Callout type="warn">
-  **`enabled: false` means "not installed", not "paused".** On SQL adapters, turning it off for an
-  existing project produces a migration that drops the image tables — including every cached
-  variant.
-</Callout>
-
-## Collections
 
 The plugin registers two collections under an **Assets** admin group: one you upload to, one that
 caches what gets generated. Both accept PNG, JPEG, WebP, and AVIF. With
 [`prewarm`](/docs/plugins/payload-images/caching#smart-prewarm) on, a third hidden collection joins
 them — the render-profile registry.
+
+## Collections
 
 ### `images`
 
@@ -265,5 +161,7 @@ setup, and the [payload-seed docs](/docs/plugins/payload-seed) for everything el
 
 ## Next
 
+- [Reference](/docs/plugins/payload-images/reference) — every plugin option, env var, CLI command, endpoint, and export.
 - [Image URLs](/docs/plugins/payload-images/image-urls) — what the `transform` knobs actually bound.
 - [Caching & prewarming](/docs/plugins/payload-images/caching) — the `prewarm` and `fallback` options in action.
+- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — Sharp not externalized, missing admin UI, wrong crops, stale pages.

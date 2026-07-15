@@ -1,0 +1,90 @@
+---
+title: "Using video"
+description: "Relate to a video from any collection and stream it with adaptive HLS — playback URLs are ready on read, no extra calls."
+---
+
+Relate to `mux-video` from any collection, then play the video back however you like. Every video exposes a `playbackId` and a virtual `playbackUrl` (an HLS `.m3u8`), which work with any Mux frontend or a custom HLS player.
+
+The URLs compute on read from the stored playback id. Already-populated videos need no extra calls to play.
+
+## Relate and play
+
+The example below uses [`@mux/mux-player-react`](https://www.npmjs.com/package/@mux/mux-player-react). Install it first:
+
+```bash
+pnpm add @mux/mux-player-react
+```
+
+Then fetch the video and hand its playback fields to the player:
+
+```tsx
+import config from '@payload-config'
+import MuxPlayer from '@mux/mux-player-react'
+import { getPayload } from 'payload'
+
+async function Page() {
+  const payload = await getPayload({ config })
+  const video = await payload.findByID({ collection: 'mux-video', id: 'example' })
+
+  const playback = video.playbackOptions?.[0]
+  if (!playback) return null // still preparing — no playback ids yet
+
+  return (
+    <MuxPlayer
+      playbackId={playback.playbackId} // by playback id
+      src={playback.playbackUrl}        // …or the HLS URL
+      poster={playback.posterUrl}
+    />
+  )
+}
+
+export default Page
+```
+
+<Callout type="warn">
+  `playbackOptions` is empty until the asset reaches `ready`. Read it with `video.playbackOptions?.[0]`
+  and guard with an early return, as above. A non-null assertion (`video.playbackOptions![0]`) crashes
+  on a video that is still preparing.
+</Callout>
+
+## `playbackOptions`
+
+`playbackOptions` is an array with **one row per playback id**. Most videos have a single row, so you read `playbackOptions?.[0]`. Each row carries:
+
+<TypeTable
+  type={{
+    playbackId: { description: "The Mux playback id.", type: "text" },
+    playbackPolicy: { description: "This playback id's policy.", type: "signed | public" },
+    playbackUrl: { description: "Virtual HLS `.m3u8` URL, computed on read (signed under a signed policy).", type: "string" },
+    posterUrl: { description: "Virtual poster image URL, computed on read (signed under a signed policy).", type: "string" },
+    gifUrl: { description: "Virtual animated preview URL, computed on read (signed under a signed policy).", type: "string" },
+  }}
+/>
+
+The three URL fields aren't stored — they compute from the playback id on every read. Under a signed policy each one arrives JWT-signed with the `signedUrlOptions` lifetime.
+
+## Signed playback
+
+Under a **signed** policy each read signs all three URLs (`playbackUrl` / `posterUrl` / `gifUrl`), and JWT signing isn't free.
+
+<Callout type="info">
+  If you only render one URL (e.g. just the player), `select` it — alongside the `playbackId` /
+  `playbackPolicy` it's built from — so the other two aren't signed:
+
+  ```ts
+  payload.find({
+    collection: 'mux-video',
+    select: { playbackOptions: { playbackId: true, playbackPolicy: true, playbackUrl: true } },
+  })
+  ```
+
+  Public playback does no signing, so this doesn't apply there.
+</Callout>
+
+Turn signed playback on with the `playbackPolicy: 'signed'` plugin option — see [Quickstart](/docs/plugins/payload-mux#quickstart) and [Plugin options](/docs/plugins/payload-mux/reference#plugin-options).
+
+## Next
+
+- [Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) — the upload endpoints, the webhook, and server-side ingest.
+- [How it works](/docs/plugins/payload-mux/how-it-works) — the asset lifecycle, revalidation, and seeding.
+- [Troubleshooting](/docs/plugins/payload-mux/troubleshooting) — videos stuck on "preparing", signed-playback 403s, and more.

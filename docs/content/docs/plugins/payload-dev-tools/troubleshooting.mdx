@@ -1,0 +1,29 @@
+---
+title: "Troubleshooting"
+description: "Fix the common dev-tools failures fast — 404s, stale pages, wrong entry points, chrome swaps, and the enabled security note."
+---
+
+Most failures are one of a handful of wiring mistakes. Find your symptom below.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| **`/dev` or `/api/dev` 404s** | You're outside development, or `enabled: false`. Gating is layered — endpoints check per request, pages and toolbar per render. | Run in development, or set `enabled: true` (see the warning below before doing so on a deployed env). |
+| **Dev pages show stale or build-time data** | The drop-in file was statically optimized; the pages read live data on every request. | Add `export const dynamic = 'force-dynamic'` to `app/(frontend)/dev/[[...view]]/page.tsx`. |
+| **Build error importing `@pro-laico/payload-dev-tools/next` in a layout** | Wrong entry point. Three entries, three contexts: `.` is for `payload.config`, `/toolbar` is a React component for layouts, `/next` boots Payload. Mixing them fails at build time. | Import `/next` only in the dev page file; keep `/toolbar` in layouts. |
+| **Chrome swap does nothing** | The `resolveDevChrome` line is missing; `header`/`footer` chips set their cookie but nothing reads it. | Add the `resolveDevChrome` call to your layout ([Quickstart step 4](/docs/plugins/payload-dev-tools#quickstart)). The override is site-wide in dev by design; the toolbar's Real chip (or `?slot=…&clear=1`) is the way back. |
+| **Toolbar closes when I open the admin** | Jumping to the admin is a different root layout, so the panel remounts closed. That's a Next boundary, not a setting. | Add the same `<DevToolbar />` line inside `<RootLayout>` in `app/(payload)/layout.tsx`. |
+| **Seed view refuses to seed** | The seed plugin's preconditions aren't met: `ENABLE_SEED=true` in `.env.local` and a logged-in Payload user. | Set both. The card tells you which one is missing, but it can't remove them. |
+
+<Callout type="warn">
+**`enabled: true` outside dev publishes your counts.** The snapshot and pages are deliberately
+unauthenticated for local convenience. Flipping them on in a deployed env exposes collection
+counts, slugs, and seed state to anyone with the URL. Only force it true on a preview env you'd
+hand a teammate anyway.
+</Callout>
+
+## Next
+
+- [Overview & Quickstart](/docs/plugins/payload-dev-tools)
+- [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages)
+- [The test harness](/docs/plugins/payload-dev-tools/test-harness)
+- [How it works](/docs/plugins/payload-dev-tools/how-it-works)

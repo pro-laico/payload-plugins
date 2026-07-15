@@ -1,0 +1,70 @@
+---
+title: "Troubleshooting"
+description: "Fix the common payload-fonts failures fast — blank admin fields, fonts that never shrink, changes that don't show, and the generated files."
+---
+
+Symptom-first. Find your failure in bold, read the cause, apply the fix.
+
+**Admin font field or component is blank ("not found in import map").**
+The plugin registers new admin components by string path, and the import map is stale.
+Run `pnpm payload generate:importmap`, then restart the dev server.
+
+**Uploaded a font but nothing renders on the page.**
+Uploading a typeface only adds it to the library — it isn't selected yet.
+Open the `fontSet` global, pick a **Font** for the family you want, and save. See [The `fontSet` global](/docs/plugins/payload-fonts/collections#the-fontset-global).
+
+**Fonts save but never shrink; a typeface's Served Files count stays 0.**
+Without `serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']` in next.config, Next bundles the subsetter, the wasm breaks, and optimization silently skips.
+Add the three packages to `serverExternalPackages` (a Quickstart step). You'll hear about it: a dev-boot probe runs a real subset and logs a loud `[payload-fonts]` error with the fix when the wasm can't load. In production the same error logs on the first font save. A typeface whose **Served Files** count stays 0 in the admin is the same signal.
+
+**Re-subsetted the same typeface but dev still shows the old font.**
+The browser cached the `/api/fontOptimized/file/…` font file.
+Hard-refresh.
+
+**The `families` you passed dropped sans / serif / mono / display.**
+`families` is the *complete* list — it replaces the four defaults wholesale, so `families: [{ key: 'brand' }]` drops them all.
+Spread `DEFAULT_FONT_FAMILIES` to keep them and add yours:
+
+```ts
+import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
+
+fontsPlugin({ families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] })
+```
+
+**Reshaping `families` broke existing data.**
+Dropping a family removes its `fontSet` slot (the stored selection silently vanishes) and leaves `font` docs whose `family` value is no longer an option — they fail validation on their next save.
+Migrate those docs (or keep the old key) when you reshape the list.
+
+**`definition.ts` and `public/fonts/` keep showing up as git changes.**
+Both are generated — `payload-fonts-download` owns them; there's no file to hand-create or hand-edit.
+Gitignore `src/app/definition.ts` and `public/fonts/`.
+
+**The build shipped with no fonts — everything falls back to your CSS stacks.**
+The download CLI fetches over HTTP from `FONT_DOWNLOAD_URL`, so that Payload instance must be up and reachable while `prebuild` runs. When it can't reach it, the CLI resets `definition.ts` to an **empty** module and exits 0 so the build still compiles.
+Make sure Payload is running and reachable during `prebuild`, and watch the build log.
+
+<Callout type="warn">
+  **The download CLI fails soft, and carries your secret.** Every handled failure writes the empty
+  definition and exits 0 so the build proceeds — CI can't gate on "shipped without fonts". And the
+  CLI sends `PAYLOAD_SECRET` as a bearer token to whatever `FONT_DOWNLOAD_URL` points at — keep that
+  URL https and correct.
+</Callout>
+
+**A production font change didn't show.**
+The build bakes the `fontSet` selection via `next/font`; there's no runtime cache to revalidate.
+Publish a swap by re-running the download and rebuilding (`payload-fonts-download` → `next build`), or wire a deploy hook via `fontSetOverrides`. See [Revalidation & caching](/docs/plugins/payload-fonts/how-it-works#revalidation--caching).
+
+**Some characters render in the fallback font.**
+Subsetting is lossy to your `charset` — characters outside it aren't in the served WOFF2.
+The originals are archived, so widen `charset` and re-save each typeface to re-derive. No re-upload.
+
+**A save is rejected for a shared original, or for mixing variable and weights.**
+One `fontOriginal` belongs to exactly one typeface (it keeps cascade cleanup safe), and a typeface uses a variable file XOR per-weight files, never both.
+Give the second typeface its own upload, and pick one shape per typeface. See [`font`](/docs/plugins/payload-fonts/collections#font).
+
+## Next
+
+- [Overview & Quickstart](/docs/plugins/payload-fonts)
+- [Serving](/docs/plugins/payload-fonts/serving)
+- [Collections & the fontSet global](/docs/plugins/payload-fonts/collections)
+- [How it works](/docs/plugins/payload-fonts/how-it-works)

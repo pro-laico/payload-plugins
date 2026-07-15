@@ -1,0 +1,163 @@
+---
+title: "Using icons"
+description: "Drop `<Icon name>` into any server component to inline a recolorable SVG, or call getIconSvg to render one in your own markup."
+---
+
+## `<Icon>`
+
+`<Icon name="…" />` is the frontend surface — one import, no wrapper file.
+It resolves `name` through the **active set** and inlines the matched icon as a real `<svg>`.
+Your `className` and props win over the SVG's intrinsic attributes, and the glyph inherits CSS `color` through `currentColor`.
+
+Import it from the `components/Icon` subpath:
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+<Icon name="arrow-right" className="size-6 text-primary" />
+```
+
+<Callout type="info">
+  It's an async **server component** (it queries Payload), so render it in a server component / page.
+  It resolves your config from the plugin itself (stashed when Payload boots), so there's nothing to
+  wire. Only if it can render before *anything* has initialized Payload does it fall back to the
+  `@payload-config` alias — which, from a published package, needs
+  `transpilePackages: ['@pro-laico/payload-icons']` in next.config. When `name` isn't in the active
+  set it renders the `fallback` you pass (or a small built-in warning glyph), never nothing.
+</Callout>
+
+<Callout type="info">
+  **Accessibility.** `<Icon>` renders `aria-hidden` by default, which is right for decorative icons. When the
+  icon carries meaning (e.g. it's the only content of a button), pass `aria-hidden={false}` plus an
+  `aria-label` or a `<title>`; your props always win over the defaults.
+</Callout>
+
+## Props
+
+export const iconProps = [
+  { name: 'name', type: 'string', required: true, description: `The name to render, matched against each entry's name in the active iconSet's iconsArray. Resolved server-side through the active set.` },
+  { name: 'fallback', type: 'string', default: 'built-in warning glyph', description: `Optional SVG string rendered when name doesn't match any icon in the active set. Omit it to use the built-in warning glyph.` },
+  { name: '...svgProps', type: 'SVGAttributes', description: `Any SVG attribute (className, style, width, …) spread onto the rendered svg, winning over the source's intrinsic attributes.` },
+]
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={iconProps} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+// `name` is the only required prop; it resolves through the active set.
+<Icon
+  name="arrow-right"
+  className="size-6 text-primary"
+  // fallback={myCustomSvgString}  // shown if the name isn't in the active set
+/>
+```
+
+</Tab>
+
+</Tabs>
+
+## Rendering it yourself
+
+`<Icon>` is just `getIconSvg` (from the `cache` subpath, server-only and memoized per request) composed
+with the pure `extractSvg*` helpers. Call `getIconSvg` yourself to render an icon in your own markup.
+It's memoized, so a page calling it many times is still one query.
+
+```
+getIconSvg(payload: Payload | Promise<Payload>, name: string, draft = false): Promise<string | undefined>
+```
+
+Pass a live Payload handle as the first argument:
+
+```tsx
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { getIconSvg } from '@pro-laico/payload-icons/cache'
+import { extractSvgContent, extractSvgProps } from '@pro-laico/payload-icons'
+
+const svg = await getIconSvg(getPayload({ config }), 'arrow-right') // draft defaults to false (published)
+if (!svg) return null
+
+return (
+  <svg
+    {...extractSvgProps(svg)}
+    className="size-6"
+    dangerouslySetInnerHTML={{ __html: extractSvgContent(svg) }}
+  />
+)
+```
+
+It reads the active set's `_status: 'published'` rows on the published frontend (and the latest draft
+in draft mode), so you never render an unpublished set.
+
+## Styling with CVA + Tailwind
+
+Because the optimizer rewrites fills to `currentColor` and `<Icon>` forwards `className` straight
+onto the `<svg>`, one source SVG recolors and resizes from class names alone, with no custom wrapper
+needed. Pair `<Icon>` with [`class-variance-authority`](https://cva.style) to turn `size` / `tone`
+props into classes, one variant per line so the axes stay legible:
+
+<Tabs items={['Variants', 'Usage']}>
+
+<Tab value="Variants">
+
+```tsx
+import { cva } from 'class-variance-authority'
+
+const iconClass = cva('inline-block shrink-0', {
+  variants: {
+    size: {
+      xs: 'size-3.5',
+      sm: 'size-4',
+      base: 'size-5',
+      lg: 'size-6',
+      xl: 'size-8',
+    },
+    tone: {
+      current: '',
+      muted: 'text-muted-foreground',
+      primary: 'text-primary',
+      destructive: 'text-destructive',
+    },
+  },
+  defaultVariants: { size: 'base', tone: 'current' },
+})
+```
+
+</Tab>
+
+<Tab value="Usage">
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+// One source SVG, every variant; the cva className recolors and resizes it.
+<Icon name="star" className={iconClass({ size: 'sm' })} />
+<Icon name="star" className={iconClass({ size: 'lg', tone: 'primary' })} />
+<Icon name="star" className={iconClass({ size: 'xl', tone: 'destructive' })} />
+```
+
+</Tab>
+
+</Tabs>
+
+The [`icons-sandbox` example](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox)
+ships the full version: a presentational `Icon` (CVA over the inline `<svg>`) plus a name-based
+`CmsIcon` server wrapper, along with a showcase page that renders one source SVG across the variant,
+size, and tone axes.
+
+## Next
+
+<Cards>
+  <Card title="Collections" href="/docs/plugins/payload-icons/collections" description="The icon, iconSet, and iconRequest collections, plus icon-use detection." />
+  <Card title="How it works" href="/docs/plugins/payload-icons/how-it-works" description="Icon resolution, revalidation, and seeding." />
+  <Card title="Troubleshooting" href="/docs/plugins/payload-icons/troubleshooting" description="Fallback glyphs, solid blobs, and blank previews — symptom-first fixes." />
+</Cards>

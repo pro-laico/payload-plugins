@@ -1,0 +1,53 @@
+---
+title: "Troubleshooting"
+description: "Fix a fallback glyph, a solid-blob icon, a blank admin preview, or an empty requested-icons panel — symptom-first, with the exact strings to search for."
+---
+
+Most `payload-icons` problems come down to a set that isn't active, a stroke-drawn SVG, or an import map that's out of date. Find your symptom below, then apply the fix.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| **Fallback warning glyph instead of your icon** | The active set doesn't resolve the `name` you passed. | Check three things in order: (1) a set is **active**, (2) it's **published** (not just saved as a draft), (3) the row **name** exactly matches the `name` you pass to `<Icon>` (both are kebab-cased). A name with no match always renders the fallback, never nothing. |
+| **Icon renders as a solid blob** (an outline fills in — a circle becomes a disk) | The uploaded SVG is stroke-drawn (`fill="none" stroke="…"`, Lucide/Feather-style). The optimizer themes filled glyphs by rewriting their colors to `currentColor`, so a stroke icon's enclosed shapes fill solid. | Upload solid **fill-based** glyphs instead (Noun Project-style filled paths). The upload detects the stroke signature and flags it in the doc's `optimized` report — check that field on the `icon` doc. |
+| **`@payload-config` resolution error at build**, from a published package | `<Icon>` fell back to the `@payload-config` alias because it rendered before anything initialized Payload, and the alias isn't transpiled from an installed package. | Add `transpilePackages: ['@pro-laico/payload-icons']` to `next.config`. |
+| **Blank admin icon preview** (icon-preview component missing) | The preview components register by string path and the import map is stale. | Run `pnpm payload generate:importmap`, then restart the dev server. |
+| **Requested icons panel is empty in production** | The static scan reads your source, which isn't on disk at runtime. | Run `payload-icons-scan` in your build to write `icon-usage-manifest.json` for the panel to read. |
+| **SVG upload rejected** | Payload blocks SVG uploads by default (they're on its restricted-file-types list). | Nothing to do — the `icon` collection sanitizes every file and opts in automatically via `upload.allowRestrictedFileTypes`. If you overrode `upload`, keep that flag set. |
+
+## `@payload-config` resolution, in detail
+
+`<Icon>` resolves your config from the plugin itself, stashed when Payload boots — normally there's nothing to wire. It only reaches for the `@payload-config` alias when it can render before *anything* has initialized Payload. From a published package that alias needs transpiling:
+
+```ts title="next.config.ts"
+transpilePackages: ['@pro-laico/payload-icons']
+```
+
+See [`<Icon>`](/docs/plugins/payload-icons/using-icons#icon) for the full component contract.
+
+## Requested icons panel, in detail
+
+The [Requested icons panel](/docs/plugins/payload-icons/collections#icon-use-detection) draws from two sources, and each fails differently in production.
+
+- **Static scan sees literal names only.** It matches `name="x"`, `name={'x'}`, and <code>{'name={`x`}'}</code>. A dynamic `name={expr}` is invisible to it — that's the runtime recorder's job (`trackRequests`).
+- **In dev the panel scans live**, so nothing is set up or run. In **production** the source isn't on disk, so run `payload-icons-scan` during your build:
+
+  ```bash
+  payload-icons-scan            # scans ./src and ./app; -o sets the manifest path
+  ```
+
+- **In prod the panel reads `icon-usage-manifest.json` from cwd.** Override the path with the `ICON_USAGE_MANIFEST` env var. Scanning another component? Pass `--component Glyph`.
+- **On standalone / Vercel builds the manifest can go missing.** A JSON file that's never `import`ed isn't traced into the function bundle. Add it to `outputFileTracingIncludes` in `next.config` so the panel can read it there.
+
+## Behavior notes
+
+These aren't bugs — they're how the plugin works.
+
+- **The lookup name is the set entry's name, not the filename.** Renaming an uploaded file changes nothing; the `iconsArray` row's name is the key your code references.
+- **No revalidation is built in.** A statically rendered page bakes the SVG at build time and won't reflect an edit or an active-set swap until the route revalidates. Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) to make the whole surface self-healing, or wire `revalidatePath` / `revalidateTag` yourself. See [Revalidation](/docs/plugins/payload-icons/how-it-works#revalidation).
+- **SVGs using `transform` / `clip-path` skip the geometry rewrite** (it can't be applied safely) but are still sanitized before storage.
+
+## Next
+
+- [Using `<Icon>`](/docs/plugins/payload-icons/using-icons) — props, rendering it yourself, styling with CVA.
+- [Collections](/docs/plugins/payload-icons/collections) — the `icon` / `iconSet` / `iconRequest` fields and icon-use detection.
+- [How it works](/docs/plugins/payload-icons/how-it-works) — resolving an icon, revalidation, seeding.

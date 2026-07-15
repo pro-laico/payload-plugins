@@ -1,0 +1,104 @@
+---
+title: "Atomic model"
+description: "See exactly what goes stale when you edit a document — the id-keyed entries, the tag names the plugin builds, and a field-by-field map of what each change busts."
+---
+
+Edit one document and only the pages that show it go stale. This page explains the model
+that makes that possible, the tags it builds under the hood, and precisely what each kind
+of change invalidates.
+
+You never spell tags by hand — the [getters](/docs/plugins/payload-revalidate/getters) and
+hooks build them. Read this when you want to trust the result, or predict a blast radius
+before you ship.
+
+## The atomic model
+
+Every document is its own cache entry. Lists store ids, not content. References stay ids
+and render through the referenced doc's own entry. The payoff: a content edit
+re-materializes exactly one small entry — everywhere that document appears — while every
+page, list, and card around it survives.
+
+Three rules, one consequence each:
+
+1. **Every doc renders through an id-keyed getter** (`findDocByID`) → a content edit busts
+   `posts:{id}` and re-materializes exactly that entry, at every usage site at once.
+2. **Lists cache ids only** (`findIds`) → list entries change on membership/order
+   events, never on content. A title edit re-renders one card, not the archive.
+3. **References stay ids** (`depth: 0`) → an entry never bakes in another doc's content,
+   so it never needs to purge when that doc changes. The id is stable; freshness lives in
+   the referenced doc's own entry, and Next recomposes the page from surviving entries.
+
+<Callout type="info">
+Populated content that DOES get baked in (`depth > 0`) is still tagged for correctness —
+the walk finds it, including inside Lexical richText. It's flagged in dev (console + the
+[`/dev/revalidate` map](/docs/plugins/payload-revalidate/troubleshooting)) as a refactor
+candidate, with the exact field paths.
+</Callout>
+
+## The tag vocabulary
+
+Tags are id-based and colon-joined. You never spell these — the helpers and hooks build
+them.
+
+| Tag | Meaning | Busted when |
+| --- | --- | --- |
+| `posts:42` | one doc + any entry baking it in | any write to doc 42 |
+| `posts:my-slug` | alias doc tag (`idField`, default `slug`) | same — old AND new alias on renames |
+| `posts:list:recent` | a declared list scope | membership events + its declared fields change |
+| `posts` | the bare (unscoped) list tag | membership events only |
+| `global:header` | a global | the global's writes |
+| `all` | on every tagged entry | `revalidateAll()` / post-seed flush |
+| `…:draft` | draft-lane variant of any of the above | lane-aware — draft saves touch only these |
+
+<Callout type="info">
+For the rare raw-tag need, `tagsFor(payload)` builds prefix-correct tags. See the
+[Exports](/docs/plugins/payload-revalidate/reference#exports) for its import path.
+</Callout>
+
+## What busts when
+
+The write side computes each bust from which fields changed. This is the full map:
+
+| You change… | Busts |
+| --- | --- |
+| a content field (`body`, `title`, …) | `posts:{id}` + alias — **doc only, the overwhelmingly common case** |
+| a scope's declared field (`publishedAt`) | doc tags + every scope declaring that field (`posts:list:recent`, …) |
+| the `idField` (slug) | doc tags + old and new alias — id-lists hold ids, so **no list bust** |
+| membership (create / delete / publish / unpublish) | doc tags + bare list + **all** declared scopes |
+| trash / restore-from-trash (`trash: true`) | same as membership — a soft delete changes list membership exactly like a delete, it just arrives as an update |
+| anything, on a draft-only doc | the `:draft` variants only |
+
+Scope fields support dotted paths (`contact.email`, `meta.featured`) — the diff compares
+the exact path. Relationship and upload determinants compare by **id**, so a populated doc
+never reads as a change against its previous raw id.
+
+### Lanes
+
+`extraTags` follow the lanes. Published writes bust the base tag. Draft saves bust only the
+`:draft` variants.
+
+### Rules
+
+`rules` (whenFields-gated) cover flows the automation can't see. They fire when their
+declared fields changed, or on any membership event. Deletes fire rules unconditionally.
+
+<Callout type="info">
+Rules fire on any membership event even when the publish-time field diff shows nothing — a
+publish's field delta may have arrived across earlier draft saves and be invisible to the
+publish-time diff. See [Manual rules](/docs/plugins/payload-revalidate/examples#manual-rules)
+for a worked example.
+</Callout>
+
+### Seeding
+
+Every hook honors `context.disableRevalidate`, which the
+[`payload-seed`](/docs/plugins/payload-seed) engine sets. The plugin's after-seed listener
+then flushes the seeded surface once — declared scopes, `extraTags`, and rule targets for
+the touched slugs.
+
+## Next
+
+- [Writing a getter](/docs/plugins/payload-revalidate/getters) — turn this model into `'use cache'` functions.
+- [Examples](/docs/plugins/payload-revalidate/examples) — detail pages, lists, globals, sitemaps, migrations.
+- [Reference](/docs/plugins/payload-revalidate/reference) — plugin options, exports, and behavior notes.
+- [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting) — the `/dev/revalidate` map and common failure modes.

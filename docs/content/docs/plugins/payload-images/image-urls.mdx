@@ -1,12 +1,54 @@
 ---
 title: "Image URLs"
-description: "The /api/img endpoint: URL anatomy, every transform parameter, and format negotiation."
+description: "Read an image doc and get ready-made src and srcset — plus the full anatomy and every transform parameter behind the /api/img URL."
 ---
 
-Every optimized image on your site is one URL against one public endpoint. You normally never
-write these URLs yourself — [`<ResponsiveImage>` and the virtual fields](/docs/plugins/payload-images/rendering)
-do it for you — but reading one is the fastest way to understand the whole pipeline. Let's dissect
-a real one:
+Every optimized image on your site is one URL against one public endpoint, `/api/img`.
+
+You rarely write these URLs by hand. Every read of an image doc hands you a ready-made `src` and `srcset`, so the fastest integration is: read the doc, use the URL. Reading a single URL is also the fastest way to understand the whole pipeline.
+
+## The virtual URL fields
+
+You don't need JavaScript to consume these URLs. Every read of an image doc — REST, GraphQL, Local API, and populated relationships — carries ready-made URLs as **virtual fields**, computed on read and never stored:
+
+```jsonc
+// GET /api/images/<id>  (or a populated page.heroImage)
+{
+  "id": "...", "alt": "...", "width": 2400, "height": 1600,
+  "src": "https://site.com/api/img/<id>?w=1280&fit=cover&q=75&fmt=auto&v=…",
+  "srcset": "https://site.com/api/img/<id>?w=400&h=267&fit=cover&q=75&fmt=auto&v=… 400w, …",
+  "placeholderURL": "https://site.com/api/img/<id>?w=32&h=21&fit=cover&q=40&fmt=auto&v=…",
+  "thumbnailURL": "https://site.com/api/img/<id>?w=160&h=160&fit=cover…"
+}
+```
+
+That's the whole integration story for a mobile app, a GraphQL client, or an RSS/OG generator: read the doc, use the URL. The URLs are absolute when `serverURL` is set, relative otherwise. They flow through relationship population, so a populated `page.heroImage` is render-ready with no second query.
+
+By default a read gets natural-ratio URLs. Declare the render in the read's `context` to get `src`/`srcset` built for exactly that render:
+
+```ts title="Declare the render on the read"
+// findByID / find / GraphQL — pass a render declaration in context
+context: { image: { aspectRatio, quality, fit, format } }
+```
+
+The `srcset` follows the project-wide `pixelStep` ladder (default `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) up to the source width — the source's native width is always the top rung. A numeric `pixelStep` steps densely instead.
+
+<Callout type="warn">
+  A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
+  several KB of string on every read and population, and a much larger stored-variant space.
+  Prefer the ladder default (or your own array) if response size matters. Disable the fields
+  entirely with `virtualFields: false`.
+</Callout>
+
+<Callout type="info">
+  The resolved config (slugs + options) is stashed on `config.custom.payloadImages`, so decoupled
+  tooling (an OG/sitemap generator, a CDN-purge script, a migration) can read it from just
+  `payload`, with no import.
+</Callout>
+
+## URL anatomy
+
+When you do build a URL by hand, here's the shape:
 
 ```
 /api/img/64a1f2c…?w=1280&h=720&fit=cover&q=80&fmt=auto&v=1a2b3c
@@ -24,8 +66,7 @@ a real one:
   ignores it; it exists so the URL changes when the image does
   ([Caching & prewarming](/docs/plugins/payload-images/caching)).
 
-The first request for a URL generates the variant with Sharp and streams it same-origin; the
-variant persists after the response, and every later identical request streams the stored copy.
+The first request for a URL generates the variant with Sharp and streams it same-origin. The variant persists after the response. Every later identical request streams the stored copy.
 
 ```
 GET /api/img/<id>?w=600&h=600&fit=cover           # focal cover-crop, auto format
@@ -34,76 +75,36 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 
 ## Parameters
 
-| Param | Meaning |
-| --- | --- |
-| `w` / `h` | Target width / height in px (at least one required). Snapped to a 50px grid (a numeric `pixelStep` replaces the grid; an array `pixelStep`'s exact widths also pass) and clamped to `maxDimension` (default 4096). |
-| `ar` | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator); derives the missing dimension. |
-| `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
-| `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange` (default 40–95; 75 when omitted). |
-| `fmt` | `auto` (negotiate from `Accept`, default) · `avif` · `webp` · `jpeg` · `png`. |
-| `v` | Cache-busting token (derived from filename + focal); ignored by the server. |
+| Param | Default | Meaning |
+| --- | --- | --- |
+| `w` / `h` | — | Target width / height in px. At least one is required. |
+| `ar` | — | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator). Derives the missing dimension. |
+| `fit` | `cover` | How the source maps into the box: `cover` (focal crop) · `contain` · `inside` · `outside` · `fill`. |
+| `q` | `75` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
+| `fmt` | `auto` | Encode format: `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
+| `v` | — | Cache-busting token (derived from filename + focal). Ignored by the server. |
 
-Snapping and bucketing aren't cosmetic — they collapse the continuous parameter space into a
-finite set of possible variants, which is what makes the endpoint safe to expose
-([the DoS bounds](/docs/plugins/payload-images/caching#caching--abuse-limits)) and the cache effective.
-Output never upscales past the source.
+`w` and `h` snap to a 50px grid and clamp to `maxDimension` (default `4096`). A numeric `pixelStep` replaces the grid; an array `pixelStep`'s exact widths also pass. `q` clamps to `qualityRange` (default `40–95`). Output never upscales past the source.
+
+Snapping and bucketing aren't cosmetic. They collapse the continuous parameter space into a finite set of possible variants. That's what makes the endpoint safe to expose ([the DoS bounds](/docs/plugins/payload-images/caching#caching--abuse-limits)) and the cache effective. See [Reference](/docs/plugins/payload-images/reference) for these options and their defaults.
 
 <Callout type="info">
   **The endpoint is public and unsigned.** Generation is gated by the bounds above rather than a
   shared secret. For fully untrusted traffic, raise `pixelStep` or lower `maxDimension` /
   `maxInputPixels` and put a rate limiter or CDN in front —
-  [Configuration](/docs/plugins/payload-images/configuration) has every knob.
+  [Reference](/docs/plugins/payload-images/reference) has every knob.
 </Callout>
 
 ## Format negotiation
 
-With `fmt=auto` the endpoint picks the best format the browser's `Accept` header allows. WebP is
-the default modern target; AVIF only wins when `transform.preferAvif` is on (AVIF encodes far
-slower, so `auto` keeps the cold path fast — explicit `fmt=avif` always works). `fmt=auto`
-responses carry `Vary: Accept` so caches keep per-format copies straight (explicit-format
-responses don't need it).
+With `fmt=auto` the endpoint picks the best format the browser's `Accept` header allows. WebP is the default modern target. AVIF only wins when `transform.preferAvif` is on, because AVIF encodes far slower and `auto` keeps the cold path fast. Explicit `fmt=avif` always works.
 
-## The virtual URL fields
-
-You don't need JavaScript to consume these URLs. Every read of an image doc — REST, GraphQL,
-Local API, and populated relationships — carries ready-made URLs as **virtual fields**, computed
-on read and never stored:
-
-```jsonc
-// GET /api/images/<id>  (or a populated page.heroImage)
-{
-  "id": "...", "alt": "...", "width": 2400, "height": 1600,
-  "src": "https://site.com/api/img/<id>?w=1280&fit=cover&q=75&fmt=auto&v=…",
-  "srcset": "https://site.com/api/img/<id>?w=400&h=267&fit=cover&q=75&fmt=auto&v=… 400w, …",
-  "placeholderURL": "https://site.com/api/img/<id>?w=32&h=21&fit=cover&q=40&fmt=auto&v=…",
-  "thumbnailURL": "https://site.com/api/img/<id>?w=160&h=160&fit=cover…"
-}
-```
-
-That's the whole integration story for a mobile app, a GraphQL client, or an RSS/OG generator:
-read the doc, use the URL. The URLs are absolute when `serverURL` is set (relative otherwise) and
-flow through relationship population — a populated `page.heroImage` is render-ready with no
-second query. A read that declares its render (`context: { image: { aspectRatio, quality, fit, format } }`)
-gets `src`/`srcset` built for exactly that render; an undeclared read gets natural-ratio defaults.
-
-The `srcset` follows the project-wide `pixelStep` ladder (default
-`[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) up to the source width — the source's native
-width is always the top rung. A numeric `pixelStep` steps densely instead.
-
-<Callout type="warn">
-  A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
-  several KB of string on every read and population, and a much larger stored-variant space.
-  Prefer the ladder default (or your own array) if response size matters. Disable the fields
-  entirely with `virtualFields: false`.
-</Callout>
-
-<Callout type="info">
-  The resolved config (slugs + options) is stashed on `config.custom.payloadImages`, so decoupled
-  tooling (an OG/sitemap generator, a CDN-purge script, a migration) can read it from just
-  `payload`, with no import.
-</Callout>
+`fmt=auto` responses carry `Vary: Accept` so caches keep per-format copies straight. Explicit-format responses don't need it.
 
 ## Next
 
 - [Rendering images](/docs/plugins/payload-images/rendering) — the component and helper that write these URLs for you.
+- [Metadata & placeholders](/docs/plugins/payload-images/metadata) — the focal point behind `fit=cover` and the blur placeholder.
 - [Caching & prewarming](/docs/plugins/payload-images/caching) — what happens to a URL after its first request.
+- [Reference](/docs/plugins/payload-images/reference) — every option and default (`maxDimension`, `qualityRange`, `pixelStep`, `virtualFields`).
+- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — when images don't optimize or the browser over-fetches.

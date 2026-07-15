@@ -1,0 +1,186 @@
+---
+title: "payload-fonts"
+description: "Choose your site's typefaces in the CMS and self-host them at next/font speed — every upload auto-subset to a lean WOFF2."
+---
+
+`@pro-laico/payload-fonts` lets editors upload typefaces to Payload and self-hosts them through [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font).
+
+You get Next.js local-font performance — preloaded, size-adjusted, no third-party CDN — while picking your sans / serif / mono / display from the admin. Every uploaded file is subsetted to a lean, web-ready WOFF2 on save, with no manual fontkit tooling.
+
+```bash
+pnpm add @pro-laico/payload-fonts
+```
+
+## What's included
+
+- **Automatic optimization:** every uploaded font is subsetted to a lean, web-ready WOFF2 on save — smaller files, no command-line fontkit.
+- **Fonts chosen in the CMS:** pick which typeface is your sans / serif / mono / display (or your own families) from the admin, and swap them anytime with no code change.
+- **Self-hosted, no third-party CDN:** fonts are served from your own app through [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) — fast, private, preloaded, and size-adjusted against layout shift.
+- **Zero-config in dev, optimized in prod:** a runtime component serves the live selection while you work; a build step bakes `next/font` for production. The two paths never both fire.
+- **Declarative seeding:** seed typefaces like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
+
+![Fonts rendered from CMS in the /dev/fonts route](/screenshots/fonts.png)
+
+## Requirements
+
+Self-hosting fonts through `next/font` needs a few one-time wiring steps. Each maps to a Quickstart step below.
+
+| Requirement | Why |
+| --- | --- |
+| **Next.js App Router** | Serving is built on `next/font/local`. |
+| **A `next.config` change** | The subsetter (`subset-font` / `harfbuzzjs` / `fontkit`) must be externalized, or the wasm breaks and optimization silently skips (Step 2). |
+| **Root-layout wiring** | `extractFonts` on `<html>` plus `<DevFonts>` in `<head>` — the two serving paths (Step 4). |
+| **A prebuild script** | The `payload-fonts-download` CLI writes the fonts + `src/app/definition.ts` your layout imports (Step 3). |
+| **`generate:importmap`** | The plugin registers admin components; regenerate the import map after installing (Step 3). |
+
+## Quickstart
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+```ts
+import { buildConfig } from 'payload'
+import { fontsPlugin } from '@pro-laico/payload-fonts'
+
+export default buildConfig({
+  plugins: [fontsPlugin()],
+})
+```
+</Step>
+
+<Step>
+**Externalize the subsetter (Next.js)**
+
+Set `subset-font`, `harfbuzzjs`, and `fontkit` as `serverExternalPackages`:
+
+```js
+// next.config.mjs
+import { withPayload } from '@payloadcms/next/withPayload'
+
+const nextConfig = { serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit'] }
+
+export default withPayload(nextConfig)
+```
+
+<Callout type="warn">
+  Skip this and Next bundles the subsetter, the wasm breaks, and optimization is skipped — fonts save but never shrink. See [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting).
+</Callout>
+</Step>
+
+<Step>
+**Generate the fonts and wire the build scripts**
+
+Production self-hosts via `next/font/local`. The `payload-fonts-download` CLI resolves the `fontSet`
+selection and writes `public/fonts/*.woff2` + `src/app/definition.ts` — the file your layout imports
+in the next step. Run it on both `prebuild` (real fonts for the build) and `predev` (an empty stub so
+the import resolves before your dev server is up; `<DevFonts>` serves at runtime):
+
+```json
+// package.json
+{
+  "scripts": {
+    "build": "next build",
+    "prebuild": "payload-fonts-download",
+    "predev": "payload-fonts-download",
+    "generate:types": "payload generate:types",
+    "generate:importmap": "payload generate:importmap"
+  }
+}
+```
+
+**Required: regenerate the import map.** The plugin registers admin components. Run
+`pnpm payload generate:importmap` and restart the dev server, or the admin font fields render blank.
+
+The CLI authenticates against your running Payload instance, so set two env vars:
+
+```bash
+# .env
+FONT_DOWNLOAD_URL=http://localhost:3000   # the running Payload URL the CLI fetches from
+PAYLOAD_SECRET=…                          # already in your Payload project, reused as the bearer token
+```
+
+<Callout type="info">
+  `payload-fonts-download` fetches over HTTP, so that Payload instance must be up and reachable while
+  the script runs. `src/app/definition.ts` and `public/fonts/` are both generated — **gitignore** them.
+  See [Reference](/docs/plugins/payload-fonts/reference#environment-variables) for every CLI env var.
+</Callout>
+</Step>
+
+<Step>
+**Wire it into your layout**
+
+Two additions to your root layout, each a no-op in the other environment:
+
+- `extractFonts(...)` on `<html>`: the production `next/font` classes.
+- `<DevFonts />` in `<head>`: the dev-only runtime path.
+
+```tsx
+import config from '@payload-config'
+import definitionFonts from '@/app/definition'
+import { extractFonts } from '@pro-laico/payload-fonts'
+import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
+
+<html className={extractFonts(definitionFonts)}>
+  <head><DevFonts config={config} definition={definitionFonts} /></head>
+</html>
+```
+
+The `@/app/definition` import only resolves once Step 3 has run at least once (`predev` writes the stub).
+</Step>
+
+<Step>
+**Use the fonts**
+
+The families are CSS variables. With Tailwind v4, map them once and use `font-sans` / `font-mono` as usual:
+
+```css
+@theme {
+  --font-sans: var(--font-setSans);
+  --font-mono: var(--font-setMono);
+}
+/* plain CSS: body { font-family: var(--font-setSans), sans-serif } */
+```
+</Step>
+
+<Step>
+**Upload a typeface and pick it**
+
+Nothing renders until you choose a font in the admin. Go to **Assets → Font** and upload a typeface,
+then open the **`fontSet`** global and pick it per family. Refresh, and your font is on the page.
+
+See [Collections](/docs/plugins/payload-fonts/collections) for the `font` upload shape and the `fontSet` global.
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+
+<Card title="Serving" href="/docs/plugins/payload-fonts/serving">
+  The two serving paths, the `DevFonts` props, and the download CLI's environment variables.
+</Card>
+
+<Card title="Collections" href="/docs/plugins/payload-fonts/collections">
+  The `font` / `fontOriginal` / `fontOptimized` collections, the `fontSet` global, and custom families.
+</Card>
+
+<Card title="How it works" href="/docs/plugins/payload-fonts/how-it-works">
+  The subset pipeline, one-file-both-styles italics, revalidation, and seeding.
+</Card>
+
+<Card title="Troubleshooting" href="/docs/plugins/payload-fonts/troubleshooting">
+  Fonts not shrinking, blank admin fields, stale dev fonts, and production rebuilds.
+</Card>
+
+<Card title="Reference" href="/docs/plugins/payload-fonts/reference">
+  Plugin options, environment variables, CLI commands, endpoints, and exports.
+</Card>
+
+</Cards>
+
+## Plugin options
+
+Zero-config by default — every option has a sensible default. See [Reference](/docs/plugins/payload-fonts/reference) for options, env vars, CLI, and exports.

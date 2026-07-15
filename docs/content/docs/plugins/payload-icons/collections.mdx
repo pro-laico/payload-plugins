@@ -1,0 +1,130 @@
+---
+title: "Collections"
+description: "The three collections payload-icons registers — the SVG upload pipeline, the swappable icon sets, and the runtime miss tracker."
+---
+
+`iconsPlugin()` registers three collections:
+
+- **`icon`** — the SVG upload collection, in an **Assets** admin group.
+- **`iconSet`** — the `name → icon` grouping collection, in a **Sets** admin group.
+- **`iconRequest`** — a hidden diagnostics collection, on by default (disable with `trackRequests: false`).
+
+Icons accept SVG only. Every upload is sanitized before storage, so a `.svg` is safe to inline straight onto a page.
+
+## `icon`
+
+The upload collection you add icons to. Each file is optimized and sanitized on save by the
+`formatSVGHook` `beforeChange` hook and stored inline as `svgString`. Read is **public** (icons are
+frontend assets); writes are logged-in-admin only. The admin titles each doc by `filename`.
+
+**Fields**
+
+<TypeTable
+  type={{
+    filename: { description: "The uploaded SVG (the upload). The admin useAsTitle.", type: "upload" },
+    iconPreview: { description: "Theme-aware inline preview of the sanitized SVG (edit view + list cell), inheriting the admin theme's text color so icons stay visible in dark mode.", type: "ui" },
+    svgString: { description: "The cleaned, sanitized <svg>…</svg>, ready to inline. Read-only output; its list cell renders the themed preview.", type: "code" },
+    optimized: { description: "Human-readable optimization report. Read-only output, shown once present.", type: "text" },
+    filesize: { description: "Updated to the optimized byte size.", type: "number" },
+  }}
+/>
+
+**Hooks**
+
+<TypeTable
+  type={{
+    formatSVGHook: { description: "Optimizes + sanitizes each uploaded SVG, folding svgString / optimized / filesize into the doc. A no-op for changes that carry no new file.", type: "beforeChange" },
+  }}
+/>
+
+On save, `formatSVGHook` runs svgo (loaded dynamically, so it never lands in a frontend or edge
+bundle) and:
+
+- **Sanitizes** untrusted SVGs: strips `<script>` elements, `on*` handlers, and `javascript:`
+  URLs. The stored string is later inlined via `dangerouslySetInnerHTML`, so this runs even when
+  geometry optimization is skipped.
+- **Optimizes** with svgo (`preset-default` + path/number cleanup, dimensions removed).
+- **Themes** by rewriting hard-coded `fill`/`stroke` to `currentColor`, so an icon takes its color
+  from CSS.
+- **Normalizes** the `viewBox`: tightened to the real path bounds and squared around the glyph's
+  center, so mismatched source artboards render consistently.
+
+<Callout type="warn">
+  Payload blocks SVG uploads by default (they're on its restricted-file-types list). This collection
+  is SVG-only and sanitizes every file before storage, so it opts in automatically via
+  `upload.allowRestrictedFileTypes`, with nothing to configure.
+</Callout>
+
+<Callout type="info">
+  SVGs using `transform` / `clip-path` skip the geometry rewrite (it can't be applied safely) but
+  are still sanitized before storage.
+</Callout>
+
+## `iconSet`
+
+A named, ordered `name → icon` mapping into the shared `icon` pool, with a single-active toggle. Build
+a second set (a different `arrow-right`, a heavier weight, a seasonal pack) and flip it active to
+re-skin every icon at once, without touching the frontend. Writes and reads are logged-in-admin only.
+Drafts / versions are on by default; toggle with `iconSetOverrides.drafts` (default `true`). Lives
+under a **Sets** admin group.
+
+- **Settings tab:** the `active` toggle and `title` (plus any `fields` you add, and the [usage panel](#icon-use-detection) unless `usagePanel: false`).
+- **Icons tab:** the `iconsArray`, one row per icon, each a `name` (auto kebab-cased, what the
+  frontend looks up, independent of the uploaded filename) and an `icon` upload relationship into
+  the `icon` collection.
+
+<Callout type="info">
+  Only one set is active at a time. Activating a set runs a `beforeChange` hook that deactivates the
+  others **within the same status lane**, so staging a new active set as a *draft* (with live
+  preview) doesn't disturb the live published set; the swap goes live only on publish. The hook runs
+  in the same transaction and rolls back on failure, so you never end up with two active sets.
+  It's self-contained: a plain checkbox, no external dependency.
+</Callout>
+
+## `iconRequest`
+
+On by default (disable with `trackRequests: false`). A hidden diagnostics collection: every icon name
+that fails to resolve at runtime is recorded (throttled, fire-and-forget) with a hit `count` and `first`/`lastRequestedAt`
+timestamps. It's the runtime counterpart to the static scan, capturing dynamic names a static pass can't
+see. Surfaced in the IconSet [usage panel](#icon-use-detection), not browsed directly.
+
+## Icon use detection
+
+**Problem:** code asks for a name the active set lacks → the fallback warning glyph, and it's easy to
+miss which icons a project actually needs.
+
+**Fix:** the admin **Requested icons** panel (on by default) lists missing vs present names, from two
+sources:
+
+- **Static scan:** greps your source for literal `<Icon name="…">`, flagging missing names with
+  `file:line`. **In dev the panel scans live**, so there's nothing to set up or run. For **production** (source
+  isn't on disk at runtime) run `payload-icons-scan` in your build to write an
+  `icon-usage-manifest.json` the panel reads there.
+- **Runtime:** on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
+  `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
+  counts, last-seen, and a clear button.
+
+Both are on with `iconsPlugin()`; pass `usagePanel: false` / `trackRequests: false` to omit either.
+
+```bash
+payload-icons-scan            # production/CI: scans ./src and ./app; -o sets the manifest path
+```
+
+<Callout type="info">
+  Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
+  `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
+  (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`. On
+  standalone / Vercel builds, a JSON file that's never `import`ed isn't traced into the function
+  bundle — add it to `outputFileTracingIncludes` in next.config so the panel can read it there.
+</Callout>
+
+Two env vars tune usage detection at runtime, independent of the plugin options —
+`ICON_USAGE_TRACKING` and `ICON_USAGE_MANIFEST`. See
+[Reference](/docs/plugins/payload-icons/reference#environment-variables).
+
+## Next
+
+- [Using icons](/docs/plugins/payload-icons/using-icons) — `<Icon>` props, rendering the SVG yourself, CVA styling.
+- [How it works](/docs/plugins/payload-icons/how-it-works) — resolving an icon, revalidation, and seeding.
+- [Reference](/docs/plugins/payload-icons/reference) — plugin options, env vars, the CLI scan command, and exports.
+- [Troubleshooting](/docs/plugins/payload-icons/troubleshooting) — fallback glyphs, solid-blob renders, blank previews.

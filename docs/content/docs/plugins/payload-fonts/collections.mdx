@@ -1,0 +1,152 @@
+---
+title: "Collections"
+description: "The font collections that store your typefaces, and the fontSet global that chooses which one fills each family."
+---
+
+`payload-fonts` adds three collections and one global under an **Assets** admin group.
+
+You only ever edit one collection, `font` — one document per typeface. Two hidden upload collections
+derive from it, and the `fontSet` global decides which typeface fills each family. The pipeline is
+`font` → `fontOriginal` (archive) → `fontOptimized` (served), each font file flowing one slot at a
+time.
+
+## `font`
+
+One document per **typeface** (e.g. "Inter"), and the only one you touch. It's *not* an upload
+collection; it holds Payload `upload` slots pointing at `fontOriginal`, carried one of two
+mutually-exclusive ways: a single `variable` file or a `weights` array.
+
+On save, every referenced original is subsetted to a `fontOptimized` WOFF2. Variable fonts keep
+their `wght` axis range; static files take the row's weight/style. Delete cascades to both derived
+collections. Read and writes are logged-in-admin only.
+
+**Fields**
+
+<TypeTable
+  type={{
+    title: { description: "The typeface name. Required; the admin title and list-search field.", type: "text" },
+    family: { description: "The generic family it fills: sans / serif / mono / display by default (customisable via the plugin's families option). Required.", type: "radio" },
+    variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added; use this OR weights, not both.", type: "group" },
+    weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
+  }}
+/>
+
+**Hooks**
+
+<TypeTable
+  type={{
+    requireFontFiles: { description: "Requires at least one file and rejects mixing a variable font with specific weights.", type: "beforeValidate" },
+    rejectSharedOriginals: { description: "Enforces one fontOriginal per typeface, rejecting a save that references an original already used by another typeface (keeps asset cleanup safe).", type: "beforeValidate" },
+    optimizeFromOriginals: { description: "Subsets each referenced original to a served fontOptimized WOFF2, and cleans up any original a swapped/removed slot de-referenced.", type: "afterChange" },
+    cleanupFontAssets: { description: "Cascades the delete to the served fontOptimized files and the archived fontOriginal bytes.", type: "beforeDelete" },
+  }}
+/>
+
+## `fontOriginal`
+
+The hidden archive of truth: the raw, untouched files editors drop into the `font` slots. Kept so
+the lossy, subsetted output can be re-derived with a different charset later. An upload collection
+whitelisting the four web-font formats; you never see it in nav, only through the `font` fields.
+
+**Fields**: none beyond the upload itself (the stored original bytes). Accepts `woff` / `woff2` /
+`ttf` / `otf` via an `upload.mimeTypes` whitelist (OTF/TTF arrive under several sfnt mime strings).
+
+**Hooks**: none; uploading here is a plain store, which is exactly what lets it run as a
+client-upload (direct-to-Blob) collection in production. Each original belongs to exactly one
+typeface.
+
+## `fontOptimized`
+
+The hidden, derived collection of WOFF2 bytes the site actually serves: one upload doc per
+weight/style (or variable file), written by `font`'s save hook, never hand-uploaded. Read is
+**public** so the build-time export can fetch them on cloud storage; writes stay gated.
+
+**Fields**
+
+<TypeTable
+  type={{
+    file: { description: "The subsetted WOFF2 bytes (the upload).", type: "upload" },
+    font: { description: "The owning typeface. The export endpoint and reconcile hook query by it. Read-only.", type: "relationship" },
+    original: { description: "The source fontOriginal this was subsetted from, the reconcile key (one optimized per original). Read-only.", type: "relationship" },
+    weight: { description: "CSS font-weight: a single step (400) or a variable range (100 900); served verbatim to next/font. Read-only.", type: "text" },
+    style: { description: "normal / italic. Read-only.", type: "radio" },
+    isVariable: { description: "Whether this file is a variable font. Read-only.", type: "checkbox" },
+    italCapable: { description: "This upright variable file ALSO carries italics via its axes (a true ital axis, or a negative slnt range) — the serving layers emit a second, italic @font-face from the same file unless the typeface has an explicit italic file. Read-only.", type: "checkbox" },
+    obliqueAngle: { description: "For slnt-based italics: the positive CSS oblique angle (deg) matching the axis extreme, e.g. 15 for slnt 0…-15. Read-only.", type: "number" },
+  }}
+/>
+
+**Hooks**: none; the bytes are derived and rebuilt from the originals on every `font` save.
+
+## The `fontSet` global
+
+Uploading a typeface doesn't put it on the site; it just adds it to the library. **`fontSet`** is
+how you choose which uploaded typeface fills each family. `fontsPlugin()` registers it as a singleton
+global under the **Assets** group with one single-relationship slot per family (four by default),
+each filtered to its family so the admin only offers matching typefaces:
+
+| Slot | Picks the typeface used for… | Choices |
+| --- | --- | --- |
+| `sans` | `var(--font-setSans)` | `font` docs with `family: sans` |
+| `serif` | `var(--font-setSerif)` | `font` docs with `family: serif` |
+| `mono` | `var(--font-setMono)` | `font` docs with `family: mono` |
+| `display` | `var(--font-setDisplay)` | `font` docs with `family: display` |
+
+Pick one **Font** per slot and save; that selection is the source of truth both serving paths read.
+Change it and the next download (or, in dev, the next refresh) swaps the served fonts, no code change.
+Leave a family empty to fall back to whatever your CSS defines for that variable.
+
+```ts
+// or set it without the admin: server-side / in a migration
+await payload.updateGlobal({ slug: 'fontSet', data: { sans: interId, mono: jetbrainsMonoId } })
+```
+
+Seeds set it the same way with `ref()` tokens (see [Seeding](/docs/plugins/payload-fonts/how-it-works#seeding)).
+
+<Callout type="info">
+  Driving the selection some other way? Pass `includeFontSet: false` to skip the global and resolve
+  the active typefaces yourself. Without it, the export endpoint has nothing to resolve.
+</Callout>
+
+## Custom families
+
+`families` is the **complete list**: whatever you pass replaces the four defaults wholesale. It flows
+through everything in lockstep — the `family` options, the `fontSet` slots, the export JSON keys, and
+the generated `font<Key>` / `--font-set<Key>` names.
+
+```ts
+fontsPlugin({
+  families: [
+    { key: 'sans' },                                              // label defaults to "Sans"
+    { key: 'display' },
+    { key: 'brand', label: 'Brand', fallback: 'Georgia, serif' }, // a new family
+  ],
+})
+// EXACTLY these three; serif and mono are dropped. family options + fontSet slots
+// sans/display/brand; exports fontSans/fontDisplay/fontBrand; vars --font-set{Sans,Display,Brand}.
+```
+
+To **add** a family while keeping the defaults, spread `DEFAULT_FONT_FAMILIES`:
+
+```ts
+import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
+
+fontsPlugin({ families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] })
+```
+
+`<DevFonts>` auto-discovers the slots from the `fontSet` global, so custom families just work. Pass
+`families` to it only if you set custom per-family `fallback` stacks and want the dev preview to match
+(see [`DevFonts` props](/docs/plugins/payload-fonts/serving#devfonts-props)).
+
+<Callout type="warn">
+  Changing `families` strands existing data. Dropping a family removes its `fontSet` slot (the stored
+  selection silently vanishes) and leaves `font` docs whose `family` value is no longer an option —
+  they fail validation on their next save. Migrate those docs, or keep the old key, when you reshape
+  the list.
+</Callout>
+
+## Next
+
+- [Serving](/docs/plugins/payload-fonts/serving) — the production and development paths, `DevFonts` props, and env vars.
+- [How it works](/docs/plugins/payload-fonts/how-it-works) — the subset pipeline, one-file-both-styles, revalidation, and seeding.
+- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — when a font uploads but nothing renders.

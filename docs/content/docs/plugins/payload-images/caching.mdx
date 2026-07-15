@@ -1,11 +1,13 @@
 ---
 title: "Caching & prewarming"
-description: "Content-addressed caching, self-revalidation, smart prewarming, and the nearby-quality fallback."
+description: "Every image loads instantly after the first request, refreshes itself when you change it, and stays fast even on the very first hit."
 ---
 
-This page is the performance story: why the second request for any image is always instant, how
-changed images refresh themselves everywhere with nothing to configure, and the two features that
-make even the *first* request fast — smart prewarming and the nearby-quality fallback.
+Every image is rendered once and then served from cache forever. Change the source file or move
+the focal point and it refreshes itself everywhere — nothing to configure. Two features keep even
+the *first* request fast: smart prewarming and the nearby-quality fallback.
+
+**Jump to:** [Enable prewarm](#smart-prewarm) · [Define a preset](#guaranteed-presets) · [Purge a variant](#caching--abuse-limits) · [Raise the cap](#the-variant-cap)
 
 ## The transform pipeline
 
@@ -29,10 +31,7 @@ The endpoint is public-facing, so it's bounded on several fronts:
   and `POST /api/img/purge/:id` clear them on demand.
 - **Browser/CDN cache.** Responses are immutable and each URL carries the `v` token, so replacing
   the file or moving the focal makes already-cached responses refetch; a metadata-only edit
-  (`alt`) doesn't. One caveat: both the purge and the `v` token key on the **filename**, so a
-  replacement that keeps the same filename (`upload.overwriteExistingFiles: true`, or Payload's
-  built-in admin crop, which overwrites in place) is invisible to them — Payload's default
-  suffixed-filename replacement is what these guarantees assume.
+  (`alt`) doesn't.
 - **Access control.** Source reads run with the collection's access rules. A source you can't
   read returns `404`; a non-public source is served `private` with no shared CDN caching. The
   purge endpoint requires a logged-in user who can read that source.
@@ -51,6 +50,13 @@ The endpoint is public-facing, so it's bounded on several fronts:
 - **SSRF + path traversal.** Local reads stay inside the collection's `staticDir`;
   cloud/relative reads self-fetch with redirects disabled, a 15s timeout, a 64MB cap, and refuse
   loopback / private / link-local hosts (while still allowing your configured origin).
+
+<Callout type="warn">
+  Both the purge and the `v` token key on the **filename**. A replacement that keeps the same
+  filename (`upload.overwriteExistingFiles: true`, or Payload's built-in admin crop, which
+  overwrites in place) is invisible to them. These guarantees assume Payload's default
+  suffixed-filename replacement.
+</Callout>
 
 ## Nearby-quality fallback
 
@@ -156,27 +162,11 @@ images — deferred, budgeted, and idempotent.
 imagesPlugin({ prewarm: true }) // zero-config; default is OFF (enabling adds a collection = schema change)
 ```
 
-How it works, end to end:
+Prewarm enqueues Payload Jobs — it does **nothing until a jobs runner picks them up**. Use your
+existing runner (`payload.jobs.run()`, a cron hitting the jobs endpoint, or `payload jobs:run`).
+To skip the queue and generate inline, run `payload images:prewarm --now`.
 
-1. **Observe (ground truth).** Every successful transform response records `(ratio, fit, quality,
-   format, width)` — the browser-*chosen* width from the srcset, the real settings. Recording is
-   pure in-memory buffer work on the serving path (no writes, no awaits); a per-process timer
-   flushes to the hidden `image-render-profiles` collection, throttled so steady-state traffic
-   costs a handful of writes per hour. Declared ratios are recovered by replaying the endpoint's
-   own snapping math — no drift possible.
-2. **Compute (bounded).** When an image is created, its file replaced, or its focal/hotspot edited
-   (exactly the purge hook's trigger set, so invalidation and re-warming can't drift apart), the
-   target list is: the three built-in renders every read implies (`src` ≤1280, `thumbnailURL`,
-   `placeholderURL`), then config `seeds`, then observed profiles ranked by traffic — each at its
-   top observed widths, expanded into concrete `formats`, deduped against already-generated
-   variants by cache key, and capped by `maxVariantsPerImage` (default 24). Targets replay through
-   the endpoint's own parser, so a warmed variant is a byte-identical cache hit for organic traffic.
-3. **Execute (when possible, not immediately).** The work is one `imagesPrewarm` Payload Job per
-   image, enqueued with a 30-second delay (coalesces rapid saves, guarantees purge-before-warm)
-   and deduped against already-pending jobs. **Running jobs stays your app's business** — your
-   existing runner (`payload.jobs.run()`, a cron hitting the jobs endpoint, `payload jobs:run`)
-   picks them up from the `default` queue with no extra wiring. Retries are safe: every run
-   recomputes and only generates what's still missing.
+Tune it with the options object:
 
 ```ts
 imagesPlugin({
@@ -203,6 +193,28 @@ payload images:prewarm --limit 200  # cap sources this run
   site keeps working exactly as before (variants generate on first request, the fallback covers
   the gap). Prewarming is an optimization layer, not a dependency.
 </Callout>
+
+### How it works, end to end
+
+1. **Observe (ground truth).** Every successful transform response records `(ratio, fit, quality,
+   format, width)` — the browser-*chosen* width from the srcset, the real settings. Recording is
+   pure in-memory buffer work on the serving path (no writes, no awaits); a per-process timer
+   flushes to the hidden `image-render-profiles` collection, throttled so steady-state traffic
+   costs a handful of writes per hour. Declared ratios are recovered by replaying the endpoint's
+   own snapping math — no drift possible.
+2. **Compute (bounded).** When an image is created, its file replaced, or its focal/hotspot edited
+   (exactly the purge hook's trigger set, so invalidation and re-warming can't drift apart), the
+   target list is: the three built-in renders every read implies (`src` ≤1280, `thumbnailURL`,
+   `placeholderURL`), then config `seeds`, then observed profiles ranked by traffic — each at its
+   top observed widths, expanded into concrete `formats`, deduped against already-generated
+   variants by cache key, and capped by `maxVariantsPerImage` (default 24). Targets replay through
+   the endpoint's own parser, so a warmed variant is a byte-identical cache hit for organic traffic.
+3. **Execute (when possible, not immediately).** The work is one `imagesPrewarm` Payload Job per
+   image, enqueued with a 30-second delay (coalesces rapid saves, guarantees purge-before-warm)
+   and deduped against already-pending jobs. **Running jobs stays your app's business** — your
+   existing runner (`payload.jobs.run()`, a cron hitting the jobs endpoint, `payload jobs:run`)
+   picks them up from the `default` queue with no extra wiring. Retries are safe: every run
+   recomputes and only generates what's still missing.
 
 Prewarm and the fallback compose: prewarm makes misses rare, the fallback makes the residual ones
 instant.
@@ -242,7 +254,57 @@ writes never fire bust events. See it wired end-to-end in
 Without the revalidate plugin, handle it however you already do (a `revalidatePath` /
 `revalidateTag` in an `afterChange` hook, or a dynamic route).
 
+## Options
+
+export const cachingOptions = [
+  {
+    name: 'variantLimit',
+    type: 'number',
+    default: '200',
+    description: 'Max cached variants stored per image. A per-image field; set the project default with `imagesPlugin({ variantLimit })`. Presets are exempt.',
+  },
+  {
+    name: 'transform.fallback',
+    type: 'boolean',
+    default: 'true',
+    description: 'On a cache miss, serve an existing same-geometry variant instantly (`no-store`) while the exact one generates in the background.',
+  },
+  {
+    name: 'prewarm',
+    type: 'boolean | PrewarmOptions',
+    default: 'false',
+    description: 'Pre-generate the renders the site actually serves for new images. Enabling adds a hidden collection — a schema change. Pass an object to tune it.',
+  },
+  {
+    name: 'prewarm.formats',
+    type: 'Format[]',
+    default: "['webp']",
+    description: "Formats to warm. `'avif'` is added automatically when `transform.preferAvif` is set.",
+  },
+  {
+    name: 'prewarm.maxVariantsPerImage',
+    type: 'number',
+    default: '24',
+    description: 'Cap on variants prewarmed per image.',
+  },
+  {
+    name: 'prewarm.queue',
+    type: 'string',
+    default: "'default'",
+    description: 'The Payload Jobs queue the prewarm jobs are enqueued on.',
+  },
+  {
+    name: 'prewarm.autoRun',
+    type: 'string | false',
+    default: 'false',
+    description: 'A cron string wires an in-process runner into `config.jobs.autoRun`. Not for serverless.',
+  },
+]
+
+<ConfigOptions items={cachingOptions} />
+
 ## Next
 
 - [Image URLs](/docs/plugins/payload-images/image-urls) — the parameters and headers this page keeps referring to.
-- [Configuration](/docs/plugins/payload-images/configuration) — the `transform` and `prewarm` option surfaces in full.
+- [Reference](/docs/plugins/payload-images/reference) — the `transform` and `prewarm` option surfaces in full.
+- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — old image still showing, variants not generating, and other failure modes.

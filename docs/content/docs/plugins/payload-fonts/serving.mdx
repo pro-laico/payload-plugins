@@ -1,0 +1,109 @@
+---
+title: "Serving fonts"
+description: "How the fonts you pick reach the browser: zero-config in development, next/font-optimized in production, plus every env var and DevFonts prop that tunes them."
+---
+
+The active fonts apply as the `--font-set{Sans,Serif,Mono,Display}` CSS variables, so your app just
+uses `font-family: var(--font-setSans)`.
+
+Those variables are produced two ways. This page covers both, the env vars the production CLI reads,
+and the `<DevFonts>` props.
+
+## The two paths
+
+The variables are produced **two ways that never both fire**: optimized in production, zero-config in
+development. Wire both into your root layout. Each is a no-op in the other environment:
+
+```tsx
+import config from '@payload-config'
+import definitionFonts from '@/app/definition'
+import { extractFonts } from '@pro-laico/payload-fonts'
+import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
+
+<html className={extractFonts(definitionFonts)}>   {/* production: next/font */}
+  <head>
+    <DevFonts config={config} definition={definitionFonts} />   {/* development: runtime */}
+  </head>
+</html>
+```
+
+`extractFonts` puts the production `next/font` classes on `<html>`. `<DevFonts>` serves the live
+selection at runtime while you work. When `definition.ts` holds real fonts, `<DevFonts>` stands down
+and lets `next/font` take over.
+
+## Production
+
+Production self-hosts via [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font).
+That gives precise preloading, size-adjusted fallbacks, and content-hashed static assets. A build step
+resolves the `fontSet` selection and writes the fonts to disk:
+
+- `GET /api/fonts/export`, gated by `PAYLOAD_SECRET` (Bearer), returns each active family's
+  `fontOptimized` bytes.
+- The `payload-fonts-download` CLI fetches that and writes `public/fonts/*.woff2` +
+  `src/app/definition.ts`. `extractFonts` puts the generated classes (which define the `--font-set*`
+  variables) on `<html>`.
+
+```json
+// package.json: set FONT_DOWNLOAD_URL (the running Payload URL) + PAYLOAD_SECRET
+{ "scripts": { "prebuild": "payload-fonts-download" } }
+```
+
+`definition.ts` and `public/fonts/` are generated, so gitignore them. A `predev: payload-fonts-download`
+writes an empty stub so the import resolves before your dev server is up (no file to hand-create).
+
+<Callout type="info">
+  **Alternative to `predev`:** commit an empty `definition.ts` as a baseline and skip `predev`
+  entirely. The download still overwrites it on `prebuild` (the fonts-sandbox example takes this route).
+</Callout>
+
+The CLI needs a running Payload instance to fetch from, and reads several env vars — two are required.
+See [Environment variables](#environment-variables).
+
+<Callout type="info">
+  **Failures empty the definition.** Any error during the download (a missing env var, an
+  unreachable endpoint, an unexpected throw) resets `definition.ts` to an **empty** module so the
+  build still compiles, rather than leaving a stale one that imports font files no longer on disk
+  (a fresh checkout gitignores `public/fonts/`).
+</Callout>
+
+## Development
+
+`<DevFonts>` reads the active `fontSet` selection from Payload and inlines the matching `@font-face`
++ `--font-set*` variables **at runtime**. Seeding or editing a font shows up on refresh with no build
+step.
+
+It renders nothing in production, and stands down in dev once `definition.ts` is populated. So running
+`payload-fonts-download` against your dev server previews the exact production path locally.
+
+`<DevFonts>` is a server component. Pass it your `@payload-config`.
+
+## `DevFonts` props
+
+export const devFontsProps = [
+  { name: 'config', type: 'SanitizedConfig', required: true, description: `Your Payload config, the same @payload-config import you pass to getPayload.` },
+  { name: 'definition', type: 'Record<string, { variable?: string }>', description: `The generated next/font definition. When it already has fonts, DevFonts stands down and lets next/font take over; omit it and DevFonts always renders in dev.` },
+  { name: 'cssVarPrefix', type: 'string', default: "'--font-set'", description: `CSS family-variable prefix; must match the download CLI cssVariablePrefix.` },
+  { name: 'fontSetSlug', type: 'string', default: "'fontSet'", description: `Slug of the font-selection global.` },
+  { name: 'optimizedSlug', type: 'string', default: "'fontOptimized'", description: `Slug of the optimized (served) upload collection.` },
+  { name: 'families', type: 'FontFamilyConfig[]', default: 'auto-discovered', description: `Optional. The slots are auto-discovered from the fontSet global, so you only need this to match custom per-family fallback stacks in the dev preview.` },
+]
+
+<ConfigOptions items={devFontsProps} />
+
+<Callout type="info">
+  **`cssVarPrefix` and `cssVariablePrefix` are the same setting under two names — not a typo.** The
+  `<DevFonts cssVarPrefix>` prop and the download CLI's `cssVariablePrefix` (env var
+  `PAYLOAD_FONTS_CSS_VAR_PREFIX`, default `--font-set`) both set the prefix for the emitted CSS family
+  variables. Keep them equal, or the development and production paths emit different variable names
+  and your `font-family: var(--font-setSans)` rules resolve on only one path.
+</Callout>
+
+## Environment variables
+
+The CLI reads these env vars — full table in [Reference](/docs/plugins/payload-fonts/reference#environment-variables). The two required: `FONT_DOWNLOAD_URL`, `PAYLOAD_SECRET`.
+
+## Next
+
+- [Collections & the `fontSet` global](/docs/plugins/payload-fonts/collections) — the fields behind the served files.
+- [How it works](/docs/plugins/payload-fonts/how-it-works) — the subset pipeline, one-file-both-styles, and revalidation.
+- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — blank admin fields, stale dev fonts, nothing rendering.

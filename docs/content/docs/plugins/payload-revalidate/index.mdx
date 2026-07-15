@@ -1,0 +1,202 @@
+---
+title: "payload-revalidate"
+description: "Edit one document and only the pages that show it go stale — precise Next.js cache revalidation for Payload, no full-cache purges."
+---
+
+`@pro-laico/payload-revalidate` makes Next.js cache revalidation precise for Payload.
+Edit one document and only the pages that show it go stale.
+No more purging the whole cache on every content change.
+
+<Callout type="info">
+  **Before:** edit an image's alt text, purge the whole cache, every page rebuilds.
+  **After:** only that image's own cache entry refreshes — everywhere the image appears —
+  while every surrounding page, list, and card entry survives.
+</Callout>
+
+```bash
+pnpm add @pro-laico/payload-revalidate
+```
+
+## What's included
+
+- **Surgical invalidation** — edit one document and only the entries that render it go
+  stale; every surrounding page, list, and card survives.
+- **Field-driven busts** — each bust is computed from which fields changed, so a title
+  edit refreshes one card, not the whole archive.
+- **Cache helpers that fetch and tag together** — write a getter as `'use cache'` plus one
+  finder call; the finder runs the query and tags the entry.
+- **Zero-config sibling defaults** — icons, images, mux, fonts, and seed integrate
+  automatically when the plugin is registered last.
+- **A live dependency map** — `/dev/revalidate` shows exactly what revalidates when (with
+  [`payload-dev-tools`](/docs/plugins/payload-dev-tools)).
+
+## Requirements
+
+Next.js 16 with Cache Components enabled, on the App Router.
+
+```ts title="next.config.ts"
+const nextConfig = { cacheComponents: true }
+```
+
+<Callout type="warn">
+  This plugin asks you to adopt a getter pattern: each cached read is a `'use cache'`
+  function plus one finder call, and the cache helpers are seeded once with a live Payload
+  handle. The Quickstart walks the whole path.
+</Callout>
+
+## Quickstart
+
+<Steps>
+
+<Step>
+
+### Install
+
+```bash
+pnpm add @pro-laico/payload-revalidate
+```
+
+</Step>
+
+<Step>
+
+### Enable Cache Components
+
+```ts title="next.config.ts"
+const nextConfig = { cacheComponents: true }
+```
+
+</Step>
+
+<Step>
+
+### Register the plugin last
+
+Add it **last** in `plugins: []`, so it can hook collections other plugins contribute.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { revalidatePlugin } from '@pro-laico/payload-revalidate'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    // ...your other plugins
+    revalidatePlugin(), // add it LAST
+  ],
+})
+```
+
+<Callout type="info">
+  Zero-config works: every collection and global gets hooks and doc tags automatically.
+  Declaring list scopes is the one thing worth configuring — see
+  [Examples](/docs/plugins/payload-revalidate/examples) and
+  [Reference](/docs/plugins/payload-revalidate/reference#plugin-options).
+</Callout>
+
+</Step>
+
+<Step>
+
+### Seed the cache helpers
+
+Seed the helpers **once** with your app's live Payload session. Export the handle so
+getters and manual busters share it. `getPayload` returns a promise — hand it in as-is;
+`createCacheHelpers` accepts a `Payload` or `Promise<Payload>` and awaits it internally, so
+there's no top-level `await`.
+
+```ts title="src/lib/getters.ts"
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+
+export const db = getPayload({ config })
+const { findDoc, findDocByID, findIds, findGlobal } = createCacheHelpers(db)
+```
+
+<Callout type="info">
+  Two entry points: the package root exports `revalidatePlugin` and `tagsFor`; the `/cache`
+  subpath exports `createCacheHelpers`. The finders and the manual busters come from what
+  `createCacheHelpers(db)` returns. See [Exports](/docs/plugins/payload-revalidate/reference#exports).
+</Callout>
+
+</Step>
+
+<Step>
+
+### Write a getter
+
+Each getter is `'use cache'` plus one finder call. The finder runs the query and tags the
+entry.
+
+```ts title="src/lib/getters.ts"
+/** THE atomic unit: one doc, one entry, shared by every usage site. */
+export async function getPost(id: string | number) {
+  'use cache'
+  return findDocByID('posts', id)
+}
+
+/** The id-list: membership/order only. Content edits never touch this entry. */
+export async function getRecentPostIds(page = 1) {
+  'use cache'
+  return (await findIds('posts', { page, limit: 12, sort: '-publishedAt', list: 'recent' })).ids
+}
+```
+
+<Callout type="info">
+  A named `list` scope (`'recent'` here) must be declared in the plugin config, listing the
+  sort/filter fields it depends on, or reorders won't bust it. See
+  [Examples](/docs/plugins/payload-revalidate/examples#multiple-lists-over-one-collection) and
+  [Reference](/docs/plugins/payload-revalidate/reference#plugin-options).
+</Callout>
+
+</Step>
+
+<Step>
+
+### Render ids, self-fetch each card
+
+The list renders ids; each card fetches its own doc through the id-keyed getter — one cache
+entry per card.
+
+```tsx title="app/(frontend)/PostList.tsx"
+async function PostList() {
+  const ids = await getRecentPostIds()
+  return ids.map((id) => <PostCard key={id} id={id} />)
+}
+
+async function PostCard({ id }: { id: string | number }) {
+  const post = await getPost(id)
+  if (!post) return null
+  return <article>…</article>
+}
+```
+
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+  <Card title="The atomic model" href="/docs/plugins/payload-revalidate/atomic-model">
+    Why per-doc entries make invalidation surgical, the tag vocabulary, and what busts when.
+  </Card>
+  <Card title="Writing getters" href="/docs/plugins/payload-revalidate/getters">
+    The finders, their signatures and return shapes, and the low-level primitives.
+  </Card>
+  <Card title="Examples" href="/docs/plugins/payload-revalidate/examples">
+    Detail pages, lists, globals, drafts, sitemaps, manual rules, and migrating off `unstable_cache`.
+  </Card>
+  <Card title="Reference" href="/docs/plugins/payload-revalidate/reference">
+    Plugin options, the full import-path map, and behavior notes.
+  </Card>
+  <Card title="Troubleshooting" href="/docs/plugins/payload-revalidate/troubleshooting">
+    Nothing revalidates, untagged entries, the `/dev/revalidate` diagnostic map.
+  </Card>
+</Cards>
+
+## Plugin options
+
+Zero-config by default — every option is optional. See
+[Reference](/docs/plugins/payload-revalidate/reference) for every option, its default, and the full export map.

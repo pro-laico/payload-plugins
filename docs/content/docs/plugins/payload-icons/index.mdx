@@ -1,0 +1,137 @@
+---
+title: "payload-icons"
+description: "A fully custom icon set in Payload CMS that's as easy to use as Lucide, and anyone in the admin can add to it."
+---
+
+Upload an `.svg` in the admin, and the plugin optimizes, sanitizes, and themes it on save. A single
+`<Icon name="…" />` server component then drops it into any page as a real, inline `<svg>` that
+recolors from CSS.
+
+No sprite sheet, no wrapper file, no untrusted markup reaching the browser. Building your own icon
+set becomes as easy as using an off-the-shelf one like [Lucide](https://lucide.dev), and designers or
+clients can extend it from the admin without touching code.
+
+```bash
+pnpm add @pro-laico/payload-icons
+```
+
+<Callout type="info">
+  **Mental model.** Icons are a shared pool of SVGs. An **icon set** maps a lookup `name`
+  (`arrow-right`) to an icon in that pool. One set is **active**, and `<Icon name>` resolves against
+  it, so the *set entry's* name is the lookup key, **not the uploaded filename**. Swap which set is
+  active and every icon re-skins at once. Uploading an icon isn't enough on its own; it renders once
+  an **active, published** set points a name at it.
+</Callout>
+
+## What's included
+
+- **Add icons in the admin:** upload an `.svg` and the plugin optimizes, sanitizes, and themes it on save — designers and clients extend the set without touching code.
+- **One drop-in component:** `<Icon name="arrow-right" />` inlines a real, recolorable `<svg>` — as easy as [Lucide](https://lucide.dev), but it's *your* set.
+- **Swappable icon sets:** activating a different set re-skins every icon at once — a seasonal pack, a heavier redraw, an A/B test.
+- **Never ship a missing icon:** the **Requested icons** panel scans your code and tracks runtime misses, surfacing exactly which icons you still need.
+- **Declarative seeding:** icons seed natively through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) — no helper, no provider.
+
+![Icon set Default, rendered in the /dev/icons route](/screenshots/icons-default.png)
+
+![Icon set Alternate, rendered in the /dev/icons route](/screenshots/icons-alternate.png)
+
+## Requirements
+
+- **Source solid-fill SVGs.** The optimizer themes filled glyphs by rewriting their colors to `currentColor`. Stroke-drawn sets like Lucide render as solid blobs — see [Troubleshooting](/docs/plugins/payload-icons/troubleshooting).
+- **Render in a server component.** `<Icon>` is an async server component that queries Payload; it can't render inside a `'use client'` component.
+- **Revalidation is opt-in.** On its own the plugin does no cache revalidation. Install the companion [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) to make the whole surface self-healing — see [How it works](/docs/plugins/payload-icons/how-it-works).
+
+## Quickstart
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+```ts
+import { buildConfig } from 'payload'
+import { iconsPlugin } from '@pro-laico/payload-icons'
+
+export default buildConfig({
+  plugins: [iconsPlugin()],
+})
+```
+
+That registers the `icon` and `iconSet` collections plus a hidden `iconRequest` diagnostics
+collection. Zero-config.
+
+**Required: regenerate the admin import map** — the icon-preview components are registered by string
+path:
+
+```bash
+pnpm payload generate:importmap
+```
+</Step>
+
+<Step>
+**Upload an SVG**
+
+Add `.svg` files to the `icon` collection in the admin. Each is optimized and sanitized on save and
+stored as `svgString` (the cleaned `<svg>…</svg>`) plus `optimized` (a short report, e.g. `SVG
+optimized: 1234 to 567 bytes (54.1% reduction)`). Uploading alone doesn't render anything yet; a set
+has to point a name at it (next step).
+
+<Callout type="warn">
+  Use solid **fill-based** SVGs. A stroke-drawn icon comes out filled solid — a circle outline
+  becomes a disk. See [Troubleshooting](/docs/plugins/payload-icons/troubleshooting).
+</Callout>
+</Step>
+
+<Step>
+**Create a set, name each icon, then activate and publish**
+
+An `iconSet` maps lookup names to icons. In order:
+
+1. Add an `iconSet`. In the **Icons** tab, add one row per icon.
+2. Type a **name** and select an uploaded icon. The name is the lookup key `<Icon name>` uses, is **independent of the uploaded filename**, and is auto kebab-cased — type whatever you'll reference in code.
+3. In **Settings**, toggle the set **active**. Activating one set deactivates the rest.
+4. **Publish** the set.
+
+<Callout type="info">
+  Sets are drafts-enabled by default, and the published frontend only reads a *published* active
+  set. A draft-only set won't show until you publish it.
+</Callout>
+</Step>
+
+<Step>
+**Render it**
+
+The active set is now resolvable. Drop the component into any server component or page:
+
+```tsx
+import { Icon } from '@pro-laico/payload-icons/components/Icon'
+
+// resolves `arrow-right` through the active set and inlines a real <svg>
+<Icon name="arrow-right" className="size-6 text-primary" />
+```
+
+<Callout type="info">
+  `<Icon>` is an async server component — render it in a server component or page, **not** inside a
+  `'use client'` component.
+</Callout>
+
+That's the whole loop: upload → set → render. See
+[Using icons](/docs/plugins/payload-icons/using-icons) for props, fallbacks, and styling.
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+  <Card title="Using icons" href="/docs/plugins/payload-icons/using-icons" description="The <Icon> component, its props, rendering an icon yourself, and styling with CVA + Tailwind." />
+  <Card title="Collections" href="/docs/plugins/payload-icons/collections" description="The icon, iconSet, and iconRequest collections, and icon-use detection." />
+  <Card title="How it works" href="/docs/plugins/payload-icons/how-it-works" description="Resolving an icon through the active set, revalidation, and declarative seeding." />
+  <Card title="Reference" href="/docs/plugins/payload-icons/reference" description="Plugin options, environment variables, CLI commands, endpoints, and exports." />
+  <Card title="Troubleshooting" href="/docs/plugins/payload-icons/troubleshooting" description="Fallback glyphs, solid-blob renders, blank admin previews, and build-time config errors." />
+</Cards>
+
+## Plugin options
+
+Zero-config by default — every option has a sensible default. See
+[Reference](/docs/plugins/payload-icons/reference) for options, environment variables, CLI, and exports.

@@ -1,0 +1,161 @@
+---
+title: "How it works"
+description: "How the subset pipeline, one-file italics, and the two serving paths fit together — so you can reason about what happens on save, on build, and on refresh."
+---
+
+Three collections and two serving paths make up `@pro-laico/payload-fonts`. This page explains how they fit together: what happens when you save a typeface, how one variable file can serve both upright and italic, and how a `fontSet` change reaches the browser.
+
+For the collections themselves see [Collections](/docs/plugins/payload-fonts/collections); for wiring the two serving paths into your layout see [Serving](/docs/plugins/payload-fonts/serving).
+
+## The subset pipeline
+
+You only ever edit the [`font`](/docs/plugins/payload-fonts/collections#font) typeface. Its uploaded files are stored raw in [`fontOriginal`](/docs/plugins/payload-fonts/collections#fontoriginal) — the **archive of truth** — and subsetted to served [`fontOptimized`](/docs/plugins/payload-fonts/collections#fontoptimized) WOFF2s on every save.
+
+Keeping the untouched originals is deliberate. The served output is lossy: it's subsetted down to your `charset`. Holding the source bytes lets it be re-derived later — widen `charset`, save the typeface again, and the next save re-subsets from the originals with no re-upload.
+
+A delete cascades through both derived layers. The whole flow runs in the `font` collection's hooks (`optimizeFromOriginals` on save, `cleanupFontAssets` on delete), so there's no separate build step to run and nothing to keep in sync by hand.
+
+## One file, both styles
+
+Some variable fonts carry their italics **inside the upright file** — a true `ital` axis, or a `slnt` (slant) axis like Recursive's `0…-15`. Upload one of those to the `variable.upright` slot and the optimize hook reads the axes (via fontkit) and flags the served file `italCapable`, plus `obliqueAngle` for slant-based ones.
+
+Every serving path then emits **two faces from the one file**: the upright, and an italic. That covers `DevFonts` / `buildFontFaceCss`, the export endpoint, and the download CLI's `next/font/local` output. The italic is declared as `font-style: italic` (an `ital` axis) or `font-style: oblique 15deg` (a `slnt` axis), and CSS maps that onto the axis automatically. Your `font-style: italic` styles just work, because italic requests match oblique faces in font matching.
+
+<Callout type="info">
+  An explicit `variable.italic` file always wins. When the typeface has its own italic upload, the hook does no synthesis.
+</Callout>
+
+## Revalidation & caching
+
+How a `fontSet` change reaches the browser depends on the serving path, by design.
+
+- **Production** bakes fonts at build time, so there's no runtime cache to bust and **no `revalidatePath` / `revalidateTag`** — that's the tradeoff for stock `next/font`. Publish a change by re-running the download and rebuilding (`payload-fonts-download` → `next build`). To automate it, trigger a redeploy from a `fontSetOverrides.hooks.afterChange` deploy hook. The export endpoint is `Cache-Control: no-store`, so each run sees the current selection.
+- **Development** reads the live selection on every render, so keep the route dynamic (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface (see [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting)).
+
+Running [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate)? Same story: tag-based busting can't reach build-baked fonts, so there's deliberately no integration to configure. The derived `fontOriginal` / `fontOptimized` collections ship `custom: { revalidate: false }`, so the `Font` save hook's derived writes never fire bust events. `font` and the `fontSet` global keep the standard auto-attached hooks, in case you cache reads of them (for example, a font picker UI).
+
+## Seeding
+
+`fontOriginal` is a plain Payload upload collection, so its raw font files seed **natively** via [`@pro-laico/payload-seed`](/docs/plugins/payload-seed) like any image — no asset marker, no glue. Each `font` typeface then **references** its originals with `ref('fontOriginal', …)`, either in its `variable` group (one file, every weight) or its `weights` rows (one file per weight). The collection's `afterChange` hook subsets each referenced original into a served `fontOptimized` WOFF2.
+
+Point the seed engine at both definitions and map `fontOriginal`'s source folder with `assetSubDirs`:
+
+<Tabs items={['payload.config.ts', 'fontOriginals.ts', 'fonts.ts', 'fontSet.ts']}>
+
+<Tab value="payload.config.ts">
+
+```ts
+import { fontsPlugin } from '@pro-laico/payload-fonts'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+plugins: [
+  fontsPlugin(),
+  seedPlugin({
+    definitions: [fontOriginals, fonts, fontSet],
+    assetSubDirs: { fontOriginal: 'font' }, // font files live in <assetsDir>/font/, not /fontOriginal/
+  }),
+]
+```
+
+</Tab>
+
+<Tab value="fontOriginals.ts">
+
+```ts
+// src/seed/fontOriginals.ts: raw font files, seeded natively like any upload (files live in <assetsDir>/font/)
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export const fontOriginals = defineSeed('fontOriginal', ({ file }) => [
+  {
+    _key: 'inter-variable',
+    _file: file('InterVariable.woff2'), // assets/font/InterVariable.woff2 (via assetSubDirs)
+  },
+  {
+    _key: 'inter-variable-italic',
+    _file: file('InterVariable-Italic.woff2'), // assets/font/InterVariable-Italic.woff2
+  },
+  {
+    _key: 'lora-400',
+    _file: file('lora-400.woff2'), // assets/font/lora-400.woff2
+  },
+  {
+    _key: 'lora-400-italic',
+    _file: file('lora-400-italic.woff2'), // assets/font/lora-400-italic.woff2
+  },
+  {
+    _key: 'lora-700',
+    _file: file('lora-700.woff2'), // assets/font/lora-700.woff2
+  },
+  {
+    _key: 'recursive-variable',
+    _file: file('recursive-variable.woff2'), // assets/font/recursive-variable.woff2
+  },
+])
+```
+
+</Tab>
+
+<Tab value="fonts.ts">
+
+```ts
+// src/seed/fonts.ts: the three shapes — variable pair, static weights + italics, one-file-both-styles
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('font', ({ ref }) => [
+  {
+    _key: 'inter',
+    title: 'Inter',
+    family: 'sans',
+    // variable pair: upright + italic files, each covering the whole weight axis (100–900)
+    variable: {
+      upright: ref('fontOriginal', 'inter-variable'),
+      italic: ref('fontOriginal', 'inter-variable-italic'),
+    },
+  },
+  {
+    _key: 'lora',
+    title: 'Lora',
+    family: 'serif',
+    // static files: one row per weight/style you actually use
+    weights: [
+      { weight: '400', style: 'normal', file: ref('fontOriginal', 'lora-400') },
+      { weight: '400', style: 'italic', file: ref('fontOriginal', 'lora-400-italic') },
+      { weight: '700', style: 'normal', file: ref('fontOriginal', 'lora-700') },
+    ],
+  },
+  {
+    _key: 'recursive',
+    title: 'Recursive',
+    family: 'display',
+    // one file, BOTH styles: Recursive's axes carry wght 300–1000 and slnt 0…-15, so the hook
+    // flags it ital-capable and the site serves an italic face from this same upload
+    variable: { upright: ref('fontOriginal', 'recursive-variable') },
+  },
+])
+```
+
+</Tab>
+
+<Tab value="fontSet.ts">
+
+```ts
+// src/seed/fontSet.ts: pick the active typeface per family with ordinary ref() tokens
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export const fontSet = defineSeed('fontSet', ({ ref }) => ({
+  sans: ref('font', 'inter'),
+  serif: ref('font', 'lora'),
+}))
+```
+
+</Tab>
+
+</Tabs>
+
+A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, so the cascade removes the old originals + optimized too (idempotent). See the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
+
+## Next
+
+- [Collections](/docs/plugins/payload-fonts/collections) — the `font`, `fontOriginal`, `fontOptimized` shapes and the `fontSet` global.
+- [Serving](/docs/plugins/payload-fonts/serving) — wire the production and development paths into your layout.
+- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — stale dev fonts, blank admin fields, and the wasm-bundling failure.

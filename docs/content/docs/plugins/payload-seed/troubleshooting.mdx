@@ -1,0 +1,43 @@
+---
+title: "Troubleshooting"
+description: "Fix a stuck seed fast — the seed button that won't show, the destructive reset, the Node 24 CLI crash, and stale typed refs, each symptom-first."
+---
+
+When a seed misbehaves, find your symptom below. Each entry leads with what you see, then the cause, then the fix.
+
+- **Seed button doesn't appear in the admin header.** Two independent things hide it. The button registers by string path, so a stale import map drops it — run `pnpm payload generate:importmap` and restart the dev server. It also never renders unless `ENABLE_SEED` is exactly `"true"` — environments where the endpoint would refuse anyway show no button. Check both.
+
+- **CLI dies with `ENOENT … node:crypto?tsx-namespace=…` on Node 24.** That's `tsx`, not the seed. Payload's CLI loads bin scripts through tsx's `tsImport()`, and tsx ≥ 4.21.1 mis-resolves a dependency's bare `require('crypto')` under Node 24's module hooks — killing any custom `payload <script>` at boot. Pin tsx below the regression until it's fixed upstream.
+
+  ```json
+  // package.json — pnpm
+  { "pnpm": { "overrides": { "tsx": "4.19.4" } } }
+  ```
+
+  The admin button and `POST /api/seed` are unaffected — they run in the app's own runtime, so reach for either while the CLI is blocked. See [Running the seed](/docs/plugins/payload-seed/running).
+
+- **Nothing runs; endpoint and CLI return `403`.** The `ENABLE_SEED` kill switch is off. The endpoint and CLI no-op unless `ENABLE_SEED` is exactly `"true"`, and the admin button isn't even rendered. Set it per-environment while iterating, and never set it in production.
+
+  <Callout type="warn">
+    The in-code `seed()` is the exception — it skips the gate, so it will wipe whatever database it's handed. Guard your script and test setup accordingly.
+  </Callout>
+
+- **A re-run wiped data you wanted to keep.** Every run is destructive. A seed clears each collection it touches before recreating it — a reset, not an append. Re-running wipes and rebuilds, so never point it at data you want to keep.
+
+- **A doc didn't get its file; the log says `_file '…' not found`.** The source file isn't under `<assetsDir>/<subdir>/`. The engine logs the miss and keeps going — the doc is still created (and an upload collection that requires a file may then error downstream). Watch the logs for typos. The subdir defaults to the collection slug; override it with `assetSubDirs`. See [Where files live](/docs/plugins/payload-seed/writing-seeds#where-files-live).
+
+- **A hard error names a cycle like `posts:a -> authors:b -> posts:a`.** Two docs reference each other on required fields. The engine breaks a cycle by deferring one side's `ref` and setting it in a second pass once both docs exist — but that field has to be **optional** (it's created null first). A cycle where every ref sits on a *required* field can't be deferred. Make one side optional to break it.
+
+- **A `ref()` at a renamed or removed `_key` isn't flagged.** Typed refs need `generate:types`. `ref()` keys are only checked once the `SeedRegistry` is generated; before that they fall back to runtime validation. Rename a `_key` and you must regenerate types for the compile-time check to catch stale references.
+
+- **A `ref()` flips between valid and error on the dev server.** You env-gated a definition out of the array. Conditionally registering a definition (`...(withMux ? [videos] : [])`) makes the generated seed-ref types depend on the environment — the dev server regenerates them on boot, and every `ref()` at it flips. Register it unconditionally and let it be skipped at runtime instead, via `custom.seedDisabled` or `defineSeed`'s `disabled`. See [Disabled seeds](/docs/plugins/payload-seed/advanced#disabled-seeds).
+
+- **A `ref()` won't point at a global; a global updated after everything else.** `ref()` points at collection docs only — a global can reference docs, but a doc can't reference a global. Globals are applied last, after every doc exists. This is by design; see [How it works](/docs/plugins/payload-seed/advanced#how-it-works).
+
+- **A bulk seed fired a revalidation per doc.** Your `afterChange` / `afterDelete` hooks aren't checking the seed's context flag. The engine sets `context: { disableRevalidate: true }` on every write — have your hooks skip when it's present. See [Disable revalidation](/docs/plugins/payload-seed/advanced#disable-revalidation).
+
+## Next
+
+- [Running the seed](/docs/plugins/payload-seed/running) — the four entry points and their gates
+- [Writing seeds](/docs/plugins/payload-seed/writing-seeds) — `defineSeed`, refs, and files
+- [Advanced](/docs/plugins/payload-seed/advanced) — disabled seeds, revalidation, and how the engine runs

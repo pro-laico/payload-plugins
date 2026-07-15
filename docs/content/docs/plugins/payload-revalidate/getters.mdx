@@ -1,0 +1,88 @@
+---
+title: "Writing getters"
+description: "Cache one read as a getter and the finder tags its own entry — a content edit busts exactly that document, everywhere it appears."
+---
+
+A getter caches one read and tags its own cache entry. You write it once as `'use cache'` plus a single finder call. The finder runs the query and tags the entry in the same step, so a content edit busts exactly that entry — at every usage site at once.
+
+## Writing a getter
+
+Seed the helpers **once** with your app's live Payload session. Then each getter is `'use cache'` + one finder call — the collection is typed once, and the atomic defaults are baked in.
+
+```ts
+// src/lib/getters.ts
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+
+const { findDoc, findDocByID, findIds, findGlobal } = createCacheHelpers(getPayload({ config }))
+
+/** The id-list: membership/order only. Content edits never touch this entry. */
+export async function getRecentPostIds(page = 1) {
+  'use cache'
+  return (await findIds('posts', { page, limit: 12, sort: '-publishedAt', list: 'recent' })).ids
+}
+
+/** THE atomic unit: one doc, one entry, shared by every usage site. */
+export async function getPost(id: string | number) {
+  'use cache'
+  return findDocByID('posts', id)
+}
+```
+
+Returns are fully typed from your generated `payload-types` (`Post | null`, select-narrowed when you pass `select`).
+
+<Callout type="info">
+  Every finder applies the atomic defaults for you: `depth: 0`, `overrideAccess: false`, errors resolve to `null`, and id-lists are forced to `select: {}`. See [Reference](/docs/plugins/payload-revalidate/reference) for the full list of defaults in one place.
+</Callout>
+
+The list renders ids; each card self-fetches through its own getter, so every card is its own entry:
+
+```tsx
+// The list renders ids; each card self-fetches — one entry per card.
+async function PostList() {
+  const ids = await getRecentPostIds()
+  return ids.map((id) => <PostCard key={id} id={id} />)
+}
+
+async function PostCard({ id }: { id: string | number }) {
+  const post = await getPost(id)
+  if (!post) return null
+  return <article>…</article>
+}
+```
+
+<Callout type="warn">
+  The finders refuse `user` / `req`. A `'use cache'` entry is keyed by its arguments and shared across requesters, so a user-scoped read would serve one user's view to everyone. Run those outside the cache boundary with `payload.find` directly.
+</Callout>
+
+## The finders
+
+Each finder runs `payload.find` (or `findGlobal`) and tags the entry. All remaining local-API options pass through (`where`, `sort`, `locale`, `select`, `populate`, `context`, …).
+
+| Finder | Call | Returns |
+| --- | --- | --- |
+| `findDocByID` | `findDocByID(slug, id)` | the typed doc or `null` |
+| `findDoc` | `findDoc(slug, { where, as, draft, … })` | the typed doc or `null`, select-narrowed |
+| `findIds` | `findIds(slug, { page, limit, sort, list, draft })` | `{ ids, page, totalPages, totalDocs, hasNextPage, hasPrevPage }` |
+| `findGlobal` | `findGlobal(slug)` | the typed global |
+
+`findIds` returns pagination meta without a second query.
+
+Finder-specific params:
+
+- **`as`** (`findDoc`) — the alias value for the doc's alias tag. It overrides the collection's `idField` (default `slug`), and it tags even a `null` result, so a cached miss purges the moment that slug is created.
+- **`list`** (`findIds`) — names a declared list scope, giving the id-list its own scope tag (`posts:list:recent`).
+- **`draft`** (`findDoc`, `findIds`) — one flag drives both the fetch and the `:draft` tag variants.
+
+For the tag vocabulary these produce, see [The atomic model](/docs/plugins/payload-revalidate/atomic-model).
+
+## Primitives
+
+The underlying primitives — `cacheDoc`, `cacheIds`, `cacheGlobal` — stay exported from the same factory, for getters the finders can't express: multiple reads in one entry, post-processed queries, or non-Payload data in the same scope. A finder is exactly `payload.find` + the matching primitive, nothing more.
+
+Reach for a primitive when the entry deliberately carries content that `findIds` can't represent — a sitemap is the classic case. See [Examples](/docs/plugins/payload-revalidate/examples) for the pattern.
+
+---
+
+**Next:** [The atomic model](/docs/plugins/payload-revalidate/atomic-model) · [Examples](/docs/plugins/payload-revalidate/examples) · [Reference](/docs/plugins/payload-revalidate/reference) · [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting)

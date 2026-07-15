@@ -1,0 +1,108 @@
+---
+title: "Reference"
+description: "Plugin options, environment variables, the CLI scan command, and every export payload-icons ships."
+---
+
+## Plugin options
+
+`iconsPlugin(options?)` is the single entry point. One call registers the `icon` collection (upload
+pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
+collection. It's zero-config: the usage panel and request tracking are on by default; set them
+`false` to omit.
+
+export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
+  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
+  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
+  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
+  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
+  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
+  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection: additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
+]
+
+Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
+same shape in code, every defaulted option written out.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={options} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+
+// Defaulted options written out. This is what `iconsPlugin()` does with no args.
+iconsPlugin({
+  enabled: true,
+  includeIconSet: true,
+  usagePanel: true,     // the "Requested icons" panel; set false to omit
+  trackRequests: true,  // runtime miss tracking; set false to omit
+  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
+  iconOverrides: {
+    // slug: 'icon',
+    // access: { read: () => true },
+    // fields: [ /* … */ ],
+    // hooks: { /* … */ },
+  },
+  // overrides for the iconSet collection:
+  iconSetOverrides: {
+    // fields: [{ name: 'description', type: 'textarea' }],
+    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+  },
+})
+```
+
+</Tab>
+
+</Tabs>
+
+## Environment variables
+
+Two env vars tune usage detection at runtime, independent of the plugin options.
+
+<TypeTable
+  type={{
+    ICON_USAGE_TRACKING: { description: "Set to false to force-off only the runtime miss recorder, without changing the trackRequests option. The iconRequest collection stays registered.", type: "boolean" },
+    ICON_USAGE_MANIFEST: { description: "Overrides the production manifest path the Requested icons panel reads. Default: icon-usage-manifest.json in cwd.", type: "string" },
+  }}
+/>
+
+## CLI commands
+
+| Command | What |
+| --- | --- |
+| `payload-icons-scan` | Scan source for `<Icon name>` and write the usage manifest (`icon-usage-manifest.json`). Run it in your production build so the **Requested icons** panel works where source isn't on disk. Scans `./src` and `./app`; `-o` sets the manifest path, `--component Glyph` scans a different component. See [Collections](/docs/plugins/payload-icons/collections#icon-use-detection). |
+
+## Endpoints
+
+None public. Icon-set activation happens in the admin, or through the companion
+[`@pro-laico/payload-dev-tools`](/docs/plugins/payload-dev-tools) `/dev` panel.
+
+## Exports
+
+| Export | From | What |
+| --- | --- | --- |
+| `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point. |
+| `extractSvgContent` | `@pro-laico/payload-icons` | Pull the inner markup out of an `svgString` to inline it in your own `<svg>`. |
+| `extractSvgProps` | `@pro-laico/payload-icons` | Parse an `svgString`'s root attributes (viewBox, etc.) onto your own `<svg>`. |
+| `Icon` | `@pro-laico/payload-icons/components/Icon` | The drop-in `<Icon name="…" />` server component (resolves through the active set). |
+| `getIconSvg` | `@pro-laico/payload-icons/cache` | Resolve one icon name to its `svgString` through the active set (server-only, memoized). |
+| `payload-icons-scan` | `@pro-laico/payload-icons` | CLI that scans source for `<Icon name>` and writes the usage manifest. |
+
+## Collections & globals
+
+`iconsPlugin()` registers the `icon`, `iconSet`, and `iconRequest` collections — see
+[Collections](/docs/plugins/payload-icons/collections) for their fields, hooks, and the icon-use
+detection panel.
+
+## Next
+
+- [Using icons](/docs/plugins/payload-icons/using-icons) — `<Icon>` props, rendering the SVG yourself, CVA styling.
+- [Collections](/docs/plugins/payload-icons/collections) — the icon, iconSet, and iconRequest collections.
+- [How it works](/docs/plugins/payload-icons/how-it-works) — resolving an icon, revalidation, and seeding.
+- [Troubleshooting](/docs/plugins/payload-icons/troubleshooting) — fallback glyphs, solid-blob renders, blank previews.

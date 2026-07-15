@@ -1,0 +1,117 @@
+---
+title: "Reference"
+description: "Plugin options, environment variables, the download CLI, the export endpoint, and every export for payload-fonts."
+---
+
+## Plugin options
+
+`fontsPlugin(options?)` is the single entry point; one call registers the three collections, the
+`fontSet` global, and the export endpoint. It's zero-config. The collections and global are covered on
+the [Collections](/docs/plugins/payload-fonts/collections) page.
+
+export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op and registers nothing.` },
+  { name: 'charset', type: "'latin' | 'latin-ext' | string", default: "'latin'", description: `Characters the subsetter keeps in the served WOFF2 files: a preset (latin is ASCII + Latin-1 + common punctuation, latin-ext widens it), or an explicit string of characters to retain.` },
+  { name: 'families', type: 'FontFamilyConfig[]', default: 'sans / serif / mono / display', description: `Font slots. The COMPLETE list: it replaces the four defaults wholesale (spread DEFAULT_FONT_FAMILIES to keep them). Each entry:`, options: [
+    { name: 'key', type: 'string', required: true, description: `Family id. Becomes a family option, a fontSet slot, and (capitalised) font<Key> / --font-set<Key>.` },
+    { name: 'label', type: 'string', default: 'capitalised key', description: `Admin label for the family option and fontSet slot.` },
+    { name: 'fallback', type: 'string', default: 'generic sans stack', description: `CSS fallback appended after the served family in the family variable.` },
+  ] },
+  { name: 'includeFontSet', type: 'boolean', default: 'true', description: `Register the fontSet global, the active per-family selection the export endpoint and your frontend read. On by default; set false only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
+  { name: 'fontOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection, e.g. tighter access.` },
+  { name: 'fontOriginalOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection, e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter.` },
+  { name: 'fontOptimizedOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s), e.g. an upload.staticDir.` },
+  { name: 'fontSetOverrides', type: 'Partial<GlobalConfig>', description: `Merged onto the fontSet global.` },
+]
+
+Pass options to customize. **Reference** is the interactive view; **TypeScript** is the same shape
+in code, every option at its default.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={options} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+import { fontsPlugin } from '@pro-laico/payload-fonts'
+
+// Every option at its default. This is the zero-config behaviour, written out.
+fontsPlugin({
+  enabled: true,
+  charset: 'latin',
+  includeFontSet: true,
+  // families: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
+  //   ^ the default, written out. Pass your own COMPLETE list to replace it
+  //     (spread DEFAULT_FONT_FAMILIES to keep these and add more).
+  // fontOverrides: { /* … */ },          // optional, no default; merged onto the font collection
+  // fontOriginalOverrides: { /* … */ },  // optional, no default; merged onto fontOriginal
+  // fontOptimizedOverrides: { /* … */ }, // optional, no default; merged onto fontOptimized
+  // fontSetOverrides: { /* … */ },       // optional, no default; merged onto the fontSet global
+})
+```
+
+</Tab>
+
+</Tabs>
+
+Overrides merge non-destructively: `fields` append, `access` / `admin` / `upload` shallow-merge,
+and `hooks` merge per phase, so `fontOriginalOverrides: { upload: { staticDir } }` keeps the built-in
+font-mime whitelist.
+
+## Environment variables
+
+The `payload-fonts-download` CLI reads these. Only the first two are required:
+
+| Env var | Default | What |
+| --- | --- | --- |
+| `FONT_DOWNLOAD_URL` | — | **Required.** URL of the running Payload instance to fetch from. |
+| `PAYLOAD_SECRET` | — | **Required.** Bearer secret that authorizes the export endpoint. |
+| `PAYLOAD_FONTS_OUTPUT_DIR` | `./public/fonts` | Where the downloaded WOFF2 files are written. |
+| `PAYLOAD_FONTS_DEFINITION_FILE` | `./src/app/definition.ts` | The generated `next/font/local` module. |
+| `PAYLOAD_FONTS_SRC_PREFIX` | `../../public/fonts` | `src` path in the generated `localFont()` calls, relative to the definition file. |
+| `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | Prefix for the emitted CSS family variables; must match `<DevFonts cssVarPrefix>`. |
+| `PAYLOAD_FONTS_ENDPOINT` | `/api/fonts/export` | Export endpoint path, resolved against the site URL. |
+| `PAYLOAD_FONTS_ENV_FILE` | `./.env` | Dotenv file loaded before reading env. |
+| `PAYLOAD_FONTS_VERBOSE` | `false` | Print the full error on failure (also the `--verbose` / `-v` flag). |
+
+## CLI commands
+
+| Command | What |
+| --- | --- |
+| `payload-fonts-download` | The production build step. Resolves the `fontSet` selection over `GET /api/fonts/export`, writes `public/fonts/*.woff2` + `src/app/definition.ts`, and empties the definition on any failure. Run it on `prebuild` (real fonts) and `predev` (empty stub). See [Serving](/docs/plugins/payload-fonts/serving). |
+
+## Endpoints
+
+| Route | Auth | What |
+| --- | --- | --- |
+| `GET /api/fonts/export` | Bearer `PAYLOAD_SECRET` | Returns each active family's `fontOptimized` bytes; the source the download CLI fetches. Response shape is `ExportFontsResponse`. See [Serving](/docs/plugins/payload-fonts/serving#production). |
+
+## Exports
+
+| Export | From | What |
+| --- | --- | --- |
+| `fontsPlugin` | `@pro-laico/payload-fonts` | The plugin factory. |
+| `FontFamilyConfig` | `@pro-laico/payload-fonts` | The `{ key, label?, fallback? }` shape of a `families` entry. |
+| `DEFAULT_FONT_FAMILIES` | `@pro-laico/payload-fonts` | The built-in sans/serif/mono/display families (spread to extend them). |
+| `extractFonts` | `@pro-laico/payload-fonts` | Collect the generated `next/font` classes for the root `<html>` className. |
+| `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<DevFonts>`, for custom UIs. |
+| `ExportFontsResponse` | `@pro-laico/payload-fonts` | The shape of `GET /api/fonts/export`, for custom consumers. |
+| `DevFonts` | `@pro-laico/payload-fonts/DevFonts` | The dev-only runtime font component. |
+| `payload-fonts-download` | `bin` | The CLI the production build runs to write fonts to disk. |
+
+## Collections & globals
+
+`fontsPlugin` registers the `font` / `fontOriginal` / `fontOptimized` collections and the `fontSet`
+global. Their fields are documented on [Collections](/docs/plugins/payload-fonts/collections).
+
+## Next
+
+- [Serving](/docs/plugins/payload-fonts/serving) — the two serving paths, the `DevFonts` props, and the download CLI.
+- [Collections](/docs/plugins/payload-fonts/collections) — the `font` upload shape and the `fontSet` global.
+- [How it works](/docs/plugins/payload-fonts/how-it-works) — the subset pipeline, one-file-both-styles, and revalidation.
+- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — blank admin fields, stale dev fonts, nothing rendering.

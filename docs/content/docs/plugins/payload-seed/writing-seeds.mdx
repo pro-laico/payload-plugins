@@ -1,0 +1,231 @@
+---
+title: "Writing seeds"
+description: "Describe your seed data in typed seed.ts files — refs, files, collections, and globals all checked against your real Payload types as you write."
+---
+
+You write seed data in plain `seed.ts` files, one per collection or global, with `defineSeed`. Every record is typed against your generated Payload types, so fields, relationships, and file references are checked as you write them. You and your AI tools get real feedback instead of guessing at shapes.
+
+## defineSeed
+
+Declares the seed data for one collection or global, one `export default` per `seed.ts` file. It
+infers which from the slug: a **collection** slug means the builder returns an **array of records**; a
+**global** slug means it returns a **single data object** (no `_key`). Returns a seed definition you
+add to `seedPlugin({ definitions })`.
+
+export const defineSeedParams = [
+  { name: 'slug', type: 'CollectionSlug | GlobalSlug', required: true, description: `The collection or global to seed into. Typed against your Payload types, so an unknown slug is a TypeScript error. The slug also picks the builder's return shape: an array of records for a collection, a single object for a global.` },
+  { name: 'build', type: '(tokens) => Record[] | GlobalData', required: true, description: `Returns the data to create: an array of records for a collection, or one data object for a global. Receives the { ref, file } tokens as its argument, so you point at other docs and attach files inline, with nothing to import.` },
+  { name: 'opts.disabled', type: 'boolean | string', description: `Skip this definition at seed time without unregistering it, so the generated seed-ref types don't change (a string becomes the warning's reason). Rarely set by hand — a collection that declares custom.seedDisabled (e.g. payload-mux without credentials) is skipped automatically. See Disabled seeds.` },
+]
+
+The **Reference** tab lists the parameters; **TypeScript** is a minimal example.
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+
+<ConfigOptions items={defineSeedParams} />
+
+</Tab>
+
+<Tab value="TypeScript">
+
+```ts
+// src/collections/Services/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+// slug + a builder returning the data (an array of records for a collection).
+export default defineSeed('services', () => [
+  {
+    _key: 'consulting',
+    title: 'Consulting',
+  },
+])
+```
+
+</Tab>
+
+</Tabs>
+
+## Records and `_key`
+
+Each **collection record** is the collection's own data plus two meta-keys the engine reads and
+strips before create. A **global** returns a single data object with no `_key` (a global is a
+singleton).
+
+| Meta-key | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `_key` | `string` | Yes, on collection records | A local handle other seed files target with `ref(slug, key)`. It stays a free string on the producing side; only the consuming `ref()` is checked. |
+| `_file` | `FileToken` | No | The record's source file, attached with the `file()` token. Upload and provider (`custom.seedAsset`) collections only. |
+
+## Collections
+
+A collection builder returns an array of records. Point relationship fields at other records with
+`ref()`; attach a file with `file()` on `_file`:
+
+<Tabs items={['Media (an upload collection)', 'Posts (references them)']}>
+
+<Tab value="Media (an upload collection)">
+
+```ts
+// src/collections/Media/seed.ts: each doc carries its file on `_file`
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('media', ({ file }) => [
+  {
+    _key: 'serviceImg',
+    _file: file('service-a.jpg'), // assets/media/service-a.jpg
+    alt: 'Consulting',
+  },
+])
+```
+
+</Tab>
+
+<Tab value="Posts (references them)">
+
+```ts
+// src/collections/Posts/seed.ts: point at other seeded docs by ref
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('posts', ({ ref }) => [
+  {
+    _key: 'launch',
+    title: 'We launched',
+    heroImage: ref('media', 'serviceImg'),          // upload-field relationship, resolved by ref
+    relatedService: ref('services', 'consulting'),  // typed dependency edge across files
+  },
+])
+```
+
+</Tab>
+
+</Tabs>
+
+Records are typed against your generated Payload types (`RequiredDataFromCollectionSlug<slug>`), with
+relationship fields widened to also accept `ref()` tokens. Change a collection's fields and the seed
+file shows a TS error until it matches; unknown fields are rejected too. The producing side (`_key`)
+stays a free string; only the consuming side (`ref`) is checked.
+
+## Globals
+
+Pass a global slug and the builder returns a single data object instead of an array (a global is a
+singleton, so there's no `_key`). It gets the same tokens, and globals are **updated after** all their
+dependencies exist:
+
+```ts
+// src/globals/SiteSettings/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('site-settings', ({ ref }) => ({
+  /* SiteSettings data; ref('services', 'consulting') etc. */
+}))
+```
+
+## Tokens
+
+Inside a `build` callback you get two tokens. The engine resolves them at create time, and `ref`
+doubles as the dependency edge that orders the run.
+
+export const tokens = [
+  { name: 'ref', type: '(collection, key) => Ref', description: `Point at another seeded doc by its _key, e.g. ref('services', 'consulting'). Records a dependency edge so the target is created first. Both arguments are checked against the SeedRegistry once types are generated. Use it for any relationship / upload field.` },
+  { name: 'file', type: '(name, options?) => FileToken', description: `Attach a source file to a doc, on its _file meta-key, e.g. file('hero.jpg'). Delivered as a native upload or a provider ingest depending on the collection (see Files). options is an optional bag for provider ingest (e.g. a font weight).` },
+]
+
+<ConfigOptions items={tokens} />
+
+You never import either; they're handed to every `build` callback (`({ ref, file }) => …`), so they
+can't drift from the data they point at. `file` goes on the record's `_file` meta-key; everything
+else is an ordinary field.
+
+Run `payload generate:types` and every `ref()` is checked against your real `_key`s: rename or remove
+a seeded item and each stale reference becomes a TS error (unknown collections error too). See
+[How it works](/docs/plugins/payload-seed/advanced#how-it-works) for the mechanism.
+
+## Files (`_file`)
+
+An asset is just a seeded doc that carries a file. Put it on the record's **`_file`** meta-key with
+the `file()` token. How the file is delivered depends on the doc's collection. The engine decides,
+you don't:
+
+- **An upload collection** (e.g. `media`, `images`, `icon`) → the bytes are read and uploaded as the
+  doc's file.
+- **A `custom.seedAsset` collection** (e.g. Mux) → the resolved path + options are handed to the
+  collection's own ingest hook (see [Custom ingestion](/docs/plugins/payload-seed/advanced#custom-ingestion)).
+
+```ts
+// src/collections/Media/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('media', ({ file }) => [
+  {
+    _key: 'hero',
+    _file: file('hero.jpg'), // assets/media/hero.jpg
+    alt: 'Hero',
+    focalX: 78,
+    focalY: 32,
+  },
+])
+```
+
+`file(name, options?)`: `name` is the source filename (resolved below); `options` is an optional bag
+merged into a `custom.seedAsset` collection's ingest source field (e.g. a Mux `playbackPolicy`) and
+ignored for native uploads. The
+doc's own fields (`alt`, focal point, `title`, …) are ordinary record fields, typed against the
+collection, so an upload collection that requires `alt` makes the seed record require it too. Focal
+points set the upload's focal point, so seeded images crop to the right subject the moment they're
+served (e.g. by [`@pro-laico/payload-images`](/docs/plugins/payload-images)).
+
+## Where files live
+
+Every `_file` resolves to the same three-part path — the assets dir, a per-collection folder, then the
+name you pass:
+
+```text
+<assetsDir> / <collection folder> / <file name>
+assets      / media              / hero.jpg
+```
+
+The folder is the collection slug, so this needs no config. On disk:
+
+```text
+root/
+  assets/                  ← assetsDir        (default 'assets', relative to project root)
+    media/                 ← collection folder (the slug; rename via assetSubDirs)
+      hero.jpg             ← file('hero.jpg')
+      portraits/           ← a subpath in the name nests further
+        jane.jpg           ← file('portraits/jane.jpg')
+```
+
+The `defineSeed` using those files:
+
+```ts
+// src/collections/Media/seed.ts
+export default defineSeed('media', ({ file }) => [
+  {
+    _key: 'hero',
+    _file: file('hero.jpg'), // assets/media/hero.jpg
+    alt: 'Hero',
+  },
+  {
+    _key: 'jane',
+    _file: file('portraits/jane.jpg'), // assets/media/portraits/jane.jpg
+    alt: 'Jane',
+  },
+])
+```
+
+A `_file` can also be an **absolute path** (`file('/tmp/logo.svg')`), used as-is for a file outside the tree.
+
+<Callout type="info">
+  Consider **gitignoring your assets folder** in a real project. Since seeding is a one-time bootstrap
+  that uploads these files into your real storage, the source originals don't need to live in the repo
+  afterward, and they can be large enough to bloat it. (The example sandboxes in this repo commit
+  theirs only so the demos run in CI.)
+</Callout>
+
+## Next
+
+- [Running the seed](/docs/plugins/payload-seed/running) — the four entry points that run these definitions.
+- [Advanced](/docs/plugins/payload-seed/advanced) — custom ingestion, disabled seeds, and how the engine works.
+- [Troubleshooting](/docs/plugins/payload-seed/troubleshooting) — missing files, circular refs, and typed-ref gotchas.

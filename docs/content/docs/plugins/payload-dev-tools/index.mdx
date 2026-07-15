@@ -1,0 +1,205 @@
+---
+title: "payload-dev-tools"
+description: "A dev-only toolbar, live /dev pages, and a machine-readable app snapshot that make building a Payload site faster."
+---
+
+Dev tools that make building a Payload CMS site easier. You get a floating utility menu on every
+page and optional `/dev` routes that show what's actually in your app.
+
+See your seeded content, icons, fonts, images, and videos rendered in your real layout. Test page,
+header, footer, and block variants right inside the running site. Point an AI agent at one snapshot
+URL to learn the whole app.
+
+Works on its own; extra panels light up when you also run the other `@pro-laico/*` plugins.
+Everything is dev-only and disappears in production.
+
+```bash
+pnpm add @pro-laico/payload-dev-tools
+```
+
+## What's included
+
+- **The `/dev` pages.** Real routes inside your app from one catch-all file: `/dev` (overview,
+  seed controls, collection counts), `/dev/icons` (glyph grid, switch the active set in one click),
+  `/dev/fonts` (specimens in your actual served fonts), `/dev/images`, `/dev/mux`, and
+  `/dev/tests/<test>` (one page per test, toolbar toggles the version).
+- **`<DevToolbar />`.** A floating corner button on every page (admin included) that navigates the
+  dev pages, toggles test versions and Next.js draft mode, seeds, and reads diagnostics. Stays open
+  while you browse. Self-styled: no Tailwind, no CSS import, no `isDev` conditional.
+- **`GET /api/dev`.** A machine-readable snapshot: environment, installed plugins, seed status and
+  counts, icon misses, font slots, mux readiness, per-collection doc counts. Point an AI agent here
+  first. Browsers get redirected to `/dev`.
+- **Plugin-aware, import-free.** Sibling `@pro-laico/*` plugins are discovered through their
+  `config.custom` markers. None are dependencies; panels and pages appear for whatever is installed.
+
+![Dev tool menu component (bottom right) on Pages view, rendered on the /dev/fonts route](/screenshots/dev-tool-tool.png)
+
+## Quickstart
+
+<Callout type="info">
+No `next.config` changes are needed. Everything mounts through the plugin, one page file, and one
+layout line.
+</Callout>
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { devToolsPlugin } from '@pro-laico/payload-dev-tools'
+
+export default buildConfig({
+  // …
+  plugins: [devToolsPlugin()],
+})
+```
+
+Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /api/dev/draft`
+(draft-mode toggle), and `POST /api/dev/icons/activate` (set switcher). All 404 outside development.
+</Step>
+
+<Step>
+**Drop in the dev pages**
+
+```tsx title="app/(frontend)/dev/[[...view]]/page.tsx"
+import { createDevPage } from '@pro-laico/payload-dev-tools/next'
+
+export const dynamic = 'force-dynamic'
+export default createDevPage()
+```
+
+One file, all views. It lives in your `(frontend)` group, so the pages inherit your layout,
+fonts, and styles. `createDevPage` resolves Payload itself; no props required.
+
+<Callout type="info">
+The Seed view needs the seed plugin's preconditions: `ENABLE_SEED=true` in `.env.local` and a
+logged-in Payload user. The card tells you which one is missing.
+</Callout>
+</Step>
+
+<Step>
+**Mount the toolbar**
+
+```tsx title="app/(frontend)/layout.tsx"
+import { DevToolbar } from '@pro-laico/payload-dev-tools/toolbar'
+
+export default function Layout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <DevToolbar />
+      </body>
+    </html>
+  )
+}
+```
+
+No `isDev` check needed; it renders `null` in production. If you want it on all your pages, admin
+included, also add the same line inside `<RootLayout>` in Payload's `app/(payload)/layout.tsx`.
+Because it lives in the layout, the panel survives client-side navigation.
+</Step>
+
+<Step>
+**Register your tests**
+
+The test harness is the reason to reach for this plugin in earnest. Define your variants once, then
+flip between them from the toolbar. Start with a `page` test and a `header` test:
+
+```tsx title="src/dev/tests.tsx"
+import { defineTest } from '@pro-laico/payload-dev-tools/next'
+
+export const heroTest = defineTest({
+  key: 'hero',
+  label: 'Homepage hero',
+  kind: 'page',
+  versions: [
+    { id: 'bold', label: 'Bold', render: () => <BoldHero /> },
+    { id: 'split', label: 'Split', render: async () => <SplitHero data={await load()} /> },
+  ],
+})
+
+export const headerTest = defineTest({
+  key: 'site-header',
+  label: 'Site header',
+  kind: 'header',
+  versions: [
+    { id: 'compact', label: 'Compact', render: () => <CompactHeader /> },
+    { id: 'mega', label: 'Mega menu', render: () => <MegaHeader /> },
+  ],
+})
+
+export const devTests = [heroTest, headerTest]
+```
+
+Pass the same `devTests` array to both frontend pieces:
+
+```tsx
+export default createDevPage({ tests: devTests })   // → the page: /dev/tests/hero
+<DevToolbar tests={devTests} />                      // → the controls: open it, toggle versions
+```
+
+Each `page` test is one page. The toolbar's chips set a cookie that picks the version: click Bold,
+look; click Split, compare.
+
+`header`/`footer` tests go further. With one more line in your layout, picking a version swaps it
+into the real layout, site-wide, until you hit Real:
+
+```tsx title="app/(frontend)/layout.tsx"
+import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolbar'
+import { devTests } from '@/dev/tests'
+
+export default async function Layout({ children }) {
+  const { header, footer } = await resolveDevChrome({
+    tests: devTests,
+    header: <SiteHeader />,
+    footer: <SiteFooter />,
+  })
+  return (
+    <html lang="en">
+      <body>
+        {header}
+        {children}
+        {footer}
+        <DevToolbar tests={devTests} />
+      </body>
+    </html>
+  )
+}
+```
+
+<Callout type="info">
+In production `resolveDevChrome` returns exactly what you passed in (before touching cookies, so
+static optimization is unaffected). A variant that throws falls back to the real chrome. See
+[The test harness](/docs/plugins/payload-dev-tools/test-harness) for the full model.
+</Callout>
+</Step>
+
+</Steps>
+
+## Plugin options
+
+Zero-config by default — every option has a sensible default. See
+[Reference](/docs/plugins/payload-dev-tools/reference) for options, env vars, endpoints, and exports.
+
+## Explore
+
+<Cards>
+  <Card title="The /dev pages" href="/docs/plugins/payload-dev-tools/dev-pages">
+    Every `/dev` route and what it shows, plus the `GET /api/dev` snapshot for AI agents.
+  </Card>
+  <Card title="The test harness" href="/docs/plugins/payload-dev-tools/test-harness">
+    `defineTest`, version switching, site-wide header/footer swaps, and the script hook.
+  </Card>
+  <Card title="How it works" href="/docs/plugins/payload-dev-tools/how-it-works">
+    Marker-based plugin discovery, layered gating, draft mode, and the persistent toolbar.
+  </Card>
+  <Card title="Reference" href="/docs/plugins/payload-dev-tools/reference">
+    Plugin options, environment variables, endpoints, and exports.
+  </Card>
+  <Card title="Troubleshooting" href="/docs/plugins/payload-dev-tools/troubleshooting">
+    404s, stale pages, wrong entry points, chrome swaps, and the `enabled` security note.
+  </Card>
+</Cards>

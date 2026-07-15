@@ -1,0 +1,232 @@
+---
+title: "Examples"
+description: "Copy-paste getters for the common caching jobs — detail pages, lists, globals, drafts, sitemaps, manual busts, and migrating off unstable_cache."
+---
+
+Copy-paste recipes for the caching jobs you actually reach for. Each one is a getter or a
+config snippet you can drop in and adapt.
+
+Every example assumes the helpers are seeded once and re-exported from a getters module —
+see [Writing a getter](/docs/plugins/payload-revalidate/getters) for that setup, and
+[The atomic model](/docs/plugins/payload-revalidate/atomic-model) for why the tags land
+where they do.
+
+## A detail page by slug
+
+The alias (`as: slug`) tags even a `null` result, so the cached miss purges the moment
+that slug is created. References stay ids and render through their own getters.
+
+```ts
+export async function getPostBySlug(slug: string) {
+  'use cache'
+  return findDoc('posts', { where: { slug: { equals: slug } }, as: slug })
+}
+```
+
+```tsx
+// app/(frontend)/blog/[slug]/page.tsx — params are request data → Suspense boundary.
+export default function PostPage({ params }: { params: Promise<{ slug: string }> }) {
+  return (
+    <Suspense fallback={<PostSkeleton />}>
+      <PostDetail params={params} />
+    </Suspense>
+  )
+}
+
+async function PostDetail({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const post = await getPostBySlug(slug)
+  if (!post) notFound()
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      {typeof post.heroImage === 'string' || typeof post.heroImage === 'number' ? <HeroImage id={post.heroImage} /> : null}
+    </article>
+  )
+}
+
+/** The image's OWN entry — an alt edit re-materializes this, and only this. */
+async function HeroImage({ id }: { id: string | number }) {
+  const media = await getMedia(id)
+  return media ? <img src={media.url ?? ''} alt={media.alt ?? ''} /> : null
+}
+```
+
+## Multiple lists over one collection
+
+Each list surface gets its own scope, so their invalidation is independent:
+
+```ts
+revalidatePlugin({
+  collections: {
+    posts: {
+      lists: {
+        recent: ['publishedAt'],
+        featured: ['featured', 'publishedAt'],
+        byCategory: ['category'],
+      },
+    },
+  },
+})
+```
+
+Flipping `featured` busts `posts:list:featured` — the recent and category archives stay
+cached. Changing `category` busts only `posts:list:byCategory`. **Declare every sort and
+filter field a scope depends on** — that's the one contract atomic lists ask of you.
+
+<Callout type="info">
+The dev map warns when a scope is observed but undeclared — see the
+[`/dev/revalidate` map](/docs/plugins/payload-revalidate/troubleshooting#the-devrevalidate-map).
+</Callout>
+
+## A global
+
+```ts
+export async function getHeader() {
+  'use cache'
+  return findGlobal('header')
+}
+```
+
+Nav links stay ids; a `<NavLink id>` component fetches each target's title through its
+id-keyed getter — renaming a page updates every menu without touching the header entry.
+
+## Draft / preview reads
+
+Runtime APIs (`draftMode()`) can't run inside `'use cache'`. Read them outside and pass
+`draft` as an **argument** — that makes it part of the cache key:
+
+```ts
+export async function getPagePreviewable(slug: string, draft: boolean) {
+  'use cache'
+  return findDoc('pages', { where: { slug: { equals: slug } }, as: slug, draft })
+}
+
+// caller (dynamic, under Suspense):
+const { isEnabled } = await draftMode()
+const page = await getPagePreviewable(slug, isEnabled)
+```
+
+Draft entries carry `:draft` variants; an editor's autosave purges only the preview
+surface.
+
+<Callout type="info">
+Simplest alternative: leave preview reads uncached — they're dynamic anyway.
+</Callout>
+
+## A sitemap
+
+A sitemap renders every doc's slug — content, not just membership — so it's the one
+classic surface that wants collection-wide field coverage. The atomic answer is a
+declared scope over the slug field.
+
+It's also the classic **low-level** case: the entry deliberately carries content (`slug`),
+which `findIds` makes unrepresentable, so drop to
+[`cacheIds`](/docs/plugins/payload-revalidate/getters#primitives) and the raw local API:
+
+```ts
+// src/lib/getters.ts — db and cacheIds come from the same createCacheHelpers seed
+// (Quickstart: export const db = getPayload({ config }))
+revalidatePlugin({ collections: { posts: { lists: { sitemap: ['slug'] } } } })
+
+export async function getSitemapEntries() {
+  'use cache'
+  const payload = await db // the handle createCacheHelpers was seeded with
+  const posts = await payload.find({ collection: 'posts', limit: 0, select: { slug: true, updatedAt: true }, depth: 0, overrideAccess: false })
+  await cacheIds(posts, 'posts', { list: 'sitemap' })
+  return posts.docs
+}
+```
+
+<Callout type="info">
+`cacheIds` warns that these docs carry `slug` content. The declared scope on `['slug']` is
+exactly the answer to that warning: slug changes bust this entry.
+</Callout>
+
+## Manual rules
+
+Data the walk can't see — like FAQ text denormalized into service pages by an app-level
+build step — gets a manual rule:
+
+```ts
+revalidatePlugin({
+  rules: [{ on: 'faqs', bust: ['services'], whenFields: ['question', 'answer'] }],
+})
+```
+
+## Sibling-plugin defaults
+
+A collection can ship revalidation markers as plain config, no import — the
+`custom.seedAsset` decoupling pattern:
+
+```ts
+{ slug: 'my-collection', custom: { revalidate: { extraTags: ['video-embeds'] } } }
+```
+
+The sibling `@pro-laico` plugins ship these markers already, so adding `revalidatePlugin()` last
+integrates them with zero config:
+
+| Plugin | What its collections declare |
+| --- | --- |
+| [payload-icons](/docs/plugins/payload-icons) | `icon` + `iconSet` carry `extraTags: ['payload-icons']` — and `<Icon>` applies the same tag via `cacheTag` inside your `'use cache'` scopes, so baked-in SVGs self-heal. `iconRequest` opts out. |
+| [payload-images](/docs/plugins/payload-images) | `images` gets the standard hooks (fetch it with an id-keyed `findDocByID` getter); the internal `generated-images` variant cache opts out, so on-demand variant writes stay silent. |
+| [payload-mux](/docs/plugins/payload-mux) | `mux-video` gets the standard hooks — webhook writes go through `payload.update`, so a "processing" page heals itself when the asset goes ready. |
+| [payload-fonts](/docs/plugins/payload-fonts) | Derived `fontOriginal` / `fontOptimized` opt out (fonts are build-baked; nothing at runtime to bust). |
+| [payload-seed](/docs/plugins/payload-seed) | A seed run flushes once at the end: list tags + declared scopes + `extraTags` per touched slug, then `all`. |
+
+`examples/revalidate-sandbox` wires icons + images alongside posts/services to show the whole
+thing live.
+
+## Manual busts from a server action
+
+The busters come from what `createCacheHelpers(db)` returns — re-export them from your
+seeded helpers module (the same `src/lib/getters.ts` from the
+[Quickstart](/docs/plugins/payload-revalidate)) and import from there:
+
+```ts title="src/lib/getters.ts"
+export const db = getPayload({ config })
+export const { findDoc, findDocByID, findIds, findGlobal, revalidateDoc, revalidateList } =
+  createCacheHelpers(db)
+```
+
+```ts
+'use server'
+
+import { revalidateDoc, revalidateList } from '@/lib/getters'
+
+export async function importProducts(rows: ProductRow[]) {
+  await syncToDatabase(rows)
+  await revalidateList('products')                       // bare + every declared scope
+  for (const row of rows) await revalidateDoc('products', row.id)
+}
+```
+
+The busters are lane-aware (published + `:draft`) and prefix-aware — prefer them over
+hand-spelling a tag string into `revalidateTag`. If you truly need a raw tag (e.g. an
+extra tag for `cacheTag`), build it with `tagsFor(payload)` — imported from the package
+root, `@pro-laico/payload-revalidate` — so the app prefix is applied.
+
+## Migrating from `unstable_cache`
+
+```ts
+// BEFORE — tags declared up front, whole-collection blast radius:
+const getPost = unstable_cache(async (slug: string) => fetchPost(slug), ['post-by-slug'], { tags: ['posts'] })
+
+// AFTER — keys automatic, entry-precise tags derived from the data itself:
+async function getPost(slug: string) {
+  'use cache'
+  return findDoc('posts', { where: { slug: { equals: slug } }, as: slug })
+}
+```
+
+`unstable_cache`'s fundamental limit — tags must exist before the fetch — is why it
+needed broad collection tags. `cacheTag()` accepts data-derived tags after the fetch,
+which is what makes per-doc precision possible; the atomic pattern is that precision
+taken to its logical end.
+
+## Next
+
+- [The atomic model](/docs/plugins/payload-revalidate/atomic-model) — why each tag lands where it does.
+- [Writing a getter](/docs/plugins/payload-revalidate/getters) — the finders and primitives these examples use.
+- [Reference](/docs/plugins/payload-revalidate/reference) — plugin options, exports, and import paths.
+- [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting) — the `/dev/revalidate` map and common failures.

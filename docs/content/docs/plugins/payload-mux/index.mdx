@@ -1,0 +1,158 @@
+---
+title: "payload-mux"
+description: "Host and play back video in Payload without a media server — Mux stores the clip, your admin stays the source of truth."
+---
+
+Video hosting inside Payload, powered by [Mux](https://www.mux.com/).
+
+Drop a clip into the admin and it streams everywhere — adaptive HLS, posters, and preview GIFs, public or signed. No media server to run, and no huge files in your storage: Mux holds the video, Payload holds the data, and they stay in sync both ways.
+
+```bash
+pnpm add @pro-laico/payload-mux
+```
+
+<Callout type="info">
+**Based on [`@oversightstudio/mux-video`](https://github.com/oversightstudio/payload-plugins) (MIT)**,
+originally created by [Idan Yekutiel](https://github.com/idanyekutiel). A port of that Mux plugin,
+restructured to our conventions and kept as a first-party package so we can track Payload and Mux
+updates directly. Full credit and thanks to the original author.
+</Callout>
+
+## Requirements
+
+- **A [Mux](https://www.mux.com/) account** for the API credentials.
+- **A publicly reachable webhook URL.** Mux pushes encoding events to your endpoint, so it must be reachable from the internet. Tunnel localhost in development (see [Quickstart](#quickstart) step 4).
+
+## What's included
+
+Video hosting that lives inside Payload, powered by Mux:
+
+- **Upload and it just plays:** drop a clip in the admin and Mux encodes it to adaptive HLS with posters and preview GIFs — no media server, no huge files bloating your storage.
+- **Direct-to-Mux uploads:** the browser posts bytes straight to Mux, so video never touches your server or database.
+- **Playback URLs computed on read:** every video exposes virtual `playbackUrl` (HLS), `posterUrl`, and `gifUrl`, JWT-signed automatically under a signed policy.
+- **Kept in sync both ways:** a webhook finishes slow-encoding videos and mirrors Mux-dashboard deletes back into Payload.
+- **Server ingest and declarative seeding:** create a video from a file or URL in code, or seed one like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
+
+## Quickstart
+
+<Steps>
+
+<Step>
+**Set Mux credentials**
+
+The plugin and the Mux SDK read the standard `MUX_*` environment variables automatically, so the
+plugin call itself takes no arguments.
+
+```bash title=".env"
+MUX_TOKEN_ID=...
+MUX_TOKEN_SECRET=...
+MUX_WEBHOOK_SECRET=...
+NEXT_PUBLIC_SERVER_URL=https://your-site.com   # your site URL — becomes the upload CORS origin
+```
+</Step>
+
+<Step>
+**Add the plugin**
+
+Zero-config reads the env vars above. Uploads' `cors_origin` resolves to
+`uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'`. Pass options only to
+override: a non-standard env var name, a custom CORS origin, or signed playback.
+
+<Tabs items={['Public playback', 'Signed playback']}>
+
+<Tab value="Public playback">
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { muxVideoPlugin } from '@pro-laico/payload-mux'
+
+export default buildConfig({
+  plugins: [muxVideoPlugin()], // credentials from MUX_*, cors_origin from NEXT_PUBLIC_SERVER_URL
+})
+```
+
+</Tab>
+
+<Tab value="Signed playback">
+
+Add the two signing keys to your env:
+
+```bash title=".env"
+MUX_SIGNING_KEY=...
+MUX_PRIVATE_KEY=...
+```
+
+```ts title="payload.config.ts"
+muxVideoPlugin({
+  playbackPolicy: 'signed',               // new videos upload as signed
+  signedUrlOptions: { expiration: '1d' }, // signed URL lifetime
+})
+```
+
+This one setting governs **every** new video — admin uploads and server-side ingest / seeding alike.
+The virtual `playbackUrl` / `posterUrl` / `gifUrl` are then JWT-signed on every read.
+
+</Tab>
+
+</Tabs>
+</Step>
+
+<Step>
+**Generate the admin import map**
+
+The collection registers admin components (the uploader field and the list-view thumbnail cell) by
+string path, so regenerate the import map, then restart the dev server:
+
+```bash
+pnpm payload generate:importmap
+```
+</Step>
+
+<Step>
+**Point a Mux webhook at the endpoint**
+
+In the Mux dashboard, send webhooks to `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if
+you've customized Payload's API route). The URL must be publicly reachable — Mux can't reach
+`localhost`. For local dev, expose it with a tunnel:
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Set the tunnel's URL (plus `/api/mux/webhook`) as the webhook. See
+[Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks#webhook) for what breaks
+without it.
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+
+<Card title="Use a video" href="/docs/plugins/payload-mux/using-video">
+Relate to `mux-video` from any collection and play it back, public or signed.
+</Card>
+
+<Card title="Endpoints and webhooks" href="/docs/plugins/payload-mux/endpoints-and-webhooks">
+The upload and webhook endpoints, and creating videos server-side from a file or URL.
+</Card>
+
+<Card title="How it works" href="/docs/plugins/payload-mux/how-it-works">
+The asset lifecycle, revalidation with Next.js, and declarative seeding.
+</Card>
+
+<Card title="Reference" href="/docs/plugins/payload-mux/reference">
+Plugin options, environment variables, CLI commands, endpoints, and exports.
+</Card>
+
+<Card title="Troubleshooting" href="/docs/plugins/payload-mux/troubleshooting">
+Videos stuck on "preparing", missing thumbnails, signed-playback 403s, and more.
+</Card>
+
+</Cards>
+
+## Plugin options
+
+Zero-config by default — every option falls back to a `MUX_*` env var or a sensible default. See
+[Reference](/docs/plugins/payload-mux/reference) for options, environment variables, endpoints, and exports.

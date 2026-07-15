@@ -1,0 +1,74 @@
+---
+title: "Conventions"
+description: "The patterns every @pro-laico plugin shares — one factory shape, zero-config defaults, and composition through plain Payload config so nothing ever imports another plugin."
+---
+
+Every `@pro-laico/*` plugin is built the same way. Learn these once and each package
+feels familiar — same install, same shape, same escape hatches.
+
+## The factory shape
+
+Every plugin is a `(opts) => (config) => config` factory, exported as both the default
+and a named export. Drop it into your Payload config's `plugins` array:
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { pluginName } from '@pro-laico/<plugin>'
+
+export default buildConfig({
+  // ...
+  plugins: [pluginName()],
+})
+```
+
+## Zero-config by default
+
+Every option has a sensible default, so `pluginName()` with no arguments works out of the
+box. When you need more control, the raw building blocks — collections, hooks, fields, and
+admin components — are exported too, so you can wire them by hand instead of through the
+factory. Reach for the factory first; reach for the exports only when you outgrow it.
+
+## Composition without coupling
+
+No plugin imports another. They discover each other at build time through `config.custom.*`
+markers, so any combination works and any one can be installed alone.
+
+- **`payload-seed`** is the connective tissue — images, icons, and font files seed natively
+  as uploads; Mux clips seed through a `custom.seedAsset` marker the engine auto-discovers.
+  One set of `seed.ts` files bootstraps a whole site.
+- **`payload-dev-tools`** lights up diagnostic panels for whatever it finds installed,
+  reading each sibling's marker (`payloadImages`, `payloadIcons`, `payloadFonts`,
+  `payloadMux`, `payloadSeed`, `payloadRevalidate`).
+- **`payload-revalidate`** picks up sibling `custom.revalidate` markers to know what to bust.
+
+<Callout type="info">
+  Composition is plain Payload config — there's no shared runtime, no plugin registry, and
+  no install order to get right.
+</Callout>
+
+## The Assets admin group
+
+The asset collections — images, icons, fonts, and Mux video — share a single **Assets**
+group in the admin sidebar, so your media stays together no matter how many of these
+plugins you install.
+
+## When to run `generate:importmap`
+
+Any plugin that registers admin components by string path needs the import map regenerated
+so Payload can resolve them. That covers the images focal/preset UI, the seed button, the
+Mux uploader, and the icons preview. After installing one of these, run:
+
+```bash
+pnpm payload generate:importmap
+```
+
+Then restart the dev server so the new components load.
+
+## Requirements
+
+Payload `^3`, React 19, and the Next.js App Router. The packages ship in lockstep under one
+version, but each works standalone — you never need to install more than the one you want.
+
+<Callout type="info">
+  Payload Plugins is not affiliated with Payload CMS in any capacity.
+</Callout>

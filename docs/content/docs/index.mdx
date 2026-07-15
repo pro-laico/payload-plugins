@@ -1,16 +1,14 @@
 ---
 title: "Overview"
-description: "A suite of composable @pro-laico/* plugins for Payload CMS. Each works standalone in any Payload + Next.js project."
+description: "Composable Payload CMS plugins — add media optimization, seeding, icons, fonts, and surgical cache revalidation one package at a time. Each works standalone in any Payload + Next.js project."
 ---
 
-**Payload Plugins** is a collection of composable [Payload CMS](https://payloadcms.com/)
-plugins published under the `@pro-laico/*` scope. Each is an independent package you can
-drop into any Payload + Next.js (App Router) project — add only the ones you need. They
-peer on Payload `^3` and React 19, and ship in lockstep under one version.
+**Payload Plugins** is a composable suite of [Payload CMS](https://payloadcms.com/)
+plugins published under the `@pro-laico/*` scope. Each is an independent package.
 
-<Callout type="info">
-  Payload Plugins is not affiliated with Payload CMS in any capacity.
-</Callout>
+Add only the ones you need. Every plugin is zero-config and drop-in — install it, register
+the factory, and it works. They snap together when you want more, and none depends on
+another.
 
 ## The plugins
 
@@ -18,51 +16,75 @@ peer on Payload `^3` and React 19, and ship in lockstep under one version.
   <Card
     title="payload-seed"
     href="/docs/plugins/payload-seed"
-    description="Type-safe database seeding — typed cross-file references, dependency ordering, media uploads, behind an ENABLE_SEED kill switch."
+    description="Bootstrap a whole site's content from typed seed files. Cross-file references resolve in dependency order, media uploads and all, behind an ENABLE_SEED kill switch."
   />
   <Card
     title="payload-images"
     href="/docs/plugins/payload-images"
-    description="On-demand image optimization — an Images collection that stores only the original, a Sharp transform endpoint with focal-aware cropping, a variant cache, and a responsive image component."
+    description="Serve any image at any size on demand. Stores only the original, crops around the subject, and caches every rendered variant — no pre-declared sizes."
   />
   <Card
     title="payload-icons"
     href="/docs/plugins/payload-icons"
-    description="SVG icons — an Icon collection that optimizes and sanitizes SVGs on save (svgo + currentColor theming) and a drop-in <Icon name> component that inlines the SVG."
+    description="Manage SVG icons in the admin and inline them anywhere. Uploads are optimized and themeable on save; a drop-in <Icon name> component renders them."
   />
   <Card
     title="payload-fonts"
     href="/docs/plugins/payload-fonts"
-    description="Custom self-hosted fonts — a Font typeface collection that subsets uploads to served WOFF2s, a fontSet global, and an export endpoint + CLI for next/font/local."
+    description="Self-host custom typefaces without touching the build. Uploads are subset to WOFF2 and served to next/font/local through an export endpoint and CLI."
   />
   <Card
     title="payload-mux"
     href="/docs/plugins/payload-mux"
-    description="Mux Video — a Videos collection that uploads straight to Mux, public or signed playback, virtual URLs, two-way delete, and an admin uploader."
+    description="Add Mux-backed video to any collection. Uploads go straight to Mux with public or signed playback, virtual URLs, two-way delete, and an admin uploader."
   />
   <Card
     title="payload-revalidate"
     href="/docs/plugins/payload-revalidate"
-    description="Surgical Next.js cache revalidation — auto-derived tags applied on reads and busted on writes, with a dependency map showing exactly what revalidates when."
+    description="Edit one document and only the pages that show it go stale. Tags are derived on reads and busted on writes, with a map of exactly what revalidates when."
   />
   <Card
     title="payload-dev-tools"
     href="/docs/plugins/payload-dev-tools"
-    description="A utility to help you build Payload CMS projects faster: a floating dev toolbar, /dev pages inside your app, and a machine-readable app snapshot for AI agents."
+    description="Build Payload projects faster. A floating dev toolbar, /dev pages inside your app, and a machine-readable app snapshot for AI agents."
   />
 </Cards>
 
+## Get started
+
+Every plugin installs the same way:
+
+```bash
+pnpm add @pro-laico/<plugin>
+```
+
+Each package exports a `(opts) => (config) => config` factory, as both the default and a
+named export. Register it in your Payload config's `plugins` array:
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { pluginName } from '@pro-laico/<plugin>'
+
+export default buildConfig({
+  // ...
+  plugins: [pluginName()],
+})
+```
+
+**Requirements**: Payload `^3`, React 19, and the Next.js App Router. Every package works
+standalone — you never need to install more than the one you want.
+
+<Callout type="info">
+  Setup specifics — env vars, `generate:importmap`, `next.config` changes — live on each
+  plugin's page. Start there once you've picked a plugin.
+</Callout>
+
 ## How they compose
 
-Each plugin stands alone, but they're built to snap together — and
-[`payload-seed`](/docs/plugins/payload-seed) is the connective tissue. Images, icons, and
-font files seed natively as uploads; Mux clips seed through the same flow via a
-`custom.seedAsset` marker the engine auto-discovers, so one set of `seed.ts` files
-bootstraps a whole site's content — assets, cross-references, and all. The asset
-collections share an **Assets** admin group, and no plugin imports another: composition
-happens through plain Payload config —
-[`payload-dev-tools`](/docs/plugins/payload-dev-tools) even discovers its siblings through
-their config markers to power its diagnostics panels.
+Each plugin stands alone, but they're built to snap together: no plugin imports another —
+they discover each other through plain Payload config markers, so any combination works.
+See [Conventions](/docs/plugins/conventions) for the factory shape, the zero-config
+defaults, the shared **Assets** group, and how composition works.
 
 See it wired end-to-end in the
 [example apps](https://github.com/pro-laico/payload-plugins/tree/main/examples):
@@ -70,8 +92,6 @@ See it wired end-to-end in the
 runs every plugin on one fictional studio site, and each content plugin has a focused
 sandbox (`seed-sandbox`, `images-sandbox`, `icons-sandbox`, `fonts-sandbox`, `mux-sandbox`).
 
-## Conventions
-
-Every plugin follows the same shape: a `(opts) => (config) => config` factory exported
-both as the default and a named export, zero-config by default, with the raw collections,
-hooks, fields, and components also exported for advanced consumers.
+<Callout type="info">
+  Payload Plugins is not affiliated with Payload CMS in any capacity.
+</Callout>

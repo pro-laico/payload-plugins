@@ -1,0 +1,112 @@
+---
+title: "How it works"
+description: "How an icon name resolves through the active set, when cache entries refresh, and how to seed icons and sets declaratively."
+---
+
+An `<Icon name>` resolves through whichever icon set is currently **active and published**. This page traces that lookup, explains when a rendered icon refreshes after an edit, and shows how to seed icons and sets from source files.
+
+## Resolving an icon
+
+`<Icon name="arrow-right" />` looks the name up in the **active, published** `iconSet`. It finds the `icon` doc that row points at and inlines that doc's stored `svgString` as a real `<svg>`. The result recolors through `currentColor` and takes its size from your own classes.
+
+The lookup reads through `payload.find`, memoized per request. Repeating the same icon on a page costs one query.
+
+The name it matches is the *set entry's* name, not the uploaded filename. That is why swapping the active set re-skins every icon at once.
+
+A name the active set doesn't cover renders the fallback warning glyph instead of nothing. The miss is recorded for the [Requested icons](/docs/plugins/payload-icons/collections#icon-use-detection) panel.
+
+## Revalidation
+
+On its own the plugin does no revalidation. `<Icon>` reads via `payload.find`, memoized per request. A **statically rendered** page bakes the SVG at build time. It won't reflect an edit or an active-set swap until the route revalidates.
+
+Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) and the whole surface becomes self-healing, zero config. Two decoupled halves meet on one shared tag, `payload-icons`:
+
+- **Write side** — the `icon` and `iconSet` collections ship a data-only `custom.revalidate` marker carrying `extraTags: ['payload-icons']`. revalidatePlugin's auto-attached hooks bust that tag on every published icon/set write and delete. The after-seed flush busts it too.
+- **Read side** — when an `<Icon>` (or `getIconSvg`) runs inside one of your `'use cache'` scopes and detects the revalidate plugin, it applies the same tag via `cacheTag`. Re-upload an SVG, remap a name, or activate a different set, and every cache entry that inlined an icon re-materializes on the next request.
+
+<Callout type="info">
+  `iconRequest` ships `custom: { revalidate: false }` — a diagnostic feed that busts nothing.
+</Callout>
+
+Without the revalidate plugin, or outside a `'use cache'` scope, the tagging is a silent no-op with no behavior change.
+
+The single coarse tag is deliberate. The active-set read isn't keyed by a doc id, icon writes are rare, and the whole set resolves in a single query. See it wired end-to-end in [`examples/revalidate-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/revalidate-sandbox).
+
+## Seeding
+
+Because `icon` is a standard upload collection, it seeds **natively** — no script, and (unlike `payload-mux`) no `custom.seedAsset` marker. Seed it like any other collection with `defineSeed`. Each record carries its source SVG on the `_file` meta-key via the `file()` token.
+
+Drop your source `.svg` files in the collection's folder under the seed assets dir. The folder is named after the slug, so `assets/icon/star.svg` resolves from `file('star.svg')`:
+
+```ts
+// src/seed/icons.ts — each icon doc carries its SVG on `_file`
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('icon', ({ file }) => [
+  {
+    _key: 'star',
+    _file: file('star.svg'), // assets/icon/star.svg
+  },
+  {
+    _key: 'check',
+    _file: file('check.svg'), // assets/icon/check.svg
+  },
+])
+```
+
+Each doc is optimized on upload via the same `formatSVGHook`. An uploaded icon doesn't render on its own, though. The frontend resolves `<Icon name>` through the **active** set, so seed an `iconSet` that maps lookup names to those icons with ordinary `ref('icon', …)` tokens:
+
+```ts
+// src/seed/iconSets.ts — an active, published set wiring names to the seeded icons
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('iconSet', ({ ref }) => [
+  {
+    _key: 'default',
+    title: 'Default',
+    active: true,         // the live set
+    _status: 'published', // visible to the non-draft frontend
+    iconsArray: [
+      { name: 'star', icon: ref('icon', 'star') },
+      { name: 'check', icon: ref('icon', 'check') },
+    ],
+  },
+])
+```
+
+Icons are equally referenceable from any other doc — e.g. a page's icon relationship:
+
+```ts
+// src/seed/pages.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('pages', ({ ref }) => [
+  {
+    _key: 'home',
+    title: 'Home',
+    icon: ref('icon', 'star'),
+  },
+])
+```
+
+Wire the definitions into the seed plugin as usual — icons precede the set and page that reference them:
+
+```ts
+import { iconsPlugin } from '@pro-laico/payload-icons'
+import { seedPlugin } from '@pro-laico/payload-seed'
+import icons from './seed/icons'
+import iconSets from './seed/iconSets'
+import pages from './seed/pages'
+
+plugins: [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages] })]
+```
+
+Because `icon` is a real collection, its seed records are type-checked and other docs reference them with `ref()`. This package never imports the seed package, so the two stay decoupled. `active: true` makes the set live and `_status: 'published'` makes it visible to the published frontend.
+
+See the [`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox) app for a full working setup, or the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
+
+## Next
+
+- [Using icons](/docs/plugins/payload-icons/using-icons) — the `<Icon>` component, props, and rendering an SVG yourself.
+- [Collections](/docs/plugins/payload-icons/collections) — the `icon`, `iconSet`, and `iconRequest` fields, plus icon use detection.
+- [Troubleshooting](/docs/plugins/payload-icons/troubleshooting) — fallback glyphs, stroke-SVG blobs, and build-time resolution errors.

@@ -3,12 +3,18 @@ title: "Rendering images"
 description: "Fetch a render-ready image doc with imageFor and paint it with <ResponsiveImage> — srcset, placeholder, and focal crop included."
 ---
 
-This page covers presenting images on your site: one helper fetches a **render-ready doc**, one
-passive component paints it. No client JS, no URL math, no layout shift.
+One helper fetches a **render-ready doc**. One passive component paints it.
 
-## Quick start
+No client JS, no URL math, no layout shift.
 
-Seed the getter once with your app's Payload handle, then fetch and render anywhere on the server:
+<Callout type="info">
+  Assumes the plugin is installed and registered — see
+  [Reference](/docs/plugins/payload-images/reference).
+</Callout>
+
+## Rendering quickstart
+
+Seed the getter once with your app's Payload handle. Then fetch and render anywhere on the server:
 
 ```ts title="src/lib/imageFor.ts"
 import config from '@payload-config'
@@ -26,69 +32,35 @@ import { imageFor } from '@/lib/imageFor'
 export async function Hero({ id }: { id: string }) {
   const img = await imageFor(id).aspectRatio('16:9').quality(80).blur('md').fetch()
   if (!img) return null
-  return <ResponsiveImage {...img} sizes="(max-width: 768px) 100vw, 50vw" />
+  // aspectRatio matches the read; sizes = how big it actually renders
+  return <ResponsiveImage {...img} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
 }
 ```
 
-The doc comes back as `{ id, alt, src, srcset, placeholder }` — a full responsive `srcset`, a
-focal-cropped placeholder data URI, everything built for exactly the render you declared — and
-spreads straight into the component. The placeholder is **opt-in**: it's only built when the
-read asks for one (`.blur(tier)` / `context.blur`); skip the call and `placeholder` is `null`,
-keeping data-URI weight out of the HTML for images that don't need it (thumbnails, icons, tiny
-cards).
+Declare `aspectRatio` in **two** places and keep them equal: on the read (so the crop is
+computed) and on the component (so the CSS box matches the crop). Set `sizes` to how big the
+image actually renders, not how big the file is.
 
-## The read contract
-
-Everything above is one `findByID` that **declares its render on the read**. The virtual fields
-compute `src`/`srcset`/`placeholder` for precisely that declaration, inside the field hooks:
-
-```ts
-const doc = await payload.findByID({
-  id,
-  collection: 'images',
-  depth: 0,
-  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
-  context: { image: { aspectRatio: '16:9', quality: 80 }, blur: { quality: 'md' } },
-})
-```
-
-`imageFor` is sugar over this contract — each chain setter maps onto it: `aspectRatio` /
-`quality` / `fit` / `format` → `context.image`, `blur(tier)` → `context.blur.quality`. Chains are
-immutable, so a partially-applied one (`imageFor(id).aspectRatio('1:1')`) can be shared and
-branched. A whole declared render can also seed the chain in one go — handy for a project-level
-wrapper:
-
-```tsx title="src/components/Image.tsx"
-import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
-import { imageFor } from '@/lib/imageFor'
-
-export async function Image({ id, image, blur, ...rest }: ImageProps) {
-  const doc = await imageFor(id, { image, blur }).fetch()
-  return doc ? <ResponsiveImage {...doc} {...rest} /> : null
-}
-```
-
-`fetch()` resolves `null` for an empty source or a missing doc, and reads the source collection
-off the plugin config (`extendCollection` setups included).
+The doc comes back as `{ id, alt, src, srcset, placeholder }` — a full responsive `srcset` and
+a focal-cropped placeholder data URI, built for exactly the render you declared. It spreads
+straight into the component.
 
 <Callout type="info">
-  `fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their
-  own access control or cache layer write the same `findByID` themselves and wrap it however they
-  like (`'use cache'`, [payload-revalidate](/docs/plugins/payload-revalidate), …). See
-  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) for the cached-getter pattern.
+  The placeholder is **opt-in**. It's built only when the read asks for one (`.blur(tier)` /
+  `context.blur`); declared without a tier, it defaults to `sm`. Skip the call and `placeholder`
+  is `null` — no data-URI weight in the HTML for images that don't need it (thumbnails, icons,
+  tiny cards).
 </Callout>
-
-Populated relationships carry the same fields for free: a `page.heroImage` upload field arrives
-with `src`/`srcset` already computed (the collection's `defaultPopulate`), so you can spread it
-into the component without a second fetch. `placeholder` rides along as `null` unless the parent
-read declared a blur (`context: { blur: { quality: 'md' } }` on the page fetch).
 
 ## `<ResponsiveImage>`
 
-A **passive** `<img>`: it paints exactly what the read delivered — the doc's `src`/`srcset` and
-its `placeholder` as an inline background while pixels load. It fetches nothing, never touches
-Payload, and is safe in server and client trees alike. Not `next/image`: no loader, no client
-runtime, no proxy — the `srcset` already points at [the transform endpoint](/docs/plugins/payload-images/image-urls).
+A **passive** `<img>`. It paints exactly what the read delivered: the doc's `src`/`srcset`, plus
+its `placeholder` as an inline background while pixels load.
+
+It fetches nothing, never touches Payload, and is safe in server and client trees alike. It is
+not `next/image` — no loader, no client runtime, no proxy. The `srcset` already points at
+[the transform endpoint](/docs/plugins/payload-images/image-urls), which the plugin auto-mounts
+at `/api/img`.
 
 <Tabs items={['Component', 'Rendered HTML']}>
 
@@ -128,8 +100,8 @@ runtime, no proxy — the `srcset` already points at [the transform endpoint](/d
 
 </Tabs>
 
-The component returns `null` when the doc has no `src`/`srcset` (deleted image, `virtualFields: false`),
-so a missing image renders nothing rather than a broken frame.
+The component returns `null` when the doc has no `src`/`srcset` (deleted image,
+`virtualFields: false`). A missing image renders nothing rather than a broken frame.
 
 <Callout type="warn">
   **Set `sizes` to how big the image actually renders.** The default is `100vw`; leave it on an
@@ -204,9 +176,56 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
 </Tabs>
 
-There is also an `ImageProps` type for the app-level wrapper shown above: `id` + the declared
+There is also an `ImageProps` type for the app-level wrapper shown below: `id` + the declared
 render (`image`, `blur`) + every presentation prop, with the doc fields omitted (the wrapper
 fetches those itself).
+
+## The read contract
+
+Everything above is one `findByID` that **declares its render on the read**. The virtual fields
+compute `src`/`srcset`/`placeholder` for precisely that declaration, inside the field hooks:
+
+```ts
+const doc = await payload.findByID({
+  id,
+  collection: 'images',
+  depth: 0,
+  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
+  context: { image: { aspectRatio: '16:9', quality: 80 }, blur: { quality: 'md' } },
+})
+```
+
+`imageFor` is sugar over this contract. Each chain setter maps onto it: `aspectRatio` /
+`quality` / `fit` / `format` → `context.image`, `blur(tier)` → `context.blur.quality`. Chains are
+immutable, so a partially-applied one (`imageFor(id).aspectRatio('1:1')`) can be shared and
+branched.
+
+A whole declared render can also seed the chain in one go — handy for a project-level wrapper:
+
+```tsx title="src/components/Image.tsx"
+import { type ImageProps, ResponsiveImage } from '@pro-laico/payload-images/components/image'
+import { imageFor } from '@/lib/imageFor'
+
+export async function Image({ id, image, blur, ...rest }: ImageProps) {
+  const doc = await imageFor(id, { image, blur }).fetch()
+  return doc ? <ResponsiveImage {...doc} {...rest} /> : null
+}
+```
+
+`fetch()` resolves `null` for an empty source or a missing doc, and reads the source collection
+off the plugin config (`extendCollection` setups included).
+
+<Callout type="info">
+  `fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their
+  own access control or cache layer write the same `findByID` themselves and wrap it however they
+  like (`'use cache'`, [payload-revalidate](/docs/plugins/payload-revalidate), …). See
+  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) for the cached-getter pattern.
+</Callout>
+
+Populated relationships carry the same fields for free: a `page.heroImage` upload field arrives
+with `src`/`srcset` already computed (the collection's `defaultPopulate`), so you can spread it
+into the component without a second fetch. `placeholder` rides along as `null` unless the parent
+read declared a blur (`context: { blur: { quality: 'md' } }` on the page fetch).
 
 ## OG images & raw URLs
 
@@ -250,3 +269,4 @@ the width cap and cache-busting token itself.
 - [Image URLs](/docs/plugins/payload-images/image-urls) — what those `srcset` URLs actually say, parameter by parameter.
 - [Image metadata](/docs/plugins/payload-images/metadata) — where the placeholder, palette, and focal crop come from.
 - [Caching & prewarming](/docs/plugins/payload-images/caching) — why the second request is always fast, and how to make the first one fast too.
+- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — crop looks wrong, browser over-fetches, `<img>` src 404s.

@@ -1,0 +1,84 @@
+---
+title: "Reference"
+description: "Plugin options, environment variables, endpoints, and exports for payload-dev-tools."
+---
+
+## Plugin options
+
+export const options = [
+  {
+    name: 'enabled',
+    type: 'boolean',
+    default: "NODE_ENV === 'development'",
+    description: `Forces the endpoints on or off regardless of environment. The default gates everything to development. Only force true on a deployment you'd hand a teammate anyway (a preview env): the snapshot exposes collection counts and config details, unauthenticated.`,
+  },
+  {
+    name: 'devRoute',
+    type: 'string',
+    default: `'/dev'`,
+    description: `Where the host app mounts the createDevPage catch-all. Drives the toolbar's built-in link and the browser redirect from GET /api/dev.`,
+  },
+]
+
+<Tabs items={['Reference', 'TypeScript']}>
+
+<Tab value="Reference" className="p-0!">
+<ConfigOptions items={options} />
+</Tab>
+
+<Tab value="TypeScript">
+```ts
+interface DevToolsPluginOptions {
+  enabled?: boolean
+  devRoute?: string // default '/dev'
+}
+```
+</Tab>
+
+</Tabs>
+
+`createDevPage({ tests, enabled })` and `<DevToolbar tests links enabled />` take the same
+`enabled` override and the same `tests` array (from `defineTest`). The toolbar's `links` adds
+extra rows to its Pages view; point them at your own labs.
+
+## Environment variables
+
+None — everything is gated by the `enabled` option (which defaults to `NODE_ENV === 'development'`).
+The Seed view surfaces the seed plugin's `ENABLE_SEED`, but that variable belongs to
+[payload-seed](/docs/plugins/payload-seed/reference#environment-variables), not this plugin.
+
+## Endpoints
+
+All four routes 404 outside development. See [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages)
+for the snapshot shape and what each view renders.
+
+| Route | What |
+| --- | --- |
+| `GET /api/dev` | Machine-readable app snapshot (env, plugins, seed status, counts, misses). Browsers are redirected to `/dev`. |
+| `GET /api/dev/stage` | Stages a URL for the toolbar (sets the stage cookie). |
+| `GET /api/dev/draft` | Toggles Next.js draft mode. |
+| `POST /api/dev/icons/activate` | Sets the active icon set. |
+
+## Exports
+
+| Export | From | What |
+| --- | --- | --- |
+| `devToolsPlugin` | `@pro-laico/payload-dev-tools` | Plugin factory; registers the `/api/dev*` endpoints. |
+| `defineTest` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | Identity helper defining a test's versions with full typing. |
+| `DevSnapshot` (+ per-plugin types) | `@pro-laico/payload-dev-tools` | The `GET /api/dev` response shape, for typed consumers. |
+| `STAGE_COOKIE` | `@pro-laico/payload-dev-tools` | The stage cookie name, for custom staging tooling. |
+| `createDevPage` | `@pro-laico/payload-dev-tools/next` | The `/dev` pages; one catch-all drop-in file. |
+| `DevToolbar` | `@pro-laico/payload-dev-tools/toolbar` | The floating toolbar server component; one line in your layout. |
+| `resolveDevChrome` | `@pro-laico/payload-dev-tools/toolbar` | The chrome-swap seam: returns the real header/footer, or the toolbar-selected variant. |
+
+## Collections & globals
+
+None — this plugin registers no collections or globals. It reads sibling plugins' collections
+through their `config.custom` markers to build the `/dev` pages and snapshot.
+
+## Next
+
+- [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) — every `/dev` route and the `GET /api/dev` snapshot.
+- [The test harness](/docs/plugins/payload-dev-tools/test-harness) — `defineTest`, version switching, and chrome swaps.
+- [How it works](/docs/plugins/payload-dev-tools/how-it-works) — plugin discovery, gating, and the persistent toolbar.
+- [Troubleshooting](/docs/plugins/payload-dev-tools/troubleshooting) — 404s, stale pages, and the `enabled` security note.

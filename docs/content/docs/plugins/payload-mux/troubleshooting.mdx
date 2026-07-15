@@ -1,0 +1,36 @@
+---
+title: "Troubleshooting"
+description: "Fix the common video failures fast: stuck-on-preparing uploads, blank admin fields, 403s on signed playback, and skipped seeds."
+---
+
+Symptom-first fixes for the failures you are most likely to hit. Find your symptom in the left column, then apply the fix.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| **Video stuck on `preparing`** (`status` never reaches `ready`, `playbackOptions` stays empty) | The upload polls for only ~6s; anything slower waits for the webhook, and the webhook never arrived. Either the endpoint is not publicly reachable, or `MUX_WEBHOOK_SECRET` does not match the dashboard — a secret mismatch rejects the event silently, so it looks identical. | Point the Mux dashboard at a publicly reachable `/api/mux/webhook`. In dev, tunnel localhost with `cloudflared tunnel --url http://localhost:3000` (or ngrok). Confirm `MUX_WEBHOOK_SECRET` matches the dashboard's. See [Webhook](/docs/plugins/payload-mux/endpoints-and-webhooks#webhook). |
+| **Uploader field or list-view thumbnail is blank** | The collection registers its admin components (uploader field, thumbnail cell) by string path, so a stale import map leaves them unresolved. | Run `pnpm payload generate:importmap`, then restart the dev server. |
+| **Signed playback returns 403, or URLs come back unsigned** | The signing keys are missing. Under a signed policy each read JWT-signs the playback URLs; without the keys, signing can't happen. | Set `MUX_SIGNING_KEY` and `MUX_PRIVATE_KEY` in the env. See [Signed playback](/docs/plugins/payload-mux/using-video#signed-playback). |
+| **Seeding is skipped with a warning** | `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` are unset, so the collection is marked `seedDisabled`. This is expected, not a failure. | Set the credentials and re-run. The next run ingests the clips and wires the refs, with no seed-file changes. See [Disabled seeds](/docs/plugins/payload-seed/advanced#disabled-seeds). |
+
+## Behaviors that surprise people
+
+These are working as designed, not bugs.
+
+<Callout type="warn">
+  **Deletes propagate both ways.** Deleting the Payload doc deletes the Mux asset (`afterDelete`), and
+  replacing a video's asset deletes the previous one. The reverse — a Mux-dashboard delete removing the
+  Payload doc — only fires through the `video.asset.deleted` webhook. See
+  [The asset lifecycle](/docs/plugins/payload-mux/how-it-works#the-asset-lifecycle).
+</Callout>
+
+<Callout type="info">
+  **`title` is unique and auto-deduped.** A duplicate title doesn't fail the save — it's suffixed to
+  stay unique, so the stored title can differ from what was typed. When extending an upload collection,
+  the deduped title is mirrored onto `filename`.
+</Callout>
+
+## Next
+
+- [Use a video](/docs/plugins/payload-mux/using-video) — relate, play back, and sign playback URLs.
+- [Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) — the webhook contract and server-side ingest.
+- [How it works](/docs/plugins/payload-mux/how-it-works) — the asset lifecycle, revalidation, and seeding.

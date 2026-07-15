@@ -1,0 +1,176 @@
+---
+title: "Advanced"
+description: "Route assets through a collection's own ingest hook, skip seeds that can't run in an environment, and keep bulk seeding from firing revalidation — plus how the engine orders and creates everything."
+---
+
+This page covers the parts you reach for once the basics work: sending an asset through a
+collection's own hook instead of a plain upload, skipping a seed when its environment isn't ready,
+and stopping a bulk run from firing a revalidation per doc. The last section explains the engine, in
+case you're debugging or curious.
+
+For the day-to-day API — `defineSeed`, `ref`, `file`, and `_file` — see
+[Writing seeds](/docs/plugins/payload-seed/writing-seeds). For the four ways to trigger a run, see
+[Running the seed](/docs/plugins/payload-seed/running).
+
+## Custom ingestion
+
+Most collections take a plain Payload upload for their `_file` and seed natively. A few ingest their file
+**through their own hook** instead — e.g. [`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s
+`mux-video`, whose bytes go to Mux. Mark such a collection's own config and the engine hands the `_file`
+to that hook (via a `sourceField`) rather than uploading bytes:
+
+```ts
+// the collection's own config — usually set by its plugin, not by you
+{
+  slug: 'mux-video',
+  custom: {
+    seedAsset: { sourceField: 'source' }, // or `seedAsset: true` for the defaults
+  },
+  fields: [
+    // the field the engine writes `{ file, ...options }` to, read by the ingest hook
+    { name: 'source', type: 'json', admin: { hidden: true } },
+    // ...the rest of the collection
+  ],
+}
+```
+
+export const seedAssetMarker = [
+  {
+    name: 'seedAsset',
+    type: 'true | { sourceField?, subdir? }',
+    description: `Set on the collection's custom.seedAsset. true uses the defaults below; pass an object to override them.`,
+    options: [
+      { name: 'sourceField', type: 'string', default: "'source'", description: `The field the engine sets to { file, ...options } for the collection's ingest hook to read.` },
+      { name: 'subdir', type: 'string', default: '<collection slug>', description: `Source-file folder under assetsDir. Override per-collection with the plugin's assetSubDirs.` },
+    ],
+  },
+]
+
+<ConfigOptions items={seedAssetMarker} />
+
+The engine auto-discovers the marker from the live config — nothing to register, and the owning plugin
+never imports payload-seed. The doc then seeds like any other (`_file` + `ref()`). Collections whose asset
+is a plain upload (payload-fonts' `fontOriginal`, payload-images' `image`) need **no** marker. See
+[payload-mux → Seeding](/docs/plugins/payload-mux) for a worked example.
+
+## Disabled seeds
+
+Some collections can't always seed — [`@pro-laico/payload-mux`](/docs/plugins/payload-mux)'s `mux-video`
+needs API credentials to ingest a clip. The **collection declares it** instead:
+
+```ts
+// set by the owning plugin when it can't ingest — e.g. payload-mux without MUX_* env vars
+{
+  slug: 'mux-video',
+  custom: { seedDisabled: 'Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)' },
+}
+```
+
+The engine **skips** that definition (warning with the reason) and **drops** any optional field whose
+`ref()` points at it — a *required* ref is a hard error. The definition stays registered, so types
+don't change with the environment. Set the env vars and the next run seeds it and fills the dropped
+refs back in.
+
+To gate a definition yourself, `defineSeed` takes the same flag directly:
+
+```ts
+defineSeed('reports', build, { disabled: !process.env.REPORTS_API_KEY })
+```
+
+<Callout type="warn">
+  Don't gate the definition on the environment by leaving it out of the `definitions` array. That
+  shifts the generated seed-ref types with the environment, so every `ref()` at it flips between valid
+  and error as the dev server regenerates types on boot. Register it unconditionally and let it be
+  skipped at runtime.
+</Callout>
+
+## How it works
+
+Every entry point runs the same engine. You don't need any of this to write seeds; it's here for when
+you're debugging or curious.
+
+### What a seed run does
+
+Trigger a seed from any entry point and the engine runs the same fixed sequence — starting from your
+in-memory `defineSeed` output and ending with a fully-populated database:
+
+<Steps>
+
+<Step>
+**Build the model**
+
+Skip any [disabled definition](#disabled-seeds) (its own `disabled`, or the collection's
+`custom.seedDisabled` — warning per skip), then run each remaining builder to produce the collection
+records (with their `_file`) and the globals. Optional fields whose `ref()` points at a skipped
+definition are dropped (required ones error).
+</Step>
+
+<Step>
+**Validate**
+
+Every `ref` targets a real collection and resolves to a seeded doc, every `_file` sits on an upload or
+`custom.seedAsset` collection, no duplicate `_key` within a collection, no unknown top-level fields. All
+issues are collected and thrown at once, naming the collection, `_key`, and field.
+</Step>
+
+<Step>
+**Build the dependency graph & topo-sort**
+
+Every `ref(collection, key)` becomes an edge; a depth-first sort orders each doc after the docs it
+references. A cycle is broken by deferring an optional field; an all-required cycle is a hard error naming it.
+</Step>
+
+<Step>
+**Clear the seeded collections**
+
+Upload collections and any collection with delete hooks clear via `payload.delete` so those hooks fire
+(e.g. external-asset cleanup); plain collections are wiped directly.
+</Step>
+
+<Step>
+**Create docs in dependency order**
+
+Resolve each doc's `ref` tokens to real ids and deliver its `_file` — a native upload, or a source-field
+value for a `custom.seedAsset` collection's ingest hook. A field deferred to break a cycle is created null.
+</Step>
+
+<Step>
+**Resolve deferred references**
+
+If a cycle was broken, set each deferred field now that every doc exists — one `update` per deferred field.
+</Step>
+
+<Step>
+**Update globals**
+
+Last, after every doc exists — resolving their refs too.
+</Step>
+
+</Steps>
+
+### How typed refs are generated
+
+The plugin injects a `SeedRegistry` into `payload-types.ts` via Payload's own `typescript.postProcess`
+hook, riding the same `generate:types` command you already run. That makes the augmentation **global
+with no import**, exactly like Payload's generated `GeneratedTypes`, so `ref('services', 'consulting')`
+is checked against your real `_key`s. Without codegen, refs fall back to runtime validation: safe
+either way, fully safe with it.
+
+## Disable revalidation
+
+The engine sets `context: { disableRevalidate: true }` on every create, update, and delete. Have your
+`afterChange` / `afterDelete` revalidation hooks check for it and skip, so a bulk seed doesn't fire a
+revalidation per doc:
+
+```ts
+export const revalidatePost: CollectionAfterChangeHook = ({ doc, context }) => {
+  if (!context.disableRevalidate) revalidatePath(`/posts/${doc.slug}`)
+  return doc
+}
+```
+
+## Next
+
+- [Writing seeds](/docs/plugins/payload-seed/writing-seeds) — `defineSeed`, records, `_file`, and where files live.
+- [Running the seed](/docs/plugins/payload-seed/running) — the admin button, HTTP endpoint, CLI, and `seed()`.
+- [Troubleshooting](/docs/plugins/payload-seed/troubleshooting) — symptom-first fixes for the common failures.

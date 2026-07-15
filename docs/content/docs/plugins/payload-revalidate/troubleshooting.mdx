@@ -1,0 +1,64 @@
+---
+title: "Troubleshooting"
+description: "Fix the common revalidation failures fast — a symptom-first table with the literal dev warnings to grep for, plus the /dev/revalidate map that shows exactly what busts when."
+---
+
+Revalidation is loud when it goes wrong. The plugin logs each failure once per process, in
+every environment — a production jobs runner silently not revalidating is the one thing it
+refuses to be quiet about. Every message is prefixed `[payload-revalidate]`, so
+`grep '\[payload-revalidate\]'` on your logs surfaces all of them. The literal strings are in
+the table below.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| **Nothing revalidates in a jobs runner or outside a request** | `revalidateTag` no-ops outside a Next request scope (a `console.warn`, once). Grep: `revalidateTag('…') was a no-op — no Next request scope`. | Bust from inside a request, or accept that background writes heal on the next request-scoped bust. This is the failure the plugin logs loudest. |
+| **Entry materialized untagged** | `cacheTag` failed, so the entry carries no tags and nothing can bust it (a `console.error`, once). Grep: `cacheTag failed — this entry (and likely every entry) is materializing UNTAGGED`. | Confirm the getter runs inside a `'use cache'` scope with `cacheComponents` enabled. |
+| **Bake-in walk skipped** | The config was unreachable, so the walk that finds baked-in content couldn't run (a `console.warn`). | The doc still tags by id; only the deep-content walk was skipped. Check the logged warning for the cause. |
+| **Hooks don't fire on a plugin's collection** | The plugin ran before the collection existed, so it couldn't hook it. Grep: `registered AFTER revalidatePlugin() and NOT hooked for revalidation`. | Register `revalidatePlugin()` **last** in `plugins: []`. The boot-time warning names anything registered after it. See [Quickstart](/docs/plugins/payload-revalidate). |
+| **List reorders don't refresh** | The read depends on a sort or filter field the scope doesn't declare, so a reorder never busts it. | Declare every sort and filter field the scope depends on. The `/dev/revalidate` map warns when a scope is observed but undeclared. See [Getters](/docs/plugins/payload-revalidate/getters). |
+| **Nothing busts during a seed** | Expected — the [`payload-seed`](/docs/plugins/payload-seed) engine sets `context.disableRevalidate` on every write. | Nothing to fix. The plugin's after-seed listener flushes the seeded surface once at the end: list tags, declared scopes, `extraTags`, and rule targets for the touched slugs, then `all`. |
+
+<Callout type="warn">
+The three loud failures all log once per process in every environment, production included:
+`revalidateTag` no-oping outside a request scope (`console.warn`), `cacheTag` failing so an
+entry materializes untagged (`console.error`), and the config being unreachable so the
+bake-in walk is skipped (`console.warn`).
+</Callout>
+
+## The `/dev/revalidate` map
+
+With [`payload-dev-tools`](/docs/plugins/payload-dev-tools) installed, the map renders in
+four tabs:
+
+- **Explore** — the interactive dependency graph (pan/zoom, click a node): editing a node
+  makes its right-hand neighbors stale; **amber animated edges are observed bake-ins**
+  (the anti-pattern), grey edges are id-references, dashed is richText. Selecting a node
+  answers "what does editing this revalidate?" and "what makes this stale?" plus the
+  observed doc-level reality: which entries carry `media:3` right now, own-entry ✓ or
+  baked-in ⚠.
+- **Fields** — per collection, every field with its computed blast radius:
+  `title → doc`, `publishedAt → doc + list:recent`, `slug → doc + alias`.
+- **Reads** — every materialized entry with an atomic-health badge (`atomic ✓`,
+  `N baked-in ⚠`, `undeclared scope!`, `capped!`).
+- **Events** — the bust log (per-tag reasons) + a manual bust box.
+
+`GET /api/revalidate-map` serves it all as JSON (dev-gated);
+`POST /api/revalidate-map { "tag": "posts:42" }` busts one tag by hand.
+
+The plugin also **polices the pattern in dev**: a getter baking in populated docs logs
+the exact field paths to fix; a `cacheIds` read carrying an undeclared scope warns that
+reorders won't reach it; docs-with-content passed to `cacheIds` warn that content edits
+won't refresh the entry.
+
+<Callout type="info">
+With `observe: true` forced on in production, the map endpoints additionally require an
+authenticated Payload user.
+</Callout>
+
+## Next
+
+- [Overview & Quickstart](/docs/plugins/payload-revalidate)
+- [The atomic model](/docs/plugins/payload-revalidate/atomic-model)
+- [Getters](/docs/plugins/payload-revalidate/getters)
+- [Examples](/docs/plugins/payload-revalidate/examples)
+- [Reference](/docs/plugins/payload-revalidate/reference)

@@ -1,0 +1,204 @@
+---
+title: "payload-seed"
+description: "Bootstrap a Payload project with type-safe seed data — declare it in files and let the plugin order, upload, and create it."
+---
+
+`@pro-laico/payload-seed` declares your seed data in files, then orders, uploads, and creates it for you. Write the initial content a site ships with once, and the plugin resolves relationships and asset uploads so you never hit an empty reference or a bad upload order.
+
+It's a **bootstrap** tool — for the initial data a project stands up with, not day-to-day edits. A run uploads that content into your real storage and database (your DB, S3, Mux, and so on) instead of leaving it in the repo.
+
+```bash
+pnpm add @pro-laico/payload-seed
+```
+
+## What's included
+
+- **Typed seed helpers.** Write seed data for any collection or global with real type feedback — you and your AI tools get shape errors instead of guessing.
+- **Automatic relationship ordering.** Reference other seeded docs by handle; the engine creates them in dependency order, so references are never empty.
+- **Asset handling.** Attach a file to a seeded doc and the engine uploads it — natively, or through a sibling plugin's own ingest hook (Mux, and others).
+- **Seed anywhere.** Run from the admin button, the HTTP endpoint, the CLI, or in code.
+
+## Requirements
+
+- **Payload CMS** — a Payload `^3` project.
+- **`pnpm payload generate:types`** to activate typed refs. Without it, `ref()` keys fall back to runtime validation — still safe, just not checked at compile time.
+- **`ENABLE_SEED=true`** to run the admin button, endpoint, or CLI. It's off by default.
+
+<Callout type="warn">
+  Every run is **destructive**. It clears each seeded collection before recreating it — a reset, not
+  an append. Never point it at data you want to keep, and never set `ENABLE_SEED` in production.
+</Callout>
+
+## Quickstart
+
+<Steps>
+
+<Step>
+**Add the plugin**
+
+Register `seedPlugin` in your Payload config. Leave `definitions` empty for now; you'll fill it in
+once your seed files exist.
+
+```ts
+import { buildConfig } from 'payload'
+import { seedPlugin } from '@pro-laico/payload-seed'
+
+export default buildConfig({
+  plugins: [
+    seedPlugin({
+      definitions: [],
+      adminButton: true,
+    }),
+  ],
+  // ...
+})
+```
+
+<Callout type="info">
+  Using `adminButton: true`? The button is registered by string path, so regenerate the admin import
+  map with `pnpm payload generate:importmap` (skip it if you only run the seed via the CLI /
+  endpoint).
+</Callout>
+</Step>
+
+<Step>
+**Define your data**
+
+Write one `seed.ts` per collection or global with `defineSeed` (it infers which from the slug). Each
+collection record needs a `_key` (a local handle other files point at). Upload collections carry their
+file on `_file`; relationship fields point at other records with `ref()`. Put the source files under
+`assets/<collection>/` — the folder name defaults to the collection slug.
+
+```ts
+// src/collections/Media/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('media', ({ file }) => [
+  {
+    _key: 'serviceImg',
+    _file: file('service-a.jpg'), // assets/media/service-a.jpg
+    alt: 'Consulting',
+  },
+])
+```
+
+```ts
+// src/collections/Services/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('services', () => [
+  {
+    _key: 'consulting',
+    title: 'Consulting',
+  },
+])
+```
+
+```ts
+// src/collections/Posts/seed.ts
+import { defineSeed } from '@pro-laico/payload-seed'
+
+export default defineSeed('posts', ({ ref }) => [
+  {
+    _key: 'launch',
+    title: 'We launched',
+    heroImage: ref('media', 'serviceImg'),
+    relatedService: ref('services', 'consulting'),
+  },
+])
+```
+
+See [Writing seeds](/docs/plugins/payload-seed/writing-seeds) for the full `defineSeed` reference,
+tokens, and where files live.
+</Step>
+
+<Step>
+**Add them to the plugin**
+
+Import each `seed.ts` export and hand the whole set to `definitions`. The same array drives the run
+and the injected types.
+
+```ts
+import { buildConfig } from 'payload'
+import { seedPlugin } from '@pro-laico/payload-seed'
+import media from './collections/Media/seed'
+import services from './collections/Services/seed'
+import posts from './collections/Posts/seed'
+
+export default buildConfig({
+  plugins: [
+    seedPlugin({
+      definitions: [media, services, posts],
+      adminButton: true,
+    }),
+  ],
+  // ...
+})
+```
+</Step>
+
+<Step>
+**Generate types**
+
+Run `pnpm payload generate:types` to activate typed refs. The plugin injects a `SeedRegistry` into
+`payload-types.ts`, so every `ref('services', 'consulting')` is checked against your real `_key`s.
+Skip this and refs still work — they just fall back to runtime validation.
+
+```bash
+pnpm payload generate:types
+```
+</Step>
+
+<Step>
+**Enable, then run**
+
+The seed is gated by the `ENABLE_SEED` kill switch (off by default). Set it, then click **"Seed your
+database"** in the admin header.
+
+```bash
+# In your env:
+ENABLE_SEED=true
+# Then click "Seed your database" in the admin header.
+```
+
+You can also run the seed from the CLI (`ENABLE_SEED=true pnpm payload seed`) or by POSTing to
+`/api/seed`. See [Running the seed](/docs/plugins/payload-seed/running) for all four entry points.
+
+<Callout type="info">
+  The CLI can trip a Node 24 tsx bug at boot. If it does, use the admin button or endpoint instead —
+  see [Troubleshooting](/docs/plugins/payload-seed/troubleshooting).
+</Callout>
+</Step>
+
+</Steps>
+
+## Explore
+
+<Cards>
+
+<Card title="Writing seeds" href="/docs/plugins/payload-seed/writing-seeds">
+  `defineSeed`, records and `_key`, collections, globals, tokens, and where files live.
+</Card>
+
+<Card title="Running the seed" href="/docs/plugins/payload-seed/running">
+  The four entry points — admin button, HTTP endpoint, CLI, and programmatic — with response shapes.
+</Card>
+
+<Card title="Advanced" href="/docs/plugins/payload-seed/advanced">
+  Custom ingestion, disabled seeds, how a run works, and disabling revalidation.
+</Card>
+
+<Card title="Reference" href="/docs/plugins/payload-seed/reference">
+  Plugin options, environment variables, CLI commands, endpoints, and exports.
+</Card>
+
+<Card title="Troubleshooting" href="/docs/plugins/payload-seed/troubleshooting">
+  Symptom-first fixes — the `ENABLE_SEED` gate, missing files, circular refs, and the Node 24 tsx bug.
+</Card>
+
+</Cards>
+
+## Plugin options
+
+Zero-config apart from `definitions` — every other option has a sensible default. See
+[Reference](/docs/plugins/payload-seed/reference) for options, env vars, CLI, endpoints, and exports.

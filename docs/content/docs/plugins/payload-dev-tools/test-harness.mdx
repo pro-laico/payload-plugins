@@ -1,0 +1,34 @@
+---
+title: "The test harness"
+description: "Define page, header, and footer variants once, then flip between them from the toolbar — inside your real running site."
+---
+
+The test harness is the reason to reach for this plugin in earnest. You define a component's variants
+once with `defineTest`, then switch between them from the toolbar — a `page` test renders on its own
+route, while a `header`/`footer` test swaps into your real layout site-wide. The
+[Quickstart](/docs/plugins/payload-dev-tools#quickstart) shows the wiring; this page is the
+model behind it.
+
+## The test harness
+
+`defineTest` registers a named test with versions; each version's `render` is a prop-less
+(optionally async) server component. Fetch your own data inside it. The model is one-page-per-test:
+
+- **The page.** `/dev/tests/<key>` renders inside your real layout with no added chrome. Which
+  version it shows comes from a session cookie (defaulting to the first version), so the URL stays
+  stable while you compare.
+- **The controller.** The toolbar's Tests view names what you're viewing; its chips flip the
+  cookie and re-render the page with the other version.
+- **Chrome overrides.** `header`/`footer`-kind tests get Real/variant chips instead of a page.
+  Selecting one sets a slot cookie that `resolveDevChrome` reads to swap the variant into the real
+  chrome on every route. Browse the whole site wearing the candidate header.
+- **The script hook.** `GET /api/dev/stage?test=hero&version=bold` sets the cookie and redirects
+  to the test's page, so an agent or screenshot script puts any version on screen with one URL
+  (`?clear=1` resets; `?slot=header|footer` targets a chrome override). A layout-invisible wrapper
+  (`display: contents`) carries `data-pdt-test` / `data-pdt-version` to assert against.
+
+## Next
+
+- [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) — where a `page` test renders and the app snapshot.
+- [How it works](/docs/plugins/payload-dev-tools/how-it-works) — how `resolveDevChrome` and gating behave in production.
+- [Troubleshooting](/docs/plugins/payload-dev-tools/troubleshooting) — "chrome swap does nothing" and other test-harness gotchas.

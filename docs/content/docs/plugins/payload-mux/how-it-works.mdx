@@ -1,0 +1,116 @@
+---
+title: "How it works"
+description: "Follow a video from upload to playback: how Mux encoding, the webhook, revalidation, and seeding fit together."
+---
+
+The upload flow, the virtual URLs, and the webhook all fit together in one lifecycle.
+This page traces that lifecycle, then covers revalidation and seeding.
+
+## The asset lifecycle
+
+When you upload, the admin field posts the bytes **straight to Mux**. The video never
+passes through your server. The doc saves with just its `assetId`.
+
+The `beforeChange` hook then polls the new asset for **~6 seconds**. A fast encode
+returns full playback metadata inline. Anything slower is left for the **webhook**,
+which fills that metadata in once Mux finishes. The webhook also mirrors Mux-dashboard
+deletes back into Payload.
+
+The `playbackUrl` / `posterUrl` / `gifUrl` fields aren't stored. They compute from the
+playback id on every read, signed on the fly under a signed policy.
+
+<Callout type="info">
+  Server-side ingest and seeding skip the 6s window entirely. They wait for the asset to
+  reach `ready` and write full metadata into the doc, so those videos play straight away
+  whatever their length. See [Server-side ingest](/docs/plugins/payload-mux/endpoints-and-webhooks#server-side-ingest).
+</Callout>
+
+## Revalidation
+
+The plugin keeps Payload and Mux in sync but doesn't touch Next.js's cache. Some writes
+land outside the request that rendered your page — the `video.asset.ready` and
+`video.asset.deleted` webhook events especially.
+
+With [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) installed there's
+nothing to wire. Its auto-attached hooks cover `mux-video` like any collection. The webhook
+writes go through `payload.update`, so they fire the same hooks as admin saves and
+server-side ingest. Fetch the video doc through an id-keyed `cacheDoc` getter and derive the
+playback URLs from it:
+
+```ts
+import { cacheDoc, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+
+export async function getVideo(id: string | number) {
+  'use cache'
+  const payload = await getPayloadClient()
+  return cacheDoc(await payload.findByID({ collection: 'mux-video', id, depth: 0, disableErrors: true }), 'mux-video')
+}
+```
+
+A page showing "processing" then heals itself. The `video.asset.ready` webhook busts
+`mux-video:{id}` the moment Mux finishes, so the next request re-fetches exactly that entry
+with the playback ids populated.
+
+<Callout type="info">
+  **Without the revalidate plugin**, handle it yourself with a Payload `afterChange` /
+  `afterDelete` hook on `mux-video`. That hook fires for webhook writes, admin saves, and
+  server-side ingest alike, so it's the one place to call `revalidateTag` / `revalidatePath`
+  for the pages that embed videos.
+</Callout>
+
+## Seeding
+
+`mux-video` isn't a plain upload collection — its bytes live at Mux. So it seeds through
+[`@pro-laico/payload-seed`](/docs/plugins/payload-seed/advanced#custom-ingestion)'s
+**custom ingestion**. `muxVideoPlugin()` marks the collection with
+`custom: { seedAsset: { sourceField: 'source' } }`, the seed engine auto-discovers that
+marker from the live config, and a video seeds **like any other doc**. Each record carries
+its clip on the `_file` meta-key via the `file()` token, and other docs point at it with
+`ref()`:
+
+```ts
+import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { defineSeed, seedPlugin } from '@pro-laico/payload-seed'
+
+// src/seed/videos.ts — each doc carries its clip on `_file`
+const videos = defineSeed('mux-video', ({ file }) => [
+  {
+    _key: 'intro',
+    _file: file('intro.mp4'), // assets/mux-video/intro.mp4
+    title: 'Intro',
+  },
+])
+
+// src/seed/pages.ts — reference a seeded video by ref
+const pages = defineSeed('pages', ({ ref }) => [
+  {
+    _key: 'home',
+    title: 'Home',
+    heroVideo: ref('mux-video', 'intro'),
+  },
+])
+
+plugins: [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages] })]
+```
+
+Under the hood the engine writes each `_file` to the collection's `source` field and the
+[server-side ingest](/docs/plugins/payload-mux/endpoints-and-webhooks#server-side-ingest)
+hook does the upload. The seed package never imports this one, nor the Mux SDK, so the two
+stay decoupled. Ingest waits for each asset to reach `ready` and writes its full metadata,
+so seeded videos play straight away, no webhook required. Playback policy comes from the
+plugin's configured policy, so seeded and admin-uploaded videos share one.
+
+<Callout type="info">
+  **Without credentials, seeding skips — it doesn't fail.** When `MUX_TOKEN_ID` /
+  `MUX_TOKEN_SECRET` aren't set, the plugin also marks the collection
+  `custom: { seedDisabled: '…' }`. The seed engine skips its definition with a warning and
+  drops any optional `ref('mux-video', …)`, so the rest of the seed runs offline. Set the
+  env vars and the next run ingests the clips and wires the refs, with no seed-file changes.
+  See [Disabled seeds](/docs/plugins/payload-seed/advanced#disabled-seeds).
+</Callout>
+
+## Next
+
+- [Use a video](/docs/plugins/payload-mux/using-video) — relate, play back, and sign URLs.
+- [Endpoints & webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) — the endpoints, webhook, and server-side ingest.
+- [Troubleshooting](/docs/plugins/payload-mux/troubleshooting) — stuck uploads, missing thumbnails, signed-playback 403s.

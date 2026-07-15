@@ -1,0 +1,137 @@
+---
+title: "Reference"
+description: "Every revalidatePlugin option, default, and export in one place — plus the guarantees the finders and hooks make."
+---
+
+The full surface: plugin options, the import-path map for every export, and the behavioural notes worth knowing. For finder signatures see [Writing getters](/docs/plugins/payload-revalidate/getters); for the tag vocabulary see [The atomic model](/docs/plugins/payload-revalidate/atomic-model).
+
+## Plugin options
+
+Every option is optional. Zero-config (`revalidatePlugin()`) gives every collection and global its hooks, and doc tags flow automatically. Declared `lists` are the one thing worth configuring.
+
+export const revalidateOptions = [
+  {
+    name: 'collections',
+    type: 'Record<string, { lists?: Record<string, string[] | { fields: string[] }> }>',
+    default: '{}',
+    required: false,
+    description:
+      "Per-collection list scopes. Each scope gives a list surface its own tag and declares which fields reorder or filter it. A scope is `name: [fields]`; the longer `name: { fields: [...] }` form is accepted too. Omit it and every collection still gets doc tags — you just get one bare list tag per collection instead of scoped ones.",
+  },
+  {
+    name: 'rules',
+    type: 'Array<{ on: string; bust: string[]; whenFields?: string[] }>',
+    default: '[]',
+    required: false,
+    description:
+      "Manual busts for data the field-walk can't see (e.g. content denormalized by an app-level build step). A rule fires when one of its `whenFields` changed, or on any membership event; deletes fire it unconditionally.",
+  },
+  {
+    name: 'observe',
+    type: 'boolean',
+    default: 'dev only',
+    required: false,
+    description:
+      "Force the dependency-map observation and dev warnings on in production. By default they run in development only. With `observe: true` in production, the map endpoints additionally require an authenticated Payload user.",
+  },
+  {
+    name: 'walk.maxTags',
+    type: 'number',
+    default: '64',
+    required: false,
+    description:
+      'Caps how many tags the bake-in walk may add to one entry (Next.js allows 128 tags per entry). Capped reads are flagged in the dev map.',
+  },
+  {
+    name: 'idField',
+    type: 'string',
+    default: 'slug',
+    required: false,
+    description:
+      'Field used for the alias doc tag (`posts:my-slug`). A collection with no such field gets id-keyed tags only.',
+  },
+]
+
+<ConfigOptions items={revalidateOptions} />
+
+<Callout type="info">
+  Finder defaults, baked in so you never repeat them: `depth: 0` (references stay
+  ids), `overrideAccess: false`, errors resolve to `null`, and id-list reads
+  (`findIds`) are forced to `select: {}`. Override any of them per call — except
+  `user` / `req`, which the finders refuse (see [Writing
+  getters](/docs/plugins/payload-revalidate/getters)).
+</Callout>
+
+## Environment variables
+
+None. The plugin reads no environment variables — everything is configured through [plugin options](#plugin-options).
+
+## Endpoints
+
+Two dependency-map routes, dev-gated. With `observe: true` forced on in production they additionally require an authenticated Payload user.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/revalidate-map` | The full dependency map as JSON. |
+| `POST /api/revalidate-map` | Bust one tag by hand — body `{ "tag": "posts:42" }`. |
+
+These power the `/dev/revalidate` map — see [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting#the-devrevalidate-map).
+
+## Exports
+
+Two import entry points, plus the finders and primitives you get back from the factory.
+
+**Package root** — `@pro-laico/payload-revalidate`
+
+| Export | Purpose |
+| --- | --- |
+| `revalidatePlugin` | The plugin. Add it **last** in `plugins: []`. |
+| `tagsFor` | `tagsFor(payload)` builds prefix-correct raw tags for the rare hand-spelled `cacheTag` need. |
+
+**Cache helpers** — `@pro-laico/payload-revalidate/cache`
+
+| Export | Purpose |
+| --- | --- |
+| `createCacheHelpers` | Seed once with your live Payload handle; returns the finders, primitives, and manual busters below. |
+
+**Factory returns** — destructured from `createCacheHelpers(db)`, not imported
+
+| Return | Purpose |
+| --- | --- |
+| `findDocByID` | One doc by id → its id-keyed entry. The atomic unit. |
+| `findDoc` | One doc by query, with alias (`as`) and `draft` tagging. |
+| `findIds` | An id-list plus pagination meta, no second query. |
+| `findGlobal` | A global. |
+| `cacheDoc` · `cacheIds` · `cacheGlobal` | The low-level primitives a finder wraps, for getters the finders can't express. |
+| `revalidateDoc` | Bust one doc's tags. Lane-aware (published + `:draft`) and prefix-aware. |
+| `revalidateList` | Bust a collection's bare list tag plus every declared scope. |
+| `revalidateGlobal` | Bust a global's tags. |
+| `revalidateAll` | Bust the `all` tag — every tagged entry. |
+
+## Notes
+
+- **Add the plugin last** in `plugins: []` — it can only hook collections that exist when
+  it runs (a boot-time warning names anything registered after it).
+- Failure paths are loud in every environment, once per process: `cacheTag` failing
+  (entry materializing untagged), the config being unreachable (bake-in walk skipped),
+  and `revalidateTag` no-oping outside a request scope all `console.error`/`warn` — a
+  production jobs runner silently not revalidating is the one thing this plugin refuses
+  to be quiet about.
+- With `observe: true` forced on in production, the map endpoints additionally require an
+  authenticated Payload user.
+- The cache helpers never resolve Payload or your config themselves — no `globalThis`
+  stashes, no `@payload-config` alias tricks, no `transpilePackages` requirement. The
+  handle you seed into `createCacheHelpers` is the session that runs and tags every read.
+- A draft save **over a published doc** is indistinguishable from an unpublish in the
+  hook signature, so both lanes bust — a harmless over-bust that keeps unpublish correct.
+- Collections without a slug field get no alias tag — id-keyed reads only.
+- The bake-in walk is capped (`walk.maxTags`, default 64; Next allows 128 tags/entry);
+  capped reads are flagged in the map.
+- Bare `posts` list tags bust on membership only — an unscoped `findIds` read that
+  depends on sort/filter fields should declare a scope instead.
+
+## Next
+
+- [Writing getters](/docs/plugins/payload-revalidate/getters) — finder signatures and the `'use cache'` pattern.
+- [The atomic model](/docs/plugins/payload-revalidate/atomic-model) — the tag vocabulary and what busts when.
+- [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting) — failure modes and the `/dev/revalidate` map.

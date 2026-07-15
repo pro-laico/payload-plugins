@@ -1,0 +1,30 @@
+---
+title: "Troubleshooting"
+description: "Fix the common payload-images failures fast — 404s, missing admin panels, over-fetching, off-center crops, and stale pages."
+---
+
+Each failure below leads with what you see, then the cause, then the fix. Scan the first column for
+your symptom.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| An `<img>` `src` points at `/api/img/…` but returns **404**, or images never optimize. | Sharp is being bundled — its native binary breaks when bundled. | Add `serverExternalPackages: ['sharp']` to `next.config.ts` (Turbopack and webpack both need it). |
+| No optimized URLs at all — `src`/`srcset` are absent, or every `/api/img/…` request **404s**. | The transform endpoint isn't mounted (`transform: false`), so `/api/img` doesn't exist and `virtualFields` defaults off. | Leave `transform` enabled. If you serve the endpoint another way, force the fields with `virtualFields: true`. See [Reference](/docs/plugins/payload-images/reference#plugin-options). |
+| The focal-point picker or the **Presets & variants** panel is missing or blank in the admin. | Admin components register by string path; the import map is stale. | Run `pnpm payload generate:importmap` and restart the dev server. (`focalUI` defaults on, so the components are registered.) |
+| The browser downloads a huge image into a small slot (over-fetching). | `sizes` left at its `100vw` default. | Set `sizes` to how big the image actually renders, e.g. `sizes="(max-width: 768px) 100vw, 33vw"`. See [Rendering images](/docs/plugins/payload-images/rendering). |
+| The crop is off-center or the wrong shape. | `aspectRatio` was declared on only one side. | Declare the **same** `aspectRatio` on both the read (`imageFor(id).aspectRatio('16:9')`) and the component (`<ResponsiveImage aspectRatio="16:9">`). |
+| Edited an image but a page still shows the old one. | The page is cached. Image URLs self-bust; the page cache doesn't. | Revalidate that route. See [Caching & prewarming → Revalidation](/docs/plugins/payload-images/caching#revalidation). |
+| `mimeTypes`, `localizeAlt`, or `maxOriginalSize` are set but ignored. | You're using `extendCollection` — you own that collection's upload config. | Set the equivalents on the collection itself. See [Collections → Extending a collection](/docs/plugins/payload-images/collections#extending-a-collection). |
+
+<Callout type="warn">
+  **Image URLs self-bust; your page cache doesn't.** A cached page keeps serving the old URL until
+  you revalidate that route — exactly as it would for any Payload content. Content-addressed URLs
+  refresh themselves on file replace or focal move; the page serving them does not.
+</Callout>
+
+## Next
+
+- [Rendering images](/docs/plugins/payload-images/rendering) — the `imageFor` + `<ResponsiveImage>` contract, and the `sizes` / `aspectRatio` rules.
+- [Caching & prewarming](/docs/plugins/payload-images/caching) — why the second request is fast, and how route revalidation works.
+- [Reference](/docs/plugins/payload-images/reference) — every plugin option, env var, CLI command, and endpoint.
+- [Collections](/docs/plugins/payload-images/collections) — the collections it registers, and `extendCollection`'s upload-config ownership.

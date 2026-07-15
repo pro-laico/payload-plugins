@@ -1,13 +1,21 @@
 ---
 title: "payload-images"
-description: "On-demand image optimization for Payload CMS, perfectly sized and focal-cropped at any screen size."
+description: "Upload a picture once, then request any size, crop, or format from a URL — rendered on demand and cached forever."
 ---
 
-`@pro-laico/payload-images` brings a **[Sanity-style image pipeline](https://www.sanity.io/docs/image-urls)
-to Payload**: upload a picture once and ask for any size, crop, or format with a URL. The plugin
-renders it on the fly the first time it's requested, then caches it forever. Think of it as the
-image-optimization layer `next/image` should give you but doesn't: art-directed focal cropping,
-AVIF/WebP negotiation, instant placeholders, and a durable cache, all driven from your CMS.
+`@pro-laico/payload-images` optimizes images on demand. Upload a picture once, then ask for any
+size, crop, or format with a URL. The plugin renders each variant the first time it's requested,
+then caches it forever.
+
+It's the [Sanity-style image pipeline](https://www.sanity.io/docs/image-urls) for Payload:
+art-directed focal cropping, AVIF/WebP negotiation, instant placeholders, and a durable cache — all
+driven from your CMS. Unlike Payload's built-in `imageSizes`, you never pre-declare a fixed set of
+sizes; any size is available the moment a layout asks for it.
+
+<Callout type="info">
+  **Built for Next.js.** This plugin targets Payload running in a Next.js app. It isn't
+  framework-agnostic — see the Quickstart note below.
+</Callout>
 
 ```bash
 pnpm add @pro-laico/payload-images
@@ -19,8 +27,8 @@ pnpm add @pro-laico/payload-images
 - **Focal-point cropping, subject-aware by default:** every upload gets a saliency-detected focal point automatically; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
-- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered — reads that don't stay lean.
-- **Self-busting cache, smart prewarming, instant fallbacks:** content-addressed URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/caching#smart-prewarm) generates what your site actually serves before anyone asks, and the residual cold path serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
+- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered.
+- **Self-busting cache, smart prewarming, instant fallbacks:** URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/caching#smart-prewarm) generates what your site actually serves before anyone asks, and a cold request serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
 
 ![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)
 
@@ -36,6 +44,8 @@ pnpm add @pro-laico/payload-images
 
 <Step>
 **Add the plugin**
+
+This registers an `images` upload collection with the transform pipeline attached.
 
 ```ts
 import { buildConfig } from 'payload'
@@ -54,7 +64,7 @@ export default buildConfig({
 <Callout type="info">
   **Already have a `media`/`images` collection?** Pass `imagesPlugin({ extendCollection: 'media' })`
   to add the pipeline to your existing upload collection instead of creating a second one. See
-  [Extending a collection](/docs/plugins/payload-images/configuration#extending-a-collection).
+  [Extending a collection](/docs/plugins/payload-images/collections#extending-a-collection).
 </Callout>
 </Step>
 
@@ -74,12 +84,19 @@ export default nextConfig
 <Step>
 **Generate the admin import map**
 
-The plugin registers custom admin components (the focal-point picker and the **Preset manager**
-panel), so regenerate the import map:
+`focalUI` is on by default, so the plugin registers custom admin components — the focal-point picker
+and the **Preset manager** panel. Regenerate the import map so they load:
 
 ```bash
 pnpm payload generate:importmap
 ```
+</Step>
+
+<Step>
+**Upload an image**
+
+Start the app, open the `images` collection in the admin, and upload a picture. Copy its document
+`id` — the next step renders from it.
 </Step>
 
 <Step>
@@ -124,28 +141,19 @@ covers everything it just did.
   <Card href="/docs/plugins/payload-images/caching" title="Caching & prewarming">
     Content-addressed caching, self-revalidation, smart prewarming, and the nearby-quality fallback.
   </Card>
-  <Card href="/docs/plugins/payload-images/configuration" title="Configuration">
-    Every plugin option, the collections it registers, extending your own collection, and seeding.
+  <Card href="/docs/plugins/payload-images/collections" title="Collections">
+    The collections it registers, extending your own upload collection, and seeding.
+  </Card>
+  <Card href="/docs/plugins/payload-images/reference" title="Reference">
+    Plugin options, environment variables, CLI commands, endpoints, and exports.
+  </Card>
+  <Card href="/docs/plugins/payload-images/troubleshooting" title="Troubleshooting">
+    Images not optimizing, missing admin panels, over-fetching, wrong crops, stale renders — symptom-first fixes.
   </Card>
 </Cards>
 
-## Exports
+## Plugin options
 
-| Export | From | What |
-| --- | --- | --- |
-| `imagesPlugin` | `@pro-laico/payload-images` | The Payload plugin; put `imagesPlugin()` in your config's `plugins`. |
-| `ResponsiveImage` | `@pro-laico/payload-images/components/image` | The passive responsive `<img>` component. |
-| `createImageFor` | `@pro-laico/payload-images` | Seed once with your Payload handle → `imageFor(id).aspectRatio('16:9').blur('md').fetch()` resolves the render-ready doc for `<ResponsiveImage>`. |
-| `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
-| `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
-| `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image (an id or a populated doc — a doc also supplies the width cap and cache-busting token). |
-| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `focalUI` is on). |
-| `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `focalUI` is on). |
-| `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
-| `PresetSpec` / `PresetEntry` | `@pro-laico/payload-images` | The presets types: a `presetTemplates` spec and a per-image `presets` array entry. |
-| `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm jobs task slug (`imagesPrewarm`) — for queueing/running the job yourself. |
-
-The plugin also registers two Payload CLI commands: **`payload images:backfill`** stamps
-upload-time metadata onto images that predate the plugin ([Image metadata](/docs/plugins/payload-images/metadata#backfilling-an-existing-library)),
-and **`payload images:prewarm`** bulk-warms a library against the learned render profiles
-([Caching & prewarming](/docs/plugins/payload-images/caching#smart-prewarm)).
+Zero-config by default — every option has a sensible default. See
+[Reference](/docs/plugins/payload-images/reference) for options, environment variables, CLI
+commands, endpoints, and exports.

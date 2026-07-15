@@ -1,0 +1,57 @@
+---
+title: "The /dev pages"
+description: "Every /dev route and what it shows, plus the GET /api/dev snapshot that describes your whole app in one request."
+---
+
+One catch-all file mounts a set of routes that render your app's real content — seeded docs, icons,
+fonts, images, videos — inside your own layout. A companion `GET /api/dev` endpoint returns the same
+picture as JSON for tooling and AI agents.
+
+## The `/dev` pages
+
+The pages render content only; navigation between them is the toolbar's Pages view, which stays
+open as you browse. Views light up based on which plugins are installed:
+
+| Route | What you see |
+| --- | --- |
+| `/dev` | Env + plugin chips, seed card (seed / destructive reseed with errors inline), doc counts. |
+| `/dev/icons` | Every icon set as a button. Click one to activate it and the whole site re-skins. Plus the active set's glyph grid and runtime misses. |
+| `/dev/fonts` | Interactive specimen per family slot. Click through only the weights and styles the typeface actually serves. |
+| `/dev/images` | Originals rendered through `/api/img/:id?w=320`, exercising the transform + cache end-to-end. Payload folders render as filter chips. |
+| `/dev/mux` | Videos with their persisted ingest `status`. |
+| `/dev/tests/<key>` | One page per test, showing the toolbar-selected version. No added chrome, so you see the component exactly as it would ship. See [The test harness](/docs/plugins/payload-dev-tools/test-harness). |
+
+Your own labs coexist: a static route like `app/(frontend)/dev/blocks/page.tsx` always beats the
+catch-all, and the toolbar's `links` puts it in the Pages view.
+
+## The snapshot: `GET /api/dev`
+
+JSON for everything non-human (`?format=json` also forces it); browsers are redirected to `/dev`.
+
+```bash
+curl -s localhost:3000/api/dev | jq '.seed.seeded, .icons.misses'
+```
+
+```jsonc
+{
+  "env": { "nodeEnv": "development", "nodeVersion": "v22.x" },
+  "plugins": { "seed": true, "images": true, "icons": true, "fonts": true, "mux": true },
+  "seed": { "enabled": true, "seeded": true, "totalDocs": 42, "counts": { "services": 4 }, "definitions": [/* … */] },
+  "images": { "sourceSlug": "images", "basePath": "/api/img", "sourceCount": 12, "variantCount": 96 },
+  "icons": { "iconCount": 9, "activeSet": "Brand icons", "misses": [{ "name": "sparkles", "count": 7 }] },
+  "fonts": { "familyKeys": ["sans", "serif"], "slots": { "sans": "Inter", "serif": null } },
+  "mux": { "slug": "mux-video", "credentialed": false, "total": 0, "ready": 0 },
+  "collections": [{ "slug": "services", "count": 4 }/* … */],
+  "globals": ["site-settings"],
+  "devRoute": "/dev"
+}
+```
+
+Each plugin panel is `null` when that plugin isn't installed. One request answers "what is this
+app, is it seeded, and what's broken."
+
+## Next
+
+- [The test harness](/docs/plugins/payload-dev-tools/test-harness) — build page/header/footer variants and flip between them.
+- [How it works](/docs/plugins/payload-dev-tools/how-it-works) — how the pages resolve Payload and discover sibling plugins.
+- [Troubleshooting](/docs/plugins/payload-dev-tools/troubleshooting) — 404s, stale data, and the `enabled` security note.
