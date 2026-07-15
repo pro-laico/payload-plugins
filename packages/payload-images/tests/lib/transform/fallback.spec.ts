@@ -102,6 +102,76 @@ describe('pickFallbackVariant — anchors and null cases', () => {
   })
 })
 
+describe('pickFallbackVariant — crop-family separation (ratio drift gate + ratio-first ranking)', () => {
+  // A ?w=400&ar=3:2 request parses to 400×250 (snap), whose band also admits 16:9 and 7:4
+  // candidates via geometry replay. The drift gate must reject the wrong families and the
+  // correct 3:2 stand-in must win.
+  const src = { width: 3000, height: 2000 }
+  const c169 = cand({ id: '16:9', width: 800, height: 450 })
+  const c74 = cand({ id: '7:4', width: 700, height: 400 })
+  const c32 = cand({ id: '3:2', width: 800, height: 533 })
+
+  it('rejects cross-family candidates that land in the snap band (400×250 vs 16:9 / 7:4)', () => {
+    expect(pick(req({ w: 400, h: 250 }), [c169], 'webp', src)).toBeNull()
+    expect(pick(req({ w: 400, h: 250 }), [c74], 'webp', src)).toBeNull()
+  })
+
+  it('picks the correct-family stand-in over band-stragglers', () => {
+    expect(pick(req({ w: 400, h: 250 }), [c169, c74, c32], 'webp', src)?.id).toBe('3:2')
+  })
+
+  it('mirror case: a 16:9 request never gets the 400×250 (3:2-ish) crop', () => {
+    expect(pick(req({ w: 800, h: 450 }), [cand({ width: 400, height: 250 })], 'webp', src)).toBeNull()
+  })
+})
+
+describe('pickFallbackVariant — render-path (windowed) matching under a zoomed hotspot', () => {
+  // focalSize < 100 makes windowed (w+h cover) and full-frame (width-only) renders DIFFERENT
+  // content at identical dims — the persisted render path must match the request's.
+  const zoomedSrc = { width: 1600, height: 900, focalSize: 50 }
+
+  it('rejects a full-frame variant standing in for a windowed request (and vice versa)', () => {
+    const fullFrame = cand({ width: 800, height: 450, windowed: false })
+    const windowed = cand({ id: 'win', width: 800, height: 450, windowed: true })
+    expect(pick(req({ w: 800, h: 450 }), [fullFrame], 'webp', zoomedSrc)).toBeNull()
+    expect(pick(req({ w: 800, h: 450 }), [windowed], 'webp', zoomedSrc)?.id).toBe('win')
+    expect(pick(req({ w: 800, h: undefined }), [windowed], 'webp', zoomedSrc)).toBeNull()
+    expect(pick(req({ w: 800, h: undefined }), [fullFrame], 'webp', zoomedSrc)).toBeTruthy()
+  })
+
+  it('rejects legacy rows (unknown render path) only when the hotspot actually zooms', () => {
+    const legacy = cand({ width: 800, height: 450, windowed: null })
+    expect(pick(req({ w: 800, h: 450 }), [legacy], 'webp', zoomedSrc)).toBeNull()
+    // focalSize 100/unset: both paths render identically — legacy rows keep matching.
+    expect(pick(req({ w: 800, h: 450 }), [legacy], 'webp', { width: 1600, height: 900 })).toBeTruthy()
+  })
+})
+
+describe('pickFallbackVariant — format support gate', () => {
+  it('never serves webp to a client that only negotiated jpeg/png', () => {
+    const webp = cand({ width: 1600, height: 900 })
+    expect(pick(req({}), [webp], 'jpeg')).toBeNull()
+    const jpeg = cand({ width: 1600, height: 900, format: 'jpeg', mimeType: 'image/jpeg' })
+    expect(pick(req({}), [jpeg], 'jpeg')).toBeTruthy()
+  })
+
+  it('prefers a png candidate for a png request over an equal-width lossy one (stored png quality is meaningless)', () => {
+    const png = cand({ id: 'png', width: 1200, height: 800, format: 'png', mimeType: 'image/png', quality: 40 })
+    const jpeg = cand({ id: 'jpeg', width: 1200, height: 800, format: 'jpeg', mimeType: 'image/jpeg', quality: 90 })
+    const src = { width: 2400, height: 1600 }
+    expect(pick(req({ w: 800, h: undefined, q: 90 }), [png, jpeg], 'png', src)?.id).toBe('png')
+  })
+})
+
+describe('pickFallbackVariant — achievable-width floor (hotspot/crop clamp)', () => {
+  it('accepts a stand-in at ~the max achievable render width of a cropped source', () => {
+    // cropLeft/Right 25 → window 2000×1333: a 3900×2600 request can never render wider than 2000,
+    // so a 1900-wide variant is ≥ half the achievable width even though it is < half of 3900.
+    const src = { width: 4000, height: 3000, cropLeft: 25, cropRight: 25 }
+    expect(pick(req({ w: 3900, h: 2600 }), [cand({ width: 1900, height: 1250 })], 'webp', src)).toBeTruthy()
+  })
+})
+
 describe('pickFallbackVariant — focal-mismatch rejection (stale-crop guard)', () => {
   it('rejects a candidate whose baked focal differs from the source current focal', () => {
     // Source now at focal (70,60); a variant persisted with the old (30,40) is a stale crop.

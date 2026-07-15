@@ -7,20 +7,41 @@ import type { UploadDocLike, UploadHandler } from '../../types'
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024
 
+const isPrivateIPv4 = (ip: string): boolean => {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!m) return false
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (a === 0 || a === 10 || a === 127) return true
+  if (a === 169 && b === 254) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 100 && b >= 64 && b <= 127) return true
+  return false
+}
+
+// An IPv4 address smuggled inside an IPv6 literal (::ffff:169.254.169.254, ::ffff:a9fe:a9fe,
+// ::169.254.169.254), which the OS routes to the mapped IPv4 — normalized so the IPv4 ranges apply.
+const embeddedIPv4 = (h: string): string | undefined => {
+  const dotted = h.match(/^(?:::|(?:0{1,4}:){1,6})(?:ffff:)?((?:\d{1,3}\.){3}\d{1,3})$/)
+  if (dotted) return dotted[1]
+  // Hex tails: mapped (::ffff:a9fe:a9fe) and the deprecated IPv4-compatible ::/96 block
+  // (::7f00:1) — the form URL parsing normalizes dotted literals into.
+  const hex = h.match(/^(?:::|(?:0{1,4}:){1,6})(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (!hex) return undefined
+  const hi = Number.parseInt(hex[1] ?? '', 16)
+  const lo = Number.parseInt(hex[2] ?? '', 16)
+  return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`
+}
+
+// Literal-address guard only: a hostname that DNS-resolves to a private address is not caught here.
+// Source URLs come from the app's own storage config (not attacker-set), so DNS pinning is out of scope.
 const isPrivateHost = (hostname: string): boolean => {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
-  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '::1') return true
-  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (m) {
-    const a = Number(m[1])
-    const b = Number(m[2])
-    if (a === 0 || a === 10 || a === 127) return true
-    if (a === 169 && b === 254) return true
-    if (a === 192 && b === 168) return true
-    if (a === 172 && b >= 16 && b <= 31) return true
-    if (a === 100 && b >= 64 && b <= 127) return true
-    return false
-  }
+  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '::' || h === '::1') return true
+  if (isPrivateIPv4(h)) return true
+  const mapped = embeddedIPv4(h)
+  if (mapped && isPrivateIPv4(mapped)) return true
   return /^fe80:/i.test(h) || /^f[cd][0-9a-f]{2}:/i.test(h)
 }
 

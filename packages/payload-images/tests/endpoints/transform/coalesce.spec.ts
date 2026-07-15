@@ -30,6 +30,24 @@ describe('createSingleFlight', () => {
     expect(await flight('k', fn)).toBe(2)
   })
 
+  it('keeps the entry resident until the settle hook resolves (deferred-persist window)', async () => {
+    let releaseSettle = (): void => {}
+    const settled = new Promise<void>((r) => {
+      releaseSettle = r
+    })
+    const flight = createSingleFlight<string, number>(() => settled)
+    let calls = 0
+    const fn = async (): Promise<number> => ++calls
+    expect(await flight('k', fn)).toBe(1)
+    // Value resolved but settle pending: a same-key call reuses the resident result.
+    expect(await flight('k', fn)).toBe(1)
+    expect(calls).toBe(1)
+    releaseSettle()
+    await settled
+    await new Promise((r) => setTimeout(r, 0))
+    expect(await flight('k', fn)).toBe(2) // entry cleared after settle
+  })
+
   it('clears the entry on rejection too', async () => {
     const flight = createSingleFlight<string, number>()
     let calls = 0

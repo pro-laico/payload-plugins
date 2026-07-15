@@ -258,7 +258,7 @@ describe('payload-images wiring', () => {
 
     // The doc arrives render-ready: srcset for THIS render, v= baked in, placeholder finished.
     expect(doc.srcset).toContain('q=80')
-    expect(doc.srcset).toMatch(/w=800&h=450/) // 16/9 h derived per width, not the natural ratio
+    expect(doc.srcset).toMatch(/w=640&h=360/) // 16/9 h derived per ladder rung, not the natural ratio
     expect(doc.srcset).toContain('v=') // cache-bust token baked in — nothing left for the client to derive
     expect(doc.src).toContain('/api/img/')
 
@@ -300,13 +300,14 @@ describe('payload-images wiring', () => {
     expect(ogUrl).toContain('h=630')
     expect(ogUrl).toContain('v=') // cache-bust token (filename + focal)
 
-    // And it actually resolves to an image (height snaps to the 50px anti-DoS grid → 650).
+    // And it actually resolves to an image (height snaps to the anti-DoS grid — the default
+    // width ladder's 640 rung is nearer to 630 than the 50px grid's 650).
     const handler = getHandler(payload, 'get', '/img/:id')
     const res = await handler(makeReq(payload, sourceId, ogUrl.split('?')[1], 'image/webp'))
     expect(res.status).toBe(200)
     const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata()
     expect(meta.width).toBe(1200)
-    expect(meta.height).toBe(650)
+    expect(meta.height).toBe(640)
   })
 
   it('purges a source’s variants and cascades on delete', async () => {

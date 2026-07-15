@@ -15,6 +15,8 @@ describe('variantCacheKey', () => {
     const base = variantCacheKey(doc, p, 'webp')
     expect(variantCacheKey({ ...doc, focalX: 41 }, p, 'webp')).not.toBe(base)
     expect(variantCacheKey({ ...doc, filename: 'photo-665-1.jpg' }, p, 'webp')).not.toBe(base)
+    // Same-filename byte replacement (overwriteExistingFiles / admin crop) keys off filesize.
+    expect(variantCacheKey({ ...doc, filesize: 123_456 }, p, 'webp')).not.toBe(base)
     expect(variantCacheKey({ ...doc, id: '666' }, p, 'webp')).not.toBe(base)
     expect(variantCacheKey(doc, { ...p, w: 640 }, 'webp')).not.toBe(base)
     expect(variantCacheKey(doc, { ...p, fit: 'contain' }, 'webp')).not.toBe(base)

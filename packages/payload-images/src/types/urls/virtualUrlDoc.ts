@@ -3,6 +3,7 @@ export interface ImageDocLike {
   width?: number | null
   height?: number | null
   filename?: string | null
+  filesize?: number | null
   url?: string | null
   focalX?: number | null
   focalY?: number | null

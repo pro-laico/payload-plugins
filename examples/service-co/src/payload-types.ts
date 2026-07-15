@@ -277,7 +277,7 @@ export interface Image {
   placeholderXxl?: string | null;
   placeholderX3?: string | null;
   /**
-   * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
+   * Placeholder for the read — opt-in: a finished data URI focal-cropped to the declared render, returned only when the read declares a blur (context.blur = { quality, format } or an X-Blurhash header); null otherwise so undeclared reads carry no data-URI weight.
    */
   placeholder?: string | null;
   /**
@@ -376,6 +376,7 @@ export interface GeneratedImage {
   fit?: string | null;
   format?: string | null;
   quality?: number | null;
+  windowed?: boolean | null;
   focalX?: number | null;
   focalY?: number | null;
   updatedAt: string;
@@ -1038,6 +1039,7 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
   fit?: T;
   format?: T;
   quality?: T;
+  windowed?: T;
   focalX?: T;
   focalY?: T;
   updatedAt?: T;

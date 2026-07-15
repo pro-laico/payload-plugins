@@ -1,9 +1,9 @@
 import { deriveVersion } from './version'
 import { buildVariantUrl } from './variantUrl'
-import { DEFAULT_PIXEL_STEP } from '../transform/params'
+import { DEFAULT_PIXEL_STEP, DEFAULT_WIDTH_LADDER } from '../transform/params'
 import type { BuildSrcsetOptions, BuildSrcsetResult, ImageResource } from '../../types'
 
-export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = DEFAULT_PIXEL_STEP, maxWidth = 4096): number[] => {
+export const stepWidths = (sourceWidth?: number, pixelStep: number | number[] = DEFAULT_WIDTH_LADDER, maxWidth = 4096): number[] => {
   const known = sourceWidth && sourceWidth > 0 ? Math.min(maxWidth, Math.round(sourceWidth)) : undefined
 
   if (Array.isArray(pixelStep)) {

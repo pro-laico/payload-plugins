@@ -68,10 +68,17 @@ export const createObservationRecorder = (deps: {
     if (!newWidths.length && !due) return
     if (!entry.hits && !newWidths.length) return
 
+    // Snapshot-and-swap BEFORE any await: observations landing during the DB round-trip go to the
+    // fresh buffers instead of being zeroed, and only what was actually written marks persisted.
+    const hits = entry.hits
+    const widths = entry.widths
+    entry.hits = 0
+    entry.widths = new Map()
+
     const nowIso = new Date(now).toISOString()
     const mergeWidths = (existing: WidthHistogram | null | undefined): WidthHistogram => {
       const merged: WidthHistogram = { ...(existing ?? {}) }
-      for (const [w, n] of entry.widths) {
+      for (const [w, n] of widths) {
         const prev = merged[String(w)]
         merged[String(w)] = { n: (prev?.n ?? 0) + n, last: nowIso }
       }
@@ -94,35 +101,40 @@ export const createObservationRecorder = (deps: {
       await payload.update({
         collection: slug,
         id: existing.id,
-        data: { hitCount: (existing.hitCount ?? 0) + entry.hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) },
+        data: { hitCount: (existing.hitCount ?? 0) + hits, lastSeenAt: nowIso, widths: mergeWidths(existing.widths) },
       })
       return true
     }
 
-    if (!(await update())) {
-      try {
-        await payload.create({
-          collection: slug,
-          data: {
-            profileKey: key,
-            ratio: entry.parts.ratio,
-            fit: entry.parts.fit,
-            quality: entry.parts.quality,
-            format: entry.parts.format,
-            hitCount: entry.hits,
-            lastSeenAt: nowIso,
-            widths: mergeWidths(null),
-          },
-        })
-      } catch (err) {
-        if (!isDuplicateKeyError(err, 'profileKey')) throw err
-        await update()
+    try {
+      if (!(await update())) {
+        try {
+          await payload.create({
+            collection: slug,
+            data: {
+              profileKey: key,
+              ratio: entry.parts.ratio,
+              fit: entry.parts.fit,
+              quality: entry.parts.quality,
+              format: entry.parts.format,
+              hitCount: hits,
+              lastSeenAt: nowIso,
+              widths: mergeWidths(null),
+            },
+          })
+        } catch (err) {
+          if (!isDuplicateKeyError(err, 'profileKey')) throw err
+          await update()
+        }
       }
+    } catch (err) {
+      // Write failed: merge the snapshot back so the observations retry on a later flush.
+      entry.hits += hits
+      for (const [w, n] of widths) entry.widths.set(w, (entry.widths.get(w) ?? 0) + n)
+      throw err
     }
 
-    entry.hits = 0
-    for (const w of entry.widths.keys()) entry.persistedWidths.add(w)
-    entry.widths.clear()
+    for (const w of widths.keys()) entry.persistedWidths.add(w)
     entry.lastFlushedAt = now
   }
 
@@ -138,6 +150,26 @@ export const createObservationRecorder = (deps: {
         }
       }
     }
+  }
+
+  // Flush passes never overlap (a concurrent pass would double-count via the find-then-update
+  // read-modify-write); a trigger landing mid-pass queues exactly one follow-up pass.
+  let flushing: Promise<void> | undefined
+  let rerun = false
+  const runFlush = (): Promise<void> => {
+    if (flushing) {
+      rerun = true
+      return flushing
+    }
+    flushing = (async () => {
+      do {
+        rerun = false
+        await flush()
+      } while (rerun)
+    })().finally(() => {
+      flushing = undefined
+    })
+    return flushing
   }
 
   return {
@@ -158,7 +190,7 @@ export const createObservationRecorder = (deps: {
       entry.hits++
       if (width != null && width > 0) entry.widths.set(width, (entry.widths.get(width) ?? 0) + 1)
       if (!timer) {
-        timer = setTimeout(() => void flush(), FLUSH_MS)
+        timer = setTimeout(() => void runFlush(), FLUSH_MS)
         timer.unref?.()
       }
       refreshDbRatios()
@@ -186,7 +218,7 @@ export const createObservationRecorder = (deps: {
         clearTimeout(timer)
         timer = undefined
       }
-      await flush()
+      await runFlush()
     },
   }
 }

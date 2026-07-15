@@ -7,8 +7,11 @@ import type { TransformEndpointConfig } from '../transform/transformEndpoint'
 export interface ImagesPluginOptions {
   enabled?: boolean
   extendCollection?: string
-  imagesOverrides?: Partial<CollectionConfig>
-  generatedImagesOverrides?: Partial<CollectionConfig>
+  /** Merged onto the images collection. `slug` is not overridable — every internal reference
+   * (join field, purge hooks, endpoints) is bound to the resolved slug. */
+  imagesOverrides?: Omit<Partial<CollectionConfig>, 'slug'>
+  /** Merged onto the generated-images (variant cache) collection. `slug` is not overridable. */
+  generatedImagesOverrides?: Omit<Partial<CollectionConfig>, 'slug'>
   pixelStep?: number | number[]
   transform?: TransformEndpointConfig | false
   focalUI?: boolean | { previewRatios?: string[] }

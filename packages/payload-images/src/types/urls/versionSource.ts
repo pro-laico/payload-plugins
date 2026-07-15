@@ -1,5 +1,6 @@
 export interface VersionSource {
   filename?: string | null
+  filesize?: number | null
   focalX?: number | null
   focalY?: number | null
   focalSize?: number | null

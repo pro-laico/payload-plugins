@@ -2,6 +2,13 @@
 export { default, imagesPlugin } from './plugin'
 export type { ImagesPluginOptions, TransformEndpointConfig } from './types'
 
+// The typed view of `config.custom.payloadImages` — resolve the configured slugs/settings from a
+// script or app instead of hand-casting the marker.
+export { readPluginMarker } from './lib/pluginMarker'
+export type { PayloadImagesMarker, PayloadImagesPrewarmMarker } from './types'
+export { GENERATED_IMAGES_SLUG } from './collections/generatedImages'
+export { IMAGE_RENDER_PROFILES_SLUG } from './collections/renderProfiles'
+
 // Smart prewarm: learn served render profiles, warm new/changed images via a deferred Payload Job.
 export { PREWARM_TASK_SLUG } from './lib/prewarm/resolveOptions'
 export type { PrewarmOptions, RenderProfileSeed } from './types'

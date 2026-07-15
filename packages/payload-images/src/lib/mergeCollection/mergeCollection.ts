@@ -8,6 +8,9 @@ export const mergeCollection = (base: CollectionConfig, override?: Partial<Colle
     ? {
         ...base,
         ...override,
+        // A slug override would desync every internal reference (join field, purge hooks,
+        // endpoints), so the base slug always wins. (The option types Omit 'slug' too.)
+        slug: base.slug,
         access: { ...base.access, ...override.access },
         admin: { ...base.admin, ...override.admin },
         fields: [...base.fields, ...(override.fields ?? [])],

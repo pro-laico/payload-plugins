@@ -15,7 +15,7 @@ export type VariantSourceDoc = UploadDocLike & {
   cropBottom?: number | null
 }
 
-export type GenBytes = { ok: true; data: Buffer; mimeType: string } | { ok: false; status: number; msg: string }
+export type GenBytes = { ok: true; data: Buffer; mimeType: string; settled?: Promise<void> } | { ok: false; status: number; msg: string }
 
 export type GenFlight = (key: string, fn: () => Promise<GenBytes>) => Promise<GenBytes>
 

@@ -7,6 +7,46 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING** `@pro-laico/payload-images` — the default `pixelStep` is now a conventional width
+  ladder (`[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`, next/image's deviceSizes) instead of a
+  dense 50px grid: a wide original now emits ~8 `srcset` URLs per read instead of ~82 (~8KB of
+  string), and the stored-variant space per image shrinks accordingly. Freeform widths still snap
+  to the 50px anti-DoS grid. Pass `pixelStep: 50` to restore the old dense behavior.
+  _Migration: none required — old variant files remain valid; new reads simply request ladder widths._
+
+- **BREAKING** `@pro-laico/payload-images` — replacing an image's bytes under the same filename
+  (`overwriteExistingFiles`, the admin crop tool) now purges stale variants and busts caches:
+  `filesize`/`width`/`height` participate in the variant identity, the cache key, and the `v=`
+  version token in lockstep. _Migration: existing cache keys and version tokens change once on
+  upgrade — variants regenerate on first request (or next prewarm) and CDN caches bust once._
+
+- `@pro-laico/payload-images` — `generated-images` read access now requires an authenticated user
+  AND defers to the source collection's read access (re-rooted through the `source` relationship),
+  so a tenant-scoped or owner-only source policy protects the cached variant docs and bytes too —
+  previously any logged-in user could read every variant. Override stays available via
+  `generatedImagesOverrides.access.read`.
+
+### Fixed
+
+- `@pro-laico/payload-images` — full audit-findings pass (item-by-item record mirrored in the
+  project-management findings): the fallback picker no longer serves cross-crop-family or
+  hotspot-mismatched stand-ins (ratio-drift gate, persisted `windowed` render path, webp only for
+  webp-capable clients, achievable-width floor for cropped sources, png-quality tie-break);
+  transform cache misses no longer hold original Buffers while queued (read moved inside the Sharp
+  gate) and same-key requests coalesce across the endpoint AND the prewarm job, staying coalesced
+  through the deferred-persist window; the prewarm recorder no longer drops or double-counts
+  observations under concurrent flushes; a save landing while a pending prewarm job is being picked
+  up re-defers that job instead of stranding the new identity; `prewarm.formats` is validated
+  against `transform.formats` (unservable entries warn at boot, explicit `[]` honored);
+  `buildVariantUrl` accepts numeric ids and never emits `h=0`; `imagesOverrides`/
+  `generatedImagesOverrides` can no longer desync internals via `slug`; `extendCollection` throws a
+  plugin-attributed error on field-name collisions; `imageFor()` resolves `null` instead of
+  rejecting when the plugin isn't registered; the SSRF guard catches IPv4 addresses smuggled in
+  IPv6 literals (`::ffff:169.254.169.254` and hex/compat forms); `readPluginMarker`, the marker
+  types, and both collection slugs are now exported.
+
 ### Added
 
 - `@pro-laico/payload-images` — per-image variant cap + guaranteed presets, closing the public

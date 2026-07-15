@@ -22,6 +22,7 @@ export const VIRTUAL_URL_INPUTS = [
   'width',
   'height',
   'filename',
+  'filesize',
   'focalX',
   'focalY',
   'focalSize',

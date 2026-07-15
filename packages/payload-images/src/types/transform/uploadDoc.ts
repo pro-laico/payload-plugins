@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 export interface UploadDocLike {
   filename?: string | null
+  filesize?: number | null
   url?: string | null
   prefix?: string | null
 }

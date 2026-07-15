@@ -47,6 +47,11 @@ describe('readBytes SSRF guard', () => {
       'http://10.0.0.5/internal',
       'http://192.168.1.1/',
       'http://[::1]/',
+      // IPv4 smuggled inside IPv6 literals — routed to the mapped IPv4 at the OS level.
+      'http://[::ffff:169.254.169.254]/latest/meta-data/',
+      'http://[::ffff:a9fe:a9fe]/latest/meta-data/',
+      'http://[0:0:0:0:0:ffff:10.0.0.5]/internal',
+      'http://[::127.0.0.1]/admin',
     ]) {
       expect(await readBytes({ url }, '/nonexistent', 'https://site.example')).toBeNull()
     }

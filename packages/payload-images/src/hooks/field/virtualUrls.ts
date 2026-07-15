@@ -64,7 +64,7 @@ export const srcsetAfterRead: FieldHook = urlHook(
 )
 
 export const placeholderUrlAfterRead: FieldHook = urlHook((d, { baseUrl, intent }) =>
-  buildVariantUrl(String(d.id), 32, {
+  buildVariantUrl(d.id, 32, {
     quality: 40,
     aspectRatio: intent.aspectRatio ?? naturalAspectRatio(d),
     version: deriveVersion(d),
@@ -73,5 +73,5 @@ export const placeholderUrlAfterRead: FieldHook = urlHook((d, { baseUrl, intent 
 )
 
 export const thumbnailUrlAfterRead: FieldHook = urlHook((d, { baseUrl }) =>
-  buildVariantUrl(String(d.id), 160, { fit: 'cover', aspectRatio: 1, version: deriveVersion(d), baseUrl }),
+  buildVariantUrl(d.id, 160, { fit: 'cover', aspectRatio: 1, version: deriveVersion(d), baseUrl }),
 )

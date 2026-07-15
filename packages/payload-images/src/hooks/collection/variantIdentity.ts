@@ -7,8 +7,11 @@ export interface VariantIdentityChange {
 
 type DocLike = Record<string, unknown> | undefined
 
+// filesize/width/height catch same-filename byte replacement (overwriteExistingFiles, the admin
+// crop tool), which keeps the filename identical. They participate in variantCacheKey and
+// deriveVersion too — the three MUST stay in lockstep or stale variants survive a purge.
 export const detectVariantIdentityChange = (previousDoc: DocLike, doc: DocLike): VariantIdentityChange => {
-  const fileChanged = previousDoc?.filename !== doc?.filename
+  const fileChanged = (['filename', 'filesize', 'width', 'height'] as const).some((f) => (previousDoc?.[f] ?? null) !== (doc?.[f] ?? null))
   const focalChanged = previousDoc?.focalX !== doc?.focalX || previousDoc?.focalY !== doc?.focalY
   const hotspotChanged = (['focalSize', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom'] as const).some(
     (f) => (previousDoc?.[f] ?? null) !== (doc?.[f] ?? null),

@@ -25,6 +25,8 @@ const sourceId = (source: ImageSource): string | number | null => {
   return id == null || id === '' ? null : id
 }
 
+let warnedMissingCollection = false
+
 export const createImageFor = (payload: Payload | Promise<Payload>): ImageFor => {
   const chain = (state: ChainState): ImageForChain => ({
     aspectRatio: (aspectRatio) => chain({ ...state, image: { ...state.image, aspectRatio } }),
@@ -37,6 +39,15 @@ export const createImageFor = (payload: Payload | Promise<Payload>): ImageFor =>
       if (id == null) return null
       const p = await payload
       const collection = asSlug(readPluginMarker(p.config).sourceSlug ?? 'images')
+      // Keep the documented img-or-null contract when the plugin isn't registered (enabled: false,
+      // preview/CI env) — findByID would otherwise reject with a generic unknown-collection APIError.
+      if (p.collections && !(collection in p.collections)) {
+        if (!warnedMissingCollection) {
+          warnedMissingCollection = true
+          p.logger.warn(`[payload-images] imageFor: collection "${collection}" is not registered — is the plugin enabled? Returning null.`)
+        }
+        return null
+      }
       const context: Record<string, unknown> = {
         ...(state.image ? { image: state.image } : {}),
         ...(state.blur ? { blur: state.blur } : {}),

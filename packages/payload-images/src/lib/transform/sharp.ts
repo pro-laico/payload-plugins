@@ -21,10 +21,13 @@ const encode = (pipeline: Sharp, format: OutputFormat, quality: number): Sharp =
   }
 }
 
-export const transformImage = (src: Buffer, input: TransformInput): Promise<TransformOutput> =>
+// `src` may be a provider so the original bytes are read INSIDE the concurrency gate — queued
+// cache misses then wait without holding a whole-original Buffer each; at most `limit` are resident.
+export const transformImage = (src: Buffer | (() => Promise<Buffer>), input: TransformInput): Promise<TransformOutput> =>
   withTransformLimit(async () => {
+    const bytes = typeof src === 'function' ? await src() : src
     const sharp = await loadSharp()
-    let pipeline = sharp(src, { failOn: 'none', limitInputPixels: input.maxInputPixels ?? MAX_INPUT_PIXELS }).rotate()
+    let pipeline = sharp(bytes, { failOn: 'none', limitInputPixels: input.maxInputPixels ?? MAX_INPUT_PIXELS }).rotate()
     const meta = await pipeline.metadata()
     const swapped = (meta.orientation ?? 1) >= 5
     const sw = (swapped ? meta.height : meta.width) ?? 0

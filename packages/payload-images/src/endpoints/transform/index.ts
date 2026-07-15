@@ -16,12 +16,12 @@ import { buildFallbackHeaders, buildHeaders, toBody } from './response'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'
 import { countVariantsForSource } from '../../lib/transform/variantCount'
 import { classifyRatio, type RatioCandidate } from '../../lib/prewarm/profileKey'
-import { FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
+import { effectiveRequestWidth, FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } from '../../lib/transform/fallback'
 import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
 import { isRecord } from '../../lib/isRecord'
-import type { FallbackCandidate, GenBytes, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
+import type { FallbackCandidate, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
 
 const isFallbackCandidate = (v: unknown): v is FallbackCandidate => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 
@@ -43,7 +43,6 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
   setTransformConcurrency(cfg.maxConcurrency)
 
   let recorder: ObservationRecorder | undefined
-  const genFlight = createSingleFlight<string, GenBytes>()
   const sourceFlight = createSingleFlight<string, SourceDoc | null>()
 
   return {
@@ -93,14 +92,13 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
         variantSlug,
         base,
         maxInputPixels: constraints.maxInputPixels,
-        genFlight,
       }
       let result = await getCachedVariantBytes(engineArgs)
 
       let standIn: { data: Buffer; mimeType: string } | null = null
       if (!result && fallback && p.w != null) {
         try {
-          const effectiveW = Math.min(p.w, src.width && src.width > 0 ? src.width : p.w)
+          const effectiveW = effectiveRequestWidth(p, src)
           const rows = await payload.find({
             collection: variantSlug,
             where: {
@@ -120,6 +118,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
               fit: true,
               format: true,
               quality: true,
+              windowed: true,
               mimeType: true,
               focalX: true,
               focalY: true,

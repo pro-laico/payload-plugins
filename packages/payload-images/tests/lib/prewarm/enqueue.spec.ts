@@ -5,12 +5,13 @@ import { enqueuePrewarmAfterChange } from '../../../src/hooks/collection/enqueue
 import { enqueuePrewarmJob } from '../../../src/lib/prewarm/enqueue'
 import { detectVariantIdentityChange } from '../../../src/hooks/collection/variantIdentity'
 
-const fakeReq = (pending: { input?: unknown }[] = []) => {
+const fakeReq = (pending: { id?: string; input?: unknown }[] = []) => {
   const find = vi.fn().mockResolvedValue({ docs: pending })
   const queue = vi.fn().mockResolvedValue({})
+  const update = vi.fn().mockResolvedValue({})
   const logger = { warn: vi.fn(), info: vi.fn(), error: vi.fn() }
-  const payload = { find, jobs: { queue }, logger } as unknown as Payload
-  return { req: { payload }, find, queue, logger }
+  const payload = { find, update, jobs: { queue }, logger } as unknown as Payload
+  return { req: { payload }, find, queue, update, logger }
 }
 
 const doc = { id: 'img1', filename: 'a.jpg', mimeType: 'image/jpeg', focalX: 50, focalY: 50 }
@@ -24,6 +25,16 @@ describe('detectVariantIdentityChange', () => {
     expect(detectVariantIdentityChange(doc, { ...doc, filename: 'b.jpg' })).toMatchObject({ fileChanged: true, any: true })
     expect(detectVariantIdentityChange(doc, { ...doc, focalX: 80 })).toMatchObject({ focalChanged: true, any: true })
     expect(detectVariantIdentityChange(doc, { ...doc, cropLeft: 10 })).toMatchObject({ hotspotChanged: true, any: true })
+  })
+
+  it('catches same-filename byte replacement via filesize/dims (overwriteExistingFiles, admin crop)', () => {
+    const withFile = { ...doc, filesize: 1000, width: 4000, height: 3000 }
+    expect(detectVariantIdentityChange(withFile, withFile).any).toBe(false)
+    expect(detectVariantIdentityChange(withFile, { ...withFile, filesize: 999 })).toMatchObject({ fileChanged: true, any: true })
+    expect(detectVariantIdentityChange(withFile, { ...withFile, width: 3000, height: 2250, filesize: 999 })).toMatchObject({
+      fileChanged: true,
+      any: true,
+    })
   })
 })
 
@@ -54,10 +65,22 @@ describe('enqueuePrewarmAfterChange', () => {
     expect(queue).not.toHaveBeenCalled()
   })
 
-  it('dedupes against a pending un-started job for the same source', async () => {
-    const { req, queue } = fakeReq([{ input: { sourceId: 'img1', reason: 'create' } }])
+  it('dedupes against a pending un-started job for the same source, re-deferring it past this save', async () => {
+    const { req, queue, update } = fakeReq([{ id: 'job1', input: { sourceId: 'img1', reason: 'create' } }])
     await run({ doc, operation: 'create', req })
     expect(queue).not.toHaveBeenCalled()
+    // The dupe's waitUntil is pushed forward so a runner pickup racing this save's open
+    // transaction can't strand the new identity without a job.
+    expect(update).toHaveBeenCalledOnce()
+    expect(update.mock.calls[0]?.[0]).toMatchObject({ collection: 'payload-jobs', id: 'job1' })
+    expect(typeof update.mock.calls[0]?.[0]?.data?.waitUntil).toBe('string')
+  })
+
+  it('still queues when the dupe re-defer fails (never strands the save)', async () => {
+    const { req, queue, update } = fakeReq([{ id: 'job1', input: { sourceId: 'img1', reason: 'create' } }])
+    update.mockRejectedValueOnce(new Error('update denied'))
+    await run({ doc, operation: 'create', req })
+    expect(queue).toHaveBeenCalledOnce()
   })
 
   it('swallows queue failures — the write is never blocked', async () => {

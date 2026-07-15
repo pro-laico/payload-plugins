@@ -36,7 +36,7 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 
 | Param | Meaning |
 | --- | --- |
-| `w` / `h` | Target width / height in px (at least one required). Snapped to the `pixelStep` grid (default 50; an array `pixelStep`'s exact widths also pass) and clamped to `maxDimension` (default 4096). |
+| `w` / `h` | Target width / height in px (at least one required). Snapped to a 50px grid (a numeric `pixelStep` replaces the grid; an array `pixelStep`'s exact widths also pass) and clamped to `maxDimension` (default 4096). |
 | `ar` | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator); derives the missing dimension. |
 | `fit` | `cover` (focal crop, default) · `contain` · `inside` · `outside` · `fill`. |
 | `q` | Quality, bucketed to multiples of 5 and clamped to `qualityRange` (default 40–95; 75 when omitted). |
@@ -86,13 +86,15 @@ flow through relationship population — a populated `page.heroImage` is render-
 second query. A read that declares its render (`context: { image: { aspectRatio, quality, fit, format } }`)
 gets `src`/`srcset` built for exactly that render; an undeclared read gets natural-ratio defaults.
 
-The `srcset` steps by the project-wide `pixelStep` (default 50) up to the source width, or follows
-an explicit ladder if you configured an array.
+The `srcset` follows the project-wide `pixelStep` ladder (default
+`[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) up to the source width — the source's native
+width is always the top rung. A numeric `pixelStep` steps densely instead.
 
 <Callout type="warn">
-  A wide original at the default `pixelStep: 50` emits dozens of `srcset` URLs — several KB of
-  string on every read and population. Raise `pixelStep` or pass an explicit ladder if response
-  size matters. Disable the fields entirely with `virtualFields: false`.
+  A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
+  several KB of string on every read and population, and a much larger stored-variant space.
+  Prefer the ladder default (or your own array) if response size matters. Disable the fields
+  entirely with `virtualFields: false`.
 </Callout>
 
 <Callout type="info">

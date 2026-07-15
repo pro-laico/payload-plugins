@@ -264,4 +264,24 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
     const pages: CollectionConfig = { slug: 'pages', fields: [] }
     expect(() => imagesPlugin({ extendCollection: 'pages' })(baseConfig([pages]))).toThrow(/not an upload/)
   })
+
+  it('throws a plugin-attributed error when the target already defines an injected field name', () => {
+    const clashing: CollectionConfig = { ...media, fields: [...media.fields, { name: 'placeholder', type: 'text' }] }
+    expect(() => imagesPlugin({ extendCollection: 'media' })(baseConfig([clashing]))).toThrow(/payload-images.*placeholder/)
+    // Nested inside a presentational row is the same data level — still a collision.
+    const rowClash: CollectionConfig = { ...media, fields: [{ type: 'row', fields: [{ name: 'palette', type: 'json' }] }] }
+    expect(() => imagesPlugin({ extendCollection: 'media' })(baseConfig([rowClash]))).toThrow(/payload-images.*palette/)
+  })
+})
+
+describe('imagesPlugin — override slug safety', () => {
+  it('ignores a slug in generatedImagesOverrides / imagesOverrides (internal references stay bound)', () => {
+    const out = run({
+      generatedImagesOverrides: { slug: 'renamed-variants' } as Partial<CollectionConfig>,
+      imagesOverrides: { slug: 'renamed-images' } as Partial<CollectionConfig>,
+    } as Parameters<typeof imagesPlugin>[0])
+    expect(slugs(out)).toEqual(expect.arrayContaining(['images', 'generated-images']))
+    expect(slugs(out)).not.toContain('renamed-variants')
+    expect(slugs(out)).not.toContain('renamed-images')
+  })
 })

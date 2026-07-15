@@ -16,7 +16,7 @@ import { SHARP_INSTALL_HINT } from './lib/transform/getVariantBytes'
 import { imageEnhancements } from './collections/images/imageEnhancements'
 import { type RatioCandidate, ratioToken } from './lib/prewarm/profileKey'
 import type { ImagesPluginOptions, TransformEndpointConfig } from './types'
-import { DEFAULT_PIXEL_STEP, parseAspectRatio } from './lib/transform/params'
+import { DEFAULT_WIDTH_LADDER, parseAspectRatio } from './lib/transform/params'
 import { createRenderProfilesCollection } from './collections/renderProfiles'
 import { DEFAULT_VARIANT_LIMIT, resolvePresetTemplates } from './lib/presets/defaults'
 import { createTransformEndpoint, type PrewarmObserveConfig } from './endpoints/transform'
@@ -37,6 +37,16 @@ const binScriptPath = (name: string): string => {
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
+// Data-level field names in an array, recursing only into presentational containers (row,
+// collapsible, unnamed tabs) — their children share the parent's level for name uniqueness.
+const namedFields = (fields: CollectionConfig['fields']): string[] =>
+  fields.flatMap((f) => {
+    if ('name' in f && typeof f.name === 'string') return [f.name]
+    if ('fields' in f && Array.isArray(f.fields)) return namedFields(f.fields)
+    if (f.type === 'tabs') return f.tabs.flatMap((t) => ('name' in t && t.name ? [] : namedFields(t.fields)))
+    return []
+  })
+
 export const imagesPlugin =
   (opts: ImagesPluginOptions = {}): Plugin =>
   (config: Config): Config => {
@@ -45,7 +55,7 @@ export const imagesPlugin =
       extendCollection,
       imagesOverrides,
       generatedImagesOverrides,
-      pixelStep = DEFAULT_PIXEL_STEP,
+      pixelStep = DEFAULT_WIDTH_LADDER,
       transform = {},
       focalUI: focalUIOpt = true,
       localizeAlt = false,
@@ -80,7 +90,7 @@ export const imagesPlugin =
       ? { sourceSlug, variantSlug, templates: presetTemplates, constraints }
       : false
     const imageOpts = { presetTemplates, variantLimit, presetGen }
-    const prewarm = resolvePrewarmOptions(opts)
+    const prewarm = resolvePrewarmOptions(opts, constraints)
     const prewarmDeps = prewarm
       ? {
           sourceSlug,
@@ -133,6 +143,14 @@ export const imagesPlugin =
         defaultPopulate: mergeSelect(enh.defaultPopulate, target.defaultPopulate),
         ...(enh.forceSelect || target.forceSelect ? { forceSelect: mergeSelect(enh.forceSelect, target.forceSelect) } : {}),
       }
+      // Fields append on merge, so a target field named like an injected one would boot-fail with
+      // Payload's bare DuplicateFieldName — catch it here with a plugin-attributed error instead.
+      const injected = new Set(namedFields(parity.fields ?? []))
+      const collisions = namedFields(target.fields).filter((n) => injected.has(n))
+      if (collisions.length)
+        throw new Error(
+          `[payload-images] extendCollection: '${extendCollection}' already defines field(s) ${collisions.join(', ')} that the plugin injects — rename or remove them.`,
+        )
       const enhanced = mergeCollection(mergeCollection(target, parity), imagesOverrides)
       collections = [...(config.collections ?? []).filter((c) => c.slug !== extendCollection), enhanced, generated]
     } else {
@@ -243,6 +261,10 @@ export const imagesPlugin =
         if (prewarm && !endpointsEnabled)
           payload.logger.warn(
             '[payload-images] prewarm with transform: false — nothing serves (or observes) variants, so only seeded profiles are meaningful and warmed bytes are unreachable. Enable the transform endpoint or drop prewarm.',
+          )
+        if (prewarm && prewarm.droppedFormats.length)
+          payload.logger.warn(
+            `[payload-images] prewarm.formats: ${prewarm.droppedFormats.join(', ')} not in transform.formats — the endpoint could never serve those variants, so they are not warmed. Warming: ${prewarm.formats.join(', ') || 'none'}.`,
           )
         try {
           await loadSharp()

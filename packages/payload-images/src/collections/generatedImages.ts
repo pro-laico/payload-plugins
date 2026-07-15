@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { authd } from '../access'
+import { authd, readScopedToSource } from '../access'
 import { asSlug } from '../lib/asSlug'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
 import type { CreateGeneratedImagesOptions } from '../types'
@@ -13,7 +13,7 @@ export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptio
 
   return {
     slug,
-    access: { create: authd, delete: authd, read: authd, update: authd },
+    access: { create: authd, delete: authd, read: readScopedToSource(sourceSlug), update: authd },
     custom: { revalidate: false },
     admin: {
       hidden: true,
@@ -31,6 +31,7 @@ export const createGeneratedImagesCollection = (opts: CreateGeneratedImagesOptio
           { name: 'fit', type: 'text' },
           { name: 'format', type: 'text' },
           { name: 'quality', type: 'number' },
+          { name: 'windowed', type: 'checkbox' },
         ],
       },
       {

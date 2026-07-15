@@ -314,6 +314,7 @@ export interface GeneratedImage {
   fit?: string | null;
   format?: string | null;
   quality?: number | null;
+  windowed?: boolean | null;
   focalX?: number | null;
   focalY?: number | null;
   updatedAt: string;
@@ -634,6 +635,7 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
   fit?: T;
   format?: T;
   quality?: T;
+  windowed?: T;
   focalX?: T;
   focalY?: T;
   updatedAt?: T;

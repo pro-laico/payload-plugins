@@ -24,6 +24,12 @@ describe('buildVariantUrl', () => {
   it('encodes the id', () => {
     expect(buildVariantUrl('a/b', 320)).toContain('/api/img/a%2Fb?')
   })
+  it('accepts numeric ids (Postgres serials) like every other entry point', () => {
+    expect(buildVariantUrl(42, 320)).toBe('/api/img/42?w=320&fit=cover&q=75&fmt=auto')
+  })
+  it('clamps a derived height to 1 for extreme aspect ratios (h=0 would 400)', () => {
+    expect(buildVariantUrl('abc', 32, { aspectRatio: '4000:30' })).toContain('h=1')
+  })
   it('appends a version cache-buster as a trailing v= when given, and omits it otherwise', () => {
     expect(buildVariantUrl('abc', 800, { version: 'xyz9' })).toBe('/api/img/abc?w=800&fit=cover&q=75&fmt=auto&v=xyz9')
     expect(buildVariantUrl('abc', 800)).not.toContain('v=')
@@ -47,6 +53,10 @@ describe('deriveVersion', () => {
     expect(deriveVersion({ filename: 'b.png', focalX: 50, focalY: 50 })).not.toBe(base) // file replaced
     expect(deriveVersion({ filename: 'a.png', focalX: 80, focalY: 50 })).not.toBe(base) // focal moved
   })
+  it('changes on a same-filename byte replacement (filesize)', () => {
+    const base = deriveVersion({ filename: 'a.png', filesize: 1000, focalX: 50, focalY: 50 })
+    expect(deriveVersion({ filename: 'a.png', filesize: 2000, focalX: 50, focalY: 50 })).not.toBe(base)
+  })
 })
 
 describe('stepWidths', () => {
@@ -63,6 +73,11 @@ describe('stepWidths', () => {
     const w = stepWidths(undefined, 50, 200)
     expect(w[w.length - 1]).toBe(200)
     expect(w.every((x: number) => x % 50 === 0)).toBe(true)
+  })
+
+  it('defaults to the conventional breakpoint ladder, not a dense 50px grid', () => {
+    expect(stepWidths(1200)).toEqual([640, 750, 828, 1080, 1200])
+    expect(stepWidths(4096)).toEqual([640, 750, 828, 1080, 1200, 1920, 2048, 3840, 4096])
   })
 
   describe('explicit width ladder (array pixelStep)', () => {

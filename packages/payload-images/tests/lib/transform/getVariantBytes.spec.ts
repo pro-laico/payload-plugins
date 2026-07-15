@@ -59,6 +59,15 @@ describe('getOrCreateVariantBytes persist modes', () => {
     expect(wasPersisted()).toBe(true)
   })
 
+  it('persists the render path (windowed) and normalizes png quality to null', async () => {
+    const { payload, create } = fakePayload()
+    const res = await getOrCreateVariantBytes({ ...args(payload, false), format: 'png' as const })
+    expect(res.ok).toBe(true)
+    const data = create.mock.calls[0]?.[0]?.data
+    expect(data.windowed).toBe(true) // w+h cover → hotspot-windowed render
+    expect(data.quality).toBeNull() // png ignores quality in encoder + cache key alike
+  })
+
   it("deferPersist: 'never' serves the bytes but never persists (the at-cap path)", async () => {
     const { payload, create } = fakePayload()
     const res = await getOrCreateVariantBytes(args(payload, 'never'))

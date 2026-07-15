@@ -1,6 +1,6 @@
 import { ratioToken } from './profileKey'
 import { variantCacheKey } from '../transform/variantKey'
-import { FITS, FORMATS, bucketQuality, parseAspectRatio, parseTransformParams } from '../transform/params'
+import { ENCODABLE_FORMATS, FITS, bucketQuality, parseAspectRatio, parseTransformParams } from '../transform/params'
 import type { ComputeTargetsArgs, Fit, OutputFormat, PrewarmTarget, QuerySource, WidthHistogram } from '../../types'
 
 export const DEFAULT_PREWARM_WIDTHS = [320, 640, 1024, 1600]
@@ -28,9 +28,7 @@ const topWidths = (hist: WidthHistogram | null | undefined): number[] | undefine
 
 const asFit = (fit: string | undefined): Fit => FITS.find((f) => f === fit) ?? 'cover'
 
-const isOutputFormat = (value: string): value is OutputFormat => FORMATS.some((f) => f === value)
-
-const concreteFormat = (format: string): OutputFormat | undefined => (format !== 'auto' && isOutputFormat(format) ? format : undefined)
+const concreteFormat = (format: string): OutputFormat | undefined => ENCODABLE_FORMATS.find((f) => f === format)
 
 export const computePrewarmTargets = (args: ComputeTargetsArgs): PrewarmTarget[] => {
   const { source, seeds, formats, constraints, existingKeys, maxVariantsPerImage } = args

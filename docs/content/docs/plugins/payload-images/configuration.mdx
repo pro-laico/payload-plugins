@@ -14,7 +14,7 @@ export const options = [
   { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection (you own its upload config).` },
   { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key, not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
   { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
-  { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths. A number is the step (bigger = fewer widths and cached variants) and doubles as the endpoint's snap grid; an array is an explicit ladder, e.g. [200, 450, 750, 1200, 2000] — its widths always pass the endpoint's snap unchanged. maxDimension caps the top.` },
+  { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
   {
     name: 'transform',
     type: 'TransformEndpointConfig | false',
@@ -67,7 +67,7 @@ imagesPlugin({
   // extendCollection: 'media',           // optional, no default: add the pipeline to an existing collection instead of creating `images`
   // imagesOverrides: { /* … */ },          // optional, no default: deep-merged onto the images collection
   // generatedImagesOverrides: { /* … */ }, // optional, no default: merged onto the variant-cache collection
-  pixelStep: 50,
+  pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // or a number, e.g. 50, for a dense grid
   transform: {
     cdnCacheControl: true,
     maxDimension: 4096,
@@ -192,13 +192,14 @@ collection's change/delete hooks.
 **Hooks**: none. Variants are derived and disposable, so the collection carries no revalidation
 hooks (busting cache tags on every cache-miss create would be pure churn).
 
-<Callout type="warn">
-  **Private images? Scope the variant cache's read access to match.** `generated-images` defaults
-  to authenticated read, independent of your source collection's policy. If you restrict `images`
-  read (e.g. to owners), tighten the cache too, or a variant's bytes stay readable to any logged-in
-  user: `imagesPlugin({ generatedImagesOverrides: { access: { read: yourSourceReadPolicy } } })`.
-  The transform endpoint itself always gates on the source's read access — this only concerns
-  direct reads of the `generated-images` collection.
+<Callout>
+  **Variant reads inherit the source's access policy.** `generated-images` read access requires an
+  authenticated user AND defers to the source collection's read access, re-rooted through the
+  `source` relationship — so a tenant-scoped or owner-only `images` policy scopes the cached
+  variants (docs and bytes) automatically. Caveat: a source read access that branches on the
+  individual doc `id` can't be re-rooted; in that case supply your own
+  `generatedImagesOverrides: { access: { read: … } }`. The transform endpoint itself always gates
+  on the source's read access.
 </Callout>
 
 ### `image-render-profiles`
