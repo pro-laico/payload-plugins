@@ -38,7 +38,7 @@ export async function bootLab(opts: {
   return {
     payload,
     cleanup: async () => {
-      await (payload as unknown as { db?: { destroy?: () => Promise<void> } }).db?.destroy?.() //TODO: replace `as` cast with proper typing
+      await payload.db.destroy?.()
       await rm(dbPath, { force: true }).catch(() => {})
     },
   }
@@ -57,7 +57,7 @@ export async function expectBootError(plugins: Plugin[], collections: Collection
       typescript: { autoGenerate: false },
     })
   } catch (e) {
-    return e as Error //TODO: replace `as` cast with proper typing
+    return e instanceof Error ? e : new Error(String(e))
   }
   throw new Error('expected buildConfig to fail, but it succeeded')
 }

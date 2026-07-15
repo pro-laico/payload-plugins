@@ -1,34 +1,12 @@
 import config from '@payload-config'
-import { getPayload } from 'payload'
-import type { CSSProperties } from 'react'
-import type { AspectRatio } from '@pro-laico/payload-images'
-import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
+import { type CollectionSlug, getPayload } from 'payload'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
 import { shellProps } from './shell'
-import { Image } from '../../components/Image'
-import type { ImageListItem, PageDoc } from '../../types'
+import { PageCard } from '../../components/PageCard'
+import { ImageCard } from '../../components/ImageCard'
 
-const SEEDED_SLUGS = ['images', 'pages']
-
-const RATIOS: { label: string; ar?: AspectRatio }[] = [
-  { label: 'natural' },
-  { label: '16:9', ar: '16:9' },
-  { label: '1:1', ar: '1:1' },
-  { label: '9:16', ar: '9:16' },
-]
-
-const TILE_SIZES = '(max-width: 920px) 45vw, 200px'
-
-const ratiosGrid: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }
-const ratioTile: CSSProperties = { border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', background: 'var(--card)' }
-const ratioLabel: CSSProperties = {
-  display: 'block',
-  padding: '6px 8px',
-  fontSize: '0.72rem',
-  color: 'var(--muted)',
-  borderTop: '1px solid var(--border)',
-}
+const SEEDED_SLUGS: CollectionSlug[] = ['images', 'pages']
 
 export default async function HomePage() {
   const payload = await getPayload({ config })
@@ -42,8 +20,8 @@ export default async function HomePage() {
       sort: 'createdAt',
       select: { alt: true, width: true, height: true, focalX: true, focalY: true },
     })
-  ).docs as ImageListItem[] //TODO: replace `as` cast with proper typing
-  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs as PageDoc[] //TODO: replace `as` cast with proper typing
+  ).docs
+  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs
 
   return (
     <SandboxShell
@@ -75,31 +53,10 @@ export default async function HomePage() {
           ({images.length})
         </small>
       </h2>
-      {/*TODO: extract into its own component */}
       {images.length === 0 ? (
         <EmptyState>No images yet — seed the database above, or upload your own in the admin.</EmptyState>
       ) : (
-        images.map((img) => (
-          <div className="shell-card" key={String(img.id)}>
-            <div className="shell-row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-              <strong>{img.alt ?? '(no alt)'}</strong>
-              <small className="shell-muted">
-                {img.width}×{img.height} · focal {img.focalX ?? 50}%/{img.focalY ?? 50}%
-              </small>
-            </div>
-            <div style={ratiosGrid}>
-              {RATIOS.map(({ label, ar }) => (
-                <div style={ratioTile} key={label}>
-                  <Image id={img.id} aspectRatio={ar} image={{ aspectRatio: ar }} sizes={TILE_SIZES} />
-                  <small style={ratioLabel}>{label}</small>
-                </div>
-              ))}
-            </div>
-            <p className="shell-muted" style={{ margin: '10px 0 0', fontSize: '0.78rem' }}>
-              e.g. <code>{getImageUrl(img, { width: 600, aspectRatio: '1:1' })}</code>
-            </p>
-          </div>
-        ))
+        images.map((img) => <ImageCard img={img} key={String(img.id)} />)
       )}
 
       <h2>
@@ -112,32 +69,10 @@ export default async function HomePage() {
         Confirms the relationship + seed <code>ref()</code> resolution end to end: a <code>pages</code> doc&apos;s <code>heroImage</code> (an{' '}
         <code>upload</code> field to <code>images</code>) rendered through the same component.
       </p>
-      {/*TODO: extract into its own component */}
       {pages.length === 0 ? (
         <EmptyState>No pages yet — seed the database above.</EmptyState>
       ) : (
-        pages.map((page) => {
-          const heroId = typeof page.heroImage === 'object' && page.heroImage ? page.heroImage.id : (page.heroImage ?? undefined)
-          return (
-            <div className="shell-card" key={String(page.id)}>
-              <div className="shell-row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-                <strong>{page.title ?? '(untitled)'}</strong>
-                <small className="shell-muted">heroImage → {heroId ? `#${heroId}` : '(none)'}</small>
-              </div>
-              {heroId ? (
-                <Image
-                  id={heroId}
-                  aspectRatio="16:9"
-                  image={{ aspectRatio: '16:9' }}
-                  blur={{ quality: 'md' }}
-                  sizes="(max-width: 920px) 100vw, 880px"
-                />
-              ) : (
-                <EmptyState>No hero image set.</EmptyState>
-              )}
-            </div>
-          )
-        })
+        pages.map((page) => <PageCard page={page} key={String(page.id)} />)
       )}
 
       <h2>How it works</h2>

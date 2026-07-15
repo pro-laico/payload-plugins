@@ -1,8 +1,8 @@
-import { defineSeed } from '@pro-laico/payload-seed'
+import { defineSeed, type Ref } from '@pro-laico/payload-seed'
 
 /** A paragraph followed by an embedded upload node — the runtime walk finds the
  *  `{ relationTo, value }` inside the Lexical tree and tags the media doc. */
-const body = (imageRef: unknown) => ({
+const body = (imageRef: Ref) => ({
   root: {
     type: 'root',
     direction: null,
@@ -33,6 +33,6 @@ export default defineSeed('posts', ({ ref }) => [
     excerpt: 'Announcing our new consulting practice.',
     heroImage: ref('media', 'post'),
     relatedService: ref('services', 'consulting'),
-    body: body(ref('media', 'serviceA')) as never, //TODO: replace `as` cast with proper typing
+    body: body(ref('media', 'serviceA')),
   },
 ])

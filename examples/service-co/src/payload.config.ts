@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type SharpDependency } from 'payload'
+import { buildConfig } from 'payload'
 import { plugins } from './plugins'
 import { Users } from './collections/Users'
 import { Projects } from './collections/Projects'
@@ -31,7 +31,6 @@ export default buildConfig({
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',
   typescript: { outputFile: resolve(currentDir, 'payload-types.ts') },
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URI || 'file:./service-co.db' } }),
-  //TODO: drop the cast when Payload's SharpDependency catches up to sharp 0.35's input types.
-  sharp: sharp as unknown as SharpDependency,
+  sharp,
   plugins,
 })

@@ -1,34 +1,12 @@
 import config from '@payload-config'
-import { getPayload, type Payload } from 'payload'
-import { type ActiveFace, getActiveFontFaces } from '@pro-laico/payload-fonts'
+import { type CollectionSlug, getPayload, type Payload } from 'payload'
+import { getActiveFontFaces } from '@pro-laico/payload-fonts'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
 import type { ActiveEntry } from '@/types'
+import { FontSpecimen, SPECIMEN_CSS } from '@/components/FontSpecimen'
 
-const SEEDED_SLUGS = ['fontOriginal', 'font']
-const SAMPLE = 'The quick brown fox jumps over the lazy dog'
-const FAMILY_LABEL: Record<string, string> = { sans: 'Sans', serif: 'Serif', mono: 'Mono', display: 'Display' }
-
-const rangeLabel = (faces: ActiveFace[]) => {
-  const variable = faces.find((f) => f.weight.includes(' '))
-  const italic = faces.find((f) => f.style === 'italic')
-  const base = variable ? `variable wght ${variable.weight.replace(' ', '–')}` : `wght ${faces.map((f) => f.weight).join(' · ')}`
-  return italic ? `${base} + italic${italic.obliqueAngle ? ` (oblique ${italic.obliqueAngle}°)` : ''}` : base
-}
-
-const sampleWeights = (faces: ActiveFace[]): number[] => {
-  const upright = faces.filter((f) => f.style === 'normal')
-  const variable = upright.find((f) => f.weight.includes(' '))
-  if (variable) {
-    const [min, max] = variable.weight.split(' ').map(Number)
-    return [...new Set([min, 400, 700, max])].filter((w) => w >= min && w <= max).sort((a, b) => a - b)
-  }
-  return [...new Set(upright.map((f) => Number(f.weight)))].sort((a, b) => a - b)
-}
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-const familyVar = (family: string) => `var(--font-set${cap(family)})`
-const italicFontStyle = (face: ActiveFace) => (face.obliqueAngle ? `oblique ${face.obliqueAngle}deg` : 'italic')
+const SEEDED_SLUGS: CollectionSlug[] = ['fontOriginal', 'font']
 
 /** The active typefaces (family, title, served faces) — the fonts the layout makes available as
  *  `--font-set*` variables (via `<DevFonts />` in dev, `next/font` in prod). */
@@ -37,10 +15,9 @@ async function getActive(payload: Payload): Promise<ActiveEntry[]> {
 
   const titleByFamily = new Map<string, string>()
   try {
-    //TODO: replace `as` cast with proper typing
-    const fontSet = (await payload.findGlobal({ slug: 'fontSet', depth: 1 })) as unknown as Partial<Record<string, { title?: string } | null>>
-    for (const family of ['sans', 'serif', 'mono', 'display']) {
-      const doc = fontSet?.[family]
+    const fontSet = await payload.findGlobal({ slug: 'fontSet', depth: 1 })
+    const familyDocs = { sans: fontSet.sans, serif: fontSet.serif, mono: fontSet.mono, display: fontSet.display }
+    for (const [family, doc] of Object.entries(familyDocs)) {
       if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)
     }
   } catch {}
@@ -77,33 +54,7 @@ export default async function Home() {
           Inter, a two-weight Lora, and an ital-capable Recursive), subsets each to a served WOFF2, and wires the <code>fontSet</code> global.
         </EmptyState>
       ) : (
-        //TODO: extract into its own component
-        active.map((entry) => (
-          <section key={entry.family} className="shell-card">
-            <div className="specimen__head">
-              <span className="specimen__name" style={{ fontFamily: familyVar(entry.family) }}>
-                {entry.title}
-              </span>
-              <span className="specimen__badge">
-                {FAMILY_LABEL[entry.family] ?? entry.family} · var(--font-set{cap(entry.family)}) · {rangeLabel(entry.faces)}
-              </span>
-            </div>
-            {sampleWeights(entry.faces).map((weight) => (
-              <p key={weight} className="specimen__sample" style={{ fontFamily: familyVar(entry.family), fontWeight: weight }}>
-                <span className="specimen__weight">{weight}</span> {SAMPLE}
-              </p>
-            ))}
-            {entry.faces
-              .filter((f) => f.style === 'italic')
-              .slice(0, 1)
-              .map((face) => (
-                <p key="italic" className="specimen__sample" style={{ fontFamily: familyVar(entry.family), fontStyle: italicFontStyle(face) }}>
-                  <span className="specimen__weight">italic</span> {SAMPLE}
-                </p>
-              ))}
-            <p className="specimen__files shell-muted">{[...new Set(entry.faces.map((f) => f.filename))].join(' · ')}</p>
-          </section>
-        ))
+        active.map((entry) => <FontSpecimen entry={entry} key={entry.family} />)
       )}
 
       <p className="shell-muted" style={{ fontSize: '0.85rem', maxWidth: '72ch' }}>
@@ -114,12 +65,3 @@ export default async function Home() {
     </SandboxShell>
   )
 }
-
-const SPECIMEN_CSS = `
-  .specimen__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-  .specimen__name { font-size: 1.5rem; font-weight: 600; }
-  .specimen__badge { font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
-  .specimen__sample { display: flex; align-items: baseline; gap: 14px; font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; word-break: break-word; }
-  .specimen__weight { flex: none; min-width: 3ch; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
-  .specimen__files { font-size: 0.8rem; margin: 8px 0 0; }
-`

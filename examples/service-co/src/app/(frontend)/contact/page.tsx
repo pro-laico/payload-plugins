@@ -32,7 +32,7 @@ async function ContactDetails() {
     c.email ? { icon: 'mail', label: c.email, href: `mailto:${c.email}` } : null,
     c.phone ? { icon: 'phone', label: c.phone, href: `tel:${c.phone.replace(/[^+\d]/g, '')}` } : null,
     c.address ? { icon: 'map-pin', label: c.address, href: undefined } : null,
-  ].filter(Boolean) as { icon: string; label: string; href?: string }[] //TODO: replace `as` cast with proper typing
+  ].filter((row) => row !== null)
 
   return (
     <>

@@ -4,6 +4,14 @@ import { useState } from 'react'
 
 import type { SeedError, SeedPanelProps } from './types'
 
+/** Narrows the /api/seed error body (external data) into a SeedError, or null if it isn't one. */
+function toSeedError(body: unknown): SeedError | null {
+  if (typeof body !== 'object' || body === null || !('error' in body) || typeof body.error !== 'string') return null
+  const issues =
+    'issues' in body && Array.isArray(body.issues) ? body.issues.filter((issue): issue is string => typeof issue === 'string') : undefined
+  return { error: body.error, issues }
+}
+
 export function SeedPanel({ seeded, counts = {}, note }: SeedPanelProps) {
   const [running, setRunning] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -21,8 +29,8 @@ export function SeedPanel({ seeded, counts = {}, note }: SeedPanelProps) {
         location.reload()
         return
       }
-      const body = (await res.json().catch(() => null)) as SeedError | null //TODO: replace `as` cast with proper typing
-      setError(body?.error ? body : { error: `Seed failed (HTTP ${res.status}).` })
+      const body = toSeedError(await res.json().catch(() => null))
+      setError(body ?? { error: `Seed failed (HTTP ${res.status}).` })
     } catch {
       setError({ error: 'Seed request failed — is the dev server running?' })
     }

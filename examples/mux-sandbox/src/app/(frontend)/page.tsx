@@ -1,19 +1,16 @@
 import config from '@payload-config'
-import { getPayload } from 'payload'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { type CollectionSlug, getPayload } from 'payload'
+import { getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
-import type { VideoDoc } from '@/types'
+import { VideoList } from '@/components/VideoList'
 
-const SEEDED_SLUGS = ['mux-video', 'pages']
-
-const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
+const SEEDED_SLUGS: CollectionSlug[] = ['mux-video', 'pages']
 
 export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  //TODO: replace `as` cast with proper typing
-  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs as VideoDoc[]
+  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs
 
   return (
     <SandboxShell
@@ -45,22 +42,7 @@ export default async function HomePage() {
           ({videos.length})
         </small>
       </h2>
-      {/*TODO: extract into its own component */}
-      {videos.length === 0 ? (
-        <EmptyState>No videos yet — seed the database above, or upload a clip in the admin.</EmptyState>
-      ) : (
-        <div className="shell-card">
-          {videos.map((doc) => (
-            <p key={doc.id} style={{ margin: '4px 0' }}>
-              <strong>{doc.title}</strong>{' '}
-              <small className="shell-muted">
-                {doc.duration ? `${formatDuration(doc.duration)} · ` : ''}
-                {doc.status ?? 'preparing'}
-              </small>
-            </p>
-          ))}
-        </div>
-      )}
+      <VideoList videos={videos} />
     </SandboxShell>
   )
 }

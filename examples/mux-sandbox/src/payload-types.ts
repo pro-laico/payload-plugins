@@ -175,6 +175,8 @@ export interface MuxVideo {
    */
   title: string;
   assetId?: string | null;
+  status?: ('preparing' | 'ready' | 'errored') | null;
+  error?: string | null;
   duration?: number | null;
   /**
    * A timestamp (in seconds) from the video to be used as the poster image. When unset, defaults to the middle of the video.
@@ -185,8 +187,8 @@ export interface MuxVideo {
   maxHeight?: number | null;
   playbackOptions?:
     | {
-        playbackId?: string | null;
-        playbackPolicy?: ('signed' | 'public') | null;
+        playbackId: string;
+        playbackPolicy: 'signed' | 'public';
         playbackUrl?: string | null;
         posterUrl?: string | null;
         gifUrl?: string | null;
@@ -314,6 +316,8 @@ export interface MuxVideoSelect<T extends boolean = true> {
   source?: T;
   title?: T;
   assetId?: T;
+  status?: T;
+  error?: T;
   duration?: T;
   posterTimestamp?: T;
   aspectRatio?: T;

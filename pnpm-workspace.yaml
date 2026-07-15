@@ -20,6 +20,10 @@ allowBuilds:
 # whole CLI in it) taints CJS `node:` builtin requires with `?tsx-namespace=…` under Node 24's sync
 # module hooks — breaking every custom `payload <bin-script>` (e.g. `payload seed`) with
 # ENOENT node:crypto. Still broken in tsx 4.22.5; 4.19.4 predates the namespace rework and works.
+# next 16 optionally pulls sharp 0.34, which pnpm hoists — so payload's SharpDependency types
+# resolved 0.34's Sharp/Metadata while apps import 0.35 (FormatEnum gained 'vips' → incompatible,
+# forcing `as unknown as SharpDependency` casts). Pin one sharp everywhere so the casts can go.
 overrides:
   payload>undici: '^7.28.0'
+  sharp: '^0.35.2'
   tsx: '4.19.4'

@@ -1,18 +1,18 @@
 import config from '@payload-config'
-import { getPayload } from 'payload'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { type CollectionSlug, getPayload } from 'payload'
+import { getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
-import type { Media, Post, Service } from '@/payload-types'
+import { DocSection } from '@/components/DocSection'
 
-const SEEDED_SLUGS = ['media', 'services', 'posts']
+const SEEDED_SLUGS: CollectionSlug[] = ['media', 'services', 'posts']
 
 export default async function HomePage() {
   const payload = await getPayload({ config })
   const status = await getSeedStatus(payload, SEEDED_SLUGS)
 
-  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs as Post[] //TODO: replace `as` cast with proper typing
-  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs as Media[] //TODO: replace `as` cast with proper typing
-  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs as Service[] //TODO: replace `as` cast with proper typing
+  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs
+  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs
+  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs
 
   return (
     <SandboxShell
@@ -29,68 +29,31 @@ export default async function HomePage() {
     >
       <SeedPanel seeded={status.seeded} counts={status.counts} />
 
-      {/*TODO: extract into its own component */}
-      <h2>
-        Media{' '}
-        <small className="shell-muted" style={{ fontWeight: 400 }}>
-          ({media.length})
-        </small>
-      </h2>
-      {media.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="shell-card">
-          {media.map((doc) => (
-            <p key={doc.id} style={{ margin: '4px 0' }}>
-              <strong>{doc.alt}</strong> <small className="shell-muted">{doc.filename}</small>
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/*TODO: extract into its own component */}
-      <h2>
-        Services{' '}
-        <small className="shell-muted" style={{ fontWeight: 400 }}>
-          ({services.length})
-        </small>
-      </h2>
-      {services.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="shell-card">
-          {services.map((doc) => (
-            <p key={doc.id} style={{ margin: '4px 0' }}>
-              <strong>{doc.title}</strong>{' '}
-              <small className="shell-muted">
-                /{doc.slug} — {doc.summary}
-              </small>
-            </p>
-          ))}
-        </div>
-      )}
-
-      {/*TODO: extract into its own component */}
-      <h2>
-        Posts{' '}
-        <small className="shell-muted" style={{ fontWeight: 400 }}>
-          ({posts.length})
-        </small>
-      </h2>
-      {posts.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="shell-card">
-          {posts.map((doc) => (
-            <p key={doc.id} style={{ margin: '4px 0' }}>
-              <strong>{doc.title}</strong>{' '}
-              <small className="shell-muted">
-                /{doc.slug} — {doc.excerpt}
-              </small>
-            </p>
-          ))}
-        </div>
-      )}
+      <DocSection title="Media" items={media.map((doc) => ({ id: doc.id, primary: doc.alt, secondary: doc.filename }))} />
+      <DocSection
+        title="Services"
+        items={services.map((doc) => ({
+          id: doc.id,
+          primary: doc.title,
+          secondary: (
+            <>
+              /{doc.slug} — {doc.summary}
+            </>
+          ),
+        }))}
+      />
+      <DocSection
+        title="Posts"
+        items={posts.map((doc) => ({
+          id: doc.id,
+          primary: doc.title,
+          secondary: (
+            <>
+              /{doc.slug} — {doc.excerpt}
+            </>
+          ),
+        }))}
+      />
     </SandboxShell>
   )
 }

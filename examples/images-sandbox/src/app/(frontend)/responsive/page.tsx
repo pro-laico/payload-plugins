@@ -4,14 +4,13 @@ import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 
 import { shellProps } from '../shell'
-import type { ImageDoc } from '../../../types'
 import { Image } from '../../../components/Image'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ResponsivePage() {
   const payload = await getPayload({ config })
-  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs[0] as ImageDoc | undefined //TODO: replace `as` cast with proper typing
+  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs.at(0)
 
   if (!img) {
     return (
