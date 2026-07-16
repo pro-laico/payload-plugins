@@ -8,6 +8,8 @@ export { ingestMuxVideo } from './lib/ingest'
 export type { IngestMuxVideoOptions } from './types'
 
 export type {
+  MuxAccessFn,
+  MuxAccessOptions,
   MuxAdminThumbnail,
   MuxAnimatedGifExtension,
   MuxPlaybackPolicy,

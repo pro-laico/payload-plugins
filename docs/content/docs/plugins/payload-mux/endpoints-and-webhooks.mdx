@@ -8,7 +8,7 @@ The plugin mounts three HTTP endpoints and expects one Mux webhook. Together the
 
 ## Endpoints
 
-The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `access` option.
+The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `access.upload` option.
 
 | Endpoint | What it does |
 | --- | --- |
@@ -36,9 +36,11 @@ Not every flow depends on the webhook. Use the split below to know what breaks w
 
 <Tab value="Needs the webhook">
 
-- **Metadata for videos that take longer than ~6s to encode.** The common case. Without the webhook
-  they're saved without `playbackOptions`, so they never become playable (the poll gave up, and
-  re-saving won't re-fetch).
+- **Metadata for videos that take longer than ~6s to encode, without anyone touching the doc.** The
+  common case. The upload's poll gives up at ~6s and the webhook is what fills `playbackOptions` in
+  on its own. Without it the video stays `preparing` until someone saves the doc, which refetches
+  from Mux — so a missed event is recoverable, but only by hand. See
+  [Troubleshooting](/docs/plugins/payload-mux/troubleshooting).
 - **Mux → Payload delete sync.** Deleting an asset in the Mux dashboard removes the Payload doc only
   via the `video.asset.deleted` event.
 - **`autoCreateOnWebhook` backfill.** Importing assets you uploaded directly in Mux.
@@ -48,6 +50,8 @@ Not every flow depends on the webhook. Use the split below to know what breaks w
 <Tab value="Works without it">
 
 - The upload itself, and metadata for short videos (set synchronously by the 6s poll).
+- **Recovering a video stuck on `preparing`.** Saving the doc refetches the asset from Mux, so a
+  webhook you never received doesn't strand the video.
 - **Payload → Mux delete.** Handled by the collection's `afterDelete` hook, not the webhook.
 - **Server-side ingest / seeding.** The 6s limit doesn't apply; ingest waits for `ready` and writes
   full metadata into the doc, so these play straight away whatever their length.
@@ -66,7 +70,9 @@ import { ingestMuxVideo } from '@pro-laico/payload-mux'
 
 await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro' })
 // or a URL: ingestMuxVideo(payload, { source: 'https://example.com/intro.mp4', title: 'Intro' })
-// playback policy comes from the plugin's uploadSettings; pass { playbackPolicy: 'signed' } to override one video
+// playback policy comes from the plugin's `playbackPolicy`; pass { playbackPolicy: 'signed' } to override one video
+// posterTimestamp: 12.5 picks the poster frame; defaults to the middle of the video
+// collection: 'media' — required if you used `extendCollection`, since there is no `mux-video` to write to
 ```
 
 Local paths stream from disk, so ingesting a large file doesn't load it all into memory. Ingest is also what powers declarative seeding — see [How it works](/docs/plugins/payload-mux/how-it-works#seeding).

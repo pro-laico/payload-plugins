@@ -15,9 +15,11 @@ a live dependency map showing what revalidates when.
   tags: `findDoc` / `findDocByID` (one doc = one entry, id-keyed, shared by every usage
   site), `findIds` (lists cache ids only — `select: {}` forced — with declared scopes
   like `posts:list:featured`), `findGlobal`. Atomic defaults baked in (`depth: 0`,
-  `overrideAccess: false`, errors → `null`), full local-API passthrough, returns typed
+  errors → `null`), full local-API passthrough, returns typed
   from your generated `payload-types`, and `user`/`req` refused (a shared cache entry
-  must not hold a requester-scoped read). References stay ids — "edit image 123 → only
+  must not hold a requester-scoped read). Access is left to Payload's own default
+  (`overrideAccess: true`) — pass `overrideAccess: false` to scope a read to what an
+  anonymous visitor may see. References stay ids — "edit image 123 → only
   its own entry re-materializes, everywhere it's used." The low-level `cacheDoc` /
   `cacheIds` / `cacheGlobal` primitives stay exported for getters the finders can't
   express.

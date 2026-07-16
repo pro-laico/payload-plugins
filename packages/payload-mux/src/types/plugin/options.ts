@@ -19,6 +19,18 @@ export interface MuxAdminOptions {
   thumbnail?: MuxAdminThumbnail
 }
 
+export type MuxAccessFn = (request: PayloadRequest) => Promise<boolean> | boolean
+
+export interface MuxAccessOptions {
+  /** Who may read videos. Defaults to a logged-in admin-collection user — an anonymous read of a
+   * signed-policy video would hand out a signed playback URL. Ignored under `extendCollection`:
+   * you own that collection's access. Create / update / delete fall back to Payload's own. */
+  read?: MuxAccessFn
+  /** Who may request a direct upload (`POST` / `GET /mux/upload`). Defaults to a logged-in
+   * admin-collection user. */
+  upload?: MuxAccessFn
+}
+
 export interface MuxVideoPluginOptions {
   enabled?: boolean
   collections?: MuxCollectionsOptions
@@ -33,7 +45,7 @@ export interface MuxVideoPluginOptions {
   /** Backfill a Payload doc for an asset created outside Payload (e.g. in the Mux dashboard).
    * Off by default: one Mux account shared across environments would cross-backfill each of them. */
   autoCreateOnWebhook?: boolean
-  access?: (request: PayloadRequest) => Promise<boolean> | boolean
+  access?: MuxAccessOptions
 }
 
 export interface ResolvedMuxVideoOptions {
@@ -48,5 +60,5 @@ export interface ResolvedMuxVideoOptions {
   posterExtension: MuxPosterExtension
   animatedGifExtension: MuxAnimatedGifExtension
   autoCreateOnWebhook: boolean
-  access: ((request: PayloadRequest) => Promise<boolean> | boolean) | undefined
+  access: { read: MuxAccessFn | undefined; upload: MuxAccessFn | undefined }
 }

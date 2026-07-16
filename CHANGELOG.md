@@ -76,6 +76,23 @@ and with `observe: false` they aren't registered at all, which is stronger than 
   collection factory is no longer exported; the new `collections.muxVideo` overrides cover it.
   Defaults that were implicit fallthroughs are now explicit: `playbackPolicy: 'public'`,
   `posterExtension: 'png'`, `animatedGifExtension: 'gif'`, `admin.thumbnail: 'gif'`.
+- **BREAKING** `@pro-laico/payload-mux` — `access` is now two gates, one axis each:
+  `access: (req) => …` → `access: { read: (req) => …, upload: (req) => … }`. One function used to
+  gate both collection reads and the direct-upload endpoints, so "let the public read videos but
+  keep uploads admin-only" was not expressible. Both still default to a logged-in admin-collection
+  user. Under `extendCollection`, `access.read` is ignored (you own that collection's access) and
+  the plugin warns.
+- **BREAKING** `@pro-laico/payload-mux` — `extendCollection` now merges the way `payload-images`
+  does: **target → plugin → your `collections.muxVideo` overrides last**. It used to merge the
+  target *over* the plugin, which meant the collection you were extending silently beat both the
+  plugin's config and your own overrides — an override like
+  `collections: { muxVideo: { admin: { useAsTitle: 'assetId' } } }` simply did nothing, and a
+  target that defined `access` silently replaced the plugin's read gate. The extended collection
+  now also keeps its own identity (slug, labels, admin config) and its own access rules, instead of
+  inheriting the plugin's `Video` / `Videos` labels and admin-only read; the plugin contributes only
+  its fields, hooks, `forceSelect` for the fields its list cells read, and `custom.seedAsset`.
+  **If you relied on the plugin's access gate landing on an extended collection, set that access on
+  the collection itself** (or via `collections.muxVideo.access`, which still applies).
 - **BREAKING** `@pro-laico/payload-seed` — gains `enabled` (default `true`), matching every other
   plugin.
 - `@pro-laico/payload-dev-tools` — `enabled` now gates the config once instead of being re-checked
@@ -90,6 +107,15 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Added
 
+- `@pro-laico/payload-mux` — `MuxAccessFn` / `MuxAccessOptions` are exported, so a shared `read` /
+  `upload` gate can be typed.
+- `@pro-laico/payload-mux` — env-name compatibility with `@oversightstudio/mux-video`. Where the
+  two disagree, the Oversight name is now read as a fallback: `MUX_WEBHOOK_SIGNING_SECRET` for
+  `MUX_WEBHOOK_SECRET`, `MUX_JWT_KEY_ID` for `MUX_SIGNING_KEY`, and `MUX_JWT_KEY` for
+  `MUX_PRIVATE_KEY` (`MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` already matched). Switching plugins no
+  longer means renaming anything in your host env, and a project that already had the Oversight
+  names set no longer silently 401s every webhook. The Mux-SDK name wins when both are set, and an
+  explicit `initSettings` field still beats every env var.
 - All packages — a typed `read<Name>Marker(config)` export (`readImagesMarker`, `readIconsMarker`,
   `readFontsMarker`, `readMuxMarker`, `readSeedMarker`, `readRevalidateMarker`,
   `readDevToolsMarker`) plus the marker type, so nothing hand-casts `config.custom`.
@@ -109,6 +135,27 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Fixed
 
+- `@pro-laico/payload-mux` — extending a collection that already defines a field the plugin injects
+  (`title`, `assetId`, `status`, `duration`, `playbackOptions`, …) now fails at boot with a
+  plugin-attributed error naming the colliding fields, instead of Payload's bare
+  `DuplicateFieldName` with no hint as to which plugin put the second field there.
+- `@pro-laico/payload-revalidate` — **the finders no longer force `overrideAccess: false`.**
+  `findDoc` / `findDocByID` / `findIds` / `findGlobal` now leave access to Payload's own default
+  (`true`), matching what you'd get calling `payload.find` yourself. The old default read as an
+  anonymous visitor — and since the finders also refuse `user` / `req`, there was no way to be
+  anything else — so any collection with a restricted `read` silently came back `null` or empty in
+  a getter, with no error to explain it. `@pro-laico/payload-mux`'s admin-only read default hit
+  exactly this: cached video docs resolved to `null` and the player rendered nothing.
+  Pass `overrideAccess: false` explicitly to keep the old anonymous-scoped behavior for a read.
+  **Review any getter that reads an access-gated collection**: a finder that previously returned
+  `null` may now return the doc, so a cached entry can hold data an anonymous visitor could not
+  read — which is the intent, but it is a change in what lands in a shared cache entry.
+- `@pro-laico/payload-mux` — a video whose `video.asset.ready` webhook never arrived is no longer
+  stuck on `preparing` forever. Saving the doc now refetches the asset from Mux and lands it on
+  `ready` (or `errored`), so a missed webhook — a wrong `MUX_WEBHOOK_SECRET`, an unreachable
+  endpoint, Mux downtime — is recoverable from the admin instead of needing the event resent from
+  the Mux dashboard or the video re-uploaded. Healing is best-effort: if Mux can't be reached the
+  save still goes through and the doc is left as it was.
 - `@pro-laico/payload-seed` — installing the plugin with `ENABLE_SEED=true` set gave you no admin
   button unless you also passed `adminButton: true`, which was easy to miss and impossible to
   discover from the admin UI.
@@ -119,6 +166,7 @@ and with `observe: false` they aren't registered at all, which is stronger than 
   the `false | Options` rule, and reading a plugin's marker back.
 - Every plugin Reference reflects the new nested shape, and the `payload-images` pages drop the
   removed `transform: false` / `virtualFields` modes.
+- `payload-mux` **Troubleshooting** leads the stuck-on-`preparing` row with the re-save recovery.
 
 ### Upgrade notes
 
@@ -140,7 +188,26 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 7. `@pro-laico/payload-revalidate`: remove `endpoint`; use `observe` to govern the map endpoints.
 8. `@pro-laico/payload-mux`: if you imported `MuxVideo` directly, move those overrides to
    `collections: { muxVideo }`.
-9. Beyond the images folders/localizeAlt notes above, no data migration is required.
+9. `@pro-laico/payload-mux`: split your `access` function in two. The same function in both slots
+   reproduces today's behavior exactly:
+   ```ts
+   // before
+   muxVideoPlugin({ access: (req) => Boolean(req.user) })
+   // after
+   const gate = (req) => Boolean(req.user)
+   muxVideoPlugin({ access: { read: gate, upload: gate } })
+   ```
+10. `@pro-laico/payload-mux`: if you use `extendCollection`, re-check the collection after upgrading.
+    The merge order changed (your `collections.muxVideo` overrides now win, where the target used to),
+    and the extended collection now keeps its own labels, admin config, and **access** rather than
+    inheriting the plugin's admin-only read. If you were relying on the plugin's gate landing there,
+    set `access.read` on the collection itself. If the boot now throws a `[payload-mux]
+    extendCollection: … already defines field(s) …` error, that collision was previously a silent
+    duplicate field — rename your field or drop it.
+11. `@pro-laico/payload-revalidate`: audit any cached getter that reads an access-gated collection.
+    Finders no longer force `overrideAccess: false`, so a read that used to come back `null` may now
+    return the doc. Pass `overrideAccess: false` on that call to keep the old anonymous scoping.
+12. Beyond the images folders/localizeAlt notes above, no data migration is required.
 
 ## [0.3.0] - 2026-07-15
 

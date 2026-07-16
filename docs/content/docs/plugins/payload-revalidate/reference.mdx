@@ -65,8 +65,12 @@ export const revalidateOptions = [
 
 <Callout type="info">
   Finder defaults, baked in so you never repeat them: `depth: 0` (references stay
-  ids), `overrideAccess: false`, errors resolve to `null`, and id-list reads
-  (`findIds`) are forced to `select: {}`. Override any of them per call — except
+  ids), errors resolve to `null`, and id-list reads
+  (`findIds`) are forced to `select: {}`. Access is **not** one of them — the finders
+  leave `overrideAccess` to Payload's own default (`true`), so a collection with
+  restricted `read` access reads the same through a finder as through `payload.find`.
+  Pass `overrideAccess: false` to scope a read to what an anonymous visitor may see.
+  Override any default per call — except
   `user` / `req`, which the finders refuse (see [Writing
   getters](/docs/plugins/payload-revalidate/getters)).
 </Callout>

@@ -33,7 +33,7 @@ export async function getPost(id: string | number) {
 Returns are fully typed from your generated `payload-types` (`Post | null`, select-narrowed when you pass `select`).
 
 <Callout type="info">
-  Every finder applies the atomic defaults for you: `depth: 0`, `overrideAccess: false`, errors resolve to `null`, and id-lists are forced to `select: {}`. See [Reference](/docs/plugins/payload-revalidate/reference) for the full list of defaults in one place.
+  Every finder applies the atomic defaults for you: `depth: 0`, errors resolve to `null`, and id-lists are forced to `select: {}`. Access is left to Payload's own default (`overrideAccess: true`), so an access-gated collection reads the same here as it does from `payload.find` — pass `overrideAccess: false` to scope a read to what an anonymous visitor may see. See [Reference](/docs/plugins/payload-revalidate/reference) for the full list of defaults in one place.
 </Callout>
 
 The list renders ids; each card self-fetches through its own getter, so every card is its own entry:
@@ -63,7 +63,7 @@ export const readNodes = [
   { id: 'getter', label: "getPost(id) — 'use cache'", detail: 'the entry is keyed by its arguments, shared across requesters', x: 300, y: 150 },
   { id: 'live', kind: 'check', label: 'Cache entry live?', x: 300, y: 320 },
   { id: 'serve', kind: 'result', label: 'Served from cache', detail: 'no Payload query runs', x: 40, y: 480 },
-  { id: 'finder', label: 'findDocByID runs payload.find', detail: 'depth 0, access-checked, null on error', x: 560, y: 480 },
+  { id: 'finder', label: 'findDocByID runs payload.find', detail: 'depth 0, null on error', x: 560, y: 480 },
   { id: 'tag', kind: 'store', label: 'Entry cached + tagged posts:{id}', detail: 'live until a write to that doc busts the tag', x: 560, y: 640 },
 ]
 

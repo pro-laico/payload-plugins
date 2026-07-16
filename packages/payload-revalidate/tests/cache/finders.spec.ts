@@ -53,7 +53,7 @@ describe('cached finders (fetch + tag in one call)', () => {
     findGlobal.mockReset().mockResolvedValue({ logo: 4 })
   })
 
-  it('findDoc: forces limit 1 + pagination off, defaults depth 0 / overrideAccess false, tags all + id + alias', async () => {
+  it('findDoc: forces limit 1 + pagination off, defaults depth 0, leaves access to Payload, tags all + id + alias', async () => {
     const doc = { id: 1, slug: 'hello', hero: 9 }
     find.mockResolvedValue(paginated([doc]))
     const res = await helpers.findDoc('posts', { where: { slug: { equals: 'hello' } }, as: 'hello' })
@@ -63,12 +63,25 @@ describe('cached finders (fetch + tag in one call)', () => {
         collection: 'posts',
         depth: 0,
         limit: 1,
-        overrideAccess: false,
         pagination: false,
         where: { slug: { equals: 'hello' } },
       }),
     )
     expect(applied().sort()).toEqual(['all', 'posts:1', 'posts:hello'].sort())
+  })
+
+  // Forcing `overrideAccess: false` read as an anonymous visitor, so an access-gated collection
+  // came back null with no error. The finders leave it alone: Payload's own default applies.
+  it('findDoc: never sets overrideAccess itself', async () => {
+    find.mockResolvedValue(paginated([{ id: 1 }]))
+    await helpers.findDoc('posts')
+    expect(find.mock.calls[0]?.[0]).not.toHaveProperty('overrideAccess')
+  })
+
+  it('findDoc: overrideAccess false is still honoured when asked for explicitly', async () => {
+    find.mockResolvedValue(paginated([{ id: 1 }]))
+    await helpers.findDoc('posts', { overrideAccess: false })
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ overrideAccess: false }))
   })
 
   it('findDoc miss: returns null, alias still tags the cached miss', async () => {
@@ -90,12 +103,10 @@ describe('cached finders (fetch + tag in one call)', () => {
     expect(applied()).toContain('sitemap')
   })
 
-  it('findDocByID: disables errors, defaults depth 0 / overrideAccess false, tags the id', async () => {
+  it('findDocByID: disables errors, defaults depth 0, leaves access to Payload, tags the id', async () => {
     findByID.mockResolvedValue({ id: 7 })
     await expect(helpers.findDocByID('posts', 7)).resolves.toEqual({ id: 7 })
-    expect(findByID).toHaveBeenCalledWith(
-      expect.objectContaining({ collection: 'posts', depth: 0, disableErrors: true, id: 7, overrideAccess: false }),
-    )
+    expect(findByID).toHaveBeenCalledWith(expect.objectContaining({ collection: 'posts', depth: 0, disableErrors: true, id: 7 }))
     expect(applied().sort()).toEqual(['all', 'posts:7'].sort())
   })
 
@@ -103,17 +114,17 @@ describe('cached finders (fetch + tag in one call)', () => {
     find.mockResolvedValue({ docs: [{ id: 1 }, { id: 2 }], page: 2, totalDocs: 12, totalPages: 3, hasNextPage: true, hasPrevPage: true })
     const res = await helpers.findIds('posts', { list: 'recent', sort: '-createdAt', limit: 5, page: 2 })
     expect(find).toHaveBeenCalledWith(
-      expect.objectContaining({ collection: 'posts', depth: 0, limit: 5, overrideAccess: false, page: 2, select: {}, sort: '-createdAt' }),
+      expect.objectContaining({ collection: 'posts', depth: 0, limit: 5, page: 2, select: {}, sort: '-createdAt' }),
     )
     expect(res).toEqual({ ids: [1, 2], page: 2, totalDocs: 12, totalPages: 3, hasNextPage: true, hasPrevPage: true })
     expect(applied().sort()).toEqual(['all', 'posts:list:recent'].sort())
     expect(getObservations().reads[0]).toMatchObject({ kind: 'ids', list: 'recent' })
   })
 
-  it('findGlobal: defaults depth 0 / overrideAccess false, tags global + baked-in docs', async () => {
+  it('findGlobal: defaults depth 0, leaves access to Payload, tags global + baked-in docs', async () => {
     findGlobal.mockResolvedValue({ logo: { id: 4 } })
     await expect(helpers.findGlobal('header')).resolves.toEqual({ logo: { id: 4 } })
-    expect(findGlobal).toHaveBeenCalledWith(expect.objectContaining({ slug: 'header', depth: 0, overrideAccess: false }))
+    expect(findGlobal).toHaveBeenCalledWith(expect.objectContaining({ slug: 'header', depth: 0 }))
     expect(applied().sort()).toEqual(['all', 'global:header', 'media:4'].sort())
   })
 

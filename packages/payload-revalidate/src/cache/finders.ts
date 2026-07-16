@@ -31,7 +31,7 @@ export const createCacheFinders = (
   ): Promise<TransformCollectionWithSelect<TSlug, TSelect> | null> {
     assertSharedRead('findDoc', options)
     const payload = await handle
-    const { as, depth, draft, label, overrideAccess, tags, walk, ...find } = options
+    const { as, depth, draft, label, tags, walk, ...find } = options
     const res = await payload.find({
       ...find,
       collection,
@@ -39,7 +39,6 @@ export const createCacheFinders = (
       limit: 1,
       pagination: false,
       depth: depth ?? 0,
-      overrideAccess: overrideAccess ?? false,
     })
     return base.cacheDoc(res.docs.at(0) ?? null, collection, { as, draft, label, tags, walk })
   }
@@ -51,7 +50,7 @@ export const createCacheFinders = (
   ): Promise<TransformCollectionWithSelect<TSlug, TSelect> | null> {
     assertSharedRead('findDocByID', options)
     const payload = await handle
-    const { depth, draft, label, overrideAccess, tags, walk, ...find } = options
+    const { depth, draft, label, tags, walk, ...find } = options
     const doc = await payload.findByID({
       ...find,
       id,
@@ -59,7 +58,6 @@ export const createCacheFinders = (
       collection,
       depth: depth ?? 0,
       disableErrors: true,
-      overrideAccess: overrideAccess ?? false,
     })
     return base.cacheDoc(doc, collection, { draft, label, tags, walk })
   }
@@ -67,14 +65,13 @@ export const createCacheFinders = (
   async function findIds<TSlug extends CollectionSlug>(collection: TSlug, options: FindIdsOptions<TSlug> = {}): Promise<IdsResult> {
     assertSharedRead('findIds', options)
     const payload = await handle
-    const { draft, label, list, overrideAccess, tags, ...find } = options
+    const { draft, label, list, tags, ...find } = options
     const res = await payload.find({
       ...find,
       collection,
       draft,
       depth: 0,
       select: {},
-      overrideAccess: overrideAccess ?? false,
     })
     await base.cacheIds(res, collection, { draft, label, list, tags })
     return {
@@ -93,13 +90,12 @@ export const createCacheFinders = (
   ): Promise<TransformGlobalWithSelect<TSlug, TSelect>> {
     assertSharedRead('findGlobal', options)
     const payload = await handle
-    const { draft, depth, label, overrideAccess, tags, walk, ...find } = options
+    const { draft, depth, label, tags, walk, ...find } = options
     const doc = await payload.findGlobal<TSlug, TSelect>({
       ...find,
       slug,
       draft,
       depth: depth ?? 0,
-      overrideAccess: overrideAccess ?? false,
     })
     return base.cacheGlobal(doc, slug, { draft, label, tags, walk })
   }

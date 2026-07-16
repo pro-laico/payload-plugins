@@ -132,6 +132,8 @@ revalidatePlugin({ collections: { posts: { lists: { sitemap: ['slug'] } } } })
 export async function getSitemapEntries() {
   'use cache'
   const payload = await db // the handle createCacheHelpers was seeded with
+  // overrideAccess: false is deliberate here — a sitemap should list only what an anonymous
+  // visitor can reach. It's opt-in per call; the finders don't scope reads for you.
   const posts = await payload.find({ collection: 'posts', limit: 0, select: { slug: true, updatedAt: true }, depth: 0, overrideAccess: false })
   await cacheIds(posts, 'posts', { list: 'sitemap' })
   return posts.docs

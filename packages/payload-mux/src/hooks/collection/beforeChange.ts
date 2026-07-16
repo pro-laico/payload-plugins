@@ -15,7 +15,26 @@ export const getBeforeChangeHook =
 
     if (data.assetId && Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0) return data
 
-    if (previousAssetId === data.assetId) return data
+    if (previousAssetId === data.assetId) {
+      // Same asset, but no playback options — the doc never got its `video.asset.ready` webhook
+      // (bad secret, downtime, wrong URL) and the upload hook's short poll timed out. Heal it from
+      // Mux so a plain re-save is a recovery, rather than leaving the doc `preparing` forever.
+      if (!data.assetId || data.status === 'errored') return data
+      try {
+        const asset = await mux.video.assets.retrieve(data.assetId)
+        const metadata = getAssetMetadata(asset)
+        // Only `ready` once it actually has playback options — same guard the webhook applies.
+        // Without it a policy-less asset would be marked ready with nothing to play, and every
+        // later save would fall back in here and re-hit Mux.
+        if (asset.status === 'ready' && metadata.playbackOptions?.length) return { ...data, ...metadata, status: 'ready', error: null }
+        if (asset.status === 'errored')
+          return { ...data, status: 'errored', error: asset.errors?.messages?.join('; ') || asset.errors?.type || 'Unknown Mux error' }
+      } catch (err) {
+        // Best-effort: the doc is already stuck, so a Mux outage must not also block the edit.
+        req.payload.logger.error({ err, msg: `[payload-mux] Could not refresh Mux asset '${data.assetId}' — leaving the doc as-is` })
+      }
+      return data
+    }
 
     try {
       if (operation === 'update' && previousAssetId) {

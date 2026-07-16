@@ -14,6 +14,7 @@ export const lifecycleNodes = [
   { id: 'poll', kind: 'check', label: 'Encoded within the ~6s poll?', detail: 'beforeChange polls the new asset', x: 300, y: 270 },
   { id: 'inline', label: 'Metadata saved inline', detail: 'fast encodes return playback metadata immediately', x: 40, y: 430 },
   { id: 'webhook', label: 'Webhook fills it in', detail: 'video.asset.ready → payload.update — fires the same hooks as an admin save', x: 560, y: 430 },
+  { id: 'heal', label: 'Or: a save refetches it', detail: 'no webhook? saving a doc with an assetId but no playbackOptions asks Mux again', x: 860, y: 430 },
   { id: 'urls', kind: 'result', label: 'Playback URLs compute on read', detail: 'playbackUrl / posterUrl / gifUrl — derived from the playback id, signed on the fly, never stored', x: 300, y: 600 },
 ]
 
@@ -22,8 +23,10 @@ export const lifecycleEdges = [
   { from: 'save', to: 'poll' },
   { from: 'poll', to: 'inline', label: 'yes', fromSide: 'left' },
   { from: 'poll', to: 'webhook', label: 'no — encode still running', dashed: true, fromSide: 'right' },
+  { from: 'webhook', to: 'heal', label: 'never arrived', dashed: true, fromSide: 'right' },
   { from: 'inline', to: 'urls' },
   { from: 'webhook', to: 'urls' },
+  { from: 'heal', to: 'urls' },
 ]
 
 <Flow nodes={lifecycleNodes} edges={lifecycleEdges} height={680} />
@@ -35,6 +38,14 @@ The `beforeChange` hook then polls the new asset for **~6 seconds**. A fast enco
 returns full playback metadata inline. Anything slower is left for the **webhook**,
 which fills that metadata in once Mux finishes. The webhook also mirrors Mux-dashboard
 deletes back into Payload.
+
+If that webhook never arrives — a wrong signing secret, an unreachable endpoint, Mux
+downtime — the video isn't stranded. **Saving a doc that has an `assetId` but no
+`playbackOptions` refetches the asset from Mux** and lands it on `ready` (or records
+`errored`), so a lost event is recoverable from the admin rather than by re-uploading.
+It's one request, not a poll, and it's best-effort: if Mux can't be reached the save
+still goes through and the doc is left as it was. A doc that's already `ready` never
+pays for this — it short-circuits before any Mux call.
 
 The `playbackUrl` / `posterUrl` / `gifUrl` fields aren't stored. They compute from the
 playback id on every read, signed on the fly under a signed policy.

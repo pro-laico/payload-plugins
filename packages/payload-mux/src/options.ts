@@ -13,6 +13,6 @@ export function resolveOptions(options: MuxVideoPluginOptions = {}): ResolvedMux
     posterExtension: options.posterExtension ?? 'png',
     animatedGifExtension: options.animatedGifExtension ?? 'gif',
     autoCreateOnWebhook: options.autoCreateOnWebhook ?? false,
-    access: options.access,
+    access: { read: options.access?.read, upload: options.access?.upload },
   }
 }

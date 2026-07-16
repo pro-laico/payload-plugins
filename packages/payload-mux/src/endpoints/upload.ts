@@ -7,7 +7,7 @@ import type { ResolvedMuxVideoOptions } from '../types'
 export const createMuxUploadHandler =
   (mux: Mux, options: ResolvedMuxVideoOptions): PayloadHandler =>
   async (req) => {
-    if (!(await isAllowed(options, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     try {
       const upload = await mux.video.uploads.create({
@@ -24,7 +24,7 @@ export const createMuxUploadHandler =
 export const getMuxUploadHandler =
   (mux: Mux, options: ResolvedMuxVideoOptions): PayloadHandler =>
   async (req) => {
-    if (!(await isAllowed(options, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     const id = typeof req.query?.id === 'string' ? req.query.id : undefined
     if (!id) return Response.json({ error: 'Missing upload id.' }, { status: 400 })

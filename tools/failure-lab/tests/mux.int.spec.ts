@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 import { muxVideoPlugin } from '@pro-laico/payload-mux'
-import type { Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { bootLab, expectBootError, type LabBoot } from '@/boot'
 import { clearLogs, logs } from '@/logCapture'
@@ -76,6 +76,76 @@ describe('boot without credentials', () => {
     const e = await expectBootError([muxVideoPlugin({ extendCollection: 'nope' })])
     expect(e.message).toContain("[payload-mux] extendCollection: collection 'nope' not found")
     record('extendCollection → unknown collection', e.message)
+  })
+})
+
+// Extending a collection you own: it keeps its identity and access, the plugin's fields land on
+// it, and your own `collections.muxVideo` overrides still win.
+describe('extendCollection', () => {
+  const media = (fields: CollectionConfig['fields'] = []): CollectionConfig => ({
+    slug: 'media',
+    labels: { singular: 'Medium', plural: 'Media' },
+    access: { read: () => true },
+    admin: { useAsTitle: 'caption', defaultColumns: ['caption'] },
+    fields: [{ name: 'caption', type: 'text' }, ...fields],
+  })
+
+  it('a field the plugin injects colliding with one of yours throws a named error, not a bare DuplicateFieldName', async () => {
+    const e = await expectBootError([muxVideoPlugin({ extendCollection: 'media' as never })], [media([{ name: 'title', type: 'text' }])])
+    expect(e.message).toContain("[payload-mux] extendCollection: 'media' already defines field(s) title")
+    record('extendCollection → field collision', e.message)
+  })
+
+  it('keeps the target’s identity and access, and injects the Mux fields', async () => {
+    const lab = await bootLab({ plugins: [muxVideoPlugin({ extendCollection: 'media' as never })], collections: [media()] })
+    try {
+      const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
+      expect(lab.payload.config.collections.find((c) => c.slug === 'mux-video')).toBeUndefined() // no second collection
+      expect(coll?.labels?.plural).toBe('Media') // not relabelled to "Videos"
+      expect(coll?.admin?.useAsTitle).toBe('caption') // not forced to 'title'
+      const names = (coll?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
+      expect(names).toEqual(expect.arrayContaining(['caption', 'assetId', 'playbackOptions', 'status']))
+      // The target's own read access survives — the plugin does not impose its admin-only gate.
+      const read = coll?.access?.read
+      expect(read?.({ req: { user: null } } as never)).toBe(true)
+      record(
+        'extendCollection → target keeps identity',
+        `labels.plural: ${String(coll?.labels?.plural)}`,
+        `useAsTitle: ${String(coll?.admin?.useAsTitle)}`,
+      )
+    } finally {
+      await lab.cleanup()
+    }
+  })
+
+  it('collections.muxVideo overrides win over both the plugin and the target', async () => {
+    const lab = await bootLab({
+      plugins: [muxVideoPlugin({ extendCollection: 'media' as never, collections: { muxVideo: { admin: { useAsTitle: 'assetId' } } } })],
+      collections: [media()],
+    })
+    try {
+      const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
+      expect(coll?.admin?.useAsTitle).toBe('assetId') // target said 'caption'; the override is last
+      record('extendCollection → overrides win', `useAsTitle: ${String(coll?.admin?.useAsTitle)}`)
+    } finally {
+      await lab.cleanup()
+    }
+  })
+
+  it('warns that access.read is ignored when extending — the target owns its access', async () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const lab = await bootLab({
+        plugins: [muxVideoPlugin({ extendCollection: 'media' as never, access: { read: () => true } })],
+        collections: [media()],
+      })
+      const warn = spy.mock.calls.map((c) => c.join(' ')).find((w) => w.includes('access.read is ignored'))
+      expect(warn).toContain("you own 'media's access")
+      record('extendCollection → access.read ignored', warn)
+      await lab.cleanup()
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

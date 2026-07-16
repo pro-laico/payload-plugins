@@ -32,17 +32,12 @@ const signableUrlField = (
   hooks: { afterRead: [signableUrlAfterRead(mux, options, type, buildUrl)] },
 })
 
-export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): CollectionConfig => ({
-  slug: options.extendCollection ?? 'mux-video',
-  labels: { singular: 'Video', plural: 'Videos' },
+/** Everything the plugin injects — the Mux fields, hooks, and the selects the admin cells need.
+ * Deliberately no `slug`, `labels`, `admin`, or `access`: under `extendCollection` these merge onto
+ * a collection you own, and you keep its identity, its admin config, and its access rules.
+ * `forceSelect` is what the list cells actually need, and it holds however you fetch. */
+export const muxEnhancements = (mux: Mux, options: ResolvedMuxVideoOptions): Partial<CollectionConfig> => ({
   custom: { seedAsset: { sourceField: 'source' } },
-  access: { read: ({ req }) => isAllowed(options, req) },
-  admin: {
-    ...(options.extendCollection ? {} : { group: 'Assets' }),
-    enableListViewSelectAPI: true,
-    useAsTitle: 'title',
-    defaultColumns: ['title', 'muxUploader', 'duration'],
-  },
   forceSelect: { playbackOptions: true, title: true },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
@@ -134,3 +129,24 @@ export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): Collection
     },
   ],
 })
+
+/** The standalone `mux-video` collection: the enhancements plus the identity and access rules the
+ * plugin owns when it registers the collection itself. */
+export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): CollectionConfig => {
+  const enh = muxEnhancements(mux, options)
+  return {
+    slug: 'mux-video',
+    labels: { singular: 'Video', plural: 'Videos' },
+    custom: enh.custom,
+    access: { read: ({ req }) => isAllowed(options.access.read, req) },
+    admin: {
+      group: 'Assets',
+      enableListViewSelectAPI: true,
+      useAsTitle: 'title',
+      defaultColumns: ['title', 'muxUploader', 'duration'],
+    },
+    ...(enh.forceSelect ? { forceSelect: enh.forceSelect } : {}),
+    hooks: enh.hooks,
+    fields: enh.fields ?? [],
+  }
+}

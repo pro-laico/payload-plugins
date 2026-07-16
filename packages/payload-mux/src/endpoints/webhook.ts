@@ -22,7 +22,7 @@ export const muxWebhookHandler =
     try {
       event = await mux.webhooks.unwrap(JSON.stringify(body), req.headers)
     } catch (err) {
-      const hint = 'check that MUX_WEBHOOK_SECRET matches the signing secret in the Mux dashboard'
+      const hint = 'check that MUX_WEBHOOK_SECRET (or MUX_WEBHOOK_SIGNING_SECRET) matches the signing secret in the Mux dashboard'
       req.payload.logger.error({ err, msg: `[payload-mux] Webhook signature verification failed — ${hint}` })
       return Response.json({ error: `Invalid signature — ${hint}.` }, { status: 401 })
     }
