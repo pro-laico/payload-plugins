@@ -31,7 +31,7 @@ See [`<Icon>`](/docs/plugins/payload-icons/using-icons#icon) for the full compon
 
 The [Requested icons panel](/docs/plugins/payload-icons/collections#icon-use-detection) draws from two sources, and each fails differently in production.
 
-- **Static scan sees literal names only.** It matches `name="x"`, `name={'x'}`, and <code>{'name={`x`}'}</code>. A dynamic `name={expr}` is invisible to it — that's the runtime recorder's job (`trackRequests`).
+- **Static scan sees literal names only.** It matches `name="x"`, `name={'x'}`, and <code>{'name={`x`}'}</code>. A dynamic `name={expr}` is invisible to it — that's the runtime recorder's job (the `iconRequest` collection).
 - **In dev the panel scans live**, so nothing is set up or run. In **production** the source isn't on disk, so run `payload-icons-scan` during your build:
 
   ```bash

@@ -37,8 +37,10 @@ beforeAll(async () => {
   lab = await bootLab({
     plugins: [
       fontsPlugin({
-        fontOriginalOverrides: { upload: { staticDir: join(dir, 'original') } },
-        fontOptimizedOverrides: { upload: { staticDir: join(dir, 'optimized') } },
+        collections: {
+          fontOriginal: { upload: { staticDir: join(dir, 'original') } },
+          fontOptimized: { upload: { staticDir: join(dir, 'optimized') } },
+        },
       }),
     ],
   })

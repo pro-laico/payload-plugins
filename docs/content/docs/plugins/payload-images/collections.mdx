@@ -6,7 +6,8 @@ description: "The collections the plugin registers, how to extend your own uploa
 The plugin registers two collections under an **Assets** admin group: one you upload to, one that
 caches what gets generated. Both accept PNG, JPEG, WebP, and AVIF. With
 [`prewarm`](/docs/plugins/payload-images/caching#smart-prewarm) on, a third hidden collection joins
-them — the render-profile registry.
+them — the render-profile registry. `admin.folders` is on by default, so Payload's own hidden
+`payload-folders` collection is registered too.
 
 ## Collections
 
@@ -22,19 +23,20 @@ is **public**; writes are logged-in-admin only.
 <TypeTable
   type={{
     file: { description: "The original image (the upload). Stored as-is; shown in relationship fields via displayPreview, and the admin list shows a 160px focal-cropped on-demand thumbnail.", type: "upload" },
-    alt: { description: "Required. Screen-reader / SEO text; the admin title and list-search field. Localizable.", type: "text" },
+    alt: { description: "Required. Screen-reader / SEO text; the admin title and list-search field. Localized when localizeAlt is on — which it is whenever your config sets localization.", type: "text" },
     focalPoint: { description: "Payload's native upload.focalPoint, surfaced by the picker below.", type: "built-in" },
-    focalPreview: { description: "Focal-point picker + ratio preview. Only with focalUI.", type: "ui" },
-    presetManager: { description: "The preset manager panel: preset toggles, cached-variant list, purge button, and the per-image variant cap. Only with focalUI and the transform endpoint.", type: "ui" },
-    variants: { description: "Data/API join to this image's cached generated-images. Hidden in the admin (the preset manager panel lists variants itself). Only with focalUI and the transform endpoint.", type: "join" },
+    folder: { description: "Payload's native folder organization. Nullable, and added by default — set admin.folders: false to leave it off.", type: "relationship" },
+    focalPreview: { description: "Focal-point picker + ratio preview. Only with admin.focalUI.", type: "ui" },
+    presetManager: { description: "The preset manager panel: preset toggles, cached-variant list, purge button, and the per-image variant cap. Only with admin.focalUI.", type: "ui" },
+    variants: { description: "Data/API join to this image's cached generated-images. Hidden in the admin (the preset manager panel lists variants itself). Only with admin.focalUI.", type: "join" },
     presets: { description: "Guaranteed public variants toggled onto this image — a presetTemplates name or a custom spec. Cap-exempt, pre-generated, served via ?preset=<name>. Managed by the preset manager panel; hidden in the admin.", type: "array" },
     variantLimit: { description: "Per-image cap on cached variants; blank uses the plugin's variantLimit default. Presets never count against it. Hidden in the admin (edited via the preset manager panel).", type: "number" },
-    src: { description: "Default-width optimized URL, computed on read and hidden in admin. Only with virtualFields.", type: "virtual" },
-    srcset: { description: "Responsive srcset of optimized URLs. Only with virtualFields.", type: "virtual" },
-    placeholderURL: { description: "Tiny 32px blurred image URL (URL form, for non-React consumers). Only with virtualFields.", type: "virtual" },
-    thumbnailURL: { description: "160px focal-cropped thumbnail URL. Only with virtualFields.", type: "virtual" },
-    aspectRatio: { description: "The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one. Only with virtualFields.", type: "virtual" },
-    variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields. Only with virtualFields.", type: "virtual" },
+    src: { description: "Default-width optimized URL, computed on read and hidden in admin.", type: "virtual" },
+    srcset: { description: "Responsive srcset of optimized URLs.", type: "virtual" },
+    placeholderURL: { description: "Tiny 32px blurred image URL (URL form, for non-React consumers).", type: "virtual" },
+    thumbnailURL: { description: "160px focal-cropped thumbnail URL.", type: "virtual" },
+    aspectRatio: { description: "The render aspect ratio: the ratio the read declared (context.image.aspectRatio), else the natural one.", type: "virtual" },
+    variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields.", type: "virtual" },
     "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
     "placeholderXxl / placeholderX3": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
     placeholder: { description: "Opt-in placeholder: a finished data URI focal-cropped to the declared render, returned only when the read requests a blur (context.blur / X-Blurhash header); null otherwise.", type: "virtual" },
@@ -57,7 +59,7 @@ The `presetManager` UI field renders the **Presets & variants** panel — the ad
     generateImageMetadataBeforeChange: { description: "When a save carries a new file, one decode stores the placeholder tiers (five BlurHash strings + the micro-webp data URIs), the color palette, the alpha flags, and — when the editor hasn't picked one — a saliency-based focal point, all in the same write (payload images:backfill covers pre-existing images).", type: "beforeChange" },
     purgeStaleVariantsAfterChange: { description: "Purges this image's stale cached variants when its file or focal point changes.", type: "afterChange" },
     enqueuePrewarmAfterChange: { description: "Queues the imagesPrewarm job on create / file replace / focal edit. Only with prewarm on; best-effort — never blocks the write.", type: "afterChange" },
-    generatePresetsAfterChange: { description: "Regenerates this image's guaranteed presets on create / file replace / focal or hotspot edits, after the stale-variant purge. Only with the transform endpoint on.", type: "afterChange" },
+    generatePresetsAfterChange: { description: "Regenerates this image's guaranteed presets on create / file replace / focal or hotspot edits, after the stale-variant purge.", type: "afterChange" },
     purgeVariantsBeforeDelete: { description: "Purges all of this image's cached variants before the doc is deleted.", type: "beforeDelete" },
   }}
 />
@@ -94,8 +96,8 @@ hooks (busting cache tags on every cache-miss create would be pure churn).
   `source` relationship — so a tenant-scoped or owner-only `images` policy scopes the cached
   variants (docs and bytes) automatically. Caveat: a source read access that branches on the
   individual doc `id` can't be re-rooted; in that case supply your own
-  `generatedImagesOverrides: { access: { read: … } }`. The transform endpoint itself always gates
-  on the source's read access.
+  `collections: { generatedImages: { access: { read: … } } }`. The transform endpoint itself always
+  gates on the source's read access.
 </Callout>
 
 ### `image-render-profiles`
@@ -154,8 +156,8 @@ plugins: [
 ```
 
 `alt`, `focalX`, and `focalY` are ordinary record fields, type-checked against the collection.
-With `folders: true`, Payload's folders seed the same way — ordinary docs in the hidden
-`payload-folders` collection, each image referencing its folder like any relationship. See
+Payload's folders are on by default (`admin.folders`) and seed the same way — ordinary docs in the
+hidden `payload-folders` collection, each image referencing its folder like any relationship. See
 [`examples/images-sandbox`](https://github.com/pro-laico/payload-plugins) for a full working
 setup, and the [payload-seed docs](/docs/plugins/payload-seed) for everything else about seeding.
 

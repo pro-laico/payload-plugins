@@ -1,1 +1,2 @@
-export type * from './plugin-options'
+export type * from './marker'
+export type * from './options'

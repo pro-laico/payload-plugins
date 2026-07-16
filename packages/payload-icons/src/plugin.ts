@@ -1,42 +1,35 @@
 import type { CollectionConfig, Config, Plugin } from 'payload'
 
 import { Icon } from './collections/Icon'
-import type { IconsPluginOptions } from './types'
+import { resolveOptions } from './options'
 import { createIconSetCollection, ICON_SET_SLUG } from './collections/IconSet'
 import { createClearIconRequestsEndpoint } from './endpoints/clearIconRequests'
+import type { IconsPluginOptions, PayloadIconsMarker } from './types'
 import { createIconRequestCollection, ICON_REQUEST_SLUG } from './collections/IconRequest'
 
 export const iconsPlugin =
   (opts: IconsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const {
-      enabled = true,
-      iconOverrides,
-      includeIconSet = true,
-      iconSetOverrides,
-      usagePanel = true,
-      trackRequests = true,
-      iconRequestOverrides,
-    } = opts
+    const { enabled, icon, iconSet, iconRequest, usagePanel } = resolveOptions(opts)
     if (!enabled) return config
 
-    const additions: CollectionConfig[] = [Icon(iconOverrides)]
-    if (includeIconSet) additions.push(createIconSetCollection({ iconSlug: iconOverrides?.slug ?? 'icon', usagePanel, ...iconSetOverrides }))
-    if (trackRequests) additions.push(createIconRequestCollection(iconRequestOverrides))
+    const iconSlug = icon.slug ?? 'icon'
+    const additions: CollectionConfig[] = [Icon(icon)]
+    if (iconSet !== false) additions.push(createIconSetCollection({ iconSlug, usagePanel, ...iconSet }))
+    if (iconRequest !== false) additions.push(createIconRequestCollection(iconRequest))
+
+    const marker: PayloadIconsMarker = {
+      options: opts,
+      iconSlug,
+      iconSetSlug: iconSet !== false ? (iconSet.slug ?? ICON_SET_SLUG) : null,
+      iconRequestSlug: iconRequest !== false ? ICON_REQUEST_SLUG : null,
+    }
 
     return {
       ...config,
       collections: [...(config.collections ?? []), ...additions],
-      endpoints: trackRequests ? [...(config.endpoints ?? []), createClearIconRequestsEndpoint()] : config.endpoints,
-      custom: {
-        ...config.custom,
-        payloadIcons: {
-          options: opts,
-          iconSlug: iconOverrides?.slug ?? 'icon',
-          iconSetSlug: includeIconSet ? (iconSetOverrides?.slug ?? ICON_SET_SLUG) : null,
-          iconRequestSlug: trackRequests ? ICON_REQUEST_SLUG : null,
-        },
-      },
+      endpoints: iconRequest !== false ? [...(config.endpoints ?? []), createClearIconRequestsEndpoint()] : config.endpoints,
+      custom: { ...config.custom, payloadIcons: marker },
     }
   }
 

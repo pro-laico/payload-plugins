@@ -2,7 +2,7 @@ import type Mux from '@mux/mux-node'
 import type { CollectionConfig, TextField } from 'payload'
 
 import { isAllowed } from '../lib/isAllowed'
-import type { MuxVideoPluginOptions } from '../types'
+import type { MuxAdminThumbnail, ResolvedMuxVideoOptions } from '../types'
 import { signableUrlAfterRead } from '../hooks/field/afterRead'
 import { getAfterDeleteHook } from '../hooks/collection/afterDelete'
 import { getBeforeChangeHook } from '../hooks/collection/beforeChange'
@@ -10,7 +10,7 @@ import { getBeforeValidateHook } from '../hooks/collection/beforeValidate'
 
 const C = '@pro-laico/payload-mux/components'
 
-const thumbnailCell = (mode: MuxVideoPluginOptions['adminThumbnail']): string | undefined => {
+const thumbnailCell = (mode: MuxAdminThumbnail): string | undefined => {
   if (mode === 'image') return `${C}/MuxVideoImageCell#MuxVideoImageCell`
   if (mode === 'none') return undefined
   return `${C}/MuxVideoGifCell#MuxVideoGifCell`
@@ -18,7 +18,7 @@ const thumbnailCell = (mode: MuxVideoPluginOptions['adminThumbnail']): string | 
 
 const signableUrlField = (
   mux: Mux,
-  options: MuxVideoPluginOptions,
+  options: ResolvedMuxVideoOptions,
   name: string,
   label: string,
   type: 'video' | 'thumbnail' | 'gif',
@@ -32,7 +32,7 @@ const signableUrlField = (
   hooks: { afterRead: [signableUrlAfterRead(mux, options, type, buildUrl)] },
 })
 
-export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionConfig => ({
+export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): CollectionConfig => ({
   slug: options.extendCollection ?? 'mux-video',
   labels: { singular: 'Video', plural: 'Videos' },
   custom: { seedAsset: { sourceField: 'source' } },
@@ -120,7 +120,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
           'posterUrl',
           'Poster URL',
           'thumbnail',
-          (id) => new URL(`https://image.mux.com/${id}/thumbnail.${options.posterExtension ?? 'png'}`),
+          (id) => new URL(`https://image.mux.com/${id}/thumbnail.${options.posterExtension}`),
         ),
         signableUrlField(
           mux,
@@ -128,7 +128,7 @@ export const MuxVideo = (mux: Mux, options: MuxVideoPluginOptions): CollectionCo
           'gifUrl',
           'Gif URL',
           'gif',
-          (id) => new URL(`https://image.mux.com/${id}/animated.${options.animatedGifExtension ?? 'gif'}`),
+          (id) => new URL(`https://image.mux.com/${id}/animated.${options.animatedGifExtension}`),
         ),
       ],
     },

@@ -1,3 +1,3 @@
-export type * from './pluginMarker'
-export type * from './pluginOptions'
+export type * from './marker'
+export type * from './options'
 export type * from './renderIntent'

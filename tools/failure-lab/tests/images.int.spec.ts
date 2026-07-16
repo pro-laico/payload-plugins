@@ -86,16 +86,6 @@ describe('boot-time config guards (thrown from buildConfig)', () => {
 })
 
 describe('boot-time warnings (logged, not thrown)', () => {
-  it('transform: false + virtualFields: true warns that the URL fields will 404', async () => {
-    clearLogs()
-    const b = await bootLab({ plugins: [imagesPlugin({ transform: false, virtualFields: true })] })
-    const warn = warnMessages().find((w) => w.includes('[payload-images]'))
-    await b.cleanup()
-    expect(warn).toContain('virtualFields: true with transform: false')
-    expect(warn).toContain('will 404')
-    record('virtualFields without the transform endpoint', warn)
-  })
-
   it("a collection named 'img' shadows the transform route — warned at boot", async () => {
     clearLogs()
     const b = await bootLab({

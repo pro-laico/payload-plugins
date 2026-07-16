@@ -1,7 +1,7 @@
 import type { CollectionSlug, GlobalSlug } from 'payload'
 
 import type { SeedTokens } from '../tokens/seedTokens'
-import type { SeedDisabledMarker } from '../options/markers'
+import type { SeedDisabledMarker } from '../plugin/collectionMarkers'
 import type { CollectionSeedData, GlobalSeedData } from './seedData'
 
 export type SeedBuilder<T> = (tokens: SeedTokens) => T

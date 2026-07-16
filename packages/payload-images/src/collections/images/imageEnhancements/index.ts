@@ -45,7 +45,7 @@ export const resolveAdminThumbnail = (adminThumbnail: number | false | undefined
 }
 
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, virtualFields = true, previewRatios, purgePath, folders, endpointsEnabled = true } = opts
+  const { focalUI = true, previewRatios, purgePath, folders } = opts
   const presetTemplates = resolvePresetTemplates(opts.presetTemplates)
   const variantSlug = asSlug(opts.variantSlug || GENERATED_IMAGES_SLUG)
   const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
@@ -92,31 +92,25 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
     on: 'source',
     admin: { hidden: true, allowCreate: false },
   }
-  const adminUIFields = focalUI ? [focalPreview, ...(endpointsEnabled ? [presetManager, variants] : [])] : []
+  const adminUIFields = focalUI ? [focalPreview, presetManager, variants] : []
 
-  // With the virtuals on, a populated image carries exactly what <ResponsiveImage> renders;
-  // without them the component builds URLs itself — so the identity fields buildSrcset /
-  // getImageUrl / deriveVersion and the placeholder crop need must ride along in EITHER mode.
-  const defaultPopulate: SelectType = virtualFields
-    ? RESPONSIVE_IMAGE_SELECT
-    : {
-        alt: true,
-        url: true,
-        palette: true,
-        hasAlpha: true,
-        isOpaque: true,
-        ...Object.fromEntries(VIRTUAL_URL_INPUTS.map((f): [string, true] => [f, true])),
-      }
+  // A populated image carries exactly what <ResponsiveImage> renders.
+  const defaultPopulate: SelectType = RESPONSIVE_IMAGE_SELECT
   // VIRTUAL_URL_INPUTS already includes the hotspot fields; always force the crop/version inputs so
-  // the placeholder virtual and the build-URLs-yourself mode have their inputs regardless of virtualFields.
+  // the placeholder virtual has them.
   const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, 'presets'].map((f): [string, true] => [f, true]))
 
-  const presetGen = opts.presetGen && endpointsEnabled ? generatePresetsAfterChange(opts.presetGen) : null
+  const presetGen = opts.presetGen ? generatePresetsAfterChange(opts.presetGen) : null
 
   return {
     fields: [
       ...adminUIFields,
-      ...(virtualFields ? [aspectRatioField, variantVersionField, srcField, srcsetField, placeholderUrlField, thumbnailUrlField] : []),
+      aspectRatioField,
+      variantVersionField,
+      srcField,
+      srcsetField,
+      placeholderUrlField,
+      thumbnailUrlField,
       ...placeholderStorageFields,
       placeholderField,
       paletteField,

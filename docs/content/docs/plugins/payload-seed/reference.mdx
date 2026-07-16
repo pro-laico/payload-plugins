@@ -6,15 +6,22 @@ description: "Plugin options, environment variables, CLI commands, endpoints, an
 ## Plugin options
 
 `seedPlugin(options?)` is the single entry point. One call registers the `payload seed` command,
-the `POST /api/seed` endpoint, the optional admin button, and the type augmentation that checks your
-refs. It does nothing useful without `definitions`.
+the `POST /api/seed` endpoint, the admin button, and the type augmentation that checks your refs. It
+does nothing useful without `definitions`.
 
 export const options = [
+  { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing: no command, endpoint, button, or type augmentation. This is a build-time switch — to turn seeding itself off at runtime, leave ENABLE_SEED unset (it already is by default).` },
   { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions: your defineSeed exports. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do.` },
   { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. A native upload's file is looked up under its per-collection subdir (see assetSubDirs) then the root; providers look under their own subdir.` },
   { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' } or { fontOriginal: 'font' }.` },
-  { name: 'adminButton', type: 'boolean', default: 'false', description: `Render the Seed your database button in the admin header.` },
 ]
+
+<Callout type="info">
+  **The admin button is always registered.** It is double-guarded already — the button renders `null`
+  and `POST /api/seed` 403s unless `ENABLE_SEED=true`, so `ENABLE_SEED` is the real switch. Because the
+  button is wired by string path, regenerate the admin import map with `pnpm payload generate:importmap`
+  after adding the plugin.
+</Callout>
 
 The **Reference** tab is the interactive view; **TypeScript** is the same shape in code, every option
 at its default.
@@ -34,10 +41,10 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 
 // Every option at its default.
 seedPlugin({
+  enabled: true,
   // definitions: [media, services, posts], // no default; your seed.ts exports
   assetsDir: 'assets',
   assetSubDirs: {}, // default folder per collection is its slug; override here, e.g. { media: 'images' }
-  adminButton: false,
 })
 ```
 
@@ -68,13 +75,14 @@ seedPlugin({
 | Export | From | What |
 | --- | --- | --- |
 | `seedPlugin` | `@pro-laico/payload-seed` | The plugin factory. |
+| `readSeedMarker` | `@pro-laico/payload-seed` | `readSeedMarker(config)` returns the typed `config.custom.payloadSeed` — `{ options, endpointPath, assetsDir }` — so a script can resolve the configured paths off a live config instead of restating them. |
 | `defineSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records or a global's seed data (inferred from the slug; one default export per `seed.ts`). |
 | `seed` | `@pro-laico/payload-seed` | Run the seed from a script / test / migration (see [Running the seed](/docs/plugins/payload-seed/running)). |
 | `ref` / `file` / `isRef` / `isFileToken` | `@pro-laico/payload-seed` | The token constructors + type guards, for code that builds seed data *outside* a builder callback (unit tests, composed fragments). Inside a builder, use the supplied tokens. |
 | `SeedTokens` / `WithRefs` / `CollectionSeedData` / `GlobalSeedData` | `@pro-laico/payload-seed` | Types for seed helpers composed across files: type a fragment's `{ ref, file }` parameter, widen generated data types to accept `Ref` tokens. |
 | `Ref` / `FileToken` | `@pro-laico/payload-seed` | The token value types themselves. |
 | `SeedRegistry` | `@pro-laico/payload-seed` | Augmentable interface `generate:types` fills in, so `ref()` keys are checked. Not imported by name. |
-| `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (wired via the import map when `adminButton` is on). Server component — renders nothing unless `ENABLE_SEED` is `"true"`. |
+| `SeedButton` | `@pro-laico/payload-seed/components/SeedButton` | The admin **Seed your database** button (always registered, wired via the import map). Server component — renders nothing unless `ENABLE_SEED` is `"true"`. |
 
 ## Collections & globals
 

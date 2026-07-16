@@ -9,5 +9,5 @@ export const seedDefinitions = [fontOriginals, fonts, fontSet]
 
 export const plugins: Plugin[] = [
   fontsPlugin(),
-  seedPlugin({ adminButton: true, definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }),
+  seedPlugin({ definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }),
 ]

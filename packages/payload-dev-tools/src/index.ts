@@ -2,6 +2,10 @@
 export { default, devToolsPlugin } from './plugin'
 export type { DevToolsPluginOptions } from './types'
 
+// The typed view of `config.custom.payloadDevTools`.
+export { readDevToolsMarker } from './lib/marker'
+export type { PayloadDevToolsMarker } from './types'
+
 // The test harness authoring helper + types. `defineTest` lives here (not just /toolbar) so seed
 // scripts, screenshot tooling, and payload-side code can import it without pulling in next.
 export { defineTest } from './harness'

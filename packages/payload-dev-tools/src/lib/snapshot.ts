@@ -1,6 +1,7 @@
 import type { Payload, Where } from 'payload'
 
 import { isRecord } from './isRecord'
+import { readDevToolsMarker } from './marker'
 import type {
   CollectionCount,
   DevSnapshot,
@@ -169,7 +170,7 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
     generatedAt: new Date().toISOString(),
     env: { nodeEnv: process.env.NODE_ENV ?? 'development', nodeVersion: process.version },
     adminRoute: payload.config.routes?.admin ?? '/admin',
-    devRoute: typeof custom.payloadDevTools?.devRoute === 'string' ? custom.payloadDevTools.devRoute : '/dev',
+    devRoute: readDevToolsMarker(payload.config)?.devRoute ?? '/dev',
     plugins: {
       seed: !!seedMarker,
       images: !!imagesMarker,

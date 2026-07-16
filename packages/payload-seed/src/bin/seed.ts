@@ -1,6 +1,7 @@
 import { getPayload, type SanitizedConfig } from 'payload'
 
 import { seed } from '../engine/run'
+import { readSeedMarker } from '../lib/marker'
 import type { SeedPluginOptions } from '../types'
 import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
 
@@ -10,7 +11,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     process.exitCode = 1
     return
   }
-  const options: SeedPluginOptions = config.custom?.payloadSeed?.options ?? {}
+  const options: SeedPluginOptions = readSeedMarker(config)?.options ?? {}
   const payload = await getPayload({ config })
   try {
     const result = await seed({ payload, options })

@@ -1,10 +1,10 @@
 // The plugin
 export { default, imagesPlugin } from './plugin'
-export type { ImagesPluginOptions, TransformEndpointConfig } from './types'
+export type { ImagesAdminOptions, ImagesCollectionsOptions, ImagesPluginOptions, TransformEndpointConfig } from './types'
 
 // The typed view of `config.custom.payloadImages` — resolve the configured slugs/settings from a
 // script or app instead of hand-casting the marker.
-export { readPluginMarker } from './lib/pluginMarker'
+export { readImagesMarker } from './lib/marker'
 export type { PayloadImagesMarker, PayloadImagesPrewarmMarker } from './types'
 export { GENERATED_IMAGES_SLUG } from './collections/generatedImages'
 export { IMAGE_RENDER_PROFILES_SLUG } from './collections/renderProfiles'

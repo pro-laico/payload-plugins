@@ -101,8 +101,8 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
         <strong>Requested icons</strong>
         <p style={noteStyle}>
           No usage manifest found. Run <code style={codeStyle}>{scanCommand}</code> in your project to scan source for{' '}
-          <code style={codeStyle}>{'<Icon name="…" />'}</code> and list the names your repo needs here. Enable{' '}
-          <code style={codeStyle}>trackRequests</code> to also capture runtime misses.
+          <code style={codeStyle}>{'<Icon name="…" />'}</code> and list the names your repo needs here. Runtime misses are captured too, unless{' '}
+          <code style={codeStyle}>collections.iconRequest</code> is off.
         </p>
       </div>
     )

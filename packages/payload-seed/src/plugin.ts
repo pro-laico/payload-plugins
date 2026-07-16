@@ -4,8 +4,8 @@ import type { Config, Plugin } from 'payload'
 
 import { resolveOptions } from './options'
 import { buildSeedRegistry } from './typegen'
-import type { SeedPluginOptions } from './types'
 import { createSeedEndpoint } from './endpoints/seed'
+import type { PayloadSeedMarker, SeedPluginOptions } from './types'
 
 function binScriptPath(name: string): string {
   const here = fileURLToPath(import.meta.url)
@@ -13,14 +13,26 @@ function binScriptPath(name: string): string {
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
-export function seedPlugin(options: SeedPluginOptions = {}): Plugin {
-  const resolved = resolveOptions(options)
+export const seedPlugin =
+  (opts: SeedPluginOptions = {}): Plugin =>
+  (incomingConfig: Config): Config => {
+    const resolved = resolveOptions(opts)
+    if (!resolved.enabled) return incomingConfig
 
-  return (incomingConfig: Config): Config => {
+    // The seed button and endpoint both no-op unless ENABLE_SEED=true (see guard.ts) — that env var
+    // is the real switch, so registering them unconditionally costs nothing and removes the trap of
+    // opting into seeding and still getting no button.
+    const components = incomingConfig.admin?.components ?? {}
+    const marker: PayloadSeedMarker = { options: opts, endpointPath: '/api/seed', assetsDir: resolved.assetsDir }
+
     const config: Config = {
       ...incomingConfig,
+      admin: {
+        ...incomingConfig.admin,
+        components: { ...components, actions: [...(components.actions ?? []), '@pro-laico/payload-seed/components/SeedButton#SeedButton'] },
+      },
       bin: [...(incomingConfig.bin ?? []), { key: 'seed', scriptPath: binScriptPath('seed') }],
-      custom: { ...incomingConfig.custom, payloadSeed: { options } },
+      custom: { ...incomingConfig.custom, payloadSeed: marker },
       endpoints: [...(incomingConfig.endpoints ?? []), createSeedEndpoint(resolved)],
     }
 
@@ -35,14 +47,7 @@ export function seedPlugin(options: SeedPluginOptions = {}): Plugin {
       }
     }
 
-    if (resolved.adminButton) {
-      const components = config.admin?.components ?? {}
-      config.admin = {
-        ...config.admin,
-        components: { ...components, actions: [...(components.actions ?? []), '@pro-laico/payload-seed/components/SeedButton#SeedButton'] },
-      }
-    }
-
     return config
   }
-}
+
+export default seedPlugin

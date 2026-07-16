@@ -1,15 +1,12 @@
 import type { Endpoint } from 'payload'
 
 import { isRecord } from '../lib/isRecord'
-import { devToolsEnabled } from '../options'
 
-export function createActivateIconSetEndpoint(enabled?: boolean): Endpoint {
+export function createActivateIconSetEndpoint(): Endpoint {
   return {
     path: '/dev/icons/activate',
     method: 'post',
     handler: async (req) => {
-      if (!devToolsEnabled(enabled)) return Response.json({ error: 'Not found' }, { status: 404 })
-
       const marker = req.payload.config.custom?.payloadIcons
       const iconSetSlug = isRecord(marker) && typeof marker.iconSetSlug === 'string' ? marker.iconSetSlug : undefined
       if (!iconSetSlug) return Response.json({ error: 'payload-icons (with its iconSet collection) is not installed.' }, { status: 400 })

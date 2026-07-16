@@ -100,8 +100,8 @@ at `/api/img`.
 
 </Tabs>
 
-The component returns `null` when the doc has no `src`/`srcset` (deleted image,
-`virtualFields: false`). A missing image renders nothing rather than a broken frame.
+The component returns `null` when the doc has no `src`/`srcset` (a deleted image, or a read whose
+explicit `select` left them out). A missing image renders nothing rather than a broken frame.
 
 <Callout type="warn">
   **Set `sizes` to how big the image actually renders.** The default is `100vw`; leave it on an

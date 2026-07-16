@@ -56,8 +56,7 @@ export const virtualEdges = [
 <Callout type="warn">
   A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
   several KB of string on every read and population, and a much larger stored-variant space.
-  Prefer the ladder default (or your own array) if response size matters. Disable the fields
-  entirely with `virtualFields: false`.
+  Prefer the ladder default (or your own array) if response size matters.
 </Callout>
 
 <Callout type="info">
@@ -126,5 +125,5 @@ With `fmt=auto` the endpoint picks the best format the browser's `Accept` header
 - [Rendering images](/docs/plugins/payload-images/rendering) — the component and helper that write these URLs for you.
 - [Metadata & placeholders](/docs/plugins/payload-images/metadata) — the focal point behind `fit=cover` and the blur placeholder.
 - [Caching & prewarming](/docs/plugins/payload-images/caching) — what happens to a URL after its first request.
-- [Reference](/docs/plugins/payload-images/reference) — every option and default (`maxDimension`, `qualityRange`, `pixelStep`, `virtualFields`).
+- [Reference](/docs/plugins/payload-images/reference) — every option and default (`maxDimension`, `qualityRange`, `pixelStep`).
 - [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — when images don't optimize or the browser over-fetches.

@@ -5,7 +5,7 @@ import type { IconRequestCollectionOverrides } from '../types'
 
 const d = {
   iconRequestDescription:
-    'Icon names requested at runtime that did not resolve to an icon in the active set. Populated when iconsPlugin({ trackRequests: true }) is set; compare against the IconSet usage panel.',
+    'Icon names requested at runtime that did not resolve to an icon in the active set. Populated unless iconsPlugin({ collections: { iconRequest: false } }) opts out; compare against the IconSet usage panel.',
 }
 
 export const ICON_REQUEST_SLUG = 'iconRequest'

@@ -52,14 +52,12 @@ describe('createImagesCollection', () => {
     expect((alt as { admin?: { description?: string } }).admin?.description).toBeTruthy()
   })
 
-  it('adds virtual URL fields by default (computed, for API consumers) and drops them when off', () => {
+  it('adds the virtual URL fields (computed, for API consumers)', () => {
     const on = createImagesCollection()
     for (const name of ['src', 'srcset', 'placeholderURL', 'thumbnailURL']) {
       const f = byName(on.fields, name)
       expect((f as { virtual?: boolean }).virtual).toBe(true)
     }
-    const off = createImagesCollection({ virtualFields: false })
-    expect(byName(off.fields, 'src')).toBeUndefined()
   })
 
   it('populates the lean <ResponsiveImage> set by default (finished virtuals only), never the variants join', () => {
@@ -67,9 +65,6 @@ describe('createImagesCollection', () => {
     for (const name of ['alt', 'src', 'srcset', 'placeholder']) expect(dp[name]).toBe(true)
     expect(dp.url).toBeUndefined() // identity/metadata fields are an explicit select away
     expect(dp.variants).toBeUndefined()
-    // Without the virtuals there are no finished URLs, so the raw url + metadata ride along.
-    const off = createImagesCollection({ virtualFields: false }).defaultPopulate as Record<string, boolean>
-    expect(off.url).toBe(true)
     // forceSelect keeps the virtual fields' inputs present even under `select`.
     expect((createImagesCollection().forceSelect as Record<string, boolean>).width).toBe(true)
   })

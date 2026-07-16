@@ -5,7 +5,4 @@ import { imagesPlugin } from '@pro-laico/payload-images'
 import pages from '../seed/pages'
 import images from '../seed/images'
 
-export const plugins: Plugin[] = [
-  imagesPlugin({ prewarm: true }),
-  seedPlugin({ adminButton: true, definitions: [images, pages], assetsDir: 'seed-assets' }),
-]
+export const plugins: Plugin[] = [imagesPlugin(), seedPlugin({ definitions: [images, pages], assetsDir: 'seed-assets' })]

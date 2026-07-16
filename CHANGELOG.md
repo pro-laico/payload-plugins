@@ -7,6 +7,141 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+Every plugin's options now have the same shape, and the toggles that never earned their keep are
+gone. Configure one plugin and you can guess the next: `enabled`, a `collections` key per
+collection the plugin registers, `admin` for UI-only toggles, then the plugin's own options flat.
+Four options were deleted outright — each one's "off" state was either already unreachable or
+incoherent — and two defaults flip on. Breaking for five packages; every change is a mechanical
+rename except where noted. See **Upgrade notes**.
+
+### Highlights
+
+#### One options shape across all seven plugins
+
+Every collection a plugin registers is now one key under `collections` (or `globals`, for
+`payload-fonts`' fontSet — it's a Payload global, so it isn't pretending to be a collection), and
+each key has a single axis: `false` means don't register it, an object means override it. That
+retires the old boolean-plus-overrides pairs (`includeIconSet` + `iconSetOverrides`,
+`includeFontSet` + `fontSetOverrides`, `trackRequests` + `iconRequestOverrides`), each of which
+could express an unreachable state. Optional sub-features read `false | Options` everywhere — the
+`boolean | Options` form is gone, since `true` never meant anything `{}` didn't.
+
+Admin-only toggles moved under `admin` (`admin.focalUI`, `admin.folders`, `admin.usagePanel`,
+`admin.thumbnail`). `payload-images` drops from 15 top-level options to 12; `payload-icons` from 7
+to 3; `payload-fonts` from 8 to 5.
+
+Every package now resolves its defaults in one place — a `resolveOptions` in `src/options.ts`
+returning a fully-resolved mirror type — so "what's the default for X" is answerable from one file
+instead of by reading `plugin.ts` top to bottom. Every package also exports a typed
+`read<Name>Marker(config)` for its `config.custom.payload<Name>` stash.
+
+#### Defaults that stop hiding the feature you installed
+
+`payload-seed`'s button is now always registered. It was already double-guarded — the button
+renders nothing and the endpoint 403s unless `ENABLE_SEED=true` — so `adminButton: false` only
+meant you could opt into seeding and still get no button. `ENABLE_SEED` is the switch.
+
+`payload-images` turns folders on: the plugin's premise is a managed image library, and a library
+without organization is the wrong default. It localizes `alt` when your app configures
+localization, because a localized site localizes its alt text — that's an accessibility fact, not
+a preference.
+
+#### Toggles removed
+
+`payload-images`' `transform: false` cost 17 conditional branches across the plugin and its
+collection layer to support a mode that left you a transform plugin with no transform endpoint —
+an upload collection plus a variant cache that never fills. The endpoint is the plugin, so it's
+always registered, and `virtualFields` goes with it: it was already derived from `transform`, and
+its only remaining state contradicted the plugin's own exported read contract.
+
+`payload-revalidate`'s `endpoint` was a third gate on endpoints that already 404'd when `observe`
+was off and still require an authenticated user in production. `observe` alone governs them now —
+and with `observe: false` they aren't registered at all, which is stronger than the old 404.
+
+### Changed
+
+- **BREAKING** `@pro-laico/payload-icons` — `iconOverrides` → `collections.icon`; `iconSetOverrides`
+  → `collections.iconSet`; `iconRequestOverrides` → `collections.iconRequest`; `includeIconSet:
+  false` → `collections.iconSet: false`; `trackRequests: false` → `collections.iconRequest: false`;
+  `usagePanel` → `admin.usagePanel`.
+- **BREAKING** `@pro-laico/payload-fonts` — `fontOverrides` → `collections.font`;
+  `fontOriginalOverrides` → `collections.fontOriginal`; `fontOptimizedOverrides` →
+  `collections.fontOptimized`; `fontSetOverrides` → `globals.fontSet`; `includeFontSet: false` →
+  `globals.fontSet: false`.
+- **BREAKING** `@pro-laico/payload-images` — `imagesOverrides` → `collections.images`;
+  `generatedImagesOverrides` → `collections.generatedImages`; `focalUI` → `admin.focalUI` (and its
+  bare `true` form is gone — pass `{}` or omit); `folders` → `admin.folders`; `prewarm: true` →
+  `prewarm: {}`.
+- **BREAKING** `@pro-laico/payload-mux` — `adminThumbnail` → `admin.thumbnail`. The `MuxVideo`
+  collection factory is no longer exported; the new `collections.muxVideo` overrides cover it.
+  Defaults that were implicit fallthroughs are now explicit: `playbackPolicy: 'public'`,
+  `posterExtension: 'png'`, `animatedGifExtension: 'gif'`, `admin.thumbnail: 'gif'`.
+- **BREAKING** `@pro-laico/payload-seed` — gains `enabled` (default `true`), matching every other
+  plugin.
+- `@pro-laico/payload-dev-tools` — `enabled` now gates the config once instead of being re-checked
+  per request by four endpoint handlers, so when it's off the dev endpoints don't exist at all
+  rather than registering and 404ing. Same default (`NODE_ENV === 'development'`).
+- `@pro-laico/payload-mux` — gains `collections.muxVideo`; it was the only plugin with no way to
+  override its own collection.
+- `@pro-laico/payload-images` — the `PayloadImagesMarker` type no longer lies: it declares the
+  `options` the plugin has always stashed, and its slug/path fields are required rather than
+  optional. `readPluginMarker` → `readImagesMarker`, and it returns `undefined` (not `{}`) when the
+  plugin isn't registered.
+
+### Added
+
+- All packages — a typed `read<Name>Marker(config)` export (`readImagesMarker`, `readIconsMarker`,
+  `readFontsMarker`, `readMuxMarker`, `readSeedMarker`, `readRevalidateMarker`,
+  `readDevToolsMarker`) plus the marker type, so nothing hand-casts `config.custom`.
+- `@pro-laico/payload-seed` — `PayloadSeedMarker` (`{ options, endpointPath, assetsDir }`), the
+  package's first typed marker.
+
+### Removed
+
+- **BREAKING** `@pro-laico/payload-images` — `transform: false`. `transform` is now only a config
+  object; the transform endpoint is always registered.
+- **BREAKING** `@pro-laico/payload-images` — `virtualFields`. The virtual URL fields are always
+  added, and `defaultPopulate` is always the lean `RESPONSIVE_IMAGE_SELECT`. `forceSelect` still
+  carries the virtuals' inputs, so they survive an explicit `select`.
+- **BREAKING** `@pro-laico/payload-seed` — `adminButton`. The button is always registered;
+  `ENABLE_SEED=true` governs it, as it always did.
+- **BREAKING** `@pro-laico/payload-revalidate` — `endpoint`. `observe` governs the map endpoints.
+
+### Fixed
+
+- `@pro-laico/payload-seed` — installing the plugin with `ENABLE_SEED=true` set gave you no admin
+  button unless you also passed `adminButton: true`, which was easy to miss and impossible to
+  discover from the admin UI.
+
+### Docs
+
+- The shared **Conventions** page documents the options skeleton, the one-key-per-collection rule,
+  the `false | Options` rule, and reading a plugin's marker back.
+- Every plugin Reference reflects the new nested shape, and the `payload-images` pages drop the
+  removed `transform: false` / `virtualFields` modes.
+
+### Upgrade notes
+
+1. Run `pnpm install` (or your package manager's equivalent) to pull the new versions.
+2. Apply the renames in **Changed** — all mechanical, no semantic change. The two `true` forms that
+   are gone (`prewarm: true`, `focalUI: true`) become `{}`.
+3. `@pro-laico/payload-images`: **folders now default on.** This adds a nullable `folder`
+   relationship and Payload's hidden `payload-folders` collection — additive, so it needs a schema
+   push (`pnpm payload migrate` or a dev push) but no data migration. It also registers Payload's
+   folder admin components, so **run `pnpm payload generate:importmap`** and restart, or the admin
+   fails to resolve them. Pass `admin: { folders: false }` to keep the old behavior.
+4. `@pro-laico/payload-images`: **`localizeAlt` now defaults to `Boolean(config.localization)`.** If
+   your app configures localization and your `alt` field is currently unlocalized, this flips
+   `localized` on an existing field — a real data migration. Set `localizeAlt: false` explicitly to
+   keep the old behavior, or migrate deliberately.
+5. `@pro-laico/payload-images`: if you passed `transform: false` or `virtualFields: false`, there is
+   no replacement — those modes are gone. Drop the option.
+6. `@pro-laico/payload-seed`: remove `adminButton`; set `ENABLE_SEED=true` where you want the button.
+7. `@pro-laico/payload-revalidate`: remove `endpoint`; use `observe` to govern the map endpoints.
+8. `@pro-laico/payload-mux`: if you imported `MuxVideo` directly, move those overrides to
+   `collections: { muxVideo }`.
+9. Beyond the images folders/localizeAlt notes above, no data migration is required.
+
 ## [0.3.0] - 2026-07-15
 
 A `@pro-laico/payload-images` release. The plugin gains a read-side render contract — you

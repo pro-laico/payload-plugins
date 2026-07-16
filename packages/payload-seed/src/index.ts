@@ -1,5 +1,9 @@
-export { seedPlugin } from './plugin'
+export { default, seedPlugin } from './plugin'
 export type { SeedPluginOptions } from './types'
+
+// The typed view of `config.custom.payloadSeed` — resolve the configured paths from a script.
+export { readSeedMarker } from './lib/marker'
+export type { PayloadSeedMarker } from './types'
 
 export { defineSeed } from './defineSeed'
 

@@ -1,4 +1,4 @@
-import type { IconsPluginOptions } from './plugin-options'
+import type { IconsPluginOptions } from './options'
 
 export interface PayloadIconsMarker {
   options: IconsPluginOptions

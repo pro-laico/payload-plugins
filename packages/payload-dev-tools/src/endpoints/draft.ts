@@ -1,17 +1,13 @@
 import type { Endpoint } from 'payload'
 
-import { devToolsEnabled } from '../options'
-
 const TRUTHY = new Set(['1', 'true', 'on'])
 const FALSY = new Set(['0', 'false', 'off'])
 
-export function createDraftEndpoint(enabled?: boolean): Endpoint {
+export function createDraftEndpoint(): Endpoint {
   return {
     path: '/dev/draft',
     method: 'get',
     handler: async (req) => {
-      if (!devToolsEnabled(enabled)) return Response.json({ error: 'Not found' }, { status: 404 })
-
       let draft: { isEnabled: boolean; enable: () => void; disable: () => void }
       try {
         const { draftMode } = await import('next/headers')

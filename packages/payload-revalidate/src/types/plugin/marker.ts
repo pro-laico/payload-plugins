@@ -1,5 +1,5 @@
 import type { DependencyRule } from './dependencyRule'
-import type { RevalidatePluginOptions } from './pluginOptions'
+import type { RevalidatePluginOptions } from './options'
 
 export interface PayloadRevalidateMarker {
   options: RevalidatePluginOptions

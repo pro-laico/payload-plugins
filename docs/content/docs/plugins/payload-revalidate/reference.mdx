@@ -53,14 +53,7 @@ export const revalidateOptions = [
     default: 'dev only',
     required: false,
     description:
-      "Force the dependency-map observation and dev warnings on in production. By default they run in development only. With `observe: true` in production, the map endpoints additionally require an authenticated Payload user.",
-  },
-  {
-    name: 'endpoint',
-    type: 'boolean',
-    default: 'true',
-    required: false,
-    description: 'Registers the dependency-map endpoints at `/api/revalidate-map`. Set `false` to skip them.',
+      "Force the dependency-map observation and dev warnings on in production. By default they run in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
   },
 ]
 
@@ -84,7 +77,7 @@ None. The plugin reads no environment variables — everything is configured thr
 
 ## Endpoints
 
-Two dependency-map routes, dev-gated. With `observe: true` forced on in production they additionally require an authenticated Payload user.
+Two dependency-map routes, governed entirely by [`observe`](#plugin-options) — dev-only by default. They serve nothing but observations, so with `observe: false` (the production posture) they are not registered at all. With `observe: true` forced on in production they additionally require an authenticated Payload user.
 
 | Route | Purpose |
 | --- | --- |
@@ -103,6 +96,7 @@ Two import entry points, plus the finders and primitives you get back from the f
 | --- | --- |
 | `revalidatePlugin` | The plugin. Add it **last** in `plugins: []`. |
 | `tagsFor` | `tagsFor(payload)` builds prefix-correct raw tags for the rare hand-spelled `cacheTag` need. |
+| `readRevalidateMarker` | `readRevalidateMarker(config)` returns the typed `config.custom.payloadRevalidate` — the resolved `prefix`, `observe`, `lists`, `extraTags`, `rules`, and the map `endpointPath` (non-null only while observing). |
 
 **Cache helpers** — `@pro-laico/payload-revalidate/cache`
 
@@ -133,8 +127,9 @@ Two import entry points, plus the finders and primitives you get back from the f
   and `revalidateTag` no-oping outside a request scope all `console.error`/`warn` — a
   production jobs runner silently not revalidating is the one thing this plugin refuses
   to be quiet about.
-- With `observe: true` forced on in production, the map endpoints additionally require an
-  authenticated Payload user.
+- The map endpoints are registered only while `observe` is on, so the production default leaves
+  them off the config entirely. With `observe: true` forced on in production, they additionally
+  require an authenticated Payload user.
 - The cache helpers never resolve Payload or your config themselves — no `globalThis`
   stashes, no `@payload-config` alias tricks, no `transpilePackages` requirement. The
   handle you seed into `createCacheHelpers` is the session that runs and tags every read.

@@ -1,6 +1,6 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { globalEnabled, resolveCollectionSettings, resolveOptions } from '../../src/lib/options'
+import { globalEnabled, resolveCollectionSettings, resolveOptions } from '../src/options'
 
 const posts = (
   custom?: CollectionConfig['custom'],
@@ -13,12 +13,12 @@ const posts = (
 
 describe('resolveOptions', () => {
   it('applies defaults', () => {
-    expect(resolveOptions()).toMatchObject({ enabled: true, prefix: '', collections: {}, globals: {}, rules: [], endpoint: true })
+    expect(resolveOptions()).toMatchObject({ enabled: true, prefix: '', collections: {}, globals: {}, rules: [] })
   })
 
   it('keeps explicit values', () => {
-    const resolved = resolveOptions({ enabled: false, prefix: 'shop', observe: true, endpoint: false })
-    expect(resolved).toMatchObject({ enabled: false, prefix: 'shop', observe: true, endpoint: false })
+    const resolved = resolveOptions({ enabled: false, prefix: 'shop', observe: true })
+    expect(resolved).toMatchObject({ enabled: false, prefix: 'shop', observe: true })
   })
 })
 

@@ -8,7 +8,7 @@ import { readBytes } from '../lib/transform/source'
 // The plugin owns the collection schema but can't name its app-generated type; an id check confirms a real row.
 const isBackfillDoc = (v: unknown): v is UploadDocLike & Record<string, unknown> & { id: string | number } =>
   isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
-import { readPluginMarker } from '../lib/pluginMarker'
+import { readImagesMarker } from '../lib/marker'
 import { getServerSideURL } from '../lib/getServerSideURL'
 import { resolveStaticDir } from '../lib/transform/staticDir'
 import { analyzeImageMetadata } from '../lib/metadata/analyze'
@@ -18,9 +18,9 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   const argv = process.argv.slice(2)
   const force = argv.includes('--force')
   const focal = argv.includes('--focal')
-  const marker = readPluginMarker(config)
+  const marker = readImagesMarker(config)
   const collectionIdx = argv.indexOf('--collection')
-  const slug = asSlug((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker.sourceSlug ?? 'images')
+  const slug = asSlug((collectionIdx !== -1 ? argv[collectionIdx + 1] : undefined) ?? marker?.sourceSlug ?? 'images')
 
   const payload = await getPayload({ config })
   try {

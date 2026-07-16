@@ -9,9 +9,9 @@ const resolve = (opts: ImagesPluginOptions, c: TransformConstraints = constraint
 
 describe('resolvePrewarmOptions formats', () => {
   it('defaults to webp, adding avif when the transform prefers it', () => {
-    const base = resolve({ prewarm: true })
+    const base = resolve({ prewarm: {} })
     expect(base && base.formats).toEqual(['webp'])
-    const avif = resolve({ prewarm: true }, { ...constraints, preferAvif: true })
+    const avif = resolve({ prewarm: {} }, { ...constraints, preferAvif: true })
     expect(avif && avif.formats).toEqual(['webp', 'avif'])
   })
 

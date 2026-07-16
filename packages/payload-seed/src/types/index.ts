@@ -1,7 +1,7 @@
 export type * from './model'
 export type * from './graph'
 export type * from './tokens'
-export type * from './options'
+export type * from './plugin'
 export type * from './results'
 export type * from './registry'
 export type * from './components'

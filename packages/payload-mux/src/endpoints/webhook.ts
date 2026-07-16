@@ -3,7 +3,7 @@ import type { PayloadHandler } from 'payload'
 
 import { getAssetMetadata } from '../lib/getAssetMetadata'
 import { isRecord } from '../lib/isRecord'
-import type { MuxVideoPluginOptions } from '../types'
+import type { ResolvedMuxVideoOptions } from '../types'
 
 const fail = () => new Response('Error', { status: 500 })
 const ok = () => new Response('Success!', { status: 200 })
@@ -11,7 +11,7 @@ const ok = () => new Response('Success!', { status: 200 })
 let verifiedLogged = false
 
 export const muxWebhookHandler =
-  (mux: Mux, pluginOptions: MuxVideoPluginOptions): PayloadHandler =>
+  (mux: Mux, options: ResolvedMuxVideoOptions): PayloadHandler =>
   async (req) => {
     if (!req.json) return Response.json({ error: 'Bad request.' }, { status: 400 })
 
@@ -32,7 +32,7 @@ export const muxWebhookHandler =
       req.payload.logger.info('[payload-mux] webhook verified — receiving Mux events')
     }
 
-    const collection = pluginOptions.extendCollection ?? 'mux-video'
+    const collection = options.extendCollection ?? 'mux-video'
     const assetId = event.object.id
 
     const videos = await req.payload.find({ collection, where: { assetId: { equals: assetId } }, limit: 1, pagination: false })
@@ -40,7 +40,7 @@ export const muxWebhookHandler =
 
     if (!video) {
       if (
-        pluginOptions.autoCreateOnWebhook &&
+        options.autoCreateOnWebhook &&
         (event.type === 'video.asset.created' || event.type === 'video.asset.ready' || event.type === 'video.asset.updated')
       ) {
         try {

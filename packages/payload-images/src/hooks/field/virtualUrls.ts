@@ -4,7 +4,7 @@ import { buildSrcset } from '../../lib/urls/srcset'
 import { deriveVersion } from '../../lib/urls/version'
 import { getImageUrl } from '../../lib/urls/getImageUrl'
 import { readImageIntent } from '../../lib/renderIntent'
-import { readPluginMarker } from '../../lib/pluginMarker'
+import { readImagesMarker } from '../../lib/marker'
 import { buildVariantUrl } from '../../lib/urls/variantUrl'
 import { isRecord } from '../../lib/isRecord'
 import type { ImageDocLike, ParsedRenderIntent } from '../../types'
@@ -29,7 +29,7 @@ const urlHook =
   ({ data, req }) => {
     if (!isSavedImageDoc(data) || !data.filename) return null
     const cfg = req?.payload?.config
-    const ctx = { baseUrl: cfg?.serverURL || '', pixelStep: readPluginMarker(cfg).pixelStep, intent: readImageIntent(req) }
+    const ctx = { baseUrl: cfg?.serverURL || '', pixelStep: readImagesMarker(cfg)?.pixelStep, intent: readImageIntent(req) }
     return compute(data, ctx)
   }
 

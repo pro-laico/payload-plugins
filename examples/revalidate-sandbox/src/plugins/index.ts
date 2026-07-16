@@ -16,7 +16,7 @@ import siteSettingsSeed from '../globals/SiteSettings/seed'
 export const seedOptions = { definitions: [mediaSeed, imagesSeed, iconsSeed, iconSetsSeed, servicesSeed, postsSeed, siteSettingsSeed] }
 
 export const plugins: Plugin[] = [
-  seedPlugin({ ...seedOptions, adminButton: true }),
+  seedPlugin(seedOptions),
   devToolsPlugin(),
   iconsPlugin(),
   imagesPlugin(),

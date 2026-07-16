@@ -41,11 +41,12 @@ describe('revalidatePlugin', () => {
     expect(config.globals?.[0]?.hooks?.afterChange).toBeUndefined()
   })
 
-  it('registers the map endpoints (both methods) and preserves existing endpoints', () => {
+  // The map endpoints only ever serve observations, so `observe` alone governs registration.
+  it('registers the map endpoints (both methods) when observing, and none when not', () => {
     const existing: Endpoint = { path: '/mine', method: 'get', handler: async () => new Response(null) }
-    const endpoints = apply({ endpoints: [existing] }).endpoints ?? []
+    const endpoints = apply({ endpoints: [existing] }, { observe: true }).endpoints ?? []
     expect(endpoints.map((e) => `${e.method} ${e.path}`)).toEqual(['get /mine', 'get /revalidate-map', 'post /revalidate-map'])
-    expect(apply({}, { endpoint: false }).endpoints ?? []).toHaveLength(0)
+    expect(apply({}, { observe: false }).endpoints ?? []).toHaveLength(0)
   })
 
   it('registers the revalidate-map bin command and preserves existing bin entries', () => {
@@ -55,9 +56,9 @@ describe('revalidatePlugin', () => {
   })
 
   it('writes the custom.payloadRevalidate marker and preserves existing custom entries', () => {
-    const config = apply({ custom: { other: 1 } })
+    const config = apply({ custom: { other: 1 } }, { observe: true })
     expect(config.custom).toMatchObject({ other: 1, payloadRevalidate: { endpointPath: '/api/revalidate-map' } })
-    expect(apply({}, { endpoint: false }).custom).toMatchObject({ payloadRevalidate: { endpointPath: null } })
+    expect(apply({}, { observe: false }).custom).toMatchObject({ payloadRevalidate: { endpointPath: null } })
   })
 
   it('is a no-op when disabled', () => {

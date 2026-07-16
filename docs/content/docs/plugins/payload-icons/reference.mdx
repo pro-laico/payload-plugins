@@ -7,17 +7,17 @@ description: "Plugin options, environment variables, the CLI scan command, and e
 
 `iconsPlugin(options?)` is the single entry point. One call registers the `icon` collection (upload
 pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
-collection. It's zero-config: the usage panel and request tracking are on by default; set them
-`false` to omit.
+collection. It's zero-config: everything is on by default.
+
+Every collection the plugin registers is one key under `collections`, on a single axis — `false`
+means "don't register it", an object means "override it". Admin-only UI toggles live under `admin`.
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
-  { name: 'iconOverrides', type: 'IconCollectionOverrides', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG.` },
-  { name: 'includeIconSet', type: 'boolean', default: 'true', description: `When false, the iconSet collection is not registered (only icon). Use when you want icons in the CMS but not the grouping/active-set concept.` },
-  { name: 'iconSetOverrides', type: 'IconSetCollectionOverrides', description: `Overrides for the iconSet collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like iconOverrides, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
-  { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
-  { name: 'trackRequests', type: 'boolean', default: 'true', description: `Registers the iconRequest diagnostics collection and makes <Icon> record every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. Set false to omit; or force-off only the recorder at runtime with ICON_USAGE_TRACKING=false.` },
-  { name: 'iconRequestOverrides', type: 'IconRequestCollectionOverrides', description: `Overrides for the iconRequest collection: additive fields/hooks (it has no built-in hooks). Only meaningful when trackRequests isn't false.` },
+  { name: 'collections.icon', type: 'IconCollectionOverrides', default: '{}', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG. The icon collection is always registered — there is no false.` },
+  { name: 'collections.iconSet', type: 'false | IconSetCollectionOverrides', default: '{}', description: `false skips the iconSet collection entirely (only icon is registered) — use it when you want icons in the CMS but not the grouping/active-set concept. An object overrides the collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like collections.icon, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
+  { name: 'collections.iconRequest', type: 'false | IconRequestCollectionOverrides', default: '{}', description: `false skips the iconRequest diagnostics collection and its clear endpoint — nothing tracks missing icons. Otherwise <Icon> records every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. An object overrides the collection: additive fields/hooks (it has no built-in hooks). To force-off only the recorder at runtime, leave the collection registered and set ICON_USAGE_TRACKING=false.` },
+  { name: 'admin.usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
 ]
 
 Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
@@ -39,20 +39,25 @@ import { iconsPlugin } from '@pro-laico/payload-icons'
 // Defaulted options written out. This is what `iconsPlugin()` does with no args.
 iconsPlugin({
   enabled: true,
-  includeIconSet: true,
-  usagePanel: true,     // the "Requested icons" panel; set false to omit
-  trackRequests: true,  // runtime miss tracking; set false to omit
-  // overrides for the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
-  iconOverrides: {
-    // slug: 'icon',
-    // access: { read: () => true },
-    // fields: [ /* … */ ],
-    // hooks: { /* … */ },
+  // one key per registered collection: `false` to skip it, an object to override it
+  collections: {
+    // the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
+    icon: {
+      // slug: 'icon',
+      // access: { read: () => true },
+      // fields: [ /* … */ ],
+      // hooks: { /* … */ },
+    },
+    // the iconSet collection; `false` omits it:
+    iconSet: {
+      // fields: [{ name: 'description', type: 'textarea' }],
+      // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+    },
+    // the iconRequest diagnostics collection; `false` omits it (no runtime miss tracking):
+    iconRequest: {},
   },
-  // overrides for the iconSet collection:
-  iconSetOverrides: {
-    // fields: [{ name: 'description', type: 'textarea' }],
-    // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+  admin: {
+    usagePanel: true, // the "Requested icons" panel; set false to omit
   },
 })
 ```
@@ -67,7 +72,7 @@ Two env vars tune usage detection at runtime, independent of the plugin options.
 
 <TypeTable
   type={{
-    ICON_USAGE_TRACKING: { description: "Set to false to force-off only the runtime miss recorder, without changing the trackRequests option. The iconRequest collection stays registered.", type: "boolean" },
+    ICON_USAGE_TRACKING: { description: "Set to false to force-off only the runtime miss recorder, without changing the collections.iconRequest option. The iconRequest collection stays registered.", type: "boolean" },
     ICON_USAGE_MANIFEST: { description: "Overrides the production manifest path the Requested icons panel reads. Default: icon-usage-manifest.json in cwd.", type: "string" },
   }}
 />

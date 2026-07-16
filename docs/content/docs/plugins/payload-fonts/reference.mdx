@@ -9,6 +9,11 @@ description: "Plugin options, environment variables, the download CLI, the expor
 `fontSet` global, and the export endpoint. It's zero-config. The collections and global are covered on
 the [Collections](/docs/plugins/payload-fonts/collections) page.
 
+Everything the plugin registers is one key under `collections` (Payload collections) or `globals`
+(`fontSet` is a Payload global, so it lives there, not under `collections`) — mirroring Payload's own
+config shape. Each key has a single axis: `false` means "don't register it", an object means
+"override it".
+
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op and registers nothing.` },
   { name: 'charset', type: "'latin' | 'latin-ext' | string", default: "'latin'", description: `Characters the subsetter keeps in the served WOFF2 files: a preset (latin is ASCII + Latin-1 + common punctuation, latin-ext widens it), or an explicit string of characters to retain.` },
@@ -17,11 +22,10 @@ export const options = [
     { name: 'label', type: 'string', default: 'capitalised key', description: `Admin label for the family option and fontSet slot.` },
     { name: 'fallback', type: 'string', default: 'generic sans stack', description: `CSS fallback appended after the served family in the family variable.` },
   ] },
-  { name: 'includeFontSet', type: 'boolean', default: 'true', description: `Register the fontSet global, the active per-family selection the export endpoint and your frontend read. On by default; set false only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
-  { name: 'fontOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection, e.g. tighter access.` },
-  { name: 'fontOriginalOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection, e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter.` },
-  { name: 'fontOptimizedOverrides', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s), e.g. an upload.staticDir.` },
-  { name: 'fontSetOverrides', type: 'Partial<GlobalConfig>', description: `Merged onto the fontSet global.` },
+  { name: 'collections.font', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection, e.g. tighter access. The font collection is always registered — there is no false.` },
+  { name: 'collections.fontOriginal', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection, e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter. Always registered — there is no false.` },
+  { name: 'collections.fontOptimized', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s), e.g. an upload.staticDir. Always registered — there is no false.` },
+  { name: 'globals.fontSet', type: 'false | Partial<GlobalConfig>', default: '{}', description: `The fontSet global: the active per-family selection the export endpoint and your frontend read. Registered by default; an object is merged onto it. false skips the global entirely — set it only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
 ]
 
 Pass options to customize. **Reference** is the interactive view; **TypeScript** is the same shape
@@ -44,14 +48,17 @@ import { fontsPlugin } from '@pro-laico/payload-fonts'
 fontsPlugin({
   enabled: true,
   charset: 'latin',
-  includeFontSet: true,
+  globals: {
+    fontSet: {}, // {} registers the global as-is; an object overrides it, false skips it
+  },
   // families: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
   //   ^ the default, written out. Pass your own COMPLETE list to replace it
   //     (spread DEFAULT_FONT_FAMILIES to keep these and add more).
-  // fontOverrides: { /* … */ },          // optional, no default; merged onto the font collection
-  // fontOriginalOverrides: { /* … */ },  // optional, no default; merged onto fontOriginal
-  // fontOptimizedOverrides: { /* … */ }, // optional, no default; merged onto fontOptimized
-  // fontSetOverrides: { /* … */ },       // optional, no default; merged onto the fontSet global
+  // collections: {                        // optional, no defaults; each merged onto its collection
+  //   font: { /* … */ },                  // the visible font typeface collection
+  //   fontOriginal: { /* … */ },          // the hidden originals upload collection
+  //   fontOptimized: { /* … */ },         // the hidden served-WOFF2 upload collection
+  // },
 })
 ```
 
@@ -60,8 +67,8 @@ fontsPlugin({
 </Tabs>
 
 Overrides merge non-destructively: `fields` append, `access` / `admin` / `upload` shallow-merge,
-and `hooks` merge per phase, so `fontOriginalOverrides: { upload: { staticDir } }` keeps the built-in
-font-mime whitelist.
+and `hooks` merge per phase, so `collections: { fontOriginal: { upload: { staticDir } } }` keeps the
+built-in font-mime whitelist.
 
 ## Environment variables
 

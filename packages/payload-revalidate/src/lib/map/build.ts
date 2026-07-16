@@ -3,7 +3,7 @@ import type { CollectionConfig, GlobalConfig } from 'payload'
 import { topLevelFieldNames } from '../fields'
 import { buildReferenceGraph } from '../graph/referenceGraph'
 import { isRevalidateMarker } from '../marker'
-import { resolveCollectionSettings, resolveOptions } from '../options'
+import { resolveCollectionSettings, resolveOptions } from '../../options'
 import type { RevalidateInspection, RevalidatePluginOptions } from '../../types'
 
 export interface MapConfigSource {

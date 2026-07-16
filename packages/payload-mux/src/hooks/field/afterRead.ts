@@ -1,11 +1,11 @@
 import type Mux from '@mux/mux-node'
 import type { FieldHook } from 'payload'
 
-import type { MuxVideoPluginOptions } from '../../types'
+import type { ResolvedMuxVideoOptions } from '../../types'
 
 const signIfNeeded = async (
   mux: Mux,
-  options: MuxVideoPluginOptions,
+  options: ResolvedMuxVideoOptions,
   url: URL,
   playbackId: string,
   policy: unknown,
@@ -19,7 +19,7 @@ const signIfNeeded = async (
 }
 
 export const signableUrlAfterRead =
-  (mux: Mux, options: MuxVideoPluginOptions, type: 'video' | 'thumbnail' | 'gif', buildUrl: (playbackId: string) => URL): FieldHook =>
+  (mux: Mux, options: ResolvedMuxVideoOptions, type: 'video' | 'thumbnail' | 'gif', buildUrl: (playbackId: string) => URL): FieldHook =>
   async ({ data, siblingData }) => {
     const playbackId = siblingData?.playbackId
     if (!playbackId) return null

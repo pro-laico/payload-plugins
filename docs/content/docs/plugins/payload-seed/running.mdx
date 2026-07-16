@@ -53,13 +53,13 @@ export const runEdges = [
 
 ## Admin button
 
-The friendliest path: a **"Seed your database"** button in the admin header. Turn it on with
-`adminButton: true`, set `ENABLE_SEED=true`, then click it. It POSTs to `/api/seed` as the logged-in
-user and reports success (or the error) inline.
+The friendliest path: a **"Seed your database"** button in the admin header. The plugin registers it
+for you — set `ENABLE_SEED=true`, then click it. It POSTs to `/api/seed` as the logged-in user and
+reports success (or the error) inline.
 
 ```ts
 // payload.config.ts
-seedPlugin({ definitions: [media, services, posts], adminButton: true })
+seedPlugin({ definitions: [media, services, posts] })
 ```
 
 When `ENABLE_SEED` isn't set, the button doesn't render at all — environments where the endpoint would

@@ -28,6 +28,50 @@ box. When you need more control, the raw building blocks — collections, hooks,
 admin components — are exported too, so you can wire them by hand instead of through the
 factory. Reach for the factory first; reach for the exports only when you outgrow it.
 
+Defaults lean toward the feature being **on**. A plugin you installed should do its job
+without a checklist of opt-ins, so anything integral to the plugin isn't a toggle at all —
+`payload-images` always registers its transform endpoint, and `payload-seed` always
+registers its button (the `ENABLE_SEED` env var is the real switch there).
+
+## The options shape
+
+Every plugin's options follow the same skeleton, so once you've configured one you can
+guess the next:
+
+```ts
+pluginName({
+  enabled: true,        // always defaults true; false makes the plugin a no-op
+  collections: { … },   // one key per collection the plugin registers
+  globals: { … },       // …and per global, where the plugin has any
+  admin: { … },         // admin-only UI toggles
+  // …then the plugin's own domain options, flat
+})
+```
+
+Two rules make the rest predictable:
+
+- **One key per registered collection.** Each key under `collections` (or `globals`) takes
+  a single axis: `false` means *don't register it*, an object means *override it*. So
+  `collections: { iconSet: false }` drops the collection, and `collections: { iconSet: {…} }`
+  customizes it — never a separate `includeX` boolean paired with an `xOverrides` object.
+- **Optional sub-features read `false | Options`.** There's no `true` form; passing `{}`
+  means "on, all defaults". `prewarm: {}` and `prewarm: false` — not `prewarm: true`.
+
+Slugs are never overridable on a collection the plugin wires internally; use the plugin's
+`extendCollection` option to point it at a collection you own instead.
+
+## Reading a plugin's config back
+
+Each plugin stashes a typed marker on `config.custom.payload<Name>` describing what it
+resolved — slugs, endpoint paths, settings. Read it with the plugin's `read<Name>Marker(config)`
+helper rather than hand-casting `custom`:
+
+```ts
+import { readImagesMarker } from '@pro-laico/payload-images'
+
+const { sourceSlug, basePath } = readImagesMarker(payload.config) ?? {}
+```
+
 ## Composition without coupling
 
 No plugin imports another. They discover each other at build time through `config.custom.*`

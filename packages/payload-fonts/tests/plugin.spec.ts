@@ -29,7 +29,7 @@ describe('fontsPlugin (unit)', () => {
 
   it('registers the fontSet global by default, and skips it only when opted out', () => {
     expect((apply(fontsPlugin()).globals ?? []).some((g) => g.slug === 'fontSet')).toBe(true)
-    expect((apply(fontsPlugin({ includeFontSet: false })).globals ?? []).some((g) => g.slug === 'fontSet')).toBe(false)
+    expect((apply(fontsPlugin({ globals: { fontSet: false } })).globals ?? []).some((g) => g.slug === 'fontSet')).toBe(false)
   })
 
   it('registers the fonts export endpoint', () => {
@@ -37,8 +37,8 @@ describe('fontsPlugin (unit)', () => {
     expect(endpoints.some((e) => typeof e.path === 'string' && e.path.includes('/fonts/export'))).toBe(true)
   })
 
-  it('merges fontOriginalOverrides onto the upload collection (keeps the mime whitelist)', () => {
-    const collections = apply(fontsPlugin({ fontOriginalOverrides: { upload: { staticDir: '/tmp/x' } } })).collections ?? []
+  it('merges collections.fontOriginal onto the upload collection (keeps the mime whitelist)', () => {
+    const collections = apply(fontsPlugin({ collections: { fontOriginal: { upload: { staticDir: '/tmp/x' } } } })).collections ?? []
     const original = collections.find((c) => c.slug === 'fontOriginal')
     const upload = original?.upload as { staticDir?: string; mimeTypes?: string[] }
     expect(upload.staticDir).toBe('/tmp/x')

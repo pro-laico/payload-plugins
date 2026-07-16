@@ -574,7 +574,7 @@ export interface IconSet {
   _status?: ('draft' | 'published') | null;
 }
 /**
- * Icon names requested at runtime that did not resolve to an icon in the active set. Populated when iconsPlugin({ trackRequests: true }) is set; compare against the IconSet usage panel.
+ * Icon names requested at runtime that did not resolve to an icon in the active set. Populated unless iconsPlugin({ collections: { iconRequest: false } }) opts out; compare against the IconSet usage panel.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "iconRequest".

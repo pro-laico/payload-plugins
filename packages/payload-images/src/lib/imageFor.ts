@@ -2,7 +2,7 @@ import type { Payload } from 'payload'
 
 import { asSlug } from './asSlug'
 import { isRecord } from './isRecord'
-import { readPluginMarker } from './pluginMarker'
+import { readImagesMarker } from './marker'
 import { RESPONSIVE_IMAGE_SELECT } from './renderIntent'
 import type {
   BlurRenderIntent,
@@ -38,7 +38,7 @@ export const createImageFor = (payload: Payload | Promise<Payload>): ImageFor =>
       const id = sourceId(state.source)
       if (id == null) return null
       const p = await payload
-      const collection = asSlug(readPluginMarker(p.config).sourceSlug ?? 'images')
+      const collection = asSlug(readImagesMarker(p.config)?.sourceSlug ?? 'images')
       // Keep the documented img-or-null contract when the plugin isn't registered (enabled: false,
       // preview/CI env) — findByID would otherwise reject with a generic unknown-collection APIError.
       if (p.collections && !(collection in p.collections)) {

@@ -9,17 +9,22 @@ can turn later.
 
 ## Plugin options
 
+Every collection the plugin registers is one key under `collections`, on a single axis — an object
+means "override it". Admin-only UI toggles live under `admin`. Optional sub-features read
+`false | Options`: `prewarm: {}` is "on, all defaults", `prewarm: false` opts out.
+
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, registers nothing. This is "not installed", not "paused": on SQL adapters, turning it off for an existing project produces a migration that drops the image tables and their data.` },
   { name: 'extendCollection', type: 'string', description: `Slug of an existing upload collection to add the pipeline to (focal UI, variants join, purge hooks, upload.focalPoint), instead of creating the images collection. The target must be an upload collection (you own its upload config).` },
-  { name: 'imagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key, not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
-  { name: 'generatedImagesOverrides', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection.` },
-  { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
+  { name: 'collections.images', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough (any collection-level key, not a fixed plugin set), deep-merged onto the Images collection: upload/access/admin merged, fields/hooks appended. slug is not overridable — every internal reference is bound to the resolved slug. Don't redeclare a base field name like alt or variants. With extendCollection, merged onto the target instead.` },
+  { name: 'collections.generatedImages', type: 'Partial<CollectionConfig>', description: `A Payload CollectionConfig passthrough, merged onto the hidden generated-images (variant cache) collection. slug is not overridable.` },
+  { name: 'admin.focalUI', type: 'false | { previewRatios?: string[] }', default: '{}', description: `Render the focal-point picker + ratio-preview field and the preset manager panel (preset toggles, cached-variant list, purge button, per-image variant cap). The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']). false leaves a clean upload collection, and the import map isn't needed.` },
+  { name: 'admin.folders', type: 'boolean', default: 'true', description: `Payload's native folder organization on the managed collection (the created images, or the extendCollection target), so editors can organize a large library. On by default — a managed image library without organization is the wrong default. It adds a nullable folder relationship and Payload's hidden payload-folders collection: additive, so an existing database needs a schema push but no data migration. Set false to opt out.` },
   {
     name: 'transform',
-    type: 'TransformEndpointConfig | false',
+    type: 'TransformEndpointConfig',
     default: '{}',
-    description: `Config for the on-demand transform + purge endpoints. Pass false to register neither.`,
+    description: `Config for the on-demand transform + purge endpoints. The endpoint is always registered — it is the plugin.`,
     options: [
       { name: 'cdnCacheControl', type: 'boolean', default: 'true', description: `Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).` },
       { name: 'maxDimension', type: 'number', default: '4096', description: `Hard ceiling on either output dimension.` },
@@ -34,15 +39,13 @@ export const options = [
       { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
     ],
   },
-  { name: 'focalUI', type: 'boolean | { previewRatios?: string[] }', default: 'true', description: `Render the focal-point picker + ratio-preview field and the preset manager panel (preset toggles, cached-variant list, purge button, per-image variant cap). The object form customizes the aspect ratios shown as preview tiles (default ['16:9','9:16','1:1','4:3','3:2','21:9']).` },
-  { name: 'virtualFields', type: 'boolean', default: 'true (false when transform: false)', description: `Add computed src/srcset/placeholderURL/thumbnailURL fields to every read, so optimized URLs ride along in REST/GraphQL/Local-API responses and relationship population. Defaults off when the transform endpoint is disabled (the URLs would 404); pass true explicitly to force them anyway.` },
-  { name: 'localizeAlt', type: 'boolean', default: 'false', description: `Mark the alt field localized (requires Payload localization). Ignored with extendCollection.` },
-  { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
-  { name: 'folders', type: 'boolean', default: 'false', description: `Enable Payload's native folder organization on the managed collection (the created images, or the extendCollection target) so editors can organize a large library.` },
-  { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
-  { name: 'prewarm', type: 'boolean | PrewarmOptions', default: 'true', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue, and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Caching & prewarming → Running prewarm.` },
-  { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
+  { name: 'prewarm', type: 'false | PrewarmOptions', default: '{}', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue, and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Caching & prewarming → Running prewarm.` },
+  { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
   { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
+  { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
+  { name: 'localizeAlt', type: 'boolean', default: 'whether the app configures localization', description: `Mark the alt field localized (requires Payload localization). Defaults to Boolean(config.localization) — a localized site localizes its alt text, an accessibility fact rather than a preference. Flipping it on an existing collection is a data migration, so set it explicitly to opt out. Ignored with extendCollection.` },
+  { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
+  { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
 ]
 
 The **Reference** tab is the interactive view (`transform` expands to its nested options);
@@ -64,10 +67,15 @@ import { imagesPlugin } from '@pro-laico/payload-images'
 // Every option at its default. This is the zero-config behaviour, written out.
 imagesPlugin({
   enabled: true,
-  // extendCollection: 'media',           // optional, no default: add the pipeline to an existing collection instead of creating `images`
-  // imagesOverrides: { /* … */ },          // optional, no default: deep-merged onto the images collection
-  // generatedImagesOverrides: { /* … */ }, // optional, no default: merged onto the variant-cache collection
-  pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // or a number, e.g. 50, for a dense grid
+  // extendCollection: 'media',  // optional, no default: add the pipeline to an existing collection instead of creating `images`
+  collections: {
+    // images: { /* … */ },          // optional, no default: deep-merged onto the images collection
+    // generatedImages: { /* … */ }, // optional, no default: merged onto the variant-cache collection
+  },
+  admin: {
+    focalUI: {}, // or { previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'] }
+    folders: true,
+  },
   transform: {
     cdnCacheControl: true,
     maxDimension: 4096,
@@ -81,19 +89,17 @@ imagesPlugin({
     sharpConcurrency: 1,
     fallback: true,
   },
-  focalUI: true, // or { previewRatios: ['16:9', '9:16', '1:1', '4:3', '3:2', '21:9'] }
-  virtualFields: true,
-  localizeAlt: false,
-  mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],
-  folders: false,
-  // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
-  prewarm: true,
-  variantLimit: 200,
+  prewarm: {}, // or false to opt out; the object takes seeds / formats / maxVariantsPerImage / autoRun / queue
+  pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // or a number, e.g. 50, for a dense grid
   presetTemplates: {
     // both ship by default; your own entries merge on top
     og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
     thumbnail: { width: 160, height: 160, fit: 'cover', quality: 70, format: 'webp' },
   },
+  variantLimit: 200,
+  // localizeAlt: false,     // default: whether your config sets `localization`
+  mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],
+  // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
 })
 ```
 
@@ -148,8 +154,8 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 | `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
 | `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
 | `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image (an id or a populated doc — a doc also supplies the width cap and cache-busting token). |
-| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `focalUI` is on). |
-| `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `focalUI` is on). |
+| `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `admin.focalUI` is on). |
+| `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `admin.focalUI` is on). |
 | `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
 | `PresetSpec` / `PresetEntry` | `@pro-laico/payload-images` | The presets types: a `presetTemplates` spec and a per-image `presets` array entry. |
 | `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm jobs task slug (`imagesPrewarm`) — for queueing/running the job yourself. |
@@ -158,8 +164,9 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 
 The plugin registers `images` (the upload collection you touch), the hidden `generated-images`
 variant cache, and — with `prewarm` on — the hidden `image-render-profiles` registry, all under an
-**Assets** admin group. See [Collections](/docs/plugins/payload-images/collections) for their
-fields, hooks, and access.
+**Assets** admin group. `admin.folders` brings Payload's own hidden `payload-folders` collection
+with it. See [Collections](/docs/plugins/payload-images/collections) for their fields, hooks, and
+access.
 
 ## Next
 

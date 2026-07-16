@@ -1,3 +1,4 @@
+import type { ImagesPluginOptions } from './options'
 import type { OutputFormat } from '../transform/format'
 import type { RenderProfileSeed } from '../prewarm/options'
 import type { TransformConstraints } from '../transform/transformConstraints'
@@ -13,9 +14,11 @@ export interface PayloadImagesPrewarmMarker {
 }
 
 export interface PayloadImagesMarker {
-  sourceSlug?: string
-  variantSlug?: string
-  basePath?: string
-  pixelStep?: number | number[]
+  options: ImagesPluginOptions
+  sourceSlug: string
+  variantSlug: string
+  basePath: string
+  pixelStep: number | number[]
+  maxInputPixels: number
   prewarm?: PayloadImagesPrewarmMarker
 }

@@ -104,8 +104,8 @@ await payload.updateGlobal({ slug: 'fontSet', data: { sans: interId, mono: jetbr
 Seeds set it the same way with `ref()` tokens (see [Seeding](/docs/plugins/payload-fonts/how-it-works#seeding)).
 
 <Callout type="info">
-  Driving the selection some other way? Pass `includeFontSet: false` to skip the global and resolve
-  the active typefaces yourself. Without it, the export endpoint has nothing to resolve.
+  Driving the selection some other way? Pass `globals: { fontSet: false }` to skip the global and
+  resolve the active typefaces yourself. Without it, the export endpoint has nothing to resolve.
 </Callout>
 
 ## Custom families

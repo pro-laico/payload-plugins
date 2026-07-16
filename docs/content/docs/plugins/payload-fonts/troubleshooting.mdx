@@ -52,7 +52,7 @@ Make sure Payload is running and reachable during `prebuild`, and watch the buil
 
 **A production font change didn't show.**
 The build bakes the `fontSet` selection via `next/font`; there's no runtime cache to revalidate.
-Publish a swap by re-running the download and rebuilding (`payload-fonts-download` → `next build`), or wire a deploy hook via `fontSetOverrides`. See [Revalidation & caching](/docs/plugins/payload-fonts/how-it-works#revalidation--caching).
+Publish a swap by re-running the download and rebuilding (`payload-fonts-download` → `next build`), or wire a deploy hook via `globals.fontSet`. See [Revalidation & caching](/docs/plugins/payload-fonts/how-it-works#revalidation--caching).
 
 **Some characters render in the fallback font.**
 Subsetting is lossy to your `charset` — characters outside it aren't in the served WOFF2.

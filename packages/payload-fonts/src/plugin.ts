@@ -1,67 +1,53 @@
 import type { Config, Plugin } from 'payload'
 
-import type { FontsPluginOptions } from './types'
+import { resolveOptions } from './options'
 import { probeSubsetter } from './lib/optimizeFont'
 import { resolveFontFamilies } from './lib/families'
 import { createFontCollection } from './collections/font'
 import { exportFontsEndpoint } from './endpoints/exportFonts'
 import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
 import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
+import type { FontsPluginOptions, PayloadFontsMarker } from './types'
 import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
 import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collections/fontOptimized'
 
 export const fontsPlugin =
   (opts: FontsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const {
-      enabled = true,
-      charset,
-      families,
-      fontOverrides,
-      fontOriginalOverrides,
-      fontOptimizedOverrides,
-      includeFontSet = true,
-      fontSetOverrides,
-    } = opts
+    const { enabled, font, fontOriginal, fontOptimized, fontSet, charset, families } = resolveOptions(opts)
     if (!enabled) return config
 
     const familyKeys = resolveFontFamilies(families).map((r) => r.key)
 
     const collections = [
       ...(config.collections ?? []),
-      mergeCollection(
-        createFontCollection({ charset, families, originalSlug: FONT_ORIGINAL_SLUG, optimizedSlug: FONT_OPTIMIZED_SLUG }),
-        fontOverrides,
-      ),
-      mergeCollection(createFontOriginalCollection(), fontOriginalOverrides),
-      mergeCollection(createFontOptimizedCollection({ fontSlug: 'font', originalSlug: FONT_ORIGINAL_SLUG }), fontOptimizedOverrides),
+      mergeCollection(createFontCollection({ charset, families, originalSlug: FONT_ORIGINAL_SLUG, optimizedSlug: FONT_OPTIMIZED_SLUG }), font),
+      mergeCollection(createFontOriginalCollection(), fontOriginal),
+      mergeCollection(createFontOptimizedCollection({ fontSlug: 'font', originalSlug: FONT_ORIGINAL_SLUG }), fontOptimized),
     ]
 
-    const globals = includeFontSet
-      ? [...(config.globals ?? []), mergeGlobal(createFontSetGlobal({ families }), fontSetOverrides)]
-      : config.globals
+    const globals = fontSet !== false ? [...(config.globals ?? []), mergeGlobal(createFontSetGlobal({ families }), fontSet)] : config.globals
     const endpoints = [
       ...(config.endpoints ?? []),
       exportFontsEndpoint({ fontSetGlobalSlug: FONT_SET_SLUG, fontOptimizedSlug: FONT_OPTIMIZED_SLUG, families: familyKeys }),
     ]
+
+    const marker: PayloadFontsMarker = {
+      options: opts,
+      fontSlug: font?.slug ?? 'font',
+      fontOriginalSlug: FONT_ORIGINAL_SLUG,
+      fontOptimizedSlug: FONT_OPTIMIZED_SLUG,
+      fontSetSlug: fontSet !== false ? FONT_SET_SLUG : null,
+      familyKeys,
+      exportPath: '/fonts/export',
+    }
 
     return {
       ...config,
       collections,
       globals,
       endpoints,
-      custom: {
-        ...config.custom,
-        payloadFonts: {
-          options: opts,
-          fontSlug: fontOverrides?.slug ?? 'font',
-          fontOriginalSlug: FONT_ORIGINAL_SLUG,
-          fontOptimizedSlug: FONT_OPTIMIZED_SLUG,
-          fontSetSlug: includeFontSet ? FONT_SET_SLUG : null,
-          familyKeys,
-          exportPath: '/fonts/export',
-        },
-      },
+      custom: { ...config.custom, payloadFonts: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)
         if (process.env.NODE_ENV !== 'production') {

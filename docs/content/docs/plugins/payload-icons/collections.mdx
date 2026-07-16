@@ -7,7 +7,7 @@ description: "The three collections payload-icons registers — the SVG upload p
 
 - **`icon`** — the SVG upload collection, in an **Assets** admin group.
 - **`iconSet`** — the `name → icon` grouping collection, in a **Sets** admin group.
-- **`iconRequest`** — a hidden diagnostics collection, on by default (disable with `trackRequests: false`).
+- **`iconRequest`** — a hidden diagnostics collection, on by default (disable with `collections: { iconRequest: false }`).
 
 Icons accept SVG only. Every upload is sanitized before storage, so a `.svg` is safe to inline straight onto a page.
 
@@ -65,10 +65,10 @@ bundle) and:
 A named, ordered `name → icon` mapping into the shared `icon` pool, with a single-active toggle. Build
 a second set (a different `arrow-right`, a heavier weight, a seasonal pack) and flip it active to
 re-skin every icon at once, without touching the frontend. Writes and reads are logged-in-admin only.
-Drafts / versions are on by default; toggle with `iconSetOverrides.drafts` (default `true`). Lives
+Drafts / versions are on by default; toggle with `collections.iconSet.drafts` (default `true`). Lives
 under a **Sets** admin group.
 
-- **Settings tab:** the `active` toggle and `title` (plus any `fields` you add, and the [usage panel](#icon-use-detection) unless `usagePanel: false`).
+- **Settings tab:** the `active` toggle and `title` (plus any `fields` you add, and the [usage panel](#icon-use-detection) unless `admin: { usagePanel: false }`).
 - **Icons tab:** the `iconsArray`, one row per icon, each a `name` (auto kebab-cased, what the
   frontend looks up, independent of the uploaded filename) and an `icon` upload relationship into
   the `icon` collection.
@@ -83,7 +83,7 @@ under a **Sets** admin group.
 
 ## `iconRequest`
 
-On by default (disable with `trackRequests: false`). A hidden diagnostics collection: every icon name
+On by default (disable with `collections: { iconRequest: false }`). A hidden diagnostics collection: every icon name
 that fails to resolve at runtime is recorded (throttled, fire-and-forget) with a hit `count` and `first`/`lastRequestedAt`
 timestamps. It's the runtime counterpart to the static scan, capturing dynamic names a static pass can't
 see. Surfaced in the IconSet [usage panel](#icon-use-detection), not browsed directly.
@@ -104,7 +104,8 @@ sources:
   `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
   counts, last-seen, and a clear button.
 
-Both are on with `iconsPlugin()`; pass `usagePanel: false` / `trackRequests: false` to omit either.
+Both are on with `iconsPlugin()`; pass `admin: { usagePanel: false }` / `collections: { iconRequest: false }`
+to omit either.
 
 ```bash
 payload-icons-scan            # production/CI: scans ./src and ./app; -o sets the manifest path
@@ -112,7 +113,7 @@ payload-icons-scan            # production/CI: scans ./src and ./app; -o sets th
 
 <Callout type="info">
   Scan sees **literal** names only: `name="x"`, `name={'x'}`, <code>{'name={`x`}'}</code>; dynamic
-  `name={expr}` is `trackRequests`' job. In prod the panel reads `icon-usage-manifest.json` from cwd
+  `name={expr}` is the `iconRequest` recorder's job. In prod the panel reads `icon-usage-manifest.json` from cwd
   (override with the `ICON_USAGE_MANIFEST` env var). Other component? `--component Glyph`. On
   standalone / Vercel builds, a JSON file that's never `import`ed isn't traced into the function
   bundle — add it to `outputFileTracingIncludes` in next.config so the panel can read it there.

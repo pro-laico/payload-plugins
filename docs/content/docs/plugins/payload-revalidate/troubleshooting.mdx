@@ -51,8 +51,9 @@ reorders won't reach it; docs-with-content passed to `cacheIds` warn that conten
 won't refresh the entry.
 
 <Callout type="info">
-With `observe: true` forced on in production, the map endpoints additionally require an
-authenticated Payload user.
+Both routes are governed by `observe`, so they exist only while it is on — the production
+default registers neither. With `observe: true` forced on in production, they additionally
+require an authenticated Payload user.
 </Callout>
 
 ## Next

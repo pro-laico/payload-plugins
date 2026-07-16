@@ -38,11 +38,11 @@ export const seedDefinitions = [
 export const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }
 
 export const plugins: Plugin[] = [
-  imagesPlugin({ folders: true, prewarm: true }),
+  imagesPlugin(),
   iconsPlugin(),
   muxVideoPlugin(),
   fontsPlugin(),
-  seedPlugin({ adminButton: true, ...seedOptions }),
+  seedPlugin(seedOptions),
   devToolsPlugin(),
   revalidatePlugin({
     collections: {

@@ -1,9 +1,9 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
-import { createOnce } from './once'
-import { isRecord } from './isRecord'
-import { findTopLevelField } from './fields'
-import type { CollectionRevalidateConfig, CollectionSettings, ResolvedRevalidateOptions, RevalidatePluginOptions } from '../types'
+import { createOnce } from './lib/once'
+import { isRecord } from './lib/isRecord'
+import { findTopLevelField } from './lib/fields'
+import type { CollectionRevalidateConfig, CollectionSettings, ResolvedRevalidateOptions, RevalidatePluginOptions } from './types'
 
 export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedRevalidateOptions {
   return {
@@ -13,7 +13,6 @@ export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedR
     globals: options.globals ?? {},
     rules: options.rules ?? [],
     observe: options.observe ?? process.env.NODE_ENV === 'development',
-    endpoint: options.endpoint ?? true,
   }
 }
 

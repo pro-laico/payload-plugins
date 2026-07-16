@@ -1,15 +1,12 @@
 import type { Endpoint } from 'payload'
 
-import { devToolsEnabled } from '../options'
 import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
 
-export function createStageEndpoint({ enabled, devRoute }: { enabled?: boolean; devRoute: string }): Endpoint {
+export function createStageEndpoint({ devRoute }: { devRoute: string }): Endpoint {
   return {
     path: '/dev/stage',
     method: 'get',
     handler: async (req) => {
-      if (!devToolsEnabled(enabled)) return Response.json({ error: 'Not found' }, { status: 404 })
-
       const url = new URL(req.url ?? '/api/dev/stage', 'http://localhost')
       const test = url.searchParams.get('test')
       const slotParam = url.searchParams.get('slot')

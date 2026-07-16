@@ -47,7 +47,6 @@ export default buildConfig({
   plugins: [
     seedPlugin({
       definitions: [],
-      adminButton: true,
     }),
   ],
   // ...
@@ -55,9 +54,9 @@ export default buildConfig({
 ```
 
 <Callout type="info">
-  Using `adminButton: true`? The button is registered by string path, so regenerate the admin import
-  map with `pnpm payload generate:importmap` (skip it if you only run the seed via the CLI /
-  endpoint).
+  The **"Seed your database"** button is registered by string path, so regenerate the admin import map
+  with `pnpm payload generate:importmap` (skip it if you only run the seed via the CLI / endpoint). It
+  renders nothing unless `ENABLE_SEED=true`.
 </Callout>
 </Step>
 
@@ -129,7 +128,6 @@ export default buildConfig({
   plugins: [
     seedPlugin({
       definitions: [media, services, posts],
-      adminButton: true,
     }),
   ],
   // ...

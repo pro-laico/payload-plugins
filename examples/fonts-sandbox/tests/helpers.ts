@@ -25,8 +25,10 @@ export async function bootFonts(): Promise<BootedFonts> {
     collections: [{ slug: 'users', auth: true, fields: [] }],
     plugins: [
       fontsPlugin({
-        fontOriginalOverrides: { upload: { staticDir: join(dir, 'original') } },
-        fontOptimizedOverrides: { upload: { staticDir: join(dir, 'optimized') } },
+        collections: {
+          fontOriginal: { upload: { staticDir: join(dir, 'original') } },
+          fontOptimized: { upload: { staticDir: join(dir, 'optimized') } },
+        },
       }),
     ],
     sharp: undefined,

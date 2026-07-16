@@ -14,7 +14,7 @@ import { createAfterDelete } from './hooks/collection/afterDelete'
 import { createGlobalAfterChange } from './hooks/global/afterChange'
 import { createMapEndpoints, MAP_ENDPOINT_PATH } from './endpoints/map'
 import { changeDetectionFields, topLevelFieldNames } from './lib/fields'
-import { globalEnabled, resolveCollectionSettings, resolveOptions } from './lib/options'
+import { globalEnabled, resolveCollectionSettings, resolveOptions } from './options'
 import type { PayloadRevalidateMarker, ReferenceGraph, RevalidatePluginOptions } from './types'
 
 function binScriptPath(name: string): string {
@@ -101,7 +101,7 @@ export const revalidatePlugin =
 
     const marker: PayloadRevalidateMarker = {
       options: opts,
-      endpointPath: resolved.endpoint ? `/api${MAP_ENDPOINT_PATH}` : null,
+      endpointPath: resolved.observe ? `/api${MAP_ENDPOINT_PATH}` : null,
       prefix: resolved.prefix,
       observe: resolved.observe,
       lists,
@@ -114,7 +114,8 @@ export const revalidatePlugin =
       collections,
       globals,
       bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidateMap') }],
-      endpoints: resolved.endpoint ? [...(config.endpoints ?? []), ...createMapEndpoints({ observe: resolved.observe })] : config.endpoints,
+      // The map endpoints only ever serve observations, so `observe` alone governs them.
+      endpoints: resolved.observe ? [...(config.endpoints ?? []), ...createMapEndpoints()] : config.endpoints,
       custom: { ...config.custom, payloadRevalidate: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)

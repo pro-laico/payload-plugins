@@ -32,7 +32,7 @@ const errorMessages = (): string[] => logs.filter((l) => l.level === 50).map((l)
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'failure-lab-icons-'))
-  lab = await bootLab({ plugins: [iconsPlugin({ iconOverrides: { upload: { staticDir: join(dir, 'icon') } } })] })
+  lab = await bootLab({ plugins: [iconsPlugin({ collections: { icon: { upload: { staticDir: join(dir, 'icon') } } } })] })
   payload = lab.payload
 }, 60_000)
 

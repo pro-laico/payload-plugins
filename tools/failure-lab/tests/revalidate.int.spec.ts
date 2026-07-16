@@ -296,16 +296,13 @@ describe('map endpoint failures', () => {
 
   // LAST on purpose: applying the plugin swaps the inspect-slot closure to the observe:false
   // config, which would starve the observation assertions above of their recorded data.
-  it('with observe off (the production posture) both endpoints 404 — the map does not leak', async () => {
+  // The map only ever serves observations, so `observe: false` (the production posture) doesn't
+  // register the endpoints at all — a stronger guarantee than the 404 this used to assert.
+  it('with observe off (the production posture) the endpoints are never registered — the map cannot leak', async () => {
     const prodConfig = await revalidatePlugin({ observe: false })({ collections: [Posts, Media] } as Config)
-    const endpoints = prodConfig.endpoints ?? []
-    const get = endpoints.find((e) => e.path === '/revalidate-map' && e.method === 'get')
-    const post = endpoints.find((e) => e.path === '/revalidate-map' && e.method === 'post')
-    const getRes = await get?.handler({ payload } as unknown as PayloadRequest)
-    const postRes = await post?.handler({ payload, json: async () => ({ tag: 'posts:1' }) } as unknown as PayloadRequest)
-    expect(getRes?.status).toBe(404)
-    expect(postRes?.status).toBe(404)
-    expect((await getRes?.json()) as { error: string }).toEqual({ error: 'Not found' })
-    record('endpoints with observe off', '{"error":"Not found"} (404, GET and POST both)')
+    const paths = (prodConfig.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
+    expect(paths).not.toContain('get /revalidate-map')
+    expect(paths).not.toContain('post /revalidate-map')
+    record('endpoints with observe off', 'not registered (no route to reach, GET and POST both)')
   })
 })
