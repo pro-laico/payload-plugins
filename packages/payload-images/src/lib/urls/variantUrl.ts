@@ -1,5 +1,5 @@
 import type { BuildUrlOptions } from '../../types'
-import { parseAspectRatio } from '../transform/params'
+import { DEFAULT_CONSTRAINTS, parseAspectRatio } from '../transform/params'
 
 export const DEFAULT_TRANSFORM_API_PATH = '/api/img'
 
@@ -17,7 +17,9 @@ export const buildVariantUrl = (id: string | number, width: number, o: BuildUrlO
   // Clamped: an extreme ratio at a small width rounds to 0, which the endpoint 400s.
   if (ar) params.set('h', String(Math.max(1, Math.round(width / ar))))
   params.set('fit', o.fit ?? 'cover')
-  params.set('q', String(o.quality ?? 75))
+  // Sourced from DEFAULT_CONSTRAINTS so the URL builder and the endpoint can never disagree about
+  // the default — a mismatch silently doubles the variant space (same render, two cache keys).
+  params.set('q', String(o.quality ?? DEFAULT_CONSTRAINTS.defaultQuality))
   params.set('fmt', o.format ?? 'auto')
   if (o.version) params.set('v', o.version)
   return `${base}${apiPath}/${encodeURIComponent(id)}?${params.toString()}`

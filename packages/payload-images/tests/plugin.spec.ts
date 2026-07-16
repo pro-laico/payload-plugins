@@ -88,7 +88,7 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(variantLimit?.defaultValue).toBe(200)
     expect(byName(images.fields, 'presets')).toBeTruthy()
     expect(byName(images.fields, 'presetManager')).toBeTruthy() // the admin ui field
-    expect(images.hooks?.afterChange).toHaveLength(2) // purge + preset generation (no prewarm)
+    expect(images.hooks?.afterChange).toHaveLength(3) // purge + prewarm enqueue + preset generation
     // A custom cap default threads through:
     const capped = (run({ variantLimit: 50 }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
     expect((byName(capped.fields, 'variantLimit') as { defaultValue?: number }).defaultValue).toBe(50)
@@ -143,9 +143,21 @@ describe('imagesPlugin — default (creates the images collection)', () => {
   })
 })
 
-describe('imagesPlugin — prewarm (default off, opt-in registers the whole surface)', () => {
-  it('registers nothing prewarm-related by default', () => {
+describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of the whole surface)', () => {
+  it('is on by default: registers the registry collection, jobs task, bin script, endpoints, and marker', () => {
     const out = run()
+    expect(slugs(out)).toContain('image-render-profiles')
+    expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
+    expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
+    const marker = (out.custom as { payloadImages?: { prewarm?: unknown } }).payloadImages
+    expect(marker?.prewarm).toBeDefined()
+    const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
+    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
+    expect(presetManagerClientProps(out)?.prewarmPath).toBe('/img/prewarm')
+  })
+
+  it('prewarm: false registers nothing prewarm-related — the opt-out escape hatch', () => {
+    const out = run({ prewarm: false })
     expect(slugs(out)).not.toContain('image-render-profiles')
     expect(out.jobs).toBeUndefined()
     expect((out.bin ?? []).map((b) => b.key)).not.toContain('images:prewarm')
@@ -227,10 +239,12 @@ describe('imagesPlugin — extendCollection (enhances an existing upload collect
     expect(variantSourceRelTo(out)).toBe('media')
   })
 
-  it('hands the extended target the prewarm panel path when prewarm is on', () => {
+  it('hands the extended target the prewarm panel path (on by default; gone only when prewarm: false)', () => {
     const warmed = run({ extendCollection: 'media', prewarm: true }, [media])
     expect(presetManagerClientProps(warmed, 'media')?.prewarmPath).toBe('/img/prewarm')
-    expect(presetManagerClientProps(out, 'media')?.prewarmPath).toBeUndefined()
+    expect(presetManagerClientProps(out, 'media')?.prewarmPath).toBe('/img/prewarm') // default run — prewarm is on
+    const off = run({ extendCollection: 'media', prewarm: false }, [media])
+    expect(presetManagerClientProps(off, 'media')?.prewarmPath).toBeUndefined()
   })
 
   it('applies folders to the extended target', () => {

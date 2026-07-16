@@ -10,8 +10,15 @@ import config from '../src/payload.config'
  * exist before anything ever requested them → a focal edit re-enqueues.
  */
 
+// Accept webp like a real browser — with no Accept header fmt=auto negotiates to jpeg, which the
+// prewarm (defaultFormats: ['webp']) never generates, so every "warmed" serve would silently miss.
 const makeReq = (payload: Payload, id: string, query: string): PayloadRequest =>
-  ({ payload, routeParams: { id }, searchParams: new URLSearchParams(query), headers: new Headers() }) as unknown as PayloadRequest
+  ({
+    payload,
+    routeParams: { id },
+    searchParams: new URLSearchParams(query),
+    headers: new Headers({ accept: 'image/webp' }),
+  }) as unknown as PayloadRequest
 
 const transform = (payload: Payload) => {
   const ep = payload.config.endpoints.find((e) => e.method === 'get' && e.path === '/img/:id')
@@ -42,6 +49,19 @@ const poll = async <T>(fn: () => Promise<T | undefined>, tries = 50): Promise<T 
   return undefined
 }
 
+/** The endpoint persists variants AFTER responding (fire-and-forget under vitest) — wait for any
+ * in-flight persist to land so counts are trustworthy and nothing races db teardown. */
+const drainPersists = async (payload: Payload): Promise<number> => {
+  let settled = (await payload.count({ collection: 'generated-images' })).totalDocs
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 100))
+    const now = (await payload.count({ collection: 'generated-images' })).totalDocs
+    if (now === settled) break
+    settled = now
+  }
+  return settled
+}
+
 describe('smart prewarm', () => {
   let payload: Payload
   let observedId: string
@@ -63,6 +83,8 @@ describe('smart prewarm', () => {
   }, 60_000)
 
   afterAll(async () => {
+    // Let any floating persist land before tearing the db down under it.
+    if (payload) await drainPersists(payload)
     await payload?.db?.destroy?.()
   })
 
@@ -107,9 +129,12 @@ describe('smart prewarm', () => {
     expect(q80.length).toBeGreaterThanOrEqual(2)
 
     // The warm was exact: serving the learned render now is a pure cache hit (no new variant row).
+    // Drain deferred persists before comparing — a miss persists AFTER responding, so an immediate
+    // re-count would equal `before` even when the serve actually generated a fresh variant.
     const before = variants.totalDocs
     const res = await transform(payload)(makeReq(payload, String(doc.id), 'w=800&ar=16:9&q=80'))
     expect(res.status).toBe(200)
+    await drainPersists(payload)
     const after = await payload.find({ collection: 'generated-images', where: { source: { equals: doc.id } }, limit: 100 })
     expect(after.totalDocs).toBe(before)
   })

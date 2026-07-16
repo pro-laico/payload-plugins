@@ -14,24 +14,24 @@ describe('buildVariantUrl', () => {
     )
   })
   it('omits height without an aspect ratio and applies defaults', () => {
-    expect(buildVariantUrl('abc', 800)).toBe('/api/img/abc?w=800&fit=cover&q=75&fmt=auto')
+    expect(buildVariantUrl('abc', 800)).toBe('/api/img/abc?w=800&fit=cover&q=90&fmt=auto')
   })
   it('supports an absolute base and a custom path', () => {
     expect(buildVariantUrl('abc', 320, { baseUrl: 'https://site.com', path: '/api/image' })).toBe(
-      'https://site.com/api/image/abc?w=320&fit=cover&q=75&fmt=auto',
+      'https://site.com/api/image/abc?w=320&fit=cover&q=90&fmt=auto',
     )
   })
   it('encodes the id', () => {
     expect(buildVariantUrl('a/b', 320)).toContain('/api/img/a%2Fb?')
   })
   it('accepts numeric ids (Postgres serials) like every other entry point', () => {
-    expect(buildVariantUrl(42, 320)).toBe('/api/img/42?w=320&fit=cover&q=75&fmt=auto')
+    expect(buildVariantUrl(42, 320)).toBe('/api/img/42?w=320&fit=cover&q=90&fmt=auto')
   })
   it('clamps a derived height to 1 for extreme aspect ratios (h=0 would 400)', () => {
     expect(buildVariantUrl('abc', 32, { aspectRatio: '4000:30' })).toContain('h=1')
   })
   it('appends a version cache-buster as a trailing v= when given, and omits it otherwise', () => {
-    expect(buildVariantUrl('abc', 800, { version: 'xyz9' })).toBe('/api/img/abc?w=800&fit=cover&q=75&fmt=auto&v=xyz9')
+    expect(buildVariantUrl('abc', 800, { version: 'xyz9' })).toBe('/api/img/abc?w=800&fit=cover&q=90&fmt=auto&v=xyz9')
     expect(buildVariantUrl('abc', 800)).not.toContain('v=')
   })
   it('short-circuits to ?preset=name, ignoring the width + shape options', () => {
@@ -108,20 +108,20 @@ describe('getImageUrl', () => {
     expect(getImageUrl('')).toBeNull()
   })
   it('builds a URL from a bare id with a default width', () => {
-    expect(getImageUrl('abc')).toBe('/api/img/abc?w=1280&fit=cover&q=75&fmt=auto')
+    expect(getImageUrl('abc')).toBe('/api/img/abc?w=1280&fit=cover&q=90&fmt=auto')
   })
   it('uses an explicit width over the doc/default', () => {
-    expect(getImageUrl('abc', { width: 600, aspectRatio: '1:1' })).toBe('/api/img/abc?w=600&h=600&fit=cover&q=75&fmt=auto')
+    expect(getImageUrl('abc', { width: 600, aspectRatio: '1:1' })).toBe('/api/img/abc?w=600&h=600&fit=cover&q=90&fmt=auto')
   })
   it('auto-derives the version from a populated doc and falls back to its width', () => {
     const url = getImageUrl({ id: 'abc', width: 900, filename: 'a.png', focalX: 50, focalY: 50 })
     const v = deriveVersion({ filename: 'a.png', focalX: 50, focalY: 50 })
-    expect(url).toBe(`/api/img/abc?w=900&fit=cover&q=75&fmt=auto&v=${v}`)
+    expect(url).toBe(`/api/img/abc?w=900&fit=cover&q=90&fmt=auto&v=${v}`)
   })
   it('defaults baseUrl to NEXT_PUBLIC_SERVER_URL (absolute), overridable with an explicit baseUrl or ""', () => {
     vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://site.com')
-    expect(getImageUrl('abc')).toBe('https://site.com/api/img/abc?w=1280&fit=cover&q=75&fmt=auto')
-    expect(getImageUrl('abc', { baseUrl: '' })).toBe('/api/img/abc?w=1280&fit=cover&q=75&fmt=auto') // opt out → relative
+    expect(getImageUrl('abc')).toBe('https://site.com/api/img/abc?w=1280&fit=cover&q=90&fmt=auto')
+    expect(getImageUrl('abc', { baseUrl: '' })).toBe('/api/img/abc?w=1280&fit=cover&q=90&fmt=auto') // opt out → relative
     expect(getImageUrl('abc', { baseUrl: 'https://cdn.example.com' })).toMatch(/^https:\/\/cdn\.example\.com\/api\/img\//)
   })
 })
@@ -133,8 +133,8 @@ describe('buildSrcset', () => {
   })
   it('builds a srcset from a populated doc, capped at its intrinsic width, with a default src', () => {
     const result = buildSrcset({ id: 'abc', width: 100 }, { aspectRatio: '1:1', pixelStep: 50 })
-    expect(result?.srcset).toBe('/api/img/abc?w=50&h=50&fit=cover&q=75&fmt=auto 50w, /api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto 100w')
-    expect(result?.src).toBe('/api/img/abc?w=100&h=100&fit=cover&q=75&fmt=auto')
+    expect(result?.srcset).toBe('/api/img/abc?w=50&h=50&fit=cover&q=90&fmt=auto 50w, /api/img/abc?w=100&h=100&fit=cover&q=90&fmt=auto 100w')
+    expect(result?.src).toBe('/api/img/abc?w=100&h=100&fit=cover&q=90&fmt=auto')
   })
   it('auto-derives the version token from a populated doc and appends it to every URL', () => {
     const v = deriveVersion({ filename: 'a.png', focalX: 50, focalY: 50 })

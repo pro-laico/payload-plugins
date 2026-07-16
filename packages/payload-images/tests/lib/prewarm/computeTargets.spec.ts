@@ -45,8 +45,8 @@ describe('computePrewarmTargets', () => {
     const targets = compute({ maxVariantsPerImage: 3 })
     expect(targets).toHaveLength(3)
     // src default (≤1280 at the natural ratio), thumbnail (160² cover), placeholder (w32 → snapped, q40)
-    expect(targets[0]?.key).toBe(organicKey({ w: '1280', ar: String(2400 / 1600), fit: 'cover', q: '75' }, 'webp'))
-    expect(targets[1]?.key).toBe(organicKey({ w: '160', ar: '1', fit: 'cover', q: '75' }, 'webp'))
+    expect(targets[0]?.key).toBe(organicKey({ w: '1280', ar: String(2400 / 1600), fit: 'cover', q: '90' }, 'webp'))
+    expect(targets[1]?.key).toBe(organicKey({ w: '160', ar: '1', fit: 'cover', q: '90' }, 'webp'))
     expect(targets[2]?.key).toBe(organicKey({ w: '32', ar: String(2400 / 1600), fit: 'cover', q: '40' }, 'webp'))
   })
 
@@ -100,7 +100,7 @@ describe('computePrewarmTargets', () => {
   })
 
   it('subtracts already-generated variants and respects the overall cap', () => {
-    const existing = new Set([organicKey({ w: '160', ar: '1', fit: 'cover', q: '75' }, 'webp')])
+    const existing = new Set([organicKey({ w: '160', ar: '1', fit: 'cover', q: '90' }, 'webp')])
     const targets = compute({ profiles: [profile({})], existingKeys: existing, maxVariantsPerImage: 5 })
     expect(targets).toHaveLength(5)
     expect(targets.map((t) => t.key)).not.toContain([...existing][0])

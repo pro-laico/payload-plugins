@@ -4,9 +4,14 @@ import type { ImagesPluginOptions, OutputFormat, ResolvedPrewarmOptions, Transfo
 
 export const PREWARM_TASK_SLUG = 'imagesPrewarm'
 
+// On by default: these sites are image-led marketing pages where a cold variant is a visible LCP hit.
+// Only an explicit `prewarm: false` opts out — note that being on registers the render-profiles
+// collection (a schema change) and the jobs task, and that the enqueued jobs need a runner to do
+// anything (see the docs' run-path section; Payload's autoRun cron needs a long-lived process, so
+// serverless deploys drive it from a cron hitting the jobs endpoint or the images:prewarm CLI).
 export const resolvePrewarmOptions = (opts: ImagesPluginOptions, constraints: TransformConstraints): ResolvedPrewarmOptions | false => {
-  if (!opts.prewarm) return false
-  const raw = opts.prewarm === true ? {} : opts.prewarm
+  if (opts.prewarm === false) return false
+  const raw = typeof opts.prewarm === 'object' ? opts.prewarm : {}
   const defaultFormats: OutputFormat[] = constraints.preferAvif ? ['webp', 'avif'] : ['webp']
   // Only formats the endpoint can actually serve are worth warming — anything outside
   // transform.formats would be generated, stored, and never matched by a request key.

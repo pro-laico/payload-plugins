@@ -17,7 +17,7 @@ later request for the same URL serves the stored bytes. Nothing is pre-generated
 hidden `generated-images` collection fills in lazily, one requested size at a time.
 
 export const pipelineNodes = [
-  { id: 'req', kind: 'start', label: 'Request', detail: 'GET /api/img/:id?w=800&q=75', x: 300, y: 0 },
+  { id: 'req', kind: 'start', label: 'Request', detail: 'GET /api/img/:id?w=800&q=90', x: 300, y: 0 },
   { id: 'snap', label: 'Snap to the variant grid', detail: 'w → pixelStep grid, q → quality buckets, clamped to maxDimension', x: 300, y: 120 },
   { id: 'cached', kind: 'check', label: 'Cached variant exists?', x: 300, y: 270 },
   { id: 'serve', kind: 'result', label: 'Serve stored bytes', detail: 'immutable, 1y max-age + ETag', x: 20, y: 400 },
@@ -184,12 +184,32 @@ Prewarming makes the first request fast without generating every possible varian
 images — deferred, budgeted, and idempotent.
 
 ```ts
-imagesPlugin({ prewarm: true }) // zero-config; default is OFF (enabling adds a collection = schema change)
+imagesPlugin()                   // prewarm is ON by default — zero-config
+imagesPlugin({ prewarm: false }) // the opt-out
 ```
 
-Prewarm enqueues Payload Jobs — it does **nothing until a jobs runner picks them up**. Use your
+<Callout type="warn">
+  Being on registers the hidden `image-render-profiles` collection — a **schema change**, so run
+  `payload generate:types` after upgrading — plus the `imagesPrewarm` jobs task and the
+  `images:prewarm` CLI. `prewarm: false` leaves your schema untouched.
+</Callout>
+
+### Running prewarm
+
+Prewarm only **enqueues** Payload Jobs — it does **nothing until a jobs runner picks them up**. Use your
 existing runner (`payload.jobs.run()`, a cron hitting the jobs endpoint, or `payload jobs:run`).
 To skip the queue and generate inline, run `payload images:prewarm --now`.
+
+**On serverless (Vercel, and anything without a long-lived process):** `autoRun` wires an in-process
+cron, so it never fires there — leaving jobs enqueued and never run. Drive the queue from outside
+instead, either of:
+
+- a scheduled request to Payload's jobs endpoint (e.g. a Vercel Cron hitting `/api/payload-jobs/run`), or
+- `payload images:prewarm --now` as a build/deploy step, which warms the library against the profiles
+  learned from earlier traffic and needs no runner at all.
+
+Prewarm learns from what the site serves, so on a brand-new deploy there is nothing to warm yet —
+use `seeds` (below) to warm known renders before any traffic is observed.
 
 Tune it with the options object:
 

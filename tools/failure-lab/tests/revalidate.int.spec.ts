@@ -190,7 +190,9 @@ describe('read-side misuse (cache helpers) — dev advisories that name the read
     await cacheIds({ docs: [] }, 'posts', { list: 'trending', label: 'trendList' })
     const warn = messages().find((m) => m.includes('undeclared'))
     expect(warn).toContain("trendList carries undeclared list scope 'trending' — reorders won't bust it")
-    expect(warn).toContain("revalidatePlugin({ collections: { posts: { lists: { trending: { fields: ['<sort/filter fields>'] } } } } })")
+    // The advisory hands back the canonical array shorthand (`{ scope: [fields] }`); the `{ fields }`
+    // object form is only the future-extension slot, so the snippet must not steer people to it.
+    expect(warn).toContain("revalidatePlugin({ collections: { posts: { lists: { trending: ['<sort/filter fields>'] } } } })")
     record('undeclared list scope', warn)
   })
 

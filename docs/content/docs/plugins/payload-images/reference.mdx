@@ -23,7 +23,7 @@ export const options = [
     options: [
       { name: 'cdnCacheControl', type: 'boolean', default: 'true', description: `Also emit CDN-Cache-Control / Vercel-CDN-Cache-Control headers (public images only).` },
       { name: 'maxDimension', type: 'number', default: '4096', description: `Hard ceiling on either output dimension.` },
-      { name: 'defaultQuality', type: 'number', default: '75', description: `Encode quality used when a request omits q.` },
+      { name: 'defaultQuality', type: 'number', default: '90', description: `Encode quality used when a request omits q.` },
       { name: 'qualityRange', type: '[number, number]', default: '[40, 95]', description: `Allowed quality range; requested values clamp into it.` },
       { name: 'defaultFormat', type: 'Format', default: "'auto'", description: `Output format when a request omits fmt (auto negotiates from Accept).` },
       { name: 'formats', type: 'Format[]', default: "['auto','avif','webp','jpeg','png']", description: `Output formats the endpoint may emit.` },
@@ -40,7 +40,7 @@ export const options = [
   { name: 'mimeTypes', type: 'string[]', default: "['image/avif','image/webp','image/jpeg','image/png']", description: `Accepted upload mime types for the images collection; defaults to the raster formats the transform pipeline can process. Widen it (e.g. add 'image/svg+xml') or narrow it, but the endpoint only meaningfully resizes/crops raster images; non-raster uploads are stored and served as-is. Ignored with extendCollection (you own that collection's upload.mimeTypes).` },
   { name: 'folders', type: 'boolean', default: 'false', description: `Enable Payload's native folder organization on the managed collection (the created images, or the extendCollection target) so editors can organize a large library.` },
   { name: 'maxOriginalSize', type: 'number', description: `Cap the stored original's longest edge (px), applied once on upload. Off by default; your original stays untouched (the collection can double as original storage). Set it only to bound storage. Ignored with extendCollection.` },
-  { name: 'prewarm', type: 'boolean | PrewarmOptions', default: 'false', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. true = zero-config defaults; the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue. Default off — enabling adds the hidden image-render-profiles collection (a schema change), the imagesPrewarm jobs task, and the images:prewarm CLI.` },
+  { name: 'prewarm', type: 'boolean | PrewarmOptions', default: 'true', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue, and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Caching & prewarming → Running prewarm.` },
   { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
   { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
 ]
@@ -71,7 +71,7 @@ imagesPlugin({
   transform: {
     cdnCacheControl: true,
     maxDimension: 4096,
-    defaultQuality: 75,
+    defaultQuality: 90,
     qualityRange: [40, 95],
     defaultFormat: 'auto',
     formats: ['auto', 'avif', 'webp', 'jpeg', 'png'],
@@ -87,7 +87,7 @@ imagesPlugin({
   mimeTypes: ['image/avif', 'image/webp', 'image/jpeg', 'image/png'],
   folders: false,
   // maxOriginalSize: 4096,  // optional, no default: off (the original is kept untouched)
-  prewarm: false,
+  prewarm: true,
   variantLimit: 200,
   presetTemplates: {
     // both ship by default; your own entries merge on top
