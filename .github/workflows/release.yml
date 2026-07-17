@@ -18,7 +18,14 @@ permissions:
   id-token: write # required for npm trusted publishing + provenance (OIDC)
 
 jobs:
+  # Publishing is irreversible — a bad version can only be superseded, not recalled. So the tag
+  # push runs the full CI gate first, including the tarball smoke test that exercises the dist/
+  # artifact npm actually receives (the rest of the repo only ever loads src/).
+  verify:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

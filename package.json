@@ -13,6 +13,7 @@
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
     "test": "turbo run test",
+    "smoke": "pnpm --filter @tools/smoke smoke",
     "docs": "pnpm --filter docs dev",
     "clean": "rimraf --glob \"packages/*/dist\" \"packages/*/*.tsbuildinfo\" \"examples/*/.next\" \"examples/*/*.tsbuildinfo\" \"tools/*/*.tsbuildinfo\" \"docs/.next\" \"docs/*.tsbuildinfo\" \".turbo\"",
     "clean:all": "pnpm clean && rimraf --glob node_modules \"packages/*/node_modules\" \"examples/*/node_modules\" \"docs/node_modules\" \"tools/*/node_modules\"",

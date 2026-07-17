@@ -1,0 +1,10 @@
+{
+  "name": "@tools/smoke",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Packs every @pro-laico/* package and installs the tarballs into a plain app outside the workspace, so the PUBLISHED artifact is exercised the way a consumer gets it.",
+  "scripts": {
+    "smoke": "node ./smoke.mjs"
+  }
+}

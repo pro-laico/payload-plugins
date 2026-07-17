@@ -1,0 +1,64 @@
+name: CI
+
+# The gate. Runs on every PR and on main, and release.yml calls it before publishing — so nothing
+# reaches npm that hasn't passed this.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format + lint (biome)
+        run: pnpm check:ci
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  smoke:
+    name: published artifact installs in a plain app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Packs each package (prepack builds it), installs the tarballs into a plain non-workspace app
+      # and resolves them. The workspace loads src/; consumers get dist/ — this is the only thing
+      # that exercises the second one. See tools/smoke/README.md.
+      - name: Smoke-test the tarballs
+        run: pnpm smoke
