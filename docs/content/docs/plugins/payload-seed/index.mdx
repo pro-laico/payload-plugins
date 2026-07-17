@@ -20,7 +20,7 @@ pnpm add @pro-laico/payload-seed
 
 ## Requirements
 
-- **Payload CMS** — a Payload `^3` project.
+- **Payload CMS** — a Payload `^3` project. **No framework requirement**: zero `next/` imports and no `next` peer, so it runs in any Payload app, Next.js or not.
 - **`pnpm payload generate:types`** to activate typed refs. Without it, `ref()` keys fall back to runtime validation — still safe, just not checked at compile time.
 - **`ENABLE_SEED=true`** to run the admin button, endpoint, or CLI. It's off by default.
 

@@ -17,6 +17,16 @@ Everything is dev-only and disappears in production.
 pnpm add @pro-laico/payload-dev-tools
 ```
 
+## Requirements
+
+**Next.js 15+ on the App Router**, plus Payload `^3` and React 19. This one is Next-shaped by
+nature: the toolbar and the `/dev` pages are Next components (`next/link`, `next/navigation`), and
+the draft-mode toggle and chrome resolver read `cookies()` / `draftMode()` from `next/headers`.
+There's no framework-agnostic subset to fall back on — the whole surface is the UI.
+
+No `next.config` changes are needed, though: everything mounts through the plugin, one page file,
+and one layout line.
+
 ## What's included
 
 - **The `/dev` pages.** Real routes inside your app from one catch-all file: `/dev` (overview,

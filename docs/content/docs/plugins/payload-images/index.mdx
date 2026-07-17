@@ -12,14 +12,17 @@ art-directed focal cropping, AVIF/WebP negotiation, instant placeholders, and a 
 driven from your CMS. Unlike Payload's built-in `imageSizes`, you never pre-declare a fixed set of
 sizes; any size is available the moment a layout asks for it.
 
-<Callout type="info">
-  **Built for Next.js.** This plugin targets Payload running in a Next.js app. It isn't
-  framework-agnostic — see the Quickstart note below.
-</Callout>
-
 ```bash
 pnpm add @pro-laico/payload-images
 ```
+
+## Requirements
+
+**Next.js 15+**, plus Payload `^3` and React 19. This plugin isn't framework-agnostic and the `next`
+peer isn't optional: the transform endpoint, prewarming, and preset generation all persist their
+work with Next's `after()` (`next/server`), which is what lets a request return the bytes and store
+the variant afterwards. Without it there's no way to cache a generated variant off the response
+path — the endpoint *is* the plugin.
 
 ## What's included
 
@@ -34,11 +37,6 @@ pnpm add @pro-laico/payload-images
 
 ## Quickstart
 
-<Callout type="info">
-  **Built for Next.js.** The transform endpoint persists variants with Next's `after()` and the cache
-  story leans on Next's caching, so this plugin targets Payload running in a Next.js app (the default
-  Payload setup). It isn't framework-agnostic.
-</Callout>
 
 <Steps>
 

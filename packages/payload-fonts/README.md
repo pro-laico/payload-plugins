@@ -6,6 +6,8 @@ Custom fonts for [Payload CMS](https://payloadcms.com/) — a Font typeface coll
 pnpm add @pro-laico/payload-fonts
 ```
 
+**Requires** Payload `^3` and React 19. **Next.js 15+ to serve** — the download CLI writes a `next/font/local` module for your layout; uploading, subsetting, and exporting `.woff2` work in any Payload app.
+
 **[Documentation →](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts)**
 
 ## Troubleshooting

@@ -38,6 +38,7 @@ pnpm add @pro-laico/payload-icons
 ## Requirements
 
 - **Source solid-fill SVGs.** The optimizer themes filled glyphs by rewriting their colors to `currentColor`. Stroke-drawn sets like Lucide render as solid blobs — see [Troubleshooting](/docs/plugins/payload-icons/troubleshooting).
+- **Next.js 15+ to render icons.** The collection, the admin, and the SVG pipeline run in any Payload app. `<Icon>` reads `draftMode()` from `next/headers`, and runtime miss-tracking uses `after()` from `next/server` — so *rendering* icons is Next-bound even though managing them isn't. The `next` peer is optional for exactly that reason.
 - **Render in a server component.** `<Icon>` is an async server component that queries Payload; it can't render inside a `'use client'` component.
 - **Revalidation is opt-in.** On its own the plugin does no cache revalidation. Install the companion [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) to make the whole surface self-healing — see [How it works](/docs/plugins/payload-icons/how-it-works).
 

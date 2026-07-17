@@ -6,4 +6,6 @@ Type-safe database seeding for [Payload CMS](https://payloadcms.com/) — write 
 pnpm add @pro-laico/payload-seed
 ```
 
+**Requires** Payload `^3` and React 19. **No framework requirement** — zero `next/` imports, no `next` peer; runs in any Payload app.
+
 **[Documentation →](https://payload-plugins.prolaico.com/docs/plugins/payload-seed)**

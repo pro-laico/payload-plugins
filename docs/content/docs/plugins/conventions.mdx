@@ -110,8 +110,22 @@ Then restart the dev server so the new components load.
 
 ## Requirements
 
-Payload `^3`, React 19, and the Next.js App Router. The packages ship in lockstep under one
-version, but each works standalone — you never need to install more than the one you want.
+**Payload `^3` and React 19** for every package. The packages ship in lockstep under one version,
+but each works standalone — you never need to install more than the one you want.
+
+**Next.js is per-plugin**, not a blanket requirement:
+
+| Plugin | Next.js | Why |
+| --- | --- | --- |
+| [payload-revalidate](/docs/plugins/payload-revalidate) | **Required**, `16+` | It's a Next cache tool — the whole plugin is `next/cache` plus Cache Components. |
+| [payload-images](/docs/plugins/payload-images) | **Required**, `15+` | The transform endpoint, prewarming, and preset generation persist variants with Next's `after()`. |
+| [payload-dev-tools](/docs/plugins/payload-dev-tools) | **Required**, `15+` | The toolbar and dev pages are Next components (`next/link`, `next/navigation`, `next/headers`). |
+| [payload-icons](/docs/plugins/payload-icons) | **Partly**, `15+` | The collection, admin, and SVG pipeline work in any Payload. The `<Icon>` component reads `draftMode()` and runtime miss-tracking uses `after()`, so *rendering* icons needs Next. |
+| [payload-fonts](/docs/plugins/payload-fonts) | **Partly**, `15+` | Uploading, subsetting, and exporting work anywhere. The download CLI *writes* a `next/font/local` module, so the serving story is Next-shaped — without it, take the exported `.woff2` files and write your own `@font-face`. |
+| [payload-mux](/docs/plugins/payload-mux) | **No** | Zero `next/` imports, no `next` peer. Any Payload app. |
+| [payload-seed](/docs/plugins/payload-seed) | **No** | Zero `next/` imports, no `next` peer. Any Payload app. |
+
+Each plugin's own page states this up front too.
 
 <Callout type="info">
   Payload Plugins is not affiliated with Payload CMS in any capacity.

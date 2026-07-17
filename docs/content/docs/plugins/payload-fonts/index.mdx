@@ -27,7 +27,7 @@ Self-hosting fonts through `next/font` needs a few one-time wiring steps. Each m
 
 | Requirement | Why |
 | --- | --- |
-| **Next.js App Router** | Serving is built on `next/font/local`. |
+| **Next.js App Router**, 15+ | For *serving*. The package itself imports nothing from `next` — the download CLI **writes** a module that does (`import localFont from 'next/font/local'`), which your root layout imports. Uploading, subsetting, and exporting `.woff2` work in any Payload app; without Next, take the exported files and write your own `@font-face`. |
 | **A `next.config` change** | The subsetter (`subset-font` / `harfbuzzjs` / `fontkit`) must be externalized, or the wasm breaks and optimization silently skips (Step 2). |
 | **Root-layout wiring** | `extractFonts` on `<html>` plus `<DevFonts>` in `<head>` — the two serving paths (Step 4). |
 | **A prebuild script** | The `payload-fonts-download` CLI writes the fonts + `src/app/definition.ts` your layout imports (Step 3). |

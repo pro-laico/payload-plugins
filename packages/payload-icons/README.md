@@ -6,4 +6,6 @@ SVG icons for [Payload CMS](https://payloadcms.com/) — an Icon upload collecti
 pnpm add @pro-laico/payload-icons
 ```
 
+**Requires** Payload `^3` and React 19. **Next.js 15+ to render icons** — `<Icon>` reads `draftMode()` and miss-tracking uses `after()`; the collection, admin, and SVG pipeline work in any Payload app.
+
 **[Documentation →](https://payload-plugins.prolaico.com/docs/plugins/payload-icons)**

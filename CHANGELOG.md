@@ -171,6 +171,15 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Docs
 
+- **Framework requirements are now stated per plugin, and stated correctly.** The docs asserted
+  globally that everything needs "Payload `^3`, React 19, and the Next.js App Router" — untrue for
+  `payload-mux` and `payload-seed`, which have zero `next/` imports and no `next` peer at all.
+  Conventions now carries a per-plugin table: required for `payload-revalidate` (16+),
+  `payload-images`, and `payload-dev-tools`; needed only to *render* icons / *serve* fonts for
+  `payload-icons` and `payload-fonts`; not needed for `payload-mux` / `payload-seed`.
+  `payload-icons` had a Requirements section that never mentioned Next despite `<Icon>` reading
+  `draftMode()`; `payload-images` and `payload-dev-tools` — the two with a required `next` peer —
+  had no Requirements section at all. All 7 READMEs gained a `Requires` line up front; none had one.
 - The shared **Conventions** page documents the options skeleton, the one-key-per-collection rule,
   the `false | Options` rule, and reading a plugin's marker back.
 - Every plugin Reference reflects the new nested shape, and the `payload-images` pages drop the

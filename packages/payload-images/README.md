@@ -6,6 +6,8 @@ On-demand image optimization for [Payload CMS](https://payloadcms.com/) — an I
 pnpm add @pro-laico/payload-images
 ```
 
+**Requires** Payload `^3`, React 19, sharp, and **Next.js 15+** (App Router). Not framework-agnostic: the transform endpoint, prewarming, and preset generation persist variants with Next's `after()`.
+
 Fetch images Sanity-style — seed `createImageFor` once with your app's Payload handle, then one
 chain resolves the render-ready doc (`src`/`srcset`/`alt`/`placeholder`), ready to spread into
 `<ResponsiveImage>`:

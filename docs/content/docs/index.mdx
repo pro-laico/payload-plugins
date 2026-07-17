@@ -71,7 +71,10 @@ export default buildConfig({
 })
 ```
 
-**Requirements**: Payload `^3`, React 19, and the Next.js App Router. Every package works
+**Requirements**: Payload `^3` and React 19. Next.js is per-plugin — `payload-revalidate` (16+),
+`payload-images`, and `payload-dev-tools` need the App Router; `payload-icons` and `payload-fonts`
+need it only to render icons / serve fonts; `payload-mux` and `payload-seed` don't need it at all.
+See [Conventions → Requirements](/docs/plugins/conventions#requirements). Every package works
 standalone — you never need to install more than the one you want.
 
 <Callout type="info">

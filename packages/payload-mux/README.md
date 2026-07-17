@@ -6,6 +6,8 @@
 pnpm add @pro-laico/payload-mux
 ```
 
+**Requires** Payload `^3` and React 19, plus a Mux account. **No framework requirement** — zero `next/` imports, no `next` peer; runs in any Payload app.
+
 **[Documentation →](https://payload-plugins.prolaico.com/docs/plugins/payload-mux)**
 
 Based on [`@oversightstudio/mux-video`](https://github.com/oversightstudio/payload-plugins) (MIT) by [Idan Yekutiel](https://github.com/idanyekutiel).

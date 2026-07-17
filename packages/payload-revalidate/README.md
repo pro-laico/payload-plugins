@@ -4,6 +4,8 @@ Atomic Next.js cache revalidation for Payload CMS (App Router, Cache Components)
 id-keyed cache entries, field-driven busts that touch exactly what a change means, and
 a live dependency map showing what revalidates when.
 
+**Requires** Payload `^3`, React 19, and **Next.js 16+ with Cache Components** on the App Router. It's a Next cache tool — there is no non-Next mode. Set `cacheComponents: true` in `next.config`.
+
 - **Field-driven write side** — `revalidatePlugin()` hooks every collection/global; doc
   tags always, scoped list tags only when a scope's declared fields (or membership)
   change, draft saves only the draft lane, `context.disableRevalidate` honored.
@@ -60,8 +62,6 @@ export async function getRecentPostIds() {
 The package never resolves Payload or your config itself — no globalThis stashes, no
 `@payload-config` alias tricks, no `transpilePackages` requirement. The handle you seed is
 the session that tags every read.
-
-Requires `next >= 16` with `cacheComponents: true`.
 
 ## Map CLI
 
