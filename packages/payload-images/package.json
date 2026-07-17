@@ -1,6 +1,6 @@
 {
   "name": "@pro-laico/payload-images",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Image optimization for Payload CMS: an Images upload collection that stores only the original, an on-demand Sharp transform endpoint (focal-aware crop, format negotiation, built-in LQIP placeholders), a durable variant cache with two-way purge, an admin focal-point picker, and a responsive <ResponsiveImage> component.",
   "license": "MIT",
   "repository": {

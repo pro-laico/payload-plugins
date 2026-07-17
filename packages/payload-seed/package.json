@@ -1,6 +1,6 @@
 {
   "name": "@pro-laico/payload-seed",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Schema-aware, type-safe seeding plugin for Payload CMS: typed cross-file references with dependency tracking, robust media uploads, a POST /api/seed endpoint, and a SeedRegistry injected into payload-types.ts.",
   "license": "MIT",
   "repository": {

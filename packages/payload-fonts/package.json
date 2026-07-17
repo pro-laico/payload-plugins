@@ -1,6 +1,6 @@
 {
   "name": "@pro-laico/payload-fonts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Custom fonts for Payload CMS: a Font typeface collection that subsets uploaded files to served WOFF2s, an optional fontSet global, an export endpoint + CLI that writes the active fonts to disk for next/font/local, and declarative seeding.",
   "license": "MIT",
   "repository": {

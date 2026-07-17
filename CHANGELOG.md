@@ -7,6 +7,8 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-17
+
 Every plugin's options now have the same nested shape, and the toggles that never earned their keep
 are gone. Configure one plugin and you can guess the next: `enabled`, a `collections` entry per
 collection the plugin registers (and `globals` where it has any), the one or two items that *are*
