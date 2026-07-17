@@ -7,6 +7,20 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-17
+
+### Changed
+
+- Dependencies bumped to their latest in-range versions. Payload 3.85.2 →
+  3.86.0 (`payload` + all `@payloadcms/*`) across every example app and plugin
+  peer, plus build/test tooling (`turbo`, `vitest`, `tsx`, `@types/node`,
+  `lint-staged` 17, `biome` 2.5.4), styling (`tailwindcss` 4.3.3, `postcss`),
+  docs (`fumadocs-*`, `lucide-react`), and the plugins' own runtime deps
+  (`sharp` 0.35.3, `svgo` 4.0.2, `@xyflow/react` 12.11.2). No API changes.
+- `typescript` held at 6 and `graphql` at 16. Next 16 doesn't yet recognize
+  TypeScript 7's native compiler (the build fails auto-installing a compatible
+  `tsc`), and `graphql` 17 is out of range for the `payload` 3.86 peer.
+
 ## [0.4.0] - 2026-07-17
 
 Every plugin's options now have the same nested shape, and the toggles that never earned their keep
