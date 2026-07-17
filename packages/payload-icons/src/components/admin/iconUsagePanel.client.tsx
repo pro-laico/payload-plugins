@@ -108,16 +108,31 @@ export const IconUsagePanelClient: React.FC<IconUsagePanelClientProps> = ({ mani
     )
   }
 
+  // A scan that found nothing is not a pass. Say so plainly instead of reporting "0 of 0" and a
+  // checkmark — if the names were expected, the scan looked in the wrong place.
+  if (staticNames.length === 0 && live.length === 0) {
+    return (
+      <div style={panelStyle}>
+        <strong>Requested icons</strong>
+        <p style={noteStyle}>
+          The scan found no <code style={codeStyle}>{'<Icon name="…" />'}</code> usages in your source. If you expected some, check that{' '}
+          <code style={codeStyle}>{scanCommand}</code> runs from your app root and covers the right roots and component name — a name built at
+          runtime (<code style={codeStyle}>{'name={slug}'}</code>) is never counted here.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div style={panelStyle}>
       <strong>Requested icons</strong>
       <p style={noteStyle}>
-        {manifest ? (
+        {staticNames.length > 0 ? (
           <>
-            {present.length} of {staticNames.length} name{staticNames.length === 1 ? '' : 's'} requested in code are defined here.
+            {present.length} of {staticNames.length} requested icon{staticNames.length === 1 ? ' is' : 's are'} defined here.
           </>
         ) : (
-          <>No build-time manifest — showing runtime requests only.</>
+          <>No icon names found in source — showing runtime requests only.</>
         )}
         {liveMissing > 0 ? ` ${liveMissing} requested in production but missing.` : missing.length === 0 ? ' All present ✅' : ''}
       </p>

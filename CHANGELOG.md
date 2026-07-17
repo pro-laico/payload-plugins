@@ -135,6 +135,15 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Fixed
 
+- `@pro-laico/payload-icons` — the IconSet **Requested icons** panel no longer reports
+  "0 of 0 … All present ✅" while your manifest has the names. In dev the panel scans live, and that
+  scanner swallows every fs error and returns an empty-but-truthy manifest — so a scan that couldn't
+  see your code (a cwd that isn't the app root, roots outside `src` / `app`, an aliased `<Icon>` tag)
+  silently shadowed the `icon-usage-manifest.json` the CLI wrote, and then printed a green checkmark
+  over a scan that had checked nothing. The panel now prefers whichever source actually found names,
+  and an empty scan says so plainly instead of passing: the checkmark is unreachable unless something
+  was really checked. Copy also reads "3 of 3 requested icons are defined here" rather than
+  "names requested in code".
 - `@pro-laico/payload-mux` — extending a collection that already defines a field the plugin injects
   (`title`, `assetId`, `status`, `duration`, `playbackOptions`, …) now fails at boot with a
   plugin-attributed error naming the colliding fields, instead of Payload's bare

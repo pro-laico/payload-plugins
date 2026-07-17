@@ -1,5 +1,6 @@
 import type { Payload, UIFieldServerComponent } from 'payload'
 
+import { pickUsageManifest } from '../../scan/pick'
 import { scanIconUsagesLive } from '../../scan/live'
 import { loadIconUsageManifest } from '../../scan/load'
 import { IconUsagePanelClient } from './iconUsagePanel.client'
@@ -10,14 +11,16 @@ import 'server-only'
 
 const DEFAULT_SCAN_COMMAND = 'npx payload-icons-scan'
 
-const getManifest = (manifestPath?: string): IconUsageManifest | null => {
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      return scanIconUsagesLive()
-    } catch {}
+const liveScan = (): IconUsageManifest | null => {
+  if (process.env.NODE_ENV === 'production') return null
+  try {
+    return scanIconUsagesLive()
+  } catch {
+    return null
   }
-  return loadIconUsageManifest(manifestPath)
 }
+
+const getManifest = (manifestPath?: string): IconUsageManifest | null => pickUsageManifest(liveScan(), loadIconUsageManifest(manifestPath))
 
 const loadLiveRequests = async (payload: Payload): Promise<LiveRequest[]> => {
   try {

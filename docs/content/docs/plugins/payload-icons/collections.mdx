@@ -100,6 +100,16 @@ sources:
   `file:line`. **In dev the panel scans live**, so there's nothing to set up or run. For **production** (source
   isn't on disk at runtime) run `payload-icons-scan` in your build to write an
   `icon-usage-manifest.json` the panel reads there.
+
+<Callout type="info">
+  The live dev scan takes the defaults: roots `./src` and `./app` relative to the dev server's
+  working directory, and a component literally named `<Icon>`. If your layout differs — icons under
+  another root, an aliased tag like `<AppIcon>`, or a monorepo where the server doesn't start at the
+  app root — it finds nothing. When that happens the panel falls back to the
+  `icon-usage-manifest.json` on disk, so running `payload-icons-scan` with the right `--component` /
+  roots fixes the panel in dev too. A scan that found nothing is reported as such, never as
+  "all present" — an empty scan is not a pass.
+</Callout>
 - **Runtime:** on by default too, `<Icon>` logs names that fail to resolve at runtime (incl. dynamic
   `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
   counts, last-seen, and a clear button.
