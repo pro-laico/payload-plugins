@@ -3,21 +3,31 @@ import type { IconSetCollectionOverrides } from '../collections/icon-set-collect
 import type { IconRequestCollectionOverrides } from '../collections/icon-request-collection'
 
 export interface IconsCollectionsOptions {
+  /** Merged onto the `icon` upload collection. Always registered. */
   icon?: IconCollectionOverrides
-  /** `false` skips the iconSet collection entirely. */
+  /** Merged onto the `iconSet` collection; `false` skips it entirely. */
   iconSet?: false | IconSetCollectionOverrides
-  /** `false` skips the iconRequest collection and its clear endpoint — nothing tracks missing icons. */
+  /** Merged onto the `iconRequest` collection; `false` skips it and its clear endpoint — nothing tracks missing icons. */
   iconRequest?: false | IconRequestCollectionOverrides
 }
 
 export interface IconsAdminOptions {
-  /** The usage panel on the iconSet edit view. Live-scans the source tree on every render in dev. */
+  /** The "Requested icons" panel on the iconSet edit view. Default `true`. */
   usagePanel?: boolean
 }
 
 export interface IconsPluginOptions {
+  /** Register nothing when false — no collections, endpoints, or hooks. Default `true`. */
   enabled?: boolean
+  /** The collections this plugin registers.
+   *
+   * - `icon`
+   * - `iconSet`
+   * - `iconRequest` */
   collections?: IconsCollectionsOptions
+  /** Admin-only toggles.
+   *
+   * - `usagePanel` */
   admin?: IconsAdminOptions
 }
 

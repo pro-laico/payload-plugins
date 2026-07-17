@@ -10,6 +10,22 @@ import { MuxVideo, muxEnhancements } from './collections/MuxVideo'
 import type { MuxVideoPluginOptions, PayloadMuxMarker } from './types'
 import { createMuxUploadHandler, getMuxUploadHandler } from './endpoints/upload'
 
+/** Video hosting inside Payload, powered by Mux: uploads go straight to Mux, playback /
+ * poster / gif URLs compute on read, and the two stay in sync.
+ *
+ * - `enabled`
+ * - `collections`
+ * - `admin`
+ * - `extendCollection`
+ * - `initSettings`
+ * - `uploadSettings`
+ * - `signedUrlOptions`
+ * - `playbackPolicy`
+ * - `posterExtension`
+ * - `animatedGifExtension`
+ * - `autoCreateOnWebhook`
+ * - `access`
+ */
 export const muxVideoPlugin =
   (opts: MuxVideoPluginOptions = {}): Plugin =>
   (incomingConfig: Config): Config => {

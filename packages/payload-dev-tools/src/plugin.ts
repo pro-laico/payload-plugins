@@ -7,6 +7,12 @@ import { createStageEndpoint } from './endpoints/stage'
 import { createActivateIconSetEndpoint } from './endpoints/activateIconSet'
 import type { DevToolsPluginOptions, PayloadDevToolsMarker } from './types'
 
+/** Dev-only toolbar, `/dev` pages, and a machine-readable app snapshot. Everything here
+ * disappears in production.
+ *
+ * - `enabled`
+ * - `devRoute`
+ */
 export const devToolsPlugin =
   (opts: DevToolsPluginOptions = {}): Plugin =>
   (config: Config): Config => {

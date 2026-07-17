@@ -1,6 +1,7 @@
 export interface DevToolsPluginOptions {
-  /** Defaults to `NODE_ENV === 'development'` — the dev endpoints are not registered at all when off. */
+  /** Force the toolbar and dev endpoints on or off. Default: `NODE_ENV === 'development'`; when off, nothing is registered. */
   enabled?: boolean
+  /** Where the app mounts the `createDevPage` catch-all. Default `'/dev'`. */
   devRoute?: string
 }
 

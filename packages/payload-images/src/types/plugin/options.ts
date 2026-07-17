@@ -22,19 +22,61 @@ export interface ImagesAdminOptions {
 }
 
 export interface ImagesPluginOptions {
+  /** Register nothing when false — no collections, endpoints, or hooks. Default `true`. */
   enabled?: boolean
+  /** Put the image fields on an existing upload collection instead of registering `images`. */
   extendCollection?: string
+  /** The collections this plugin registers.
+   *
+   * - `images`
+   * - `generatedImages` */
   collections?: ImagesCollectionsOptions
+  /** Admin-only toggles.
+   *
+   * - `focalUI`
+   * - `folders` */
   admin?: ImagesAdminOptions
+  /** The transform endpoint's limits and defaults.
+   *
+   * - `maxDimension`
+   * - `qualityRange`
+   * - `defaultQuality`
+   * - `formats`
+   * - `defaultFormat`
+   * - `preferAvif`
+   * - `maxInputPixels`
+   * - `cdnCacheControl`
+   * - `maxConcurrency`
+   * - `sharpConcurrency`
+   * - `fallback` */
   transform?: TransformEndpointConfig
+  /** Pre-generate the variants the site actually serves. On by default; `false` opts out.
+   *
+   * - `seeds`
+   * - `formats`
+   * - `maxVariantsPerImage`
+   * - `autoRun`
+   * - `queue` */
   prewarm?: false | PrewarmOptions
+  /** Width ladder for generated `srcset`s — a step size, or explicit widths. */
   pixelStep?: number | number[]
+  /** Named render specs, guaranteed to exist and exempt from `variantLimit`.
+   *
+   * - `width`
+   * - `height`
+   * - `aspectRatio`
+   * - `fit`
+   * - `quality`
+   * - `format` */
   presetTemplates?: Record<string, PresetSpec>
+  /** Max cached variants per image before new sizes are served from a nearby one instead. */
   variantLimit?: number
   /** Defaults to whether the app configures localization — a localized site localizes its alt text.
    * Flipping this on an existing collection is a data migration; set it explicitly to opt out. */
   localizeAlt?: boolean
+  /** Accepted upload MIME types. Ignored under `extendCollection` — you own that upload config. */
   mimeTypes?: string[]
+  /** Max accepted upload size in bytes. Ignored under `extendCollection`. */
   maxOriginalSize?: number
 }
 

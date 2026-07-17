@@ -7,6 +7,13 @@ import { createClearIconRequestsEndpoint } from './endpoints/clearIconRequests'
 import type { IconsPluginOptions, PayloadIconsMarker } from './types'
 import { createIconRequestCollection, ICON_REQUEST_SLUG } from './collections/IconRequest'
 
+/** Your own icon set in Payload: upload an `.svg` and it's optimized, sanitized, and themed to
+ * `currentColor` on save, then rendered by `<Icon name="…">`.
+ *
+ * - `enabled`
+ * - `collections`
+ * - `admin`
+ */
 export const iconsPlugin =
   (opts: IconsPluginOptions = {}): Plugin =>
   (config: Config): Config => {

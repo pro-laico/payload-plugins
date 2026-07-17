@@ -23,6 +23,16 @@ function binScriptPath(name: string): string {
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
+/** Atomic Next.js cache revalidation: edit one document and only the pages that show it go
+ * stale. Field-driven busts, id-keyed cache entries, and a live dependency map.
+ *
+ * - `enabled`
+ * - `prefix`
+ * - `collections`
+ * - `globals`
+ * - `rules`
+ * - `observe`
+ */
 export const revalidatePlugin =
   (opts: RevalidatePluginOptions = {}): Plugin =>
   (config: Config): Config => {

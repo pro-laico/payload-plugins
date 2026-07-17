@@ -32,19 +32,49 @@ export interface MuxAccessOptions {
 }
 
 export interface MuxVideoPluginOptions {
+  /** Register nothing when false — no collection, endpoints, or hooks. Default `true`. */
   enabled?: boolean
+  /** The collections this plugin registers.
+   *
+   * - `muxVideo` */
   collections?: MuxCollectionsOptions
+  /** Admin-only toggles.
+   *
+   * - `thumbnail` */
   admin?: MuxAdminOptions
+  /** Put the Mux fields on an existing collection instead of registering `mux-video`. That
+   * collection keeps its own labels, admin config, and access. */
   extendCollection?: CollectionSlug
+  /** Mux credentials. Every field falls back to its `MUX_*` env var.
+   *
+   * - `tokenId`
+   * - `tokenSecret`
+   * - `webhookSecret`
+   * - `jwtSigningKey`
+   * - `jwtPrivateKey` */
   initSettings?: MuxVideoInitSettings
+  /** Applied to every direct upload.
+   *
+   * - `cors_origin`
+   * - `new_asset_settings` */
   uploadSettings?: MuxVideoUploadSettings
+  /** Lifetime of the JWT-signed playback URLs under a signed policy.
+   *
+   * - `expiration` */
   signedUrlOptions?: MuxVideoSignedUrlOptions
+  /** Playback policy for new uploads; `'signed'` issues JWT-signed URLs. Default `'public'`. */
   playbackPolicy?: MuxPlaybackPolicy
+  /** Image format for `posterUrl`. Default `'png'`. */
   posterExtension?: MuxPosterExtension
+  /** Format for the animated preview (`gifUrl`). Default `'gif'`. */
   animatedGifExtension?: MuxAnimatedGifExtension
   /** Backfill a Payload doc for an asset created outside Payload (e.g. in the Mux dashboard).
    * Off by default: one Mux account shared across environments would cross-backfill each of them. */
   autoCreateOnWebhook?: boolean
+  /** Who may read videos and who may request an upload; both default to a logged-in admin user.
+   *
+   * - `read`
+   * - `upload` */
   access?: MuxAccessOptions
 }
 

@@ -13,6 +13,14 @@ function binScriptPath(name: string): string {
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
+/** Declarative, typed seeding: your `defineSeed` exports become one repeatable run. A
+ * bootstrap tool for the data a project stands up with — every run is destructive.
+ *
+ * - `enabled`
+ * - `definitions`
+ * - `assetsDir`
+ * - `assetSubDirs`
+ */
 export const seedPlugin =
   (opts: SeedPluginOptions = {}): Plugin =>
   (incomingConfig: Config): Config => {

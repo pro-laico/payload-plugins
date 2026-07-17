@@ -48,6 +48,22 @@ const namedFields = (fields: CollectionConfig['fields']): string[] =>
     return []
   })
 
+/** On-demand image optimization: upload a picture once, then ask for any size, crop, or
+ * format by URL. Variants generate on first request and are cached.
+ *
+ * - `enabled`
+ * - `extendCollection`
+ * - `collections`
+ * - `admin`
+ * - `transform`
+ * - `prewarm`
+ * - `pixelStep`
+ * - `presetTemplates`
+ * - `variantLimit`
+ * - `localizeAlt`
+ * - `mimeTypes`
+ * - `maxOriginalSize`
+ */
 export const imagesPlugin =
   (opts: ImagesPluginOptions = {}): Plugin =>
   (config: Config): Config => {

@@ -19,6 +19,15 @@ function binScriptPath(name: string): string {
   return resolve(dirname(here), 'bin', `${name}.${ext}`)
 }
 
+/** Self-hosted fonts editors control: upload a typeface, it's subsetted on save and served
+ * through `next/font/local`.
+ *
+ * - `enabled`
+ * - `collections`
+ * - `globals`
+ * - `charset`
+ * - `families`
+ */
 export const fontsPlugin =
   (opts: FontsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
