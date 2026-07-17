@@ -107,6 +107,20 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Added
 
+- `@pro-laico/payload-fonts` — **`payload fonts:download`**, a build step that needs no running
+  site. It resolves the `fontSet` selection through the Local API and writes the same
+  `public/fonts/*.woff2` + `next/font/local` module the HTTP CLI does — but with no
+  `FONT_DOWNLOAD_URL`, no `PAYLOAD_SECRET` round-trip, and nothing to be up and publicly reachable
+  while `prebuild` runs. Fonts on S3 still work: the read goes through the collection's own storage
+  adapter. Point `prebuild` / `predev` at it and delete the two env vars.
+
+  The HTTP `payload-fonts-download` CLI stays for builds that genuinely can't reach the database
+  (a remote build box). It still fails soft — every handled failure writes an empty definition and
+  exits 0, deliberately: erroring would make the *first* production deploy impossible, since no
+  server yet means no fonts selected, which would fail the build, which means you never get a
+  server. It's louder about it now, though: a **production** build that ends up with no fonts says
+  so instead of logging a dev-shaped info line (dev stays quiet — `<DevFonts>` serves fonts at
+  runtime there, so no server running is just the normal pre-`next dev` state).
 - `@pro-laico/payload-mux` — `MuxAccessFn` / `MuxAccessOptions` are exported, so a shared `read` /
   `upload` gate can be typed.
 - `@pro-laico/payload-mux` — env-name compatibility with `@oversightstudio/mux-video`. Where the
@@ -135,6 +149,12 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Fixed
 
+- `@pro-laico/payload-fonts` — `PAYLOAD_FONTS_*` env vars set in `.env.local` / `.env` now actually
+  apply. The download CLI read them out of `process.env` *before* it loaded the env file, so
+  `PAYLOAD_FONTS_OUTPUT_DIR` and friends silently fell back to their defaults unless you exported
+  them in the shell — while `FONT_DOWNLOAD_URL`, read after the load, worked fine. The env file is
+  now loaded before anything else is read, which also gives `payload fonts:download` the same
+  handling.
 - `@pro-laico/payload-icons` — the IconSet **Requested icons** panel no longer reports
   "0 of 0 … All present ✅" while your manifest has the names. In dev the panel scans live, and that
   scanner swallows every fs error and returns an empty-but-truthy manifest — so a scan that couldn't

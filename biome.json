@@ -23,6 +23,7 @@
       "!**/*.generated.*",
       "!**/payload-types.ts",
       "!**/importMap.js",
+      "!**/app/definition.ts",
       "!**/*.tsbuildinfo"
     ]
   },

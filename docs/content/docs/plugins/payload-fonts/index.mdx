@@ -30,7 +30,7 @@ Self-hosting fonts through `next/font` needs a few one-time wiring steps. Each m
 | **Next.js App Router**, 15+ | For *serving*. The package itself imports nothing from `next` — the download CLI **writes** a module that does (`import localFont from 'next/font/local'`), which your root layout imports. Uploading, subsetting, and exporting `.woff2` work in any Payload app; without Next, take the exported files and write your own `@font-face`. |
 | **A `next.config` change** | The subsetter (`subset-font` / `harfbuzzjs` / `fontkit`) must be externalized, or the wasm breaks and optimization silently skips (Step 2). |
 | **Root-layout wiring** | `extractFonts` on `<html>` plus `<DevFonts>` in `<head>` — the two serving paths (Step 4). |
-| **A prebuild script** | The `payload-fonts-download` CLI writes the fonts + `src/app/definition.ts` your layout imports (Step 3). |
+| **A prebuild script** | `payload fonts:download` writes the fonts + `src/app/definition.ts` your layout imports (Step 3). It reads the database directly — no running site needed. |
 | **`generate:importmap`** | The plugin registers admin components; regenerate the import map after installing (Step 3). |
 
 ## Quickstart
@@ -72,17 +72,16 @@ export default withPayload(nextConfig)
 <Step>
 **Generate the fonts and wire the build scripts**
 
-Production self-hosts via `next/font/local`. The `payload-fonts-download` CLI resolves the `fontSet`
+Production self-hosts via `next/font/local`. `payload fonts:download` resolves the `fontSet`
 selection and writes `public/fonts/*.woff2` + `src/app/definition.ts` — the file your layout imports
-in the next step. Run it on both `prebuild` (real fonts for the build) and `predev` (an empty stub so
-the import resolves before your dev server is up; `<DevFonts>` serves at runtime):
+in the next step:
 
 ```json
 // package.json
 {
   "scripts": {
     "build": "next build",
-    "prebuild": "payload-fonts-download",
+    "prebuild": "payload fonts:download",
     "predev": "payload-fonts-download",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap"
@@ -90,21 +89,33 @@ the import resolves before your dev server is up; `<DevFonts>` serves at runtime
 }
 ```
 
+<Callout type="info">
+  **Why `predev` uses the other command.** `predev` exists only to make `definition.ts` exist so the
+  import resolves — it wants the **empty stub**, and the HTTP CLI writes one when nothing is running
+  yet. That's deliberate: `<DevFonts>` stands down the moment the definition has fonts in it
+  (`if (definition && extractFonts(definition)) return null`), so baking real fonts into dev would
+  trade runtime font-switching for a restart every time you change a typeface. Use
+  `payload fonts:download` where you *want* baked fonts — the build.
+</Callout>
+
 **Required: regenerate the import map.** The plugin registers admin components. Run
 `pnpm payload generate:importmap` and restart the dev server, or the admin font fields render blank.
 
-The CLI authenticates against your running Payload instance, so set two env vars:
-
-```bash
-# .env
-FONT_DOWNLOAD_URL=http://localhost:3000   # the running Payload URL the CLI fetches from
-PAYLOAD_SECRET=…                          # already in your Payload project, reused as the bearer token
-```
+It reads the database through Payload's Local API, so it needs **nothing running** and no extra env
+beyond what your Payload app already has (`DATABASE_URI`, `PAYLOAD_SECRET`). Fonts on S3 work too —
+the read goes through your collection's own storage adapter.
 
 <Callout type="info">
-  `payload-fonts-download` fetches over HTTP, so that Payload instance must be up and reachable while
-  the script runs. `src/app/definition.ts` and `public/fonts/` are both generated — **gitignore** them.
-  See [Reference](/docs/plugins/payload-fonts/reference#environment-variables) for every CLI env var.
+  `src/app/definition.ts` and `public/fonts/` are both generated — **gitignore** them.
+</Callout>
+
+<Callout type="info">
+  **Building somewhere that can't reach the database?** Use the `payload-fonts-download` CLI instead:
+  it fetches the same fonts over HTTP from a running site, and needs `FONT_DOWNLOAD_URL` plus a
+  matching `PAYLOAD_SECRET`. That instance must be up and reachable while the script runs — if it
+  isn't, the CLI writes an empty definition and the build ships with no fonts. See
+  [Serving](/docs/plugins/payload-fonts/serving) and
+  [Reference](/docs/plugins/payload-fonts/reference#environment-variables).
 </Callout>
 </Step>
 

@@ -39,9 +39,13 @@ Migrate those docs (or keep the old key) when you reshape the list.
 Both are generated — `payload-fonts-download` owns them; there's no file to hand-create or hand-edit.
 Gitignore `src/app/definition.ts` and `public/fonts/`.
 
+**`payload fonts:download` dies with `ENOENT node:crypto` (or another `node:` builtin).**
+Not this plugin — it's every custom `payload <command>` on Payload **≤ 3.85.1** with Node 23.5+. Payload wraps its CLI in `tsx`, whose namespaced importer leaked a `?namespace=…` query onto `node:` builtins under Node's newer synchronous module hooks, so Node tried to open `node:crypto` as a file.
+**Upgrade to `payload@>=3.85.2`**, which fixes it upstream ([payloadcms/payload#16949](https://github.com/payloadcms/payload/issues/16949)). If you're pinned to an older Payload, `payload --use-swc fonts:download` (with `@swc-node/register` installed) sidesteps tsx, or use the HTTP `payload-fonts-download` CLI, which doesn't go through Payload's bin at all.
+
 **The build shipped with no fonts — everything falls back to your CSS stacks.**
-The download CLI fetches over HTTP from `FONT_DOWNLOAD_URL`, so that Payload instance must be up and reachable while `prebuild` runs. When it can't reach it, the CLI resets `definition.ts` to an **empty** module and exits 0 so the build still compiles.
-Make sure Payload is running and reachable during `prebuild`, and watch the build log.
+You're on the HTTP CLI (`payload-fonts-download`), which fetches from `FONT_DOWNLOAD_URL`, so that Payload instance must be up and reachable while `prebuild` runs. When it can't reach it, the CLI resets `definition.ts` to an **empty** module and exits 0 so the build still compiles.
+**Switch `prebuild` to `payload fonts:download`** — it reads the database through the Local API, so there's no site to be up, no URL, and no secret to match. Keep the HTTP CLI only if your build box genuinely can't reach the database; then make sure Payload is running during `prebuild` and watch the build log (a production build that ends up with no fonts now says so loudly, though it still exits 0).
 
 <Callout type="warn">
   **The download CLI fails soft, and carries your secret.** Every handled failure writes the empty

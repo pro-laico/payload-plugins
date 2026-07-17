@@ -72,25 +72,28 @@ built-in font-mime whitelist.
 
 ## Environment variables
 
-The `payload-fonts-download` CLI reads these. Only the first two are required:
+Both commands write files, so both read the output vars. Only the transport differs: `payload
+fonts:download` gets its database connection from your Payload config, so the `FONT_DOWNLOAD_URL` /
+endpoint pair is dead weight there.
 
-| Env var | Default | What |
-| --- | --- | --- |
-| `FONT_DOWNLOAD_URL` | — | **Required.** URL of the running Payload instance to fetch from. |
-| `PAYLOAD_SECRET` | — | **Required.** Bearer secret that authorizes the export endpoint. |
-| `PAYLOAD_FONTS_OUTPUT_DIR` | `./public/fonts` | Where the downloaded WOFF2 files are written. |
-| `PAYLOAD_FONTS_DEFINITION_FILE` | `./src/app/definition.ts` | The generated `next/font/local` module. |
-| `PAYLOAD_FONTS_SRC_PREFIX` | `../../public/fonts` | `src` path in the generated `localFont()` calls, relative to the definition file. |
-| `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | Prefix for the emitted CSS family variables; must match `<DevFonts cssVarPrefix>`. |
-| `PAYLOAD_FONTS_ENDPOINT` | `/api/fonts/export` | Export endpoint path, resolved against the site URL. |
-| `PAYLOAD_FONTS_ENV_FILE` | `./.env.local, ./.env` | Dotenv file(s) loaded before reading env. Unset, both are loaded; set, only the named file. |
-| `PAYLOAD_FONTS_VERBOSE` | `false` | Print the full error on failure (also the `--verbose` / `-v` flag). |
+| Env var | Default | Applies to | What |
+| --- | --- | --- | --- |
+| `FONT_DOWNLOAD_URL` | — | HTTP CLI | **Required by `payload-fonts-download`.** URL of the running Payload instance to fetch from. `payload fonts:download` doesn't use it. |
+| `PAYLOAD_SECRET` | — | both | **Required.** The HTTP CLI sends it as the bearer token the export endpoint checks; `payload fonts:download` just needs it because it boots your Payload config. It's already in your project either way. |
+| `PAYLOAD_FONTS_ENDPOINT` | `/api/fonts/export` | HTTP CLI | Export endpoint path, resolved against the site URL. |
+| `PAYLOAD_FONTS_OUTPUT_DIR` | `./public/fonts` | both | Where the downloaded WOFF2 files are written. |
+| `PAYLOAD_FONTS_DEFINITION_FILE` | `./src/app/definition.ts` | both | The generated `next/font/local` module. |
+| `PAYLOAD_FONTS_SRC_PREFIX` | `../../public/fonts` | both | `src` path in the generated `localFont()` calls, relative to the definition file. |
+| `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | both | Prefix for the emitted CSS family variables; must match `<DevFonts cssVarPrefix>`. |
+| `PAYLOAD_FONTS_ENV_FILE` | `./.env.local, ./.env` | both | Dotenv file(s) loaded before anything else is read. Unset, both are loaded; set, only the named file. |
+| `PAYLOAD_FONTS_VERBOSE` | `false` | both | Print the full error on failure (also the `--verbose` / `-v` flag). |
 
 ## CLI commands
 
 | Command | What |
 | --- | --- |
-| `payload-fonts-download` | The production build step. Resolves the `fontSet` selection over `GET /api/fonts/export`, writes `public/fonts/*.woff2` + `src/app/definition.ts`, and empties the definition on any failure. Run it on `prebuild` (real fonts) and `predev` (empty stub). See [Serving](/docs/plugins/payload-fonts/serving). |
+| `payload fonts:download` | **The production build step** — put it on `prebuild`. Resolves the `fontSet` selection through the Local API, so no running site, no `FONT_DOWNLOAD_URL`, no HTTP, and writes `public/fonts/*.woff2` + `src/app/definition.ts`. Don't use it for `predev`: it bakes real fonts, and `<DevFonts>` stands down whenever the definition has fonts, which costs you runtime font-switching in dev. See [Serving](/docs/plugins/payload-fonts/serving). |
+| `payload-fonts-download` | The same job over HTTP, for a build that **can't reach the database** (a remote build box). Fetches `GET /api/fonts/export` from a running site with `FONT_DOWNLOAD_URL` + `PAYLOAD_SECRET`, and empties the definition on any failure — including when that site is unreachable, so the build can ship with no fonts. Prefer `payload fonts:download` where you can. |
 
 ## Endpoints
 

@@ -38,19 +38,29 @@ Production self-hosts via [`next/font/local`](https://nextjs.org/docs/app/api-re
 That gives precise preloading, size-adjusted fallbacks, and content-hashed static assets. A build step
 resolves the `fontSet` selection and writes the fonts to disk:
 
-- `GET /api/fonts/export`, gated by `PAYLOAD_SECRET` (Bearer), returns each active family's
-  `fontOptimized` bytes.
-- The `payload-fonts-download` CLI fetches that and writes `public/fonts/*.woff2` +
-  `src/app/definition.ts`. `extractFonts` puts the generated classes (which define the `--font-set*`
-  variables) on `<html>`.
+- `payload fonts:download` reads the active families straight from the database through Payload's
+  Local API and writes `public/fonts/*.woff2` + `src/app/definition.ts`. `extractFonts` puts the
+  generated classes (which define the `--font-set*` variables) on `<html>`.
+- Nothing needs to be running, and there's no URL or bearer token to configure — it boots your own
+  Payload config. Fonts on cloud storage work the same way: the read goes through your collection's
+  storage adapter.
 
 ```json
-// package.json: set FONT_DOWNLOAD_URL (the running Payload URL) + PAYLOAD_SECRET
-{ "scripts": { "prebuild": "payload-fonts-download" } }
+// package.json — no extra env; it uses your Payload config
+{ "scripts": { "prebuild": "payload fonts:download" } }
 ```
+
+For a build that genuinely **can't reach the database** (a remote build box), the
+`payload-fonts-download` CLI does the same job over HTTP: it fetches `GET /api/fonts/export` — gated
+by `PAYLOAD_SECRET` (Bearer) — from a running site named by `FONT_DOWNLOAD_URL`. That instance must
+be up while the script runs; if it isn't, the CLI writes an empty definition and the build ships
+without fonts.
 
 `definition.ts` and `public/fonts/` are generated, so gitignore them. A `predev: payload-fonts-download`
 writes an empty stub so the import resolves before your dev server is up (no file to hand-create).
+Keep `predev` on the HTTP CLI: `payload fonts:download` would bake real fonts into dev, and
+`<DevFonts>` stands down as soon as the definition has fonts in it — you'd trade live font-switching
+for a restart per change.
 
 <Callout type="info">
   **Alternative to `predev`:** commit an empty `definition.ts` as a baseline and skip `predev`

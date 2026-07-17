@@ -3,7 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { runDownloadFonts } from '../../src/scripts/downloadFonts'
+import { runDownloadFonts, writeFontsFromManifest } from '../../src/scripts/downloadFonts'
+import type { ExportFontsResponse } from '../../src/types'
 
 // A definition.ts as a previous SUCCESSFUL run would have written it — one localFont() call per
 // family, importing files under public/fonts. The bug being guarded: on a later FAILED run, this
@@ -39,6 +40,7 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     fs.rmSync(dir, { recursive: true, force: true })
     if (savedSecret === undefined) delete process.env.PAYLOAD_SECRET
     else process.env.PAYLOAD_SECRET = savedSecret
@@ -70,6 +72,31 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
     await runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' })
 
     expect(hasFontDeclarations(definitionFile)).toBe(false)
+  })
+
+  // A build with no fonts is only tolerable because failing would be worse: no server yet means no
+  // fonts selected, which would fail the build, which means you never get a server. So it stays
+  // exit-0 — but in production it says so, instead of the dev-shaped info line.
+  it('says so loudly when a production build ends up with no fonts, and still exits 0', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    process.env.PAYLOAD_SECRET = 'secret'
+    const refused = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:1'), { code: 'ECONNREFUSED' }),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(refused)),
+    )
+
+    await runDownloadFonts({ ...baseOpts(), siteUrl: 'http://localhost:1' })
+
+    expect(hasFontDeclarations(definitionFile)).toBe(false)
+    const warned = vi
+      .mocked(console.warn)
+      .mock.calls.map((c) => String(c[0]))
+      .join('\n')
+    expect(warned).toContain('this build has NO fonts')
+    expect(warned).toContain('fonts:download') // point them at the transport that doesn't need a server
   })
 
   it('treats connection-refused as the calm predev state — empties the definition without the loud failure', async () => {
@@ -193,6 +220,82 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
       expect(out).toContain("variable: '--font-setBrand'")
       expect(out).toContain('const fonts = { fontBrand }')
       expect(fs.existsSync(path.join(fontsOutputDir, 'brand-700.woff2'))).toBe(true)
+    })
+  })
+
+  // Options were read out of process.env BEFORE dotenv loaded the file, so a PAYLOAD_FONTS_* var
+  // in .env.local was ignored and silently fell back to its default — while FONT_DOWNLOAD_URL,
+  // read later, picked it up. Both paths resolve options through the same place now, so this also
+  // covers `payload fonts:download`.
+  it('honours PAYLOAD_FONTS_* from the env file, not just the shell', async () => {
+    const envFile = path.join(dir, '.env.local')
+    const outFromEnvFile = path.join(dir, 'from-env-file')
+    fs.writeFileSync(envFile, `PAYLOAD_FONTS_OUTPUT_DIR=${outFromEnvFile.replace(/\\/g, '/')}\n`)
+    delete process.env.PAYLOAD_FONTS_OUTPUT_DIR
+
+    const manifest: ExportFontsResponse = {
+      fonts: {
+        sans: [
+          {
+            filename: 'inter.woff2',
+            extension: 'woff2',
+            mimeType: 'font/woff2',
+            data: Buffer.from('x').toString('base64'),
+            weight: '400',
+            style: 'normal',
+          },
+        ],
+      },
+      diagnostics: {},
+    }
+
+    writeFontsFromManifest(manifest, { definitionFile, envFile })
+
+    expect(fs.existsSync(path.join(outFromEnvFile, 'sans-400.woff2'))).toBe(true)
+  })
+
+  // The seam `payload fonts:download` uses: it reads the manifest from the database through the
+  // Local API, then hands it to the same writer the HTTP path uses.
+  describe('writeFontsFromManifest — the transport-free half', () => {
+    const manifest: ExportFontsResponse = {
+      fonts: {
+        sans: [
+          {
+            filename: 'inter.woff2',
+            extension: 'woff2',
+            mimeType: 'font/woff2',
+            data: Buffer.from('x').toString('base64'),
+            weight: '400',
+            style: 'normal',
+          },
+        ],
+      },
+      diagnostics: {},
+    }
+
+    it('writes the files and the definition with no server, no URL, and no secret', () => {
+      delete process.env.PAYLOAD_SECRET
+      delete process.env.FONT_DOWNLOAD_URL
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject(new Error('the local path must not touch the network'))),
+      )
+
+      writeFontsFromManifest(manifest, baseOpts())
+
+      const out = fs.readFileSync(definitionFile, 'utf8')
+      expect(out).toContain("import localFont from 'next/font/local'")
+      expect(out).toContain('const fontSans = localFont(')
+      expect(fs.existsSync(path.join(fontsOutputDir, 'sans-400.woff2'))).toBe(true)
+    })
+
+    it('empties a stale definition when the database has no active fonts', () => {
+      expect(hasFontDeclarations(definitionFile)).toBe(true) // a previous run's output
+
+      writeFontsFromManifest({ fonts: {}, diagnostics: {} }, baseOpts())
+
+      expect(hasFontDeclarations(definitionFile)).toBe(false)
+      expect(fs.readFileSync(definitionFile, 'utf8')).toContain('No fonts available')
     })
   })
 })

@@ -24,10 +24,17 @@ const isServerDown = (err: unknown): boolean => {
 
 function resolveOptions(overrides?: RunDownloadFontsOptions) {
   const explicitEnvFile = overrides?.envFile ?? process.env.PAYLOAD_FONTS_ENV_FILE
+  const envFiles = explicitEnvFile ? [explicitEnvFile] : ['./.env.local', './.env']
+  // Load the env file(s) BEFORE reading anything out of process.env. This used to run afterwards,
+  // which meant every PAYLOAD_FONTS_* var below was read too early to see .env.local and silently
+  // fell back to its default unless it was exported in the real shell — while FONT_DOWNLOAD_URL,
+  // read later, did pick it up. Doing it here also gives `payload fonts:download` the same env
+  // handling for free, since both entry points resolve options through this.
+  dotenv.config({ path: envFiles, quiet: true })
   return {
     fontsOutputDir: overrides?.fontsOutputDir ?? process.env.PAYLOAD_FONTS_OUTPUT_DIR ?? './public/fonts',
     definitionFile: overrides?.definitionFile ?? process.env.PAYLOAD_FONTS_DEFINITION_FILE ?? './src/app/definition.ts',
-    envFiles: explicitEnvFile ? [explicitEnvFile] : ['./.env.local', './.env'],
+    envFiles,
     localFontSrcPrefix: overrides?.localFontSrcPrefix ?? process.env.PAYLOAD_FONTS_SRC_PREFIX ?? '../../public/fonts',
     cssVariablePrefix: overrides?.cssVariablePrefix ?? process.env.PAYLOAD_FONTS_CSS_VAR_PREFIX ?? '--font-set',
     endpointPath: overrides?.endpointPath ?? process.env.PAYLOAD_FONTS_ENDPOINT ?? '/api/fonts/export',
@@ -35,10 +42,12 @@ function resolveOptions(overrides?: RunDownloadFontsOptions) {
   }
 }
 
-export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Promise<void> {
-  const opts = resolveOptions(overrides)
-  dotenv.config({ path: opts.envFiles, quiet: true })
+type ResolvedOptions = ReturnType<typeof resolveOptions>
 
+/** The disk half: turn a manifest into `.woff2` files plus the `next/font/local` module the root
+ * layout imports. Deliberately transport-agnostic — the HTTP CLI and the `payload fonts:download`
+ * bin obtain the same manifest differently and both end up here. */
+function createWriter(opts: ResolvedOptions) {
   const FONT_FILES_DIR = opts.fontsOutputDir
   const FONT_DEFINITION_FILE = opts.definitionFile
   const localPrefix = opts.localFontSrcPrefix.replace(/\/$/, '')
@@ -79,7 +88,7 @@ export default fonts
     )
   }
 
-  function writeEmptyDefinitions(): void {
+  function empty(): void {
     generateFontDefinitions({})
   }
 
@@ -91,59 +100,7 @@ export default fonts
     }
   }
 
-  function warnAndEmpty(message: string, error?: unknown): void {
-    console.warn(colors.red(message))
-    if (error) {
-      if (opts.verbose) console.warn(error)
-      else console.warn(colors.orange('Re-run with --verbose (or set PAYLOAD_FONTS_VERBOSE=true) to see the full error.'))
-    }
-    console.warn(colors.orange('Font download failed — wrote an empty definition so the build can proceed.'))
-    writeEmptyDefinitions()
-  }
-
-  try {
-    console.log(colors.blue('Starting Font Download...\n'))
-
-    const siteUrl = overrides?.siteUrl ?? process.env.FONT_DOWNLOAD_URL
-    const secret = process.env.PAYLOAD_SECRET
-    if (!siteUrl || !secret) {
-      const searched = ` (searched ${opts.envFiles.join(', ')})`
-      if (!siteUrl) console.warn(colors.red(`Missing required environment variable: FONT_DOWNLOAD_URL${searched}`))
-      if (!secret) console.warn(colors.red(`Missing required environment variable: PAYLOAD_SECRET${searched}`))
-      console.warn(colors.orange('Font download skipped — wrote an empty definition so the build can proceed.'))
-      writeEmptyDefinitions()
-      return
-    }
-    if (!/^https?:\/\//i.test(siteUrl) || !URL.canParse(siteUrl)) {
-      warnAndEmpty(`FONT_DOWNLOAD_URL is not a valid http(s) URL: "${siteUrl}" — expected e.g. http://localhost:3000`)
-      return
-    }
-
-    const endpoint = new URL(opts.endpointPath, siteUrl).toString()
-    let manifest: ExportFontsResponse
-    try {
-      const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${secret}` } })
-      if (!res.ok) {
-        const hint =
-          res.status === 401 || res.status === 403
-            ? " — your local PAYLOAD_SECRET doesn't match the server's"
-            : res.status === 404
-              ? ' — is the fonts plugin registered on that app? (or set PAYLOAD_FONTS_ENDPOINT)'
-              : ''
-        warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}${hint}`)
-        return
-      }
-      manifest = await res.json()
-    } catch (err) {
-      if (isServerDown(err)) {
-        console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)
-        writeEmptyDefinitions()
-        return
-      }
-      warnAndEmpty(`Could not reach the font export endpoint at ${endpoint}`, err)
-      return
-    }
-
+  function fromManifest(manifest: ExportFontsResponse): void {
     const fonts = manifest?.fonts ?? {}
 
     wipeFontFiles()
@@ -202,6 +159,91 @@ export default fonts
       }
       console.log('')
     } else console.log(colors.green(`\n✓ Font definitions generated (${count} font file${count === 1 ? '' : 's'})\n`))
+  }
+
+  return { empty, fromManifest }
+}
+
+/** Write an already-resolved manifest. Used by the `payload fonts:download` bin, which reads the
+ * fonts straight out of the database through the Local API instead of over HTTP. */
+export function writeFontsFromManifest(manifest: ExportFontsResponse, overrides?: RunDownloadFontsOptions): void {
+  createWriter(resolveOptions(overrides)).fromManifest(manifest)
+}
+
+/** Fetch the fonts from a RUNNING Payload over HTTP, then write them.
+ *
+ * Every failure here writes an empty definition and exits 0, on purpose: a build must never be
+ * blocked on fonts. Erroring instead would make the first production deploy impossible — no server
+ * yet means no fonts selected, which would fail the build, which means you never get a server.
+ * Prefer `payload fonts:download`, which needs no running site at all. */
+export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Promise<void> {
+  const opts = resolveOptions(overrides) // loads the env file(s) first
+  const write = createWriter(opts)
+
+  function warnAndEmpty(message: string, error?: unknown): void {
+    console.warn(colors.red(message))
+    if (error) {
+      if (opts.verbose) console.warn(error)
+      else console.warn(colors.orange('Re-run with --verbose (or set PAYLOAD_FONTS_VERBOSE=true) to see the full error.'))
+    }
+    console.warn(colors.orange('Font download failed — wrote an empty definition so the build can proceed.'))
+    write.empty()
+  }
+
+  try {
+    console.log(colors.blue('Starting Font Download...\n'))
+
+    const siteUrl = overrides?.siteUrl ?? process.env.FONT_DOWNLOAD_URL
+    const secret = process.env.PAYLOAD_SECRET
+    if (!siteUrl || !secret) {
+      const searched = ` (searched ${opts.envFiles.join(', ')})`
+      if (!siteUrl) console.warn(colors.red(`Missing required environment variable: FONT_DOWNLOAD_URL${searched}`))
+      if (!secret) console.warn(colors.red(`Missing required environment variable: PAYLOAD_SECRET${searched}`))
+      console.warn(colors.orange('Font download skipped — wrote an empty definition so the build can proceed.'))
+      console.warn(colors.orange('`payload fonts:download` reads the database directly and needs neither.'))
+      write.empty()
+      return
+    }
+    if (!/^https?:\/\//i.test(siteUrl) || !URL.canParse(siteUrl)) {
+      warnAndEmpty(`FONT_DOWNLOAD_URL is not a valid http(s) URL: "${siteUrl}" — expected e.g. http://localhost:3000`)
+      return
+    }
+
+    const endpoint = new URL(opts.endpointPath, siteUrl).toString()
+    let manifest: ExportFontsResponse
+    try {
+      const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${secret}` } })
+      if (!res.ok) {
+        const hint =
+          res.status === 401 || res.status === 403
+            ? " — your local PAYLOAD_SECRET doesn't match the server's"
+            : res.status === 404
+              ? ' — is the fonts plugin registered on that app? (or set PAYLOAD_FONTS_ENDPOINT)'
+              : ''
+        warnAndEmpty(`Font export endpoint returned HTTP ${res.status} ${res.statusText}${hint}`)
+        return
+      }
+      manifest = await res.json()
+    } catch (err) {
+      if (isServerDown(err)) {
+        // In dev this is just the pre-`next dev` state — nothing is running yet and DevFonts serves
+        // fonts at runtime, so it stays calm. A production build with no fonts is worth shouting
+        // about; it still exits 0, because failing would make the first deploy impossible (no
+        // server yet → no fonts selected → failed build → still no server).
+        if (process.env.NODE_ENV === 'production') {
+          console.warn(colors.red(`[payload-fonts] no running Payload at ${endpoint} — this build has NO fonts.`))
+          console.warn(colors.orange('`payload fonts:download` reads the database directly and needs no running site.'))
+        } else {
+          console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)
+        }
+        write.empty()
+        return
+      }
+      warnAndEmpty(`Could not reach the font export endpoint at ${endpoint}`, err)
+      return
+    }
+
+    write.fromManifest(manifest)
   } catch (err) {
     warnAndEmpty('Unexpected error during font download', err)
   }

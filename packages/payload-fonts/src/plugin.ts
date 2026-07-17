@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import type { Config, Plugin } from 'payload'
 
 import { resolveOptions } from './options'
@@ -10,6 +12,12 @@ import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
 import type { FontsPluginOptions, PayloadFontsMarker } from './types'
 import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
 import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collections/fontOptimized'
+
+function binScriptPath(name: string): string {
+  const here = fileURLToPath(import.meta.url)
+  const ext = here.endsWith('.ts') ? 'ts' : 'js'
+  return resolve(dirname(here), 'bin', `${name}.${ext}`)
+}
 
 export const fontsPlugin =
   (opts: FontsPluginOptions = {}): Plugin =>
@@ -47,6 +55,9 @@ export const fontsPlugin =
       collections,
       globals,
       endpoints,
+      // `payload fonts:download` — the build reads fonts through the Local API, so it needs no
+      // running site (the `payload-fonts-download` CLI's HTTP path stays for remote builds).
+      bin: [...(config.bin ?? []), { key: 'fonts:download', scriptPath: binScriptPath('downloadFonts') }],
       custom: { ...config.custom, payloadFonts: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)

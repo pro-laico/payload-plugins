@@ -16,14 +16,16 @@ allowBuilds:
   unrs-resolver: true
 # payload@3.85.1 pins undici exactly at 7.24.4, which is vulnerable (GHSA fixed in >=7.28.0).
 # No newer payload exists, so override undici to a patched 7.x for payload's subtree only.
-# payload also pins tsx exactly at 4.22.4, whose namespaced tsImport() (payload's bin.js wraps the
-# whole CLI in it) taints CJS `node:` builtin requires with `?tsx-namespace=…` under Node 24's sync
-# module hooks — breaking every custom `payload <bin-script>` (e.g. `payload seed`) with
-# ENOENT node:crypto. Still broken in tsx 4.22.5; 4.19.4 predates the namespace rework and works.
+# (There WAS a `tsx: 4.19.4` pin here: payload pins tsx 4.22.4, whose namespaced tsImport leaked
+# `?namespace=…` onto `node:` builtins under Node 23.5+'s sync module hooks, so every custom
+# `payload <bin>` died with ENOENT node:crypto. payload 3.85.2 fixed it upstream — bin.js now nulls
+# `module.registerHooks` so tsx falls back to its async register() path (payloadcms/payload#16949).
+# Verified on Node 24.12 with tsx 4.22.4 unpinned: `payload seed` and `payload fonts:download` both
+# work. Dropped. If it ever returns, `payload --use-swc <bin>` and `--disable-transpile` are escape
+# hatches — but the real fix is payload >= 3.85.2.)
 # next 16 optionally pulls sharp 0.34, which pnpm hoists — so payload's SharpDependency types
 # resolved 0.34's Sharp/Metadata while apps import 0.35 (FormatEnum gained 'vips' → incompatible,
 # forcing `as unknown as SharpDependency` casts). Pin one sharp everywhere so the casts can go.
 overrides:
   payload>undici: '^7.28.0'
   sharp: '^0.35.2'
-  tsx: '4.19.4'
