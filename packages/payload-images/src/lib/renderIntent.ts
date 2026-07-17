@@ -5,6 +5,9 @@ import { isPlaceholderFormat, isPlaceholderQuality } from './placeholders/qualit
 export const RESPONSIVE_IMAGE_SELECT = {
   alt: true,
   src: true,
+  // The ratio the read declared (else the image's natural one), so the doc carries the crop it was
+  // built for and the component's CSS box can match it without the caller restating it.
+  aspectRatio: true,
   srcset: true,
   placeholder: true,
 } as const

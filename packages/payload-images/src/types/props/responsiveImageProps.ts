@@ -7,7 +7,9 @@ export interface ResponsiveImageProps {
   id: string | number
   alt?: string | null
   sizes?: string
-  aspectRatio?: AspectRatio
+  /** Carried by the doc spread — the ratio the read declared, so the CSS box matches the crop
+   * without you restating it. Pass it to override; `fill` ignores it. */
+  aspectRatio?: AspectRatio | null
   fill?: boolean
   fit?: Fit
   loading?: 'lazy' | 'eager'

@@ -40,7 +40,7 @@ export function ImageCard({ img }: { img: ImageCardDoc }) {
       <div style={ratiosGrid}>
         {RATIOS.map(({ label, ar }) => (
           <div style={ratioTile} key={label}>
-            <Image id={img.id} aspectRatio={ar} image={{ aspectRatio: ar }} sizes={TILE_SIZES} />
+            <Image id={img.id} image={{ aspectRatio: ar }} sizes={TILE_SIZES} />
             <small style={ratioLabel}>{label}</small>
           </div>
         ))}

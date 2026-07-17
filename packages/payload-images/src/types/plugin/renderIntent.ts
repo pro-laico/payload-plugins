@@ -23,6 +23,9 @@ export interface ImageRenderContext {
 export interface ResponsiveImageDoc {
   id: string | number
   alt?: string | null
+  /** The ratio this doc was rendered for: what the read declared, else the image's natural one.
+   * Spreading the doc into `<ResponsiveImage>` is what keeps its CSS box matching the crop. */
+  aspectRatio?: number | null
   src?: string | null
   srcset?: string | null
   placeholder?: string | null

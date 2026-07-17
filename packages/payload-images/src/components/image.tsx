@@ -33,7 +33,9 @@ export const ResponsiveImage = (props: ResponsiveImageProps): ReactElement | nul
 
   if (!src || !srcset) return null
 
-  const cssAr = parseAspectRatio(aspectRatio)
+  // `fill` means the positioned parent owns the box, so a ratio would be inert at best — and the
+  // doc now carries one for every read, so this is what keeps that promise ("ignored with fill").
+  const cssAr = fill ? undefined : parseAspectRatio(aspectRatio)
   const bgSize = fit === 'contain' || fit === 'inside' ? 'contain' : 'cover'
   const bg = placeholder && /^(data:|https?:|\/)/.test(placeholder) ? placeholder : undefined
 

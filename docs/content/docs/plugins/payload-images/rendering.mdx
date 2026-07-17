@@ -32,16 +32,16 @@ import { imageFor } from '@/lib/imageFor'
 export async function Hero({ id }: { id: string }) {
   const img = await imageFor(id).aspectRatio('16:9').quality(80).blur('md').fetch()
   if (!img) return null
-  // aspectRatio matches the read; sizes = how big it actually renders
-  return <ResponsiveImage {...img} aspectRatio="16:9" sizes="(max-width: 768px) 100vw, 50vw" />
+  // sizes = how big it actually renders
+  return <ResponsiveImage {...img} sizes="(max-width: 768px) 100vw, 50vw" />
 }
 ```
 
-Declare `aspectRatio` in **two** places and keep them equal: on the read (so the crop is
-computed) and on the component (so the CSS box matches the crop). Set `sizes` to how big the
-image actually renders, not how big the file is.
+Declare `aspectRatio` **once**, on the read. The doc comes back carrying the ratio it was cropped
+to, so the spread gives the component its CSS box for free — there's no second value to keep in
+sync. Set `sizes` to how big the image actually renders, not how big the file is.
 
-The doc comes back as `{ id, alt, src, srcset, placeholder }` — a full responsive `srcset` and
+The doc comes back as `{ id, alt, aspectRatio, src, srcset, placeholder }` — a full responsive `srcset` and
 a focal-cropped placeholder data URI, built for exactly the render you declared. It spreads
 straight into the component.
 
@@ -68,8 +68,7 @@ at `/api/img`.
 
 ```tsx
 <ResponsiveImage
-  {...img} // id, alt, src, srcset, placeholder — from imageFor / your getter
-  aspectRatio="16:9" // match what the read declared
+  {...img} // id, alt, aspectRatio, src, srcset, placeholder — from imageFor / your getter
   sizes="(max-width: 768px) 100vw, 50vw"
   className="rounded-xl" // Tailwind (or any className) → the <img>
 />
@@ -127,8 +126,8 @@ export const imageProps = [
   { name: 'src', type: 'string | null', description: `The default-width transform URL, from the doc spread. Missing → the component renders null.` },
   { name: 'srcset', type: 'string | null', description: `The responsive srcset, from the doc spread. Missing → the component renders null.` },
   { name: 'placeholder', type: 'string | null', description: `The doc's placeholder (a finished data URI, or a raw hash) — painted as the <img>'s background while it loads. The quality/crop were decided by the READ that fetched the doc.` },
+  { name: 'aspectRatio', type: `number | "\${n}:\${n}" | null`, description: `CSS aspect-ratio for the box, from the doc spread — the ratio the read declared, else the image's natural one — so you never restate it. Pass it only to override. Ignored with fill, where the positioned parent owns the box.` },
   { name: 'sizes', type: 'string', default: "'100vw'", description: `The img sizes attribute; set it to how big the image actually renders.` },
-  { name: 'aspectRatio', type: `number | "\${n}:\${n}"`, description: `CSS aspect-ratio for the box (16 / 9 | '16:9') — match what the read declared. Ignored with fill.` },
   { name: 'fill', type: 'boolean', default: 'false', description: `Cover-fill a positioned parent that sets its own height (full-bleed hero, slide) instead of an aspect-ratio box.` },
   { name: 'fit', type: 'Fit', default: "'cover'", description: `CSS object-fit. Pass the same fit the read declared so the CSS matches the crop.` },
   { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", description: `Native <img> loading. Set 'eager' for an above-the-fold hero.` },
@@ -139,7 +138,7 @@ export const imageProps = [
   { name: 'dataAttributes', type: `Record<"data-\${string}", string>`, description: `Extra data-* attributes spread onto the rendered img element.` },
 ]
 
-The first five props are the doc's own fields — you rarely write them by hand; spread the fetched
+The first six props are the doc's own fields — you rarely write them by hand; spread the fetched
 doc. The rest are presentation:
 
 <Tabs items={['Reference', 'TypeScript']}>
@@ -165,7 +164,6 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
   fetchPriority="auto"
   decoding="async"
   // optional, no default:
-  // aspectRatio="16:9"
   // className="rounded-xl"
   // style={{ borderRadius: 8 }}
   // dataAttributes={{ 'data-test': 'hero' }}
@@ -227,6 +225,91 @@ with `src`/`srcset` already computed (the collection's `defaultPopulate`), so yo
 into the component without a second fetch. `placeholder` rides along as `null` unless the parent
 read declared a blur (`context: { blur: { quality: 'md' } }` on the page fetch).
 
+## A grid of cards
+
+One image is the easy case. A grid is where `sizes` earns its keep: each card is a *fraction* of
+the viewport, and that fraction changes per breakpoint. Get it wrong and every card downloads a
+full-width file.
+
+```tsx title="src/components/PostGrid.tsx"
+// 3 columns ≥1024px, 2 columns ≥640px, 1 below — so each card is roughly 33vw / 50vw / 100vw.
+const CARD_SIZES = '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw'
+
+async function Card({ id }: { id: string }) {
+  const img = await imageFor(id).aspectRatio('4:3').blur('sm').fetch()
+  if (!img) return null
+  return (
+    <li className="overflow-hidden rounded-xl">
+      <ResponsiveImage {...img} sizes={CARD_SIZES} className="w-full" />
+    </li>
+  )
+}
+
+export async function PostGrid({ ids }: { ids: string[] }) {
+  return (
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {ids.map((id) => (
+        <Card key={id} id={id} />
+      ))}
+    </ul>
+  )
+}
+```
+
+Each card fetches its own doc, so a card is one cache entry and one `<img>` — spread it and the
+4:3 box comes with it. The `sizes` string is the only arithmetic you do: **describe the slot, not
+the file**. Say `33vw` and a 1200px-wide viewport picks a ~400px variant instead of a 1200px one.
+
+<Callout type="info">
+  `sizes` mirrors your CSS breakpoints — if you change the grid, change `sizes`. There's no way for
+  the plugin to know your layout; that's the one thing the browser needs you to tell it. Cards are
+  also a good place to skip the placeholder: `.blur()` costs bytes in the HTML, so drop it on small
+  tiles and keep it for the hero.
+</Callout>
+
+## Art direction: a different crop per breakpoint
+
+`sizes` picks a *size* of the same crop. **Art direction** is when the crop itself should change —
+a wide 21:9 banner on desktop that becomes a tall 4:5 on a phone, where a letterboxed sliver of a
+16:9 would be useless. That needs `<picture>` with a `<source>` per breakpoint, which means
+building the `srcset` strings yourself: `buildSrcset` is the same machinery `<ResponsiveImage>`
+uses, exposed.
+
+```tsx title="src/components/ArtDirectedHero.tsx"
+import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
+import { imageFor } from '@/lib/imageFor'
+
+export async function ArtDirectedHero({ id }: { id: string }) {
+  // A raw read: buildSrcset wants the doc's own width + version to derive the ladder and the
+  // cache-busting token, so skip the render-intent sugar here.
+  const img = await getImageDoc(id) // your findByID
+  if (!img) return null
+
+  const wide = buildSrcset(img, { aspectRatio: '21:9' })
+  const tall = buildSrcset(img, { aspectRatio: '4:5' })
+  if (!wide || !tall) return null
+
+  return (
+    <picture>
+      <source media="(min-width: 768px)" srcSet={wide.srcset} sizes="100vw" />
+      <source media="(max-width: 767px)" srcSet={tall.srcset} sizes="100vw" />
+      {/* the fallback for anything that ignores <source> */}
+      <img src={wide.src} alt={img.alt ?? ''} style={{ display: 'block', width: '100%' }} />
+    </picture>
+  )
+}
+```
+
+Every URL is still focal-cropped and versioned — each ratio is just another variant the endpoint
+generates and caches on first request. The focal point you set in the admin is what makes the 4:5
+crop keep the subject; that's the whole reason a different crop is safe to serve.
+
+<Callout type="warn">
+  This is the hand-rolled path: you own the `<img>`, so the placeholder, `loading`, `fetchPriority`,
+  and the aspect-ratio box are yours to add. Reach for it only when the crop must change — for one
+  crop at many sizes, `<ResponsiveImage>` already does all of it.
+</Callout>
+
 ## OG images & raw URLs
 
 A component can't go everywhere. For a **social/OG image, a CSS `background-image`, or an email**
@@ -260,9 +343,10 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 For *common* sizes you don't even need it: every doc read already carries virtual URL fields
 (`image.src`, `image.srcset`, `image.placeholderURL`, `image.thumbnailURL` — see
 [Image URLs](/docs/plugins/payload-images/image-urls#the-virtual-url-fields)). Reach for `getImageUrl` only
-for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `buildSrcset`
-exists for a fully hand-rolled `<img>` / `<picture>` — pass it the populated doc and it derives
-the width cap and cache-busting token itself.
+for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `buildSrcset` is the
+one for a fully hand-rolled `<img>` / `<picture>` — pass it the populated doc and it derives the
+width cap and cache-busting token itself. See
+[Art direction](#art-direction-a-different-crop-per-breakpoint) for the case that actually needs it.
 
 ## Next
 

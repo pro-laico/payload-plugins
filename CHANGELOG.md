@@ -107,6 +107,14 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Added
 
+- `@pro-laico/payload-images` — **`aspectRatio` is declared once, on the read.** The fetched doc now
+  carries the ratio it was cropped to (the read's, else the image's natural one), so spreading it
+  into `<ResponsiveImage>` gives the CSS box for free. It used to have to be stated twice — once on
+  the read so the crop is computed, once on the component so the box matches — with a silently
+  wrong-shaped image if the two drifted. Pass `aspectRatio` to the component only to override.
+  Populated upload fields get it too, since `defaultPopulate` is the same projection.
+  `aspectRatio` is now genuinely ignored under `fill` (the positioned parent owns the box), which
+  the props table always claimed but the component didn't do.
 - `@pro-laico/payload-fonts` — **`payload fonts:download`**, a build step that needs no running
   site. It resolves the `fontSet` selection through the Local API and writes the same
   `public/fonts/*.woff2` + `next/font/local` module the HTTP CLI does — but with no
@@ -205,6 +213,12 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 - Every plugin Reference reflects the new nested shape, and the `payload-images` pages drop the
   removed `transform: false` / `virtualFields` modes.
 - `payload-mux` **Troubleshooting** leads the stuck-on-`preparing` row with the re-save recovery.
+- `payload-images` **Rendering** gains the two examples every other one implied but never showed: a
+  **card grid**, where `sizes` is the arithmetic people actually get wrong (describe the slot, not
+  the file), and **art direction** — a real `<picture>` with `buildSrcset` giving a different *crop*
+  per breakpoint (21:9 desktop → 4:5 phone), which `sizes` alone can't express. `buildSrcset` had
+  been name-dropped as existing for "a fully hand-rolled `<img>` / `<picture>`" without ever being
+  demonstrated.
 
 ### Upgrade notes
 
