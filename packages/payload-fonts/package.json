@@ -98,19 +98,19 @@
     }
   },
   "devDependencies": {
-    "@payloadcms/db-sqlite": "^3.85.2",
-    "@payloadcms/ui": "^3.85.2",
+    "@payloadcms/db-sqlite": "^3.86.0",
+    "@payloadcms/ui": "^3.86.0",
     "@types/fontkit": "^2.0.9",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/subset-font": "^2.3.0",
     "next": "^16.2.10",
-    "payload": "^3.85.2",
+    "payload": "^3.86.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18"

@@ -110,17 +110,17 @@
     }
   },
   "devDependencies": {
-    "@payloadcms/ui": "^3.85.2",
-    "@types/node": "^26.0.1",
+    "@payloadcms/ui": "^3.86.0",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "next": "^16.2.10",
-    "payload": "^3.85.2",
+    "payload": "^3.86.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "sharp": "^0.35.2",
+    "sharp": "^0.35.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18"
