@@ -139,7 +139,7 @@ endpoint pair is dead weight there.
 | `PAYLOAD_FONTS_OUTPUT_DIR` | `./public/fonts` | both | Where the downloaded WOFF2 files are written. |
 | `PAYLOAD_FONTS_DEFINITION_FILE` | `./src/app/definition.ts` | both | The generated `next/font/local` module. |
 | `PAYLOAD_FONTS_SRC_PREFIX` | `../../public/fonts` | both | `src` path in the generated `localFont()` calls, relative to the definition file. |
-| `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | both | Prefix for the emitted CSS family variables; must match `<DevFonts cssVarPrefix>`. |
+| `PAYLOAD_FONTS_CSS_VAR_PREFIX` | `--font-set` | both | Prefix for the emitted CSS family variables; must match `<PreviewFonts cssVarPrefix>`. |
 | `PAYLOAD_FONTS_ENV_FILE` | `./.env.local, ./.env` | both | Dotenv file(s) loaded before anything else is read. Unset, both are loaded; set, only the named file. |
 | `PAYLOAD_FONTS_VERBOSE` | `false` | both | Print the full error on failure (also the `--verbose` / `-v` flag). |
 
@@ -147,14 +147,14 @@ endpoint pair is dead weight there.
 
 | Command | What |
 | --- | --- |
-| `payload fonts:download` | **The production build step** — put it on `prebuild`. Resolves the `fontSet` selection through the Local API, so no running site, no `FONT_DOWNLOAD_URL`, no HTTP, and writes `public/fonts/*.woff2` + `src/app/definition.ts`. Don't use it for `predev`: it bakes real fonts, and `<DevFonts>` stands down whenever the definition has fonts, which costs you runtime font-switching in dev. See [Serving](/docs/plugins/payload-fonts/serving). |
+| `payload fonts:download` | **The recommended build step** — put it on both `predev` and `prebuild`. The baked path is the same in dev and production, so keeping `definition.ts` current on every boot is exactly what you want. Resolves the `fontSet` selection through the Local API, so no running site, no `FONT_DOWNLOAD_URL`, no HTTP, and writes `public/fonts/*.woff2` + `src/app/definition.ts`. See [Serving](/docs/plugins/payload-fonts/serving). |
 | `payload-fonts-download` | The same job over HTTP, for a build that **can't reach the database** (a remote build box). Fetches `GET /api/fonts/export` from a running site with `FONT_DOWNLOAD_URL` + `PAYLOAD_SECRET`, and empties the definition on any failure — including when that site is unreachable, so the build can ship with no fonts. Prefer `payload fonts:download` where you can. |
 
 ## Endpoints
 
 | Route | Auth | What |
 | --- | --- | --- |
-| `GET /api/fonts/export` | Bearer `PAYLOAD_SECRET` | Returns each active family's `fontOptimized` bytes; the source the download CLI fetches. Response shape is `ExportFontsResponse`. See [Serving](/docs/plugins/payload-fonts/serving#production). |
+| `GET /api/fonts/export` | Bearer `PAYLOAD_SECRET` | Returns each active family's `fontOptimized` bytes; the source the download CLI fetches. Response shape is `ExportFontsResponse`. See [Serving](/docs/plugins/payload-fonts/serving#building-where-the-database-isnt-reachable). |
 
 ## Exports
 
@@ -166,11 +166,11 @@ endpoint pair is dead weight there.
 | `FontFamilyConfig` | `@pro-laico/payload-fonts` | The `{ key, label?, fallback? }` shape of a `families` entry. |
 | `DEFAULT_FONT_FAMILIES` | `@pro-laico/payload-fonts` | The built-in sans/serif/mono/display families (spread to extend them). |
 | `extractFonts` | `@pro-laico/payload-fonts` | Collect the generated `next/font` classes for the root `<html>` className. |
-| `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<DevFonts>`, for custom UIs. |
-| `buildFontFaceCss` | `@pro-laico/payload-fonts` | Turn the resolved faces from `getActiveFontFaces` into the `@font-face` + `--font-set*` CSS `<DevFonts>` inlines; for custom serving. |
+| `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<PreviewFonts>`, for custom UIs. |
+| `buildFontFaceCss` | `@pro-laico/payload-fonts` | Turn the resolved faces from `getActiveFontFaces` into the `@font-face` + `--font-set*` CSS `<PreviewFonts>` inlines; for custom serving. |
 | `ActiveTypeface` / `ActiveFace` | `@pro-laico/payload-fonts` | The types `getActiveFontFaces` returns and `buildFontFaceCss` accepts. |
 | `ExportFontsResponse` / `ExportFamilyDiagnostics` | `@pro-laico/payload-fonts` | The shape of `GET /api/fonts/export` (and its per-family diagnostics), for custom consumers. |
-| `DevFonts` | `@pro-laico/payload-fonts/DevFonts` | The dev-only runtime font component. |
+| `PreviewFonts` | `@pro-laico/payload-fonts/PreviewFonts` | The live preview escape hatch — inlines `@font-face` from the live DB selection, in dev or prod. |
 | `payload-fonts-download` | `bin` | The CLI the production build runs to write fonts to disk. |
 
 ## Collections & globals
@@ -180,7 +180,7 @@ global. Their fields are documented on [Collections](/docs/plugins/payload-fonts
 
 ## Next
 
-- [Serving](/docs/plugins/payload-fonts/serving) — the two serving paths, the `DevFonts` props, and the download CLI.
+- [Serving](/docs/plugins/payload-fonts/serving) — the baked `next/font` path, the `PreviewFonts` props, and the download CLI.
 - [Collections](/docs/plugins/payload-fonts/collections) — the `font` upload shape and the `fontSet` global.
 - [How it works](/docs/plugins/payload-fonts/how-it-works) — the subset pipeline, one-file-both-styles, and revalidation.
 - [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — blank admin fields, stale dev fonts, nothing rendering.

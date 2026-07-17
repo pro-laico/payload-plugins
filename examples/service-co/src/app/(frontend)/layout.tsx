@@ -1,9 +1,6 @@
-import config from '@payload-config'
 import type { Metadata } from 'next'
-import { getPayload } from 'payload'
 import { type ReactNode, Suspense } from 'react'
 import { extractFonts } from '@pro-laico/payload-fonts'
-import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 import { DevToolbar, resolveDevChrome } from '@pro-laico/payload-dev-tools/toolbar'
 
 import { devLinks } from '@/dev/links'
@@ -21,11 +18,6 @@ export const metadata: Metadata = {
 export default function FrontendLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={extractFonts(definitionFonts)}>
-      <head>
-        <Suspense fallback={null}>
-          <DevFonts payload={getPayload({ config })} definition={definitionFonts} />
-        </Suspense>
-      </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <Suspense fallback={<div className="h-16 border-b border-border/70" />}>
           <Chrome slot="header" />

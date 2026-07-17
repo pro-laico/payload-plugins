@@ -1,4 +1,6 @@
 import config from '@payload-config'
+import { Suspense } from 'react'
+import { connection } from 'next/server'
 import { type CollectionSlug, getPayload } from 'payload'
 import { getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
@@ -6,12 +8,7 @@ import { VideoList } from '@/components/VideoList'
 
 const SEEDED_SLUGS: CollectionSlug[] = ['mux-video', 'pages']
 
-export default async function HomePage() {
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-
-  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs
-
+export default function HomePage() {
   return (
     <SandboxShell
       title="Mux Sandbox"
@@ -25,6 +22,25 @@ export default async function HomePage() {
         </>
       }
     >
+      {/* Live reads are a dynamic hole inside Suspense — the shell around them prerenders. */}
+      <Suspense fallback={<p className="shell-muted">Loading videos…</p>}>
+        <Videos />
+      </Suspense>
+    </SandboxShell>
+  )
+}
+
+/** The live, per-request part: seed status + the seeded/uploaded videos. `connection()` marks it
+ * dynamic, so it streams into the Suspense hole instead of prerendering with build-time data. */
+async function Videos() {
+  await connection()
+  const payload = await getPayload({ config })
+  const status = await getSeedStatus(payload, SEEDED_SLUGS)
+
+  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs
+
+  return (
+    <>
       <SeedPanel
         seeded={status.seeded}
         counts={status.counts}
@@ -43,6 +59,6 @@ export default async function HomePage() {
         </small>
       </h2>
       <VideoList videos={videos} />
-    </SandboxShell>
+    </>
   )
 }

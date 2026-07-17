@@ -107,6 +107,17 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Changed
 
+- **BREAKING** `@pro-laico/payload-fonts` — one uniform serving path, and `<DevFonts>` is replaced by
+  `<PreviewFonts>`. Fonts are now baked everywhere: run `payload fonts:download` (Local API, no
+  running site) to write `public/fonts/*.woff2` + the `next/font/local` module, then `extractFonts`
+  on `<html>` — in dev and prod alike (wire it on `predev` / `prebuild`, as `service-co` does). The
+  old dev-only `<DevFonts>` (which served live in dev and stood down once the definition was baked)
+  is gone; in its place `<PreviewFonts>` from `@pro-laico/payload-fonts/PreviewFonts` inlines the live
+  `@font-face` selection and works in **any** environment — dev or production — for the isolated case
+  where you're previewing a font (a preview route, a font playground; `fonts-sandbox` demonstrates
+  it). Render it inside `<Suspense>`, not behind `export const dynamic = 'force-dynamic'`. Its props
+  drop `definition` (it never stands down). The two paths are no longer "dev vs prod" — baked is the
+  main way, `<PreviewFonts>` is a deliberate escape hatch.
 - **BREAKING** `@pro-laico/payload-icons` — `iconOverrides` → `collections.icon.overrides`;
   `iconSetOverrides` → `collections.iconSet.overrides`; `iconRequestOverrides` →
   `collections.iconRequest.overrides`; `includeIconSet: false` → `collections.iconSet: false`;
@@ -195,13 +206,12 @@ and with `observe: false` they aren't registered at all, which is stronger than 
   while `prebuild` runs. Fonts on S3 still work: the read goes through the collection's own storage
   adapter. Point `prebuild` / `predev` at it and delete the two env vars.
 
-  The HTTP `payload-fonts-download` CLI stays for builds that genuinely can't reach the database
-  (a remote build box). It still fails soft — every handled failure writes an empty definition and
-  exits 0, deliberately: erroring would make the *first* production deploy impossible, since no
-  server yet means no fonts selected, which would fail the build, which means you never get a
-  server. It's louder about it now, though: a **production** build that ends up with no fonts says
-  so instead of logging a dev-shaped info line (dev stays quiet — `<DevFonts>` serves fonts at
-  runtime there, so no server running is just the normal pre-`next dev` state).
+  The HTTP `payload-fonts-download` CLI stays as the secondary path, for builds that genuinely can't
+  reach the database (a remote build box that can hit the running site but not its DB). It still
+  fails soft — every handled failure writes an empty definition and exits 0, deliberately: erroring
+  would make the *first* production deploy impossible, since no server yet means no fonts selected,
+  which would fail the build, which means you never get a server. When it can't reach a site it now
+  points you at `payload fonts:download`, which reads the database directly and needs none.
 - `@pro-laico/payload-mux` — `MuxAccessFn` / `MuxAccessOptions` are exported, so a shared `read` /
   `upload` gate can be typed.
 - `@pro-laico/payload-mux` — env-name compatibility with `@oversightstudio/mux-video`. Where the
@@ -219,6 +229,9 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Removed
 
+- **BREAKING** `@pro-laico/payload-fonts` — the `<DevFonts>` component and its
+  `@pro-laico/payload-fonts/DevFonts` subpath export. Replaced by `<PreviewFonts>`
+  (`@pro-laico/payload-fonts/PreviewFonts`) — see **Changed**.
 - **BREAKING** `@pro-laico/payload-images` — `transform: false`. `transform` is now only a config
   object; the transform endpoint is always registered.
 - **BREAKING** `@pro-laico/payload-images` — `virtualFields`. The virtual URL fields are always
@@ -294,6 +307,11 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Docs
 
+- **No more `export const dynamic = 'force-dynamic'`** — in the examples or the guidance. Every
+  example app now renders live reads as dynamic holes inside `<Suspense>` with `cacheComponents` on
+  (a static shell that streams the live parts), and the docs that used to reach for `force-dynamic`
+  (payload-dev-tools, payload-fonts) now teach the Suspense pattern. `force-dynamic` opts a whole
+  route out of prerendering; it read as the easy answer and set a poor example.
 - **Framework requirements are now stated per plugin, and stated correctly.** The docs asserted
   globally that everything needs "Payload `^3`, React 19, and the Next.js App Router" — untrue for
   `payload-mux` and `payload-seed`, which have zero `next/` imports and no `next` peer at all.
@@ -395,7 +413,15 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 12. `@pro-laico/payload-revalidate`: audit any cached getter that reads an access-gated collection.
     Finders no longer force `overrideAccess: false`, so a read that used to come back `null` may now
     return the doc. Pass `overrideAccess: false` on that call to keep the old anonymous scoping.
-13. Beyond the images folders/localizeAlt notes above, and a slug rename if you replaced
+13. `@pro-laico/payload-fonts`: **`<DevFonts>` is gone — bake in dev too.** Point `predev` (and
+    `prebuild`) at `payload fonts:download` so `definition.ts` is baked before the server starts, and
+    keep `extractFonts(definition)` on `<html>`; that's the whole serving story now, dev and prod.
+    Drop the `<DevFonts>` line from your root layout. If you want to preview an unbaked font change,
+    render `<PreviewFonts payload={getPayload({ config })} />` (from `@pro-laico/payload-fonts/PreviewFonts`)
+    inside a `<Suspense>` in that context — it drops the `definition` prop and works in any
+    environment. Do not add `export const dynamic = 'force-dynamic'`; a `<Suspense>` boundary with
+    `cacheComponents` is the right way to render a live read.
+14. Beyond the images folders/localizeAlt notes above, and a slug rename if you replaced
     `extendCollection`, no data migration is required.
 
 ## [0.3.0] - 2026-07-15

@@ -226,15 +226,17 @@ export async function runDownloadFonts(overrides?: RunDownloadFontsOptions): Pro
       manifest = await res.json()
     } catch (err) {
       if (isServerDown(err)) {
-        // In dev this is just the pre-`next dev` state — nothing is running yet and DevFonts serves
-        // fonts at runtime, so it stays calm. A production build with no fonts is worth shouting
-        // about; it still exits 0, because failing would make the first deploy impossible (no
-        // server yet → no fonts selected → failed build → still no server).
+        // This HTTP CLI is the secondary path — it bakes against a running site, for a build box
+        // that can reach the site but not its database. When nothing's up it writes an empty
+        // definition (no fonts) rather than failing, so a first deploy can't be blocked by "no server
+        // yet → no fonts → failed build → still no server". Prefer `payload fonts:download`, which
+        // reads the database directly and needs no running site at all.
+        const msg = `[payload-fonts] no running Payload at ${endpoint} — wrote an empty definition (no fonts).`
         if (process.env.NODE_ENV === 'production') {
-          console.warn(colors.red(`[payload-fonts] no running Payload at ${endpoint} — this build has NO fonts.`))
-          console.warn(colors.orange('`payload fonts:download` reads the database directly and needs no running site.'))
+          console.warn(colors.red(msg))
+          console.warn(colors.orange('Use `payload fonts:download` instead — it reads the database directly and needs no running site.'))
         } else {
-          console.log(`[payload-fonts] no running Payload at ${endpoint} — wrote the empty dev stub (DevFonts serves fonts at runtime in dev).`)
+          console.log(`${msg} Bake them with \`payload fonts:download\` (reads the DB directly, no server needed).`)
         }
         write.empty()
         return

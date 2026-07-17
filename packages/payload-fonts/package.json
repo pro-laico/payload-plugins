@@ -37,10 +37,10 @@
         "import": "./dist/components/admin/FontOriginalUpload.js",
         "default": "./dist/components/admin/FontOriginalUpload.js"
       },
-      "./DevFonts": {
-        "types": "./dist/components/DevFonts.d.ts",
-        "import": "./dist/components/DevFonts.js",
-        "default": "./dist/components/DevFonts.js"
+      "./PreviewFonts": {
+        "types": "./dist/components/PreviewFonts.d.ts",
+        "import": "./dist/components/PreviewFonts.js",
+        "default": "./dist/components/PreviewFonts.js"
       }
     }
   },
@@ -60,10 +60,10 @@
       "import": "./src/components/admin/FontOriginalUpload.tsx",
       "default": "./src/components/admin/FontOriginalUpload.tsx"
     },
-    "./DevFonts": {
-      "types": "./dist/components/DevFonts.d.ts",
-      "import": "./src/components/DevFonts.tsx",
-      "default": "./src/components/DevFonts.tsx"
+    "./PreviewFonts": {
+      "types": "./dist/components/PreviewFonts.d.ts",
+      "import": "./src/components/PreviewFonts.tsx",
+      "default": "./src/components/PreviewFonts.tsx"
     }
   },
   "files": [

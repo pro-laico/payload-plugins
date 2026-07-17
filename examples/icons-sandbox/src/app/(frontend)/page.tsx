@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+import { connection } from 'next/server'
 import { type CollectionSlug, getPayload } from 'payload'
 import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
@@ -15,13 +17,7 @@ const TONES: IconTone[] = ['current', 'muted', 'primary', 'accent', 'destructive
 
 const iconName = (filename?: string | null): string => filename?.replace(/\.svg$/i, '') ?? 'icon'
 
-export default async function Home() {
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-  const { docs } = await payload.find({ collection: 'icon', limit: 24 })
-  const names = docs.map((d) => iconName(d.filename))
-  const name = names[0]
-
+export default function Home() {
   return (
     <SandboxShell
       title="Icons Sandbox"
@@ -36,6 +32,26 @@ export default async function Home() {
         </>
       }
     >
+      {/* Live reads are a dynamic hole inside Suspense — the shell around them prerenders. */}
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading icons…</p>}>
+        <Showcase />
+      </Suspense>
+    </SandboxShell>
+  )
+}
+
+/** The live, per-request part: seed status + the seeded icons. `connection()` marks it dynamic, so
+ * it streams into the Suspense hole instead of prerendering with build-time data. */
+async function Showcase() {
+  await connection()
+  const payload = await getPayload({ config })
+  const status = await getSeedStatus(payload, SEEDED_SLUGS)
+  const { docs } = await payload.find({ collection: 'icon', limit: 24 })
+  const names = docs.map((d) => iconName(d.filename))
+  const name = names[0]
+
+  return (
+    <>
       <SeedPanel seeded={status.seeded} counts={status.counts} />
 
       {!name ? (
@@ -121,6 +137,6 @@ export default async function Home() {
           </section>
         </div>
       )}
-    </SandboxShell>
+    </>
   )
 }

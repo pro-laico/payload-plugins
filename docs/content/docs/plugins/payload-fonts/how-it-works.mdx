@@ -1,11 +1,11 @@
 ---
 title: "How it works"
-description: "How the subset pipeline, one-file italics, and the two serving paths fit together — so you can reason about what happens on save, on build, and on refresh."
+description: "How the subset pipeline, one-file italics, the baked next/font path, and the PreviewFonts escape hatch fit together — so you can reason about what happens on save, on build, and on refresh."
 ---
 
-Three collections and two serving paths make up `@pro-laico/payload-fonts`. This page explains how they fit together: what happens when you save a typeface, how one variable file can serve both upright and italic, and how a `fontSet` change reaches the browser.
+Three collections and the baked `next/font` path (plus the `<PreviewFonts>` escape hatch) make up `@pro-laico/payload-fonts`. This page explains how they fit together: what happens when you save a typeface, how one variable file can serve both upright and italic, and how a `fontSet` change reaches the browser.
 
-For the collections themselves see [Collections](/docs/plugins/payload-fonts/collections); for wiring the two serving paths into your layout see [Serving](/docs/plugins/payload-fonts/serving).
+For the collections themselves see [Collections](/docs/plugins/payload-fonts/collections); for wiring serving into your layout see [Serving](/docs/plugins/payload-fonts/serving).
 
 ## The subset pipeline
 
@@ -20,9 +20,9 @@ export const pipelineNodes = [
   { id: 'originals', kind: 'store', label: 'Originals stored raw in fontOriginal', detail: 'the archive of truth — lossless source bytes', x: 300, y: 150 },
   { id: 'subset', label: 'optimizeFromOriginals re-subsets', detail: 'every save — down to your charset, italics synthesized from ital/slnt axes', x: 300, y: 320 },
   { id: 'optimized', kind: 'store', label: 'Served WOFF2s in fontOptimized', detail: 're-derivable any time: widen charset, save again', x: 300, y: 500 },
-  { id: 'download', label: 'prebuild: payload fonts:download', detail: 'reads the active fonts through the Local API (no running site) → writes public/fonts/*.woff2 + definition.ts', x: 40, y: 690 },
-  { id: 'build', kind: 'result', label: 'next build self-hosts via next/font/local', detail: 'extractFonts puts the --font-set* classes on <html> — rebuild to publish a fontSet change', x: 40, y: 880 },
-  { id: 'dev', kind: 'result', label: 'Development: read live', detail: 'DevFonts inlines @font-face at runtime — edit, then refresh', x: 560, y: 690 },
+  { id: 'download', label: 'predev + prebuild: payload fonts:download', detail: 'reads the active fonts through the Local API (no running site) → writes public/fonts/*.woff2 + definition.ts', x: 40, y: 690 },
+  { id: 'build', kind: 'result', label: 'Baked: next/font/local (dev and prod)', detail: 'extractFonts puts the --font-set* classes on <html> — the main path; rebuild to publish a fontSet change', x: 40, y: 880 },
+  { id: 'preview', kind: 'result', label: 'Preview: read live', detail: 'PreviewFonts inlines @font-face from the DB at render time — the escape hatch, no rebuild', x: 560, y: 690 },
 ]
 
 export const pipelineEdges = [
@@ -31,7 +31,7 @@ export const pipelineEdges = [
   { from: 'subset', to: 'optimized' },
   { from: 'optimized', to: 'download', label: 'build time', fromSide: 'left' },
   { from: 'download', to: 'build' },
-  { from: 'optimized', to: 'dev', label: 'per render', fromSide: 'right' },
+  { from: 'optimized', to: 'preview', label: 'per render', fromSide: 'right' },
 ]
 
 <Flow nodes={pipelineNodes} edges={pipelineEdges} height={900} />
@@ -40,7 +40,7 @@ export const pipelineEdges = [
 
 Some variable fonts carry their italics **inside the upright file** — a true `ital` axis, or a `slnt` (slant) axis like Recursive's `0…-15`. Upload one of those to the `variable.upright` slot and the optimize hook reads the axes (via fontkit) and flags the served file `italCapable`, plus `obliqueAngle` for slant-based ones.
 
-Every serving path then emits **two faces from the one file**: the upright, and an italic. That covers `DevFonts` / `buildFontFaceCss`, the export endpoint, and the download CLI's `next/font/local` output. The italic is declared as `font-style: italic` (an `ital` axis) or `font-style: oblique 15deg` (a `slnt` axis), and CSS maps that onto the axis automatically. Your `font-style: italic` styles just work, because italic requests match oblique faces in font matching.
+Every serving path then emits **two faces from the one file**: the upright, and an italic. That covers `PreviewFonts` / `buildFontFaceCss`, the export endpoint, and the download CLI's `next/font/local` output. The italic is declared as `font-style: italic` (an `ital` axis) or `font-style: oblique 15deg` (a `slnt` axis), and CSS maps that onto the axis automatically. Your `font-style: italic` styles just work, because italic requests match oblique faces in font matching.
 
 <Callout type="info">
   An explicit `variable.italic` file always wins. When the typeface has its own italic upload, the hook does no synthesis.
@@ -50,8 +50,8 @@ Every serving path then emits **two faces from the one file**: the upright, and 
 
 How a `fontSet` change reaches the browser depends on the serving path, by design.
 
-- **Production** bakes fonts at build time, so there's no runtime cache to bust and **no `revalidatePath` / `revalidateTag`** — that's the tradeoff for stock `next/font`. Publish a change by re-running the download and rebuilding (`payload fonts:download` → `next build`). To automate it, trigger a redeploy from a `globals.fontSet.hooks.afterChange` deploy hook. The export endpoint is `Cache-Control: no-store`, so each run sees the current selection.
-- **Development** reads the live selection on every render, so keep the route dynamic (`export const dynamic = 'force-dynamic'`) and an edit-then-refresh shows. The browser still caches the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface (see [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting)).
+- **The baked path** (main, dev and prod) bakes fonts at build time, so there's no runtime cache to bust and **no `revalidatePath` / `revalidateTag`** — that's the tradeoff for stock `next/font`. Publish a change by re-running the download and rebuilding (`payload fonts:download` → `next build`). To automate it, trigger a redeploy from a `globals.fontSet.hooks.afterChange` deploy hook. The export endpoint is `Cache-Control: no-store`, so each run sees the current selection.
+- **`<PreviewFonts>`** reads the live selection on every render, so render it inside `<Suspense>` (a dynamic hole) and enable `cacheComponents` in `next.config` — an edit-then-refresh shows, and the rest of the page still prerenders around it. No need to mark the whole route dynamic. The browser still caches the `/api/fontOptimized/file/…` font files, so hard-refresh after re-subsetting the *same* typeface (see [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting)).
 
 Running [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate)? Same story: tag-based busting can't reach build-baked fonts, so there's deliberately no integration to configure. The derived `fontOriginal` / `fontOptimized` collections ship `custom: { revalidate: false }`, so the `Font` save hook's derived writes never fire bust events. `font` and the `fontSet` global keep the standard auto-attached hooks, in case you cache reads of them (for example, a font picker UI).
 
@@ -178,5 +178,5 @@ A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, 
 ## Next
 
 - [Collections](/docs/plugins/payload-fonts/collections) — the `font`, `fontOriginal`, `fontOptimized` shapes and the `fontSet` global.
-- [Serving](/docs/plugins/payload-fonts/serving) — wire the production and development paths into your layout.
-- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — stale dev fonts, blank admin fields, and the wasm-bundling failure.
+- [Serving](/docs/plugins/payload-fonts/serving) — wire the baked path and the `PreviewFonts` escape hatch into your layout.
+- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — stale fonts, blank admin fields, and the wasm-bundling failure.

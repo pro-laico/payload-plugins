@@ -95,7 +95,7 @@ describe('runDownloadFonts — empties definition.ts on any error', () => {
       .mocked(console.warn)
       .mock.calls.map((c) => String(c[0]))
       .join('\n')
-    expect(warned).toContain('this build has NO fonts')
+    expect(warned).toContain('empty definition (no fonts)')
     expect(warned).toContain('fonts:download') // point them at the transport that doesn't need a server
   })
 

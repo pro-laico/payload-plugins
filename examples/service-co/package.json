@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3060",
-    "prebuild": "payload-fonts-download",
+    "predev": "pnpm run generate:fonts",
+    "prebuild": "pnpm run generate:fonts",
     "build": "next build",
     "start": "next start -p 3060",
     "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",
     "generate:types": "pnpm payload generate:types",
     "generate:importmap": "pnpm payload generate:importmap",
-    "generate:fonts": "cross-env FONT_DOWNLOAD_URL=http://localhost:3060 payload-fonts-download",
+    "generate:fonts": "pnpm payload fonts:download",
     "seed": "pnpm payload seed",
     "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
     "typecheck": "tsc --noEmit"

@@ -1,1 +1,1 @@
-export type * from './devFonts'
+export type * from './previewFonts'

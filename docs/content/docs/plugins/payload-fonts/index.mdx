@@ -16,7 +16,7 @@ pnpm add @pro-laico/payload-fonts
 - **Automatic optimization:** every uploaded font is subsetted to a lean, web-ready WOFF2 on save — smaller files, no command-line fontkit.
 - **Fonts chosen in the CMS:** pick which typeface is your sans / serif / mono / display (or your own families) from the admin, and swap them anytime with no code change.
 - **Self-hosted, no third-party CDN:** fonts are served from your own app through [`next/font/local`](https://nextjs.org/docs/app/api-reference/components/font) — fast, private, preloaded, and size-adjusted against layout shift.
-- **Zero-config in dev, optimized in prod:** a runtime component serves the live selection while you work; a build step bakes `next/font` for production. The two paths never both fire.
+- **Baked in dev and prod, one path:** a build step bakes `next/font` from the live selection — the same in development and production. Need to preview a font without a rebuild? Mount `<PreviewFonts>`, the live escape hatch, in that one context.
 - **Declarative seeding:** seed typefaces like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
 ![Fonts rendered from CMS in the /dev/fonts route](/screenshots/fonts.png)
@@ -29,8 +29,8 @@ Self-hosting fonts through `next/font` needs a few one-time wiring steps. Each m
 | --- | --- |
 | **Next.js App Router**, 15+ | For *serving*. The package itself imports nothing from `next` — the download CLI **writes** a module that does (`import localFont from 'next/font/local'`), which your root layout imports. Uploading, subsetting, and exporting `.woff2` work in any Payload app; without Next, take the exported files and write your own `@font-face`. |
 | **A `next.config` change** | The subsetter (`subset-font` / `harfbuzzjs` / `fontkit`) must be externalized, or the wasm breaks and optimization silently skips (Step 2). |
-| **Root-layout wiring** | `extractFonts` on `<html>` plus `<DevFonts>` in `<head>` — the two serving paths (Step 4). |
-| **A prebuild script** | `payload fonts:download` writes the fonts + `src/app/definition.ts` your layout imports (Step 3). It reads the database directly — no running site needed. |
+| **Root-layout wiring** | `extractFonts` on `<html>` — the baked serving path (Step 4). |
+| **`predev` + `prebuild` scripts** | `payload fonts:download` writes the fonts + `src/app/definition.ts` your layout imports (Step 3). It reads the database directly — no running site needed. |
 | **`generate:importmap`** | The plugin registers admin components; regenerate the import map after installing (Step 3). |
 
 ## Quickstart
@@ -81,8 +81,8 @@ in the next step:
 {
   "scripts": {
     "build": "next build",
+    "predev": "payload fonts:download",
     "prebuild": "payload fonts:download",
-    "predev": "payload-fonts-download",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap"
   }
@@ -90,12 +90,10 @@ in the next step:
 ```
 
 <Callout type="info">
-  **Why `predev` uses the other command.** `predev` exists only to make `definition.ts` exist so the
-  import resolves — it wants the **empty stub**, and the HTTP CLI writes one when nothing is running
-  yet. That's deliberate: `<DevFonts>` stands down the moment the definition has fonts in it
-  (`if (definition && extractFonts(definition)) return null`), so baking real fonts into dev would
-  trade runtime font-switching for a restart every time you change a typeface. Use
-  `payload fonts:download` where you *want* baked fonts — the build.
+  **Why `predev` too.** The baked path is the same in dev and production, so wire the download on
+  both `predev` and `prebuild`: it keeps `definition.ts` current before either server starts, and
+  regenerates it on every dev boot so there's no file to hand-create. (Previewing a live selection
+  without a rebuild is what `<PreviewFonts>` is for — see [Serving](/docs/plugins/payload-fonts/serving).)
 </Callout>
 
 **Required: regenerate the import map.** The plugin registers admin components. Run
@@ -122,24 +120,21 @@ the read goes through your collection's own storage adapter.
 <Step>
 **Wire it into your layout**
 
-Two additions to your root layout, each a no-op in the other environment:
-
-- `extractFonts(...)` on `<html>`: the production `next/font` classes.
-- `<DevFonts />` in `<head>`: the dev-only runtime path.
+Put the baked `next/font` classes on `<html>` with `extractFonts` — the same in dev and production:
 
 ```tsx
-import config from '@payload-config'
-import { getPayload } from 'payload'
 import definitionFonts from '@/app/definition'
 import { extractFonts } from '@pro-laico/payload-fonts'
-import { DevFonts } from '@pro-laico/payload-fonts/DevFonts'
 
 <html className={extractFonts(definitionFonts)}>
-  <head><DevFonts payload={getPayload({ config })} definition={definitionFonts} /></head>
+  {/* … */}
 </html>
 ```
 
-The `@/app/definition` import only resolves once Step 3 has run at least once (`predev` writes the stub).
+The `@/app/definition` import only resolves once Step 3 has run at least once (`predev` writes it).
+
+To preview a live font selection without a rebuild — a preview route, a font playground — mount
+`<PreviewFonts>` in that one context instead. See [Serving](/docs/plugins/payload-fonts/serving#previewfonts-the-live-escape-hatch).
 </Step>
 
 <Step>
@@ -172,7 +167,7 @@ See [Collections](/docs/plugins/payload-fonts/collections) for the `font` upload
 <Cards>
 
 <Card title="Serving" href="/docs/plugins/payload-fonts/serving">
-  The two serving paths, the `DevFonts` props, and the download CLI's environment variables.
+  The baked `next/font` path, the `PreviewFonts` escape hatch, and the download CLI's environment variables.
 </Card>
 
 <Card title="Collections" href="/docs/plugins/payload-fonts/collections">
@@ -184,7 +179,7 @@ See [Collections](/docs/plugins/payload-fonts/collections) for the `font` upload
 </Card>
 
 <Card title="Troubleshooting" href="/docs/plugins/payload-fonts/troubleshooting">
-  Fonts not shrinking, blank admin fields, stale dev fonts, and production rebuilds.
+  Fonts not shrinking, blank admin fields, stale fonts, and production rebuilds.
 </Card>
 
 <Card title="Reference" href="/docs/plugins/payload-fonts/reference">

@@ -99,7 +99,7 @@ each filtered to its family so the admin only offers matching typefaces:
 | `display` | `var(--font-setDisplay)` | `font` docs with `family: display` |
 
 Pick one **Font** per slot and save; that selection is the source of truth both serving paths read.
-Change it and the next download (or, in dev, the next refresh) swaps the served fonts, no code change.
+Change it and the next download (or, with `<PreviewFonts>`, the next refresh) swaps the served fonts, no code change.
 Leave a family empty to fall back to whatever your CSS defines for that variable.
 
 ```ts
@@ -142,9 +142,9 @@ import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
 fontsPlugin({ options: { families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] } })
 ```
 
-`<DevFonts>` auto-discovers the slots from the `fontSet` global, so custom families just work. Pass
-`families` to it only if you set custom per-family `fallback` stacks and want the dev preview to match
-(see [`DevFonts` props](/docs/plugins/payload-fonts/serving#devfonts-props)).
+`<PreviewFonts>` auto-discovers the slots from the `fontSet` global, so custom families just work. Pass
+`families` to it only if you set custom per-family `fallback` stacks and want the preview to match
+(see [`PreviewFonts` props](/docs/plugins/payload-fonts/serving#previewfonts-props)).
 
 <Callout type="warn">
   Changing `families` strands existing data. Dropping a family removes its `fontSet` slot (the stored
@@ -155,6 +155,6 @@ fontsPlugin({ options: { families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fa
 
 ## Next
 
-- [Serving](/docs/plugins/payload-fonts/serving) — the production and development paths, `DevFonts` props, and env vars.
+- [Serving](/docs/plugins/payload-fonts/serving) — the baked `next/font` path, `PreviewFonts` props, and env vars.
 - [How it works](/docs/plugins/payload-fonts/how-it-works) — the subset pipeline, one-file-both-styles, revalidation, and seeding.
 - [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — when a font uploads but nothing renders.

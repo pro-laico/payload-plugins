@@ -2,8 +2,6 @@ import type React from 'react'
 
 import '@pro-laico/sandbox-shell/styles.css'
 
-export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Mux Sandbox',
   description: 'An example app for @pro-laico/payload-mux.',

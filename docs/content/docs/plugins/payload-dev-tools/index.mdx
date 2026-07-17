@@ -74,17 +74,28 @@ Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /a
 **Drop in the dev pages**
 
 ```tsx title="app/(frontend)/dev/[[...view]]/page.tsx"
+import { Suspense } from 'react'
 import config from '@payload-config'
 import { getPayload } from 'payload'
 import { createDevPage } from '@pro-laico/payload-dev-tools/next'
 
-export const dynamic = 'force-dynamic'
-export default createDevPage({ payload: getPayload({ config }) })
+const DevPage = createDevPage({ payload: getPayload({ config }) })
+
+export default function Page(props: Parameters<typeof DevPage>[0]) {
+  return (
+    <Suspense fallback={null}>
+      <DevPage {...props} />
+    </Suspense>
+  )
+}
 ```
 
 One file, all views. It lives in your `(frontend)` group, so the pages inherit your layout,
 fonts, and styles. Pass `createDevPage` a Payload handle — `getPayload({ config })` from your
-app's `@payload-config`.
+app's `@payload-config`. The pages read live data, so render them inside `<Suspense>` — a dynamic
+hole that streams at request time while the rest of the route prerenders. Don't reach for
+`export const dynamic = 'force-dynamic'`; with `cacheComponents` on, the Suspense boundary is all
+you need.
 
 <Callout type="info">
 The Seed view needs the seed plugin's preconditions: `ENABLE_SEED=true` in `.env.local` and a

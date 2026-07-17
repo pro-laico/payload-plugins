@@ -1,4 +1,6 @@
 import config from '@payload-config'
+import { Suspense } from 'react'
+import { connection } from 'next/server'
 import { getPayload } from 'payload'
 import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
@@ -6,22 +8,33 @@ import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
 import { shellProps } from '../shell'
 import { Image } from '../../../components/Image'
 
-export const dynamic = 'force-dynamic'
+export default function ResponsivePage() {
+  return (
+    <SandboxShell {...shellProps}>
+      <p style={{ margin: '0 0 16px' }}>
+        <a href="/">← Back to the gallery</a>
+      </p>
 
-export default async function ResponsivePage() {
+      {/* The demo hangs off a live read of the first seeded image — a dynamic hole inside Suspense. */}
+      <Suspense fallback={<p className="shell-muted">Loading…</p>}>
+        <ResponsiveDemo />
+      </Suspense>
+    </SandboxShell>
+  )
+}
+
+/** The per-request part: read the first seeded image and render it full-bleed with its emitted srcset.
+ * `connection()` marks it dynamic, so it streams into the Suspense hole instead of prerendering. */
+async function ResponsiveDemo() {
+  await connection()
   const payload = await getPayload({ config })
   const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs.at(0)
 
   if (!img) {
     return (
-      <SandboxShell {...shellProps}>
-        <p style={{ margin: '0 0 16px' }}>
-          <a href="/">← Back to the gallery</a>
-        </p>
-        <EmptyState>
-          No images yet — <a href="/">seed the samples</a> first, then come back.
-        </EmptyState>
-      </SandboxShell>
+      <EmptyState>
+        No images yet — <a href="/">seed the samples</a> first, then come back.
+      </EmptyState>
     )
   }
 
@@ -29,10 +42,7 @@ export default async function ResponsivePage() {
   const srcset = buildSrcset(img, { aspectRatio: ar })?.srcset ?? ''
 
   return (
-    <SandboxShell {...shellProps}>
-      <p style={{ margin: 0 }}>
-        <a href="/">← Back to the gallery</a>
-      </p>
+    <>
       <h2>One image, every screen size</h2>
       <p className="shell-lead">
         A single <code>&lt;ResponsiveImage&gt;</code> with <code>sizes=&quot;100vw&quot;</code>, full-bleed. No JavaScript and no resize handler
@@ -63,6 +73,6 @@ export default async function ResponsivePage() {
 
       <h2>The srcset it emitted</h2>
       <pre className="shell-code">{srcset.split(', ').join('\n')}</pre>
-    </SandboxShell>
+    </>
   )
 }
