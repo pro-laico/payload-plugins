@@ -11,6 +11,8 @@ declare global {
 }
 
 import { delay } from './delay'
+import { readMuxMarker } from './marker'
+import { MUX_VIDEO_SLUG } from '../collections/MuxVideo'
 import type { IngestMuxAssetOptions, IngestMuxVideoOptions, MuxSource, MuxVideoNewAssetSettings } from '../types'
 
 async function pollUntil<T>(fetch: () => Promise<T>, done: (value: T) => boolean, intervalMs: number, timeoutMs = 120_000): Promise<T> {
@@ -81,7 +83,9 @@ export async function ingestMuxAsset(mux: Mux, source: MuxSource, opts: IngestMu
 }
 
 export async function ingestMuxVideo(payload: Payload, opts: IngestMuxVideoOptions): Promise<{ id: string | number }> {
-  const collection = opts.collection ?? 'mux-video'
+  // The marker carries the slug the plugin actually registered, so a renamed collection needs no
+  // `opts.collection` here — the literal is only the floor for a config the plugin never saw.
+  const collection = opts.collection ?? readMuxMarker(payload.config)?.muxVideoSlug ?? MUX_VIDEO_SLUG
   const doc = await payload.create({
     collection,
     data: {

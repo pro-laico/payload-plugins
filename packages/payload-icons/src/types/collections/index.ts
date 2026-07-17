@@ -1,5 +1,2 @@
-export type * from './collection-hooks'
-export type * from './icon-collection'
 export type * from './icon-doc'
-export type * from './icon-request-collection'
 export type * from './icon-set-collection'

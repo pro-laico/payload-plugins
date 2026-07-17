@@ -4,16 +4,27 @@ import type { CollectionRevalidateConfig } from './collectionConfig'
 export interface RevalidatePluginOptions {
   /** Register no hooks or endpoints when false. Default `true`. */
   enabled?: boolean
-  /** Namespaces every emitted tag (`'app:'` → `app:posts:my-slug`). Default `''`. */
-  prefix?: string
-  /** Per-collection config, keyed by slug; `false` opts one out.
+  /** Tracking config for YOUR collections, keyed by slug; `false` opts one out. This plugin registers
+   * no collections of its own — it annotates the ones you already have, so there's no `slug` /
+   * `overrides` here, just the per-collection settings.
    *
    * - `idField`
    * - `lists`
    * - `extraTags` */
   collections?: Partial<Record<string, CollectionRevalidateConfig | false>>
-  /** Opt a global out by setting its slug to `false`. All are tracked by default. */
+  /** Opt one of YOUR globals out by setting its slug to `false`. All are tracked by default. */
   globals?: Partial<Record<string, false>>
+  /** This plugin's own knobs.
+   *
+   * - `prefix`
+   * - `rules`
+   * - `observe` */
+  options?: RevalidateOptions
+}
+
+export interface RevalidateOptions {
+  /** Namespaces every emitted tag (`'app:'` → `app:posts:my-slug`). Default `''`. */
+  prefix?: string
   /** Manual busts for data the field-walk can't see.
    *
    * - `on`
@@ -25,11 +36,10 @@ export interface RevalidatePluginOptions {
   observe?: boolean
 }
 
+/** `RevalidatePluginOptions` with the defaults applied — same keys, same nesting. */
 export interface ResolvedRevalidateOptions {
   enabled: boolean
-  prefix: string
   collections: Partial<Record<string, CollectionRevalidateConfig | false>>
   globals: Partial<Record<string, false>>
-  rules: DependencyRule[]
-  observe: boolean
+  options: { prefix: string; rules: DependencyRule[]; observe: boolean }
 }

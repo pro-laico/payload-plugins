@@ -9,16 +9,52 @@ description: "Plugin options, environment variables, the CLI scan command, and e
 pipeline, on-save optimizer), the `iconSet` grouping collection, and the `iconRequest` diagnostics
 collection. It's zero-config: everything is on by default.
 
-Every collection the plugin registers is one key under `collections`, on a single axis — `false`
-means "don't register it", an object means "override it". Admin-only UI toggles live under `admin`.
+Every collection the plugin registers is one key under `collections`, and each key is the uniform
+`{ slug?, overrides?, options? }` shape: `slug` renames it, `overrides` is a `Partial<CollectionConfig>`
+Payload passthrough, and `options` is this plugin's own knobs for that collection. A collection the
+plugin can work without also takes `false` to skip it.
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op; no collections are registered.` },
-  { name: 'collections.icon', type: 'IconCollectionOverrides', default: '{}', description: `Overrides for the icon upload collection. slug / adminGroup / access / upload replace the defaults; fields and hooks are APPENDED after the built-ins (never replacing them), so your beforeChange runs after formatSVGHook and sees the already-optimized SVG. The icon collection is always registered — there is no false.` },
-  { name: 'collections.iconSet', type: 'false | IconSetCollectionOverrides', default: '{}', description: `false skips the iconSet collection entirely (only icon is registered) — use it when you want icons in the CMS but not the grouping/active-set concept. An object overrides the collection: slug, live-preview wiring, set-level fields, per-row fields, a drafts toggle. Like collections.icon, fields and hooks are APPENDED after the built-ins (so your beforeChange runs after the single-active hook), not replaced.` },
-  { name: 'collections.iconRequest', type: 'false | IconRequestCollectionOverrides', default: '{}', description: `false skips the iconRequest diagnostics collection and its clear endpoint — nothing tracks missing icons. Otherwise <Icon> records every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. An object overrides the collection: additive fields/hooks (it has no built-in hooks). To force-off only the recorder at runtime, leave the collection registered and set ICON_USAGE_TRACKING=false.` },
-  { name: 'admin.usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
+  { name: 'collections', type: '{ icon?, iconSet?, iconRequest? }', default: '{}', description: `The collections the plugin registers, one key each.`, options: [
+    { name: 'icon', type: 'CollectionOption', default: '{}', description: `The icon upload collection — always registered, so no false and no plugin options.`, options: [
+      { name: 'slug', type: 'string', default: "'icon'", description: `Rename it; the icon set's upload field and the plugin marker re-point automatically.` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's by the shared merge rules. Rename with the sibling slug key, not here.` },
+    ] },
+    { name: 'iconSet', type: 'false | CollectionOption<IconSetOptions>', default: '{}', description: `false skips the iconSet collection entirely (only icon is registered) — use it when you want icons in the CMS but not the grouping/active-set concept.`, options: [
+      { name: 'slug', type: 'string', default: "'iconSet'", description: `Rename it; the plugin follows it.` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's by the shared merge rules — re-group it, wire live preview through admin.preview / admin.livePreview, turn versions off, add fields. Rename with the sibling slug key, not here.` },
+      {
+        name: 'options',
+        type: 'IconSetOptions',
+        description: `This collection's own knobs.`,
+        options: [
+          { name: 'usagePanel', type: 'boolean', default: 'true', description: `The IconSet "Requested icons" panel: shows which icons your code needs vs what a set provides (scanned live in dev, from the manifest in prod, plus runtime misses). Set false to omit it.` },
+          { name: 'iconRowFields', type: 'Field[]', default: '[]', description: `Extra fields appended to every row of the icon set's iconsArray, after the built-in name and icon upload — an alias list, a per-icon note. An iconSet.overrides.fields override can't reach inside the array, which is why this is its own option under the iconSet's options.` },
+        ],
+      },
+    ] },
+    { name: 'iconRequest', type: 'false | CollectionOption', default: '{}', description: `false skips the iconRequest diagnostics collection and its clear endpoint — nothing tracks missing icons. Otherwise <Icon> records every name that fails to resolve at runtime (throttled, fire-and-forget), including dynamic names a static scan can't see, surfaced in the usage panel. No plugin options. To force-off only the recorder at runtime, leave the collection registered and set ICON_USAGE_TRACKING=false.`, options: [
+      { name: 'slug', type: 'string', default: "'iconRequest'", description: `Rename it; the clear endpoint follows it.` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's by the shared merge rules. Rename with the sibling slug key, not here.` },
+    ] },
+  ] },
 ]
+
+### How an override merges
+
+`collections.<name>.overrides` is a `Partial<CollectionConfig>` — **what Payload has, you can
+override**. There's no allowlist of permitted keys (`slug` is its own key alongside `overrides`, not
+inside it):
+
+| Key | Merge |
+| --- | --- |
+| `slug` (own key) | Renamed. The plugin threads the new slug everywhere it's referenced — the set's upload field, the marker, the clear-requests endpoint. |
+| `overrides.fields` | Appended after the plugin's. A duplicate name is a **boot error** naming the plugin, collection, and field, not a bare `DuplicateFieldName`. |
+| `overrides.hooks` | Merged per phase — yours run **after** the plugin's, so a `beforeChange` on `icon` sees the already-optimized SVG. |
+| `overrides.access` / `admin` / `upload` / `custom` | Shallow-merged, so you replace one key without losing the rest (`admin: { group: 'Branding' }` keeps `useAsTitle`). |
+| `overrides.defaultPopulate` / `forceSelect` | Merged as selects. |
+| everything else in `overrides` | Replaced — `labels`, `versions`, `defaultSort`, `timestamps`, `endpoints`, … |
 
 Pass options to customize. The **Reference** tab is the interactive view; **TypeScript** is the
 same shape in code, every defaulted option written out.
@@ -39,25 +75,33 @@ import { iconsPlugin } from '@pro-laico/payload-icons'
 // Defaulted options written out. This is what `iconsPlugin()` does with no args.
 iconsPlugin({
   enabled: true,
-  // one key per registered collection: `false` to skip it, an object to override it
+  // one key per registered collection, each `{ slug?, overrides?, options? }`; `false` skips a collection
   collections: {
-    // the icon upload collection (slug / adminGroup / access / fields / hooks / upload):
+    // the icon upload collection — always registered, so no `false`, and no plugin `options`:
     icon: {
-      // slug: 'icon',
-      // access: { read: () => true },
-      // fields: [ /* … */ ],
-      // hooks: { /* … */ },
+      // slug: 'glyph', // renamed everywhere the plugin refers to it
+      overrides: {
+        // labels: { singular: 'Glyph', plural: 'Glyphs' }, // replaced
+        // admin: { group: 'Branding' },                    // shallow-merged onto the plugin's admin
+        // access: { read: () => true },                    // shallow-merged onto the plugin's access
+        // fields: [{ name: 'note', type: 'text' }],        // appended after the built-ins
+        // hooks: { beforeChange: [mine] },                 // merged per phase; yours run last
+      },
     },
     // the iconSet collection; `false` omits it:
     iconSet: {
-      // fields: [{ name: 'description', type: 'textarea' }],
-      // iconRowFields: [{ name: 'aliases', type: 'text', hasMany: true }],
+      overrides: {
+        // versions: false,                                 // drafts are on by default
+        // fields: [{ name: 'description', type: 'textarea' }],
+        // admin: { livePreview: { url: ({ data }) => `${process.env.SITE_URL}/preview/${data.id}` } },
+      },
+      options: {
+        usagePanel: true, // the "Requested icons" panel; set false to omit
+        iconRowFields: [], // e.g. [{ name: 'aliases', type: 'text', hasMany: true }]
+      },
     },
     // the iconRequest diagnostics collection; `false` omits it (no runtime miss tracking):
     iconRequest: {},
-  },
-  admin: {
-    usagePanel: true, // the "Requested icons" panel; set false to omit
   },
 })
 ```
@@ -85,14 +129,24 @@ Two env vars tune usage detection at runtime, independent of the plugin options.
 
 ## Endpoints
 
-None public. Icon-set activation happens in the admin, or through the companion
+| Method & path | What |
+| --- | --- |
+| `DELETE /api/payload-icons/icon-requests` | Clears every `iconRequest` doc — the action behind the usage panel's **Clear** button. Logged-in only (401 otherwise). Registered only while the `iconRequest` collection is on; the path follows its resolved slug via the marker. |
+
+Icon-set activation itself happens in the admin, or through the companion
 [`@pro-laico/payload-dev-tools`](/docs/plugins/payload-dev-tools) `/dev` panel.
 
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
-| `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point. |
+| `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point (also the default export). |
+| `IconsPluginOptions` | `@pro-laico/payload-icons` | The `iconsPlugin(options?)` argument type: `{ enabled?, collections? }`. |
+| `IconsCollectionsOptions` | `@pro-laico/payload-icons` | The `collections` shape: `{ icon?, iconSet?, iconRequest? }`. |
+| `IconSetOptions` | `@pro-laico/payload-icons` | The `iconSet` collection's own knobs: `{ usagePanel?, iconRowFields? }`. |
+| `IconDoc` | `@pro-laico/payload-icons` | The `icon` document type: `{ id, filename?, svgString?, optimized? }`. |
+| `readIconsMarker` | `@pro-laico/payload-icons` | The typed view of `config.custom.payloadIcons`: `{ options, iconSlug, iconSetSlug, iconRequestSlug }`. The supported way to discover the slugs the plugin registered — they follow `collections.<name>.slug`, and `iconSetSlug` / `iconRequestSlug` are `null` when that collection is off. Returns `undefined` when the plugin isn't registered. |
+| `PayloadIconsMarker` | `@pro-laico/payload-icons` | The marker's type. |
 | `extractSvgContent` | `@pro-laico/payload-icons` | Pull the inner markup out of an `svgString` to inline it in your own `<svg>`. |
 | `extractSvgProps` | `@pro-laico/payload-icons` | Parse an `svgString`'s root attributes (viewBox, etc.) onto your own `<svg>`. |
 | `createIcon` | `@pro-laico/payload-icons/components/Icon` | Factory that takes a Payload handle and returns the `<Icon name="…" />` server component — `const Icon = createIcon(getPayload({ config }))` (resolves through the active set). |

@@ -3,7 +3,7 @@ import type { CollectionBeforeValidateHook } from 'payload'
 
 import { ingestMuxAsset } from '../../lib/ingest'
 import { getAssetMetadata } from '../../lib/getAssetMetadata'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import type { NormalizedSource, ResolvedMuxVideoOptions } from '../../types'
 
 function normalizeSource(source: unknown): NormalizedSource | null {
@@ -33,9 +33,9 @@ export const getBeforeValidateHook =
     let asset: Awaited<ReturnType<typeof ingestMuxAsset>>
     try {
       asset = await ingestMuxAsset(mux, norm.ref, {
-        newAssetSettings: { playback_policy: [options.playbackPolicy], ...options.uploadSettings?.new_asset_settings },
+        newAssetSettings: { playback_policy: [options.options.playbackPolicy], ...options.options.uploadSettings?.new_asset_settings },
         playbackPolicy: norm.playbackPolicy,
-        corsOrigin: norm.corsOrigin ?? options.uploadSettings?.cors_origin,
+        corsOrigin: norm.corsOrigin ?? options.options.uploadSettings?.cors_origin,
       })
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err)

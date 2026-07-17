@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { createLocalReq, type Payload } from 'payload'
 
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { UploadDocLike, UploadHandler } from '../../types'
 
 const MAX_FETCH_BYTES = 64 * 1024 * 1024

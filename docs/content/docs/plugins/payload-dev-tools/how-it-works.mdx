@@ -9,7 +9,7 @@ You don't need any of this to use the plugin — it's here for when you're curio
 
 - **Plugin discovery is marker-based.** Each `@pro-laico/*` plugin stashes its resolved slugs and
   options on `config.custom` (`payloadSeed`, `payloadImages`, `payloadIcons`, `payloadFonts`,
-  `payloadMux`). The snapshot builder reads those markers off `payload.config`. No plugin imports,
+  `payloadMux`, `payloadRevalidate`). The snapshot builder reads those markers off `payload.config`. No plugin imports,
   so nothing else is a dependency; third-party setups just show fewer panels.
 - **The dev page file passes Payload in.** `createDevPage({ payload })` takes an app-supplied
   Payload handle (e.g. `getPayload({ config })`) — the plugin registers no `onInit` and stashes no

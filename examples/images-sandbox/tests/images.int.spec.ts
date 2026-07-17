@@ -6,7 +6,7 @@ import config from '../src/payload.config'
 import images from '../src/seed/images'
 import pages from '../src/seed/pages'
 
-const seedOptions = { definitions: [images, pages], assetsDir: 'seed-assets' }
+const seedOptions = { enabled: true, definitions: [images, pages], options: { assetsDir: 'seed-assets' } }
 
 /** Build a minimal PayloadRequest the transform endpoint understands (id + query + Accept). */
 const makeReq = (payload: Payload, id: string, query: string, accept?: string): PayloadRequest =>

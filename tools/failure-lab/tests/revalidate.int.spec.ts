@@ -77,7 +77,7 @@ const spyError = () => {
 
 beforeAll(async () => {
   lab = await bootLab({
-    plugins: [revalidatePlugin({ observe: true, collections: { posts: { lists: { recent: { fields: ['order'] } } } } })],
+    plugins: [revalidatePlugin({ collections: { posts: { lists: { recent: { fields: ['order'] } } } }, options: { observe: true } })],
     collections: [Posts, Media],
   })
   payload = lab.payload
@@ -299,7 +299,7 @@ describe('map endpoint failures', () => {
   // The map only ever serves observations, so `observe: false` (the production posture) doesn't
   // register the endpoints at all — a stronger guarantee than the 404 this used to assert.
   it('with observe off (the production posture) the endpoints are never registered — the map cannot leak', async () => {
-    const prodConfig = await revalidatePlugin({ observe: false })({ collections: [Posts, Media] } as Config)
+    const prodConfig = await revalidatePlugin({ options: { observe: false } })({ collections: [Posts, Media] } as Config)
     const paths = (prodConfig.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
     expect(paths).not.toContain('get /revalidate-map')
     expect(paths).not.toContain('post /revalidate-map')

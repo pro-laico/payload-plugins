@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import { docId } from '../lib/values'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import { createManualBusters } from './manual'
 import { createCacheFinders } from './finders'
 import { readRevalidateMarker } from '../lib/marker'

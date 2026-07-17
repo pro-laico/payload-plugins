@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import { asSlug } from '../asSlug'
+import { asSlug } from '../../_kit'
 
 export const countVariantsForSource = async (payload: Payload, variantSlug: string, sourceId: string | number): Promise<number> => {
   const res = await payload.find({

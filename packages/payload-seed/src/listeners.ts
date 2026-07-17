@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 
-import { isRecord } from './lib/isRecord'
+import { isRecord } from './_kit'
 import type { AfterSeedListener, SeedResult } from './types'
 
 // A Symbol.for slot on globalThis is the decoupled cross-package channel (payload-revalidate

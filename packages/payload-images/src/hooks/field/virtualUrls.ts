@@ -6,7 +6,7 @@ import { getImageUrl } from '../../lib/urls/getImageUrl'
 import { readImageIntent } from '../../lib/renderIntent'
 import { readImagesMarker } from '../../lib/marker'
 import { buildVariantUrl } from '../../lib/urls/variantUrl'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import type { ImageDocLike, ParsedRenderIntent } from '../../types'
 
 export const naturalAspectRatio = (d: ImageDocLike): number | undefined => (d.width && d.height ? d.width / d.height : undefined)

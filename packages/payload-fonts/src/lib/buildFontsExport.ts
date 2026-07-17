@@ -1,18 +1,17 @@
 import type { Payload } from 'payload'
 
 import { refId } from './refs'
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import { readUploadBytes } from './uploadBytes'
-import { DEFAULT_FONT_FAMILIES } from './families'
 import type { ExportedFont, ExportFamilyDiagnostics, ExportFontsResponse, Family } from '../types'
 
 export interface BuildFontsExportOptions {
-  fontSetGlobalSlug?: string
-  fontOptimizedSlug?: string
-  families?: Family[]
+  /** The resolved `fontSet` slug, or `null` when the app opted the global out — nothing is active
+   * without it, so the export is empty by definition rather than by a failed lookup. */
+  fontSetGlobalSlug: string | null
+  fontOptimizedSlug: string
+  families: Family[]
 }
-
-const DEFAULT_FAMILY_KEYS: Family[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
 
 /** Resolves the active fonts into transferable bytes: the fontSet global → the selected typefaces →
  * their optimized files, read through whatever storage adapter the collection uses.
@@ -20,14 +19,16 @@ const DEFAULT_FAMILY_KEYS: Family[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
  * Takes a `payload` handle rather than a request, so both callers share one implementation: the
  * HTTP export endpoint (a build box hitting a running site) and the `payload fonts:download` bin
  * (the build booting Payload against the DB itself, no server needed). */
-export const buildFontsExport = async (payload: Payload, opts: BuildFontsExportOptions = {}): Promise<ExportFontsResponse> => {
-  const { fontSetGlobalSlug = 'fontSet', fontOptimizedSlug = 'fontOptimized', families = DEFAULT_FAMILY_KEYS } = opts
+export const buildFontsExport = async (payload: Payload, opts: BuildFontsExportOptions): Promise<ExportFontsResponse> => {
+  const { fontSetGlobalSlug, fontOptimizedSlug, families } = opts
 
   let selection: Record<string, unknown> | undefined
-  try {
-    const fontSetGlobal = await payload.findGlobal({ slug: fontSetGlobalSlug, depth: 1 })
-    selection = Object.fromEntries(families.map((family) => [family, isRecord(fontSetGlobal) ? fontSetGlobal[family] : undefined]))
-  } catch {}
+  if (fontSetGlobalSlug) {
+    try {
+      const fontSetGlobal = await payload.findGlobal({ slug: fontSetGlobalSlug, depth: 1 })
+      selection = Object.fromEntries(families.map((family) => [family, isRecord(fontSetGlobal) ? fontSetGlobal[family] : undefined]))
+    } catch {}
+  }
 
   const fonts: Partial<Record<Family, ExportedFont[]>> = {}
   const diagnostics: Partial<Record<Family, ExportFamilyDiagnostics>> = Object.fromEntries(

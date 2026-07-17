@@ -11,7 +11,7 @@ import { createIconSetCollection } from '../../src/collections/IconSet'
 // meet on the one shared tag these collections declare.
 describe('custom.revalidate markers', () => {
   it('icon and iconSet carry the shared icons extraTag', () => {
-    for (const collection of [Icon(), createIconSetCollection()]) {
+    for (const collection of [Icon(), createIconSetCollection({ iconSlug: 'icon', usagePanel: true, iconRowFields: [] })]) {
       expect(collection.custom?.revalidate).toEqual({ extraTags: [ICONS_REVALIDATE_TAG] })
     }
   })

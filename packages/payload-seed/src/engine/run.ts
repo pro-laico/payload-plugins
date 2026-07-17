@@ -1,6 +1,6 @@
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import { buildGraph } from './graph'
 import { resolveOptions } from '../options'
 import { notifyAfterSeed } from '../listeners'
@@ -259,11 +259,11 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
 
     if (record.file) {
       const asset = assetBySlug.get(slug)
-      const subdir = asset?.subdir ?? options.assetSubDirs[slug] ?? slug
+      const subdir = asset?.subdir ?? options.options.assetSubDirs[slug] ?? slug
       const subdirs = [subdir, '']
-      const path = await resolveFilePath(record.file.name, options.assetsDir, subdirs)
+      const path = await resolveFilePath(record.file.name, options.options.assetsDir, subdirs)
       if (!path) {
-        const searched = searchedDirs(record.file.name, options.assetsDir, subdirs).join(', ')
+        const searched = searchedDirs(record.file.name, options.options.assetsDir, subdirs).join(', ')
         payload.logger.warn({ msg: `[payload-seed] ${nodeId}: _file '${record.file.name}' not found - skipped. Searched: ${searched}` })
       } else if (asset) {
         data = { ...data, [asset.sourceField]: { file: path, ...record.file.options } }

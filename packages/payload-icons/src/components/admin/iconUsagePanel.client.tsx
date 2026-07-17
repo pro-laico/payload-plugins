@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { Button, Pill, toast, useAllFormFields, useConfig } from '@payloadcms/ui'
 
 import { CLEAR_ICON_REQUESTS_PATH } from '../../endpoints/clearIconRequests'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import type { IconUsage, IconUsagePanelClientProps, LiveRequest } from '../../types'
 
 const ICON_NAME_PATH = /^iconsArray\.\d+\.name$/

@@ -3,8 +3,8 @@ import type { Payload, UIFieldServerComponent } from 'payload'
 import { pickUsageManifest } from '../../scan/pick'
 import { scanIconUsagesLive } from '../../scan/live'
 import { loadIconUsageManifest } from '../../scan/load'
+import { iconRequestSlugOf } from '../../lib/marker'
 import { IconUsagePanelClient } from './iconUsagePanel.client'
-import { ICON_REQUEST_SLUG } from '../../collections/IconRequest'
 import type { IconUsageManifest, LiveRequest } from '../../types'
 
 import 'server-only'
@@ -24,9 +24,10 @@ const getManifest = (manifestPath?: string): IconUsageManifest | null => pickUsa
 
 const loadLiveRequests = async (payload: Payload): Promise<LiveRequest[]> => {
   try {
-    if (!payload.collections?.[ICON_REQUEST_SLUG]) return []
+    const slug = iconRequestSlugOf(payload.config)
+    if (!slug || !payload.collections?.[slug]) return []
     const res = await payload.find({
-      collection: ICON_REQUEST_SLUG,
+      collection: slug,
       limit: 500,
       depth: 0,
       sort: '-count',

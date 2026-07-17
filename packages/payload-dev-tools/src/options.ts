@@ -3,6 +3,6 @@ import type { DevToolsPluginOptions, ResolvedDevToolsOptions } from './types'
 export function resolveOptions(options: DevToolsPluginOptions = {}): ResolvedDevToolsOptions {
   return {
     enabled: options.enabled ?? process.env.NODE_ENV === 'development',
-    devRoute: options.devRoute ?? '/dev',
+    options: { devRoute: options.options?.devRoute ?? '/dev' },
   }
 }

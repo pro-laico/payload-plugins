@@ -41,24 +41,75 @@ guess the next:
 ```ts
 pluginName({
   enabled: true,        // always defaults true; false makes the plugin a no-op
-  collections: { … },   // one key per collection the plugin registers
+  collections: { … },   // one entry per collection the plugin registers
   globals: { … },       // …and per global, where the plugin has any
-  admin: { … },         // admin-only UI toggles
-  // …then the plugin's own domain options, flat
+  // …the one or two items that ARE the plugin (payload-seed's `definitions`)
+  options: { … },       // everything else — the plugin's own knobs
 })
 ```
 
-Two rules make the rest predictable:
+The split at the root is the whole idea: `collections` / `globals` describe what the plugin
+registers, and `options` holds the plugin's own behavior. A plugin whose entire job is one
+thing keeps that thing at the root next to `options` (`payload-seed` leaves `definitions`
+there); everything else lives under `options`.
 
-- **One key per registered collection.** Each key under `collections` (or `globals`) takes
-  a single axis: `false` means *don't register it*, an object means *override it*. So
-  `collections: { iconSet: false }` drops the collection, and `collections: { iconSet: {…} }`
-  customizes it — never a separate `includeX` boolean paired with an `xOverrides` object.
-- **Optional sub-features read `false | Options`.** There's no `true` form; passing `{}`
-  means "on, all defaults". `prewarm: {}` and `prewarm: false` — not `prewarm: true`.
+### Inside a collection
 
-Slugs are never overridable on a collection the plugin wires internally; use the plugin's
-`extendCollection` option to point it at a collection you own instead.
+Every `collections.<name>` (and `globals.<name>`) entry is the same three-part shape, so a
+collection reads the same way in every plugin:
+
+```ts
+imagesPlugin({
+  collections: {
+    images: {
+      slug: 'media',                          // rename it
+      overrides: { access: { read: … } },     // Payload passthrough — anything CollectionConfig has
+      options: { folders: true, focalUI: … }, // this plugin's own knobs for THIS collection
+    },
+  },
+})
+```
+
+- **`slug`** renames the collection; the plugin follows the rename through every reference it
+  owns — relationship and join fields, hooks, endpoints, and the slug on its marker.
+- **`overrides`** is a `Partial<CollectionConfig>` (or `Partial<GlobalConfig>`), merged onto
+  the plugin's — not an allowlist of blessed keys. Whatever Payload's config has, you can set,
+  except `slug`: it's the sibling key above, excluded here so a rename can't hide in `overrides`
+  where the plugin wouldn't follow it.
+- **`options`** is the plugin's vocabulary for that collection — the admin cell, upload
+  constraints, and so on. Kept apart from `overrides` so the two never bleed together.
+
+Two more rules:
+
+- **One entry per collection, one axis per key.** Where a collection is optional, `false`
+  means *this plugin ignores it* — `collections: { iconSet: false }` drops the collection
+  `payload-icons` would register. A collection the plugin can't work without has no `false`
+  form (there's no `payload-images` without `images`); each plugin's reference says which.
+- **Optional sub-features read `false | Options`.** No `true` form; `{}` means "on, all
+  defaults". `prewarm: {}` and `prewarm: false` — not `prewarm: true`.
+
+`payload-revalidate` is the one plugin that doesn't *register* collections — it annotates the
+ones **you** already have. So its `collections` is keyed by your slugs and each entry is just
+the tracking config (there's no `slug` to rename or `overrides` to merge), with `false` to opt
+one out: `collections: { posts: { idField: 'slug' }, drafts: false }`.
+
+### How `overrides` merges
+
+One algorithm, every plugin, every collection:
+
+| Key | How it merges |
+| --- | --- |
+| `slug` | **Renames** the collection (a direct key on the entry, alongside `overrides`). |
+| `fields` | **Appended** after the plugin's. A field named like one the plugin injects is a boot error naming the plugin, the `collections` key, and the field — rather than Payload's bare `DuplicateFieldName`. |
+| `hooks` | **Merged per phase.** Yours run after the plugin's. |
+| `access`, `admin`, `upload`, `custom` | **Shallow-merged**, so the plugin's other keys survive. |
+| `defaultPopulate`, `forceSelect` | **Merged** as selects. |
+| everything else | **Replaced.** |
+
+The rule of thumb: anything the plugin depends on to work is merged, never clobbered;
+anything else is yours. Renaming plus overrides is the only way to reshape a plugin's
+collection — there's no separate option for attaching a plugin's fields to a collection you
+declared yourself.
 
 ## Reading a plugin's config back
 

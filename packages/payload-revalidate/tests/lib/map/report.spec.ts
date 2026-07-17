@@ -31,7 +31,7 @@ describe('renderRevalidateMap', () => {
   })
 
   it('applies the namespace prefix to every example tag', () => {
-    const md = renderRevalidateMap(fixture({ payloadRevalidate: { options: { prefix: 'shop' }, endpointPath: null } }))
+    const md = renderRevalidateMap(fixture({ payloadRevalidate: { options: { options: { prefix: 'shop' } }, endpointPath: null } }))
     expect(md).toContain('namespace `shop`')
     expect(md).toContain('`shop:authors:42`') // vocabulary example uses the first tracked slug
     expect(md).toContain('`shop:posts`') // list tag under the posts section
@@ -53,7 +53,9 @@ describe('renderRevalidateMap', () => {
 
   it('renders manual dependency rules', () => {
     const md = renderRevalidateMap(
-      fixture({ payloadRevalidate: { options: { rules: [{ on: 'authors', bust: ['posts'], whenFields: ['name'] }] }, endpointPath: null } }),
+      fixture({
+        payloadRevalidate: { options: { options: { rules: [{ on: 'authors', bust: ['posts'], whenFields: ['name'] }] } }, endpointPath: null },
+      }),
     )
     expect(md).toContain('## Manual dependency rules')
     expect(md).toContain('on `authors` → bust `posts`')

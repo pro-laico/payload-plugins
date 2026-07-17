@@ -34,7 +34,7 @@ describe('buildStaticInspection', () => {
       collections: [posts, authors, media],
       custom: {
         payloadRevalidate: {
-          options: { prefix: 'shop', collections: { media: false }, rules: [{ on: 'authors', bust: ['posts'] }] },
+          options: { collections: { media: false }, options: { prefix: 'shop', rules: [{ on: 'authors', bust: ['posts'] }] } },
           endpointPath: '/api/revalidate-map',
         },
       },
@@ -46,8 +46,8 @@ describe('buildStaticInspection', () => {
 
   it('optionsOverride wins over the marker', () => {
     const inspection = buildStaticInspection(
-      { collections: [posts], custom: { payloadRevalidate: { options: { prefix: 'shop' }, endpointPath: null } } },
-      { prefix: 'blog' },
+      { collections: [posts], custom: { payloadRevalidate: { options: { options: { prefix: 'shop' } }, endpointPath: null } } },
+      { options: { prefix: 'blog' } },
     )
     expect(inspection.prefix).toBe('blog')
   })

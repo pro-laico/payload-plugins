@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
 
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
 import { enqueuePrewarmJob } from '../../lib/prewarm/enqueue'
 import { loadPrewarmPlan, type PrewarmSourceDeps } from '../../lib/prewarm/prewarmSource'

@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { authd, readScopedToSource } from '../access'
-import { asSlug } from '../lib/asSlug'
+import { asSlug } from '../_kit'
 import { IMAGE_MIME_TYPES } from '../lib/transform/params'
 import type { CreateGeneratedImagesOptions } from '../types'
 

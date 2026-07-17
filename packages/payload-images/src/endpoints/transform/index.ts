@@ -2,7 +2,7 @@ import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
 
 import { routeId } from '../routeId'
-import { asSlug } from '../../lib/asSlug'
+import { asSlug, isRecord } from '../../_kit'
 import { readSourceDoc } from './sourceDoc'
 import { resolveConstraints } from './config'
 import { createSingleFlight } from './coalesce'
@@ -20,7 +20,6 @@ import { effectiveRequestWidth, FALLBACK_MIN_WIDTH_RATIO, pickFallbackVariant } 
 import { createObservationRecorder, type ObservationRecorder } from '../../lib/prewarm/recorder'
 import { getCachedVariantBytes, generateVariantBytes } from '../../lib/transform/getVariantBytes'
 import { mimeForFormat, negotiateFormat, parseTransformParams } from '../../lib/transform/params'
-import { isRecord } from '../../lib/isRecord'
 import type { FallbackCandidate, OutputFormat, ParsedParams, SourceDoc, TransformEndpointArgs } from '../../types'
 
 const isFallbackCandidate = (v: unknown): v is FallbackCandidate => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')

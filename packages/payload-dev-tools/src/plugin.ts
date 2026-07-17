@@ -11,12 +11,13 @@ import type { DevToolsPluginOptions, PayloadDevToolsMarker } from './types'
  * disappears in production.
  *
  * - `enabled`
- * - `devRoute`
+ * - `options`
  */
 export const devToolsPlugin =
   (opts: DevToolsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const { enabled, devRoute } = resolveOptions(opts)
+    const { enabled, options } = resolveOptions(opts)
+    const { devRoute } = options
     // Gate at config time rather than per-request: when off, the endpoints don't exist at all
     // instead of registering and 404ing.
     if (!enabled) return config

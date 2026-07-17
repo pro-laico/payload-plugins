@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 
-import { asSlug } from '../../lib/asSlug'
+import { asSlug } from '../../_kit'
 
 export const purgeVariantsForSource = async (
   payload: Payload,

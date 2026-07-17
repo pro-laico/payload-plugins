@@ -1,18 +1,20 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
 import { createOnce } from './lib/once'
-import { isRecord } from './lib/isRecord'
+import { isRecord } from './_kit'
 import { findTopLevelField } from './lib/fields'
 import type { CollectionRevalidateConfig, CollectionSettings, ResolvedRevalidateOptions, RevalidatePluginOptions } from './types'
 
 export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedRevalidateOptions {
   return {
     enabled: options.enabled ?? true,
-    prefix: options.prefix ?? '',
     collections: options.collections ?? {},
     globals: options.globals ?? {},
-    rules: options.rules ?? [],
-    observe: options.observe ?? process.env.NODE_ENV === 'development',
+    options: {
+      prefix: options.options?.prefix ?? '',
+      rules: options.options?.rules ?? [],
+      observe: options.options?.observe ?? process.env.NODE_ENV === 'development',
+    },
   }
 }
 

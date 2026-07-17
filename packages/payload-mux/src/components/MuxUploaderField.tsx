@@ -5,7 +5,7 @@ import MuxUploader from '@mux/mux-uploader-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import './mux-uploader.css'
 
 const stripExtension = (name: string): string => name.replace(/\.[^./\\]+$/, '')

@@ -13,7 +13,11 @@ import { seedDefinitions } from '@/plugins'
 
 let payload: Payload
 
-const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }
+const seedOptions = {
+  enabled: true,
+  definitions: seedDefinitions,
+  options: { assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } },
+}
 const FAMILIES = ['sans', 'serif', 'mono', 'display'] as const
 
 beforeAll(async () => {

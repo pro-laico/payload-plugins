@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
-import { muxVideoPlugin } from '@pro-laico/payload-mux'
-import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
+import { muxVideoPlugin, readMuxMarker } from '@pro-laico/payload-mux'
+import type { Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { bootLab, expectBootError, type LabBoot } from '@/boot'
 import { clearLogs, logs } from '@/logCapture'
@@ -71,80 +71,73 @@ describe('boot without credentials', () => {
     expect(coll?.custom?.seedDisabled).toBe('Mux credentials not set (MUX_TOKEN_ID / MUX_TOKEN_SECRET)')
     record('boot with no creds', warn, `custom.seedDisabled: ${String(coll?.custom?.seedDisabled)}`)
   })
-
-  it("extendCollection pointing at a collection that doesn't exist throws a named error", async () => {
-    const e = await expectBootError([muxVideoPlugin({ extendCollection: 'nope' })])
-    expect(e.message).toContain("[payload-mux] extendCollection: collection 'nope' not found")
-    record('extendCollection → unknown collection', e.message)
-  })
 })
 
-// Extending a collection you own: it keeps its identity and access, the plugin's fields land on
-// it, and your own `collections.muxVideo` overrides still win.
-describe('extendCollection', () => {
-  const media = (fields: CollectionConfig['fields'] = []): CollectionConfig => ({
-    slug: 'media',
-    labels: { singular: 'Medium', plural: 'Media' },
-    access: { read: () => true },
-    admin: { useAsTitle: 'caption', defaultColumns: ['caption'] },
-    fields: [{ name: 'caption', type: 'text' }, ...fields],
+// Renaming the plugin's collection. `collections.muxVideo.slug` is a first-class override and the
+// plugin follows it: the marker carries the new slug, and everything that resolves the collection
+// by name — the webhook lookup, `ingestMuxVideo` — reads the marker rather than the literal.
+describe('collections.muxVideo', () => {
+  it('a field of yours colliding with one the plugin injects throws a named error, not a bare DuplicateFieldName', async () => {
+    const e = await expectBootError([
+      muxVideoPlugin({ collections: { muxVideo: { overrides: { fields: [{ name: 'title', type: 'text' }] } } } }),
+    ])
+    expect(e.message).toContain('[payload-mux] collections.muxVideo: field(s) title are already defined by the plugin')
+    record('collections.muxVideo → field collision', e.message)
   })
 
-  it('a field the plugin injects colliding with one of yours throws a named error, not a bare DuplicateFieldName', async () => {
-    const e = await expectBootError([muxVideoPlugin({ extendCollection: 'media' as never })], [media([{ name: 'title', type: 'text' }])])
-    expect(e.message).toContain("[payload-mux] extendCollection: 'media' already defines field(s) title")
-    record('extendCollection → field collision', e.message)
-  })
-
-  it('keeps the target’s identity and access, and injects the Mux fields', async () => {
-    const lab = await bootLab({ plugins: [muxVideoPlugin({ extendCollection: 'media' as never })], collections: [media()] })
-    try {
-      const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
-      expect(lab.payload.config.collections.find((c) => c.slug === 'mux-video')).toBeUndefined() // no second collection
-      expect(coll?.labels?.plural).toBe('Media') // not relabelled to "Videos"
-      expect(coll?.admin?.useAsTitle).toBe('caption') // not forced to 'title'
-      const names = (coll?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
-      expect(names).toEqual(expect.arrayContaining(['caption', 'assetId', 'playbackOptions', 'status']))
-      // The target's own read access survives — the plugin does not impose its admin-only gate.
-      const read = coll?.access?.read
-      expect(read?.({ req: { user: null } } as never)).toBe(true)
-      record(
-        'extendCollection → target keeps identity',
-        `labels.plural: ${String(coll?.labels?.plural)}`,
-        `useAsTitle: ${String(coll?.admin?.useAsTitle)}`,
-      )
-    } finally {
-      await lab.cleanup()
-    }
-  })
-
-  it('collections.muxVideo overrides win over both the plugin and the target', async () => {
+  it('slug renames the collection, and the marker follows', async () => {
     const lab = await bootLab({
-      plugins: [muxVideoPlugin({ extendCollection: 'media' as never, collections: { muxVideo: { admin: { useAsTitle: 'assetId' } } } })],
-      collections: [media()],
+      plugins: [
+        muxVideoPlugin({ collections: { muxVideo: { slug: 'media', overrides: { labels: { singular: 'Medium', plural: 'Media' } } } } }),
+      ],
     })
     try {
       const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
-      expect(coll?.admin?.useAsTitle).toBe('assetId') // target said 'caption'; the override is last
-      record('extendCollection → overrides win', `useAsTitle: ${String(coll?.admin?.useAsTitle)}`)
+      expect(coll).toBeDefined()
+      expect(lab.payload.config.collections.find((c) => c.slug === 'mux-video')).toBeUndefined() // renamed, not duplicated
+      expect(coll?.labels?.plural).toBe('Media')
+      expect(readMuxMarker(lab.payload.config)?.muxVideoSlug).toBe('media')
+      const names = (coll?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
+      expect(names).toEqual(expect.arrayContaining(['assetId', 'playbackOptions', 'status']))
+      record('collections.muxVideo → rename', `slug: ${String(coll?.slug)}`, 'marker.muxVideoSlug: media')
     } finally {
       await lab.cleanup()
     }
   })
 
-  it('warns that access.read is ignored when extending — the target owns its access', async () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  it('your fields and overrides merge onto the renamed collection', async () => {
+    const lab = await bootLab({
+      plugins: [
+        muxVideoPlugin({
+          collections: {
+            muxVideo: { slug: 'media', overrides: { admin: { useAsTitle: 'assetId' }, fields: [{ name: 'caption', type: 'text' }] } },
+          },
+        }),
+      ],
+    })
     try {
-      const lab = await bootLab({
-        plugins: [muxVideoPlugin({ extendCollection: 'media' as never, access: { read: () => true } })],
-        collections: [media()],
-      })
-      const warn = spy.mock.calls.map((c) => c.join(' ')).find((w) => w.includes('access.read is ignored'))
-      expect(warn).toContain("you own 'media's access")
-      record('extendCollection → access.read ignored', warn)
-      await lab.cleanup()
+      const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
+      expect(coll?.admin?.useAsTitle).toBe('assetId') // the plugin said 'title'; the override is last
+      expect(coll?.admin?.group).toBe('Assets') // admin shallow-merges, so the plugin's other keys survive
+      const names = (coll?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
+      expect(names).toContain('caption') // yours append after the plugin's
+      record('collections.muxVideo → overrides win', `useAsTitle: ${String(coll?.admin?.useAsTitle)}`)
     } finally {
-      spy.mockRestore()
+      await lab.cleanup()
+    }
+  })
+
+  it('options.thumbnail selects the list cell — image swaps the gif cell for the static-image one', async () => {
+    const lab = await bootLab({ plugins: [muxVideoPlugin({ collections: { muxVideo: { options: { thumbnail: 'image' } } } })] })
+    try {
+      const coll = lab.payload.config.collections.find((c) => c.slug === 'mux-video')
+      const uploader = (coll?.fields ?? []).find((f) => 'name' in f && f.name === 'muxUploader')
+      const cell = JSON.stringify(uploader && 'admin' in uploader ? uploader.admin?.components?.Cell : undefined)
+      expect(cell).toContain('MuxVideoImageCell')
+      expect(cell).not.toContain('MuxVideoGifCell')
+      record('collections.muxVideo → options.thumbnail', `cell: ${cell}`)
+    } finally {
+      await lab.cleanup()
     }
   })
 })

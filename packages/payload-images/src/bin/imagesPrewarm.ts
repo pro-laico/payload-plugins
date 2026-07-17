@@ -1,6 +1,6 @@
 import { getPayload, type SanitizedConfig } from 'payload'
 
-import { asSlug } from '../lib/asSlug'
+import { asSlug } from '../_kit'
 import { readImagesMarker } from '../lib/marker'
 import { enqueuePrewarmJob } from '../lib/prewarm/enqueue'
 import { prewarmSource } from '../lib/prewarm/prewarmSource'

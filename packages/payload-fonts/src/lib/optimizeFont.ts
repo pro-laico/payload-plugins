@@ -1,4 +1,4 @@
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import type { Charset, FontFileMetadata, FontkitFont } from '../types'
 
 const CHARSET_PRESETS: Record<string, Array<[number, number]>> = {

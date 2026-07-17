@@ -5,15 +5,17 @@ import type { CreateImagesOptions } from '../../types'
 import { IMAGE_MIME_TYPES } from '../../lib/transform/params'
 import { imageEnhancements, resolveAdminThumbnail } from './imageEnhancements'
 
+export const IMAGES_SLUG = 'images'
+
 const d = { alt: 'Describe the image for screen readers and SEO.' }
 
 export const createImagesCollection = (opts: CreateImagesOptions = {}): CollectionConfig => {
   const { localizeAlt = false, folders, maxOriginalSize } = opts
   const enh = imageEnhancements(opts)
-  const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
+  const adminThumbnail = resolveAdminThumbnail(opts.apiRoute)
 
   return {
-    slug: 'images',
+    slug: IMAGES_SLUG,
     access: { create: authd, delete: authd, read: anyone, update: authd },
     admin: {
       group: 'Assets',
@@ -32,7 +34,7 @@ export const createImagesCollection = (opts: CreateImagesOptions = {}): Collecti
       focalPoint: true,
       displayPreview: true,
       mimeTypes: opts.mimeTypes ?? IMAGE_MIME_TYPES,
-      ...(adminThumbnail ? { adminThumbnail } : {}),
+      adminThumbnail,
       ...(maxOriginalSize
         ? { resizeOptions: { width: maxOriginalSize, height: maxOriginalSize, fit: 'inside', withoutEnlargement: true } }
         : {}),

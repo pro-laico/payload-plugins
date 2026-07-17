@@ -2,10 +2,11 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Endpoint } from 'payload'
 
 import { buildFontsExport } from '../lib/buildFontsExport'
-import { DEFAULT_FONT_FAMILIES } from '../lib/families'
-import type { ExportFontsEndpointOptions, Family } from '../types'
+import type { ExportFontsEndpointOptions } from '../types'
 
-const DEFAULT_FAMILY_KEYS: Family[] = DEFAULT_FONT_FAMILIES.map((r) => r.key)
+/** The default path. `plugin.ts` registers the endpoint here and reports the same value on the
+ * marker, so the CLI and the docs can't drift from where it actually lives. */
+export const FONTS_EXPORT_PATH = '/fonts/export'
 
 function secretsMatch(provided: string, secret: string): boolean {
   const a = createHash('sha256').update(provided).digest()
@@ -16,13 +17,8 @@ function secretsMatch(provided: string, secret: string): boolean {
 /** Ships the active fonts' bytes to a build that can't reach the database — the remote case.
  * A build that CAN reach it should use `payload fonts:download`, which skips the HTTP round-trip
  * (and this auth) by reading the same data through the Local API. */
-export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions = {}): Endpoint => {
-  const {
-    path: endpointPath = '/fonts/export',
-    fontSetGlobalSlug = 'fontSet',
-    fontOptimizedSlug = 'fontOptimized',
-    families = DEFAULT_FAMILY_KEYS,
-  } = opts
+export const exportFontsEndpoint = (opts: ExportFontsEndpointOptions): Endpoint => {
+  const { path: endpointPath, fontSetGlobalSlug, fontOptimizedSlug, families } = opts
 
   return {
     path: endpointPath,

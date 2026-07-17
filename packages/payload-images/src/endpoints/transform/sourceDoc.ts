@@ -1,6 +1,6 @@
 import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
 
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import type { SourceDoc } from '../../types'
 
 const isSourceDoc = (v: unknown): v is SourceDoc => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')

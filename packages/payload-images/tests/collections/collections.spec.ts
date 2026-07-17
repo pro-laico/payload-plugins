@@ -29,18 +29,9 @@ describe('createImagesCollection', () => {
   it('serves a focal-cropped admin thumbnail via /api/img (no full-res originals in the list)', () => {
     const upload = createImagesCollection().upload as { adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null }
     expect(typeof upload.adminThumbnail).toBe('function')
-    // Default rides the always-servable `thumbnail` preset template; a custom size keeps the dimension URL.
+    // Rides the always-servable `thumbnail` preset template — stable spec, exempt from the cap.
     expect(upload.adminThumbnail?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?preset=thumbnail')
     expect(upload.adminThumbnail?.({ doc: {} })).toBeNull()
-    const sized = createImagesCollection({ adminThumbnail: 200 }).upload as {
-      adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null
-    }
-    expect(sized.adminThumbnail?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?w=200&h=200&fit=cover&fmt=auto')
-  })
-
-  it('omits the admin thumbnail when adminThumbnail is false', () => {
-    const upload = createImagesCollection({ adminThumbnail: false }).upload as { adminThumbnail?: unknown }
-    expect(upload.adminThumbnail).toBeUndefined()
   })
 
   it('leans on Payload built-ins: upload-field previews, alt search, and editor descriptions', () => {

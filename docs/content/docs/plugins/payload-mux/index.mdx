@@ -56,8 +56,8 @@ NEXT_PUBLIC_SERVER_URL=https://your-site.com   # your site URL — becomes the u
 **Add the plugin**
 
 Zero-config reads the env vars above. Uploads' `cors_origin` resolves to
-`uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'`. Pass options only to
-override: a non-standard env var name, a custom CORS origin, or signed playback.
+`options.uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'`. Pass options only
+to override: a non-standard env var name, a custom CORS origin, or signed playback.
 
 <Tabs items={['Public playback', 'Signed playback']}>
 
@@ -85,8 +85,10 @@ MUX_PRIVATE_KEY=...
 
 ```ts title="payload.config.ts"
 muxVideoPlugin({
-  playbackPolicy: 'signed',               // new videos upload as signed
-  signedUrlOptions: { expiration: '1d' }, // signed URL lifetime
+  options: {
+    playbackPolicy: 'signed',               // new videos upload as signed
+    signedUrlOptions: { expiration: '1d' }, // signed URL lifetime
+  },
 })
 ```
 
@@ -144,7 +146,7 @@ The asset lifecycle, revalidation with Next.js, and declarative seeding.
 </Card>
 
 <Card title="Reference" href="/docs/plugins/payload-mux/reference">
-Plugin options, environment variables, CLI commands, endpoints, and exports.
+Plugin options, environment variables, endpoints, and exports.
 </Card>
 
 <Card title="Troubleshooting" href="/docs/plugins/payload-mux/troubleshooting">

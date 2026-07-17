@@ -152,7 +152,7 @@ build step — gets a manual rule:
 
 ```ts
 revalidatePlugin({
-  rules: [{ on: 'faqs', bust: ['services'], whenFields: ['question', 'answer'] }],
+  options: { rules: [{ on: 'faqs', bust: ['services'], whenFields: ['question', 'answer'] }] },
 })
 ```
 

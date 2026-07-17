@@ -1,6 +1,6 @@
 import type { Endpoint } from 'payload'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 
 export function createActivateIconSetEndpoint(): Endpoint {
   return {

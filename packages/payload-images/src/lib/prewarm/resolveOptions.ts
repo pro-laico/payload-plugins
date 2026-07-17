@@ -1,6 +1,6 @@
 import { ENCODABLE_FORMATS } from '../transform/params'
 import { IMAGE_RENDER_PROFILES_SLUG } from '../../collections/renderProfiles'
-import type { ImagesPluginOptions, OutputFormat, ResolvedPrewarmOptions, TransformConstraints } from '../../types'
+import type { OutputFormat, PrewarmOptions, ResolvedPrewarmOptions, TransformConstraints } from '../../types'
 
 export const PREWARM_TASK_SLUG = 'imagesPrewarm'
 
@@ -9,9 +9,13 @@ export const PREWARM_TASK_SLUG = 'imagesPrewarm'
 // collection (a schema change) and the jobs task, and that the enqueued jobs need a runner to do
 // anything (see the docs' run-path section; Payload's autoRun cron needs a long-lived process, so
 // serverless deploys drive it from a cron hitting the jobs endpoint or the images:prewarm CLI).
-export const resolvePrewarmOptions = (opts: ImagesPluginOptions, constraints: TransformConstraints): ResolvedPrewarmOptions | false => {
-  if (opts.prewarm === false) return false
-  const raw = typeof opts.prewarm === 'object' ? opts.prewarm : {}
+export const resolvePrewarmOptions = (
+  opts: false | PrewarmOptions,
+  constraints: TransformConstraints,
+  profilesSlug: string = IMAGE_RENDER_PROFILES_SLUG,
+): ResolvedPrewarmOptions | false => {
+  if (opts === false) return false
+  const raw = opts
   const defaultFormats: OutputFormat[] = constraints.preferAvif ? ['webp', 'avif'] : ['webp']
   // Only formats the endpoint can actually serve are worth warming — anything outside
   // transform.formats would be generated, stored, and never matched by a request key.
@@ -29,7 +33,7 @@ export const resolvePrewarmOptions = (opts: ImagesPluginOptions, constraints: Tr
     maxVariantsPerImage: raw.maxVariantsPerImage ?? 24,
     autoRun: raw.autoRun ?? false,
     queue: raw.queue ?? 'default',
-    profilesSlug: IMAGE_RENDER_PROFILES_SLUG,
+    profilesSlug,
     taskSlug: PREWARM_TASK_SLUG,
   }
 }

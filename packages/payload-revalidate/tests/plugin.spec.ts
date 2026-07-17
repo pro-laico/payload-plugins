@@ -13,7 +13,7 @@ const posts: CollectionConfig = {
 }
 
 const apply = (config: Partial<Config> = {}, options: Parameters<typeof revalidatePlugin>[0] = {}): Config =>
-  revalidatePlugin({ observe: false, ...options })(config as Config) as Config
+  revalidatePlugin({ ...options, options: { observe: false, ...options.options } })(config as Config) as Config
 
 describe('revalidatePlugin', () => {
   it('appends hooks to every collection and global without dropping existing ones', () => {
@@ -44,9 +44,9 @@ describe('revalidatePlugin', () => {
   // The map endpoints only ever serve observations, so `observe` alone governs registration.
   it('registers the map endpoints (both methods) when observing, and none when not', () => {
     const existing: Endpoint = { path: '/mine', method: 'get', handler: async () => new Response(null) }
-    const endpoints = apply({ endpoints: [existing] }, { observe: true }).endpoints ?? []
+    const endpoints = apply({ endpoints: [existing] }, { options: { observe: true } }).endpoints ?? []
     expect(endpoints.map((e) => `${e.method} ${e.path}`)).toEqual(['get /mine', 'get /revalidate-map', 'post /revalidate-map'])
-    expect(apply({}, { observe: false }).endpoints ?? []).toHaveLength(0)
+    expect(apply({}, { options: { observe: false } }).endpoints ?? []).toHaveLength(0)
   })
 
   it('registers the revalidate-map bin command and preserves existing bin entries', () => {
@@ -56,9 +56,9 @@ describe('revalidatePlugin', () => {
   })
 
   it('writes the custom.payloadRevalidate marker and preserves existing custom entries', () => {
-    const config = apply({ custom: { other: 1 } }, { observe: true })
+    const config = apply({ custom: { other: 1 } }, { options: { observe: true } })
     expect(config.custom).toMatchObject({ other: 1, payloadRevalidate: { endpointPath: '/api/revalidate-map' } })
-    expect(apply({}, { observe: false }).custom).toMatchObject({ payloadRevalidate: { endpointPath: null } })
+    expect(apply({}, { options: { observe: false } }).custom).toMatchObject({ payloadRevalidate: { endpointPath: null } })
   })
 
   it('is a no-op when disabled', () => {
@@ -104,7 +104,10 @@ describe('revalidatePlugin', () => {
       // `media` is registered too: edges into UNREGISTERED nodes are dropped (they'd
       // dangle in the dev-tools graph — see the payload-folders test below).
       { collections: [posts, { slug: 'media', fields: [] }], globals: [] },
-      { prefix: 'shop', rules: [{ on: 'posts', bust: ['x'] }], collections: { posts: { lists: { recent: { fields: ['title'] } } } } },
+      {
+        collections: { posts: { lists: { recent: { fields: ['title'] } } } },
+        options: { prefix: 'shop', rules: [{ on: 'posts', bust: ['x'] }] },
+      },
     )
     const marker = (config.custom as { payloadRevalidate: PayloadRevalidateMarker }).payloadRevalidate
     expect(marker.prefix).toBe('shop')

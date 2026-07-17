@@ -1,7 +1,7 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
 import { bust } from '../lib/bust'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import { getInspection } from '../lib/inspect'
 
 export const MAP_ENDPOINT_PATH = '/revalidate-map'

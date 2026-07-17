@@ -1,5 +1,5 @@
 import { file, ref } from './refs'
-import { isRecord } from './lib/isRecord'
+import { isRecord } from './_kit'
 import type { SeedDefinition } from './types'
 
 export const SEED_PACKAGE = '@pro-laico/payload-seed'

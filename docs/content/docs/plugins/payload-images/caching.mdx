@@ -94,7 +94,7 @@ The stand-in can never masquerade as the real thing: it's served with `Cache-Con
 (CDN headers too, no ETag), so **nothing anywhere caches it** — browser, CDN, or proxy — and it is
 never persisted under the exact variant's cache key. The moment the background generation lands,
 every subsequent request serves the exact bytes with the normal immutable headers. Disable with
-`transform: { fallback: false }`.
+`options: { transform: { fallback: false } }`.
 
 <Callout type="info">
   **A stand-in upgrades on the NEXT load, not live.** `<ResponsiveImage>` is a passive `<img>`: a
@@ -110,7 +110,7 @@ unbounded, an attacker enumerating `?w=…&q=…&fmt=…` could accumulate huge 
 rows on your storage. The cap fixes that at the door.
 
 Each image carries a `variantLimit` (default **200**, editable per image, project default via
-`imagesPlugin({ variantLimit })`). When a **freeform** cache miss would exceed the limit, the
+`imagesPlugin({ options: { variantLimit } })`). When a **freeform** cache miss would exceed the limit, the
 endpoint serves the request without adding storage:
 
 - if a [nearby variant](#nearby-quality-fallback) exists, that stand-in is served (`no-store`);
@@ -143,9 +143,11 @@ on top:
 
 ```ts
 imagesPlugin({
-  presetTemplates: {
-    og:   { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
-    card: { width: 600, aspectRatio: '4:3', fit: 'cover' },
+  options: {
+    presetTemplates: {
+      og:   { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
+      card: { width: 600, aspectRatio: '4:3', fit: 'cover' },
+    },
   },
 })
 ```
@@ -184,8 +186,8 @@ Prewarming makes the first request fast without generating every possible varian
 images — deferred, budgeted, and idempotent.
 
 ```ts
-imagesPlugin()                   // prewarm is ON by default — zero-config
-imagesPlugin({ prewarm: false }) // the opt-out
+imagesPlugin()                              // prewarm is ON by default — zero-config
+imagesPlugin({ options: { prewarm: false } }) // the opt-out
 ```
 
 <Callout type="warn">
@@ -215,12 +217,14 @@ Tune it with the options object:
 
 ```ts
 imagesPlugin({
-  prewarm: {
-    seeds: [{ aspectRatio: '16:9', quality: 80 }],  // warm these before any traffic is observed
-    formats: ['webp', 'avif'],                      // default ['webp'] (+'avif' with transform.preferAvif)
-    maxVariantsPerImage: 24,
-    queue: 'default',
-    autoRun: false,  // opt-in: a cron string wires an in-process runner into config.jobs.autoRun (not for serverless)
+  options: {
+    prewarm: {
+      seeds: [{ aspectRatio: '16:9', quality: 80 }],  // warm these before any traffic is observed
+      formats: ['webp', 'avif'],                      // default ['webp'] (+'avif' with transform.preferAvif)
+      maxVariantsPerImage: 24,
+      queue: 'default',
+      autoRun: false,  // opt-in: a cron string wires an in-process runner into config.jobs.autoRun (not for serverless)
+    },
   },
 })
 ```
@@ -303,43 +307,43 @@ Without the revalidate plugin, handle it however you already do (a `revalidatePa
 
 export const cachingOptions = [
   {
-    name: 'variantLimit',
+    name: 'options.variantLimit',
     type: 'number',
     default: '200',
-    description: 'Max cached variants stored per image. A per-image field; set the project default with `imagesPlugin({ variantLimit })`. Presets are exempt.',
+    description: 'Max cached variants stored per image. A per-image field; set the project default with `imagesPlugin({ options: { variantLimit } })`. Presets are exempt.',
   },
   {
-    name: 'transform.fallback',
+    name: 'options.transform.fallback',
     type: 'boolean',
     default: 'true',
     description: 'On a cache miss, serve an existing same-geometry variant instantly (`no-store`) while the exact one generates in the background.',
   },
   {
-    name: 'prewarm',
-    type: 'boolean | PrewarmOptions',
-    default: 'false',
-    description: 'Pre-generate the renders the site actually serves for new images. Enabling adds a hidden collection — a schema change. Pass an object to tune it.',
+    name: 'options.prewarm',
+    type: 'false | PrewarmOptions',
+    default: '{}',
+    description: 'Pre-generate the renders the site actually serves for new images. On by default; enabling adds a hidden collection — a schema change. Pass an object to tune it, or `false` to opt out.',
   },
   {
-    name: 'prewarm.formats',
+    name: 'options.prewarm.formats',
     type: 'Format[]',
     default: "['webp']",
-    description: "Formats to warm. `'avif'` is added automatically when `transform.preferAvif` is set.",
+    description: "Formats to warm. `'avif'` is added automatically when `options.transform.preferAvif` is set.",
   },
   {
-    name: 'prewarm.maxVariantsPerImage',
+    name: 'options.prewarm.maxVariantsPerImage',
     type: 'number',
     default: '24',
     description: 'Cap on variants prewarmed per image.',
   },
   {
-    name: 'prewarm.queue',
+    name: 'options.prewarm.queue',
     type: 'string',
     default: "'default'",
     description: 'The Payload Jobs queue the prewarm jobs are enqueued on.',
   },
   {
-    name: 'prewarm.autoRun',
+    name: 'options.prewarm.autoRun',
     type: 'string | false',
     default: 'false',
     description: 'A cron string wires an in-process runner into `config.jobs.autoRun`. Not for serverless.',

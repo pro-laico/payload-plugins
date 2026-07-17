@@ -7,33 +7,80 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
-Every plugin's options now have the same shape, and the toggles that never earned their keep are
-gone. Configure one plugin and you can guess the next: `enabled`, a `collections` key per
-collection the plugin registers, `admin` for UI-only toggles, then the plugin's own options flat.
-Four options were deleted outright — each one's "off" state was either already unreachable or
-incoherent — and two defaults flip on. Breaking for five packages; every change is a mechanical
-rename except where noted. See **Upgrade notes**.
+Every plugin's options now have the same nested shape, and the toggles that never earned their keep
+are gone. Configure one plugin and you can guess the next: `enabled`, a `collections` entry per
+collection the plugin registers (and `globals` where it has any), the one or two items that *are*
+the plugin, then `options` for everything else. Every collection entry reads the same way too —
+`slug` to rename, `overrides` for Payload passthrough, `options` for the plugin's own knobs. Four
+options were deleted outright — each one's "off" state was already unreachable or incoherent — and
+two defaults flip on. Breaking for all seven packages. See **Upgrade notes**.
 
 ### Highlights
 
 #### One options shape across all seven plugins
 
-Every collection a plugin registers is now one key under `collections` (or `globals`, for
-`payload-fonts`' fontSet — it's a Payload global, so it isn't pretending to be a collection), and
-each key has a single axis: `false` means don't register it, an object means override it. That
-retires the old boolean-plus-overrides pairs (`includeIconSet` + `iconSetOverrides`,
-`includeFontSet` + `fontSetOverrides`, `trackRequests` + `iconRequestOverrides`), each of which
-could express an unreachable state. Optional sub-features read `false | Options` everywhere — the
-`boolean | Options` form is gone, since `true` never meant anything `{}` didn't.
+The root of every plugin separates what it *registers* from how it *behaves*: `collections` /
+`globals` describe the collections, and a single `options` object holds the plugin's own knobs. The
+one or two things that *are* the plugin stay at the root beside `options` (`payload-seed` keeps
+`definitions` there). No more flat sprawl of domain options, and no more `admin` block — admin-only
+toggles belong to the collection they configure, so they moved onto it.
 
-Admin-only toggles moved under `admin` (`admin.focalUI`, `admin.folders`, `admin.usagePanel`,
-`admin.thumbnail`). `payload-images` drops from 15 top-level options to 12; `payload-icons` from 7
-to 3; `payload-fonts` from 8 to 5.
+Every `collections.<name>` (and `globals.<name>`) entry is the same three-part shape:
 
-Every package now resolves its defaults in one place — a `resolveOptions` in `src/options.ts`
-returning a fully-resolved mirror type — so "what's the default for X" is answerable from one file
-instead of by reading `plugin.ts` top to bottom. Every package also exports a typed
-`read<Name>Marker(config)` for its `config.custom.payload<Name>` stash.
+```ts
+imagesPlugin({
+  collections: {
+    images: {
+      slug: 'media',                          // rename it
+      overrides: { access: { read } },        // Payload passthrough — anything CollectionConfig has
+      options: { folders: true, focalUI },    // this plugin's own knobs for THIS collection
+    },
+  },
+  options: { prewarm: {}, transform: {} },    // the plugin's own behavior
+})
+```
+
+`overrides` and `options` never bleed together: one is Payload's vocabulary, the other is the
+plugin's — and `overrides` excludes `slug` at the type level, so a rename can only go through the
+top-level `slug` key the plugin actually threads. A collection the plugin can work without also takes `false` to opt out — retiring the old
+boolean-plus-overrides pairs (`includeIconSet` + `iconSetOverrides`, `trackRequests` +
+`iconRequestOverrides`), each of which could express an unreachable state. Optional sub-features
+read `false | Options` everywhere — the `boolean | Options` form is gone, since `true` never meant
+anything `{}` didn't. `payload-revalidate` is the exception that proves the rule: it *annotates*
+your collections rather than registering its own, so its `collections` is keyed by your slugs with
+no `slug`/`overrides` — just the tracking config, and `false` to opt one out.
+
+Every package resolves its defaults in one place — a `resolveOptions` in `src/options.ts` returning
+a mirror type (same keys, same nesting) — so "what's the default for X" is answerable from one file.
+Every package also exports a typed `read<Name>Marker(config)` for its `config.custom.payload<Name>`
+stash. The uniform `CollectionOption` / `GlobalOption` shape is a shared type, so the structure is
+enforced by the compiler, not by convention.
+
+#### One merge contract, and renaming is now first-class
+
+The shape was uniform after the pass above, but what an override *did* still wasn't. Three plugins
+carried near-copies of the merge algorithm and one carried a bespoke allowlist, and they had
+drifted: `payload-icons` couldn't override `labels` or `versions` at all, and `payload-fonts`' copy
+was missing the slug guard — which meant `fontsPlugin({ collections: { font: { slug: 'typefaces' } } })`
+type-checked and then died at boot with `Field Font has invalid relationship 'font'`.
+
+There is now one algorithm, in one place, vendored into each package that registers collections:
+`slug` renames, `fields` append (a duplicate name is a boot error naming the plugin, the collection,
+and the field), `hooks` merge per phase, `access` / `admin` / `upload` / `custom` shallow-merge,
+`defaultPopulate` / `forceSelect` merge as selects, everything else replaces. Every override is a
+plain `Partial<CollectionConfig>` — whatever Payload's config has, you can override. CI fails if a
+package's copy drifts from the source.
+
+`slug` is now a supported override rather than a forbidden one, and each plugin follows the rename
+through every reference it owns — relationship and join fields, hooks, endpoints, and the slug it
+publishes on its marker. That's what replaces `extendCollection`.
+
+The same vendoring now carries the helpers every plugin had its own copy of: `isRecord` (seven
+byte-identical copies), `binScriptPath` (four), and the `authd` / `anyone` access primitives (three).
+`binScriptPath` is the one that mattered — it encodes which extension a `config.bin` entry points at,
+`.ts` in a workspace and `.js` in a published install, and getting that wrong doesn't fail a build:
+the command is simply missing when you run it. A conformance test now asserts every registered bin
+resolves to a file that exists.
 
 #### Defaults that stop hiding the feature you installed
 
@@ -60,41 +107,57 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 
 ### Changed
 
-- **BREAKING** `@pro-laico/payload-icons` — `iconOverrides` → `collections.icon`; `iconSetOverrides`
-  → `collections.iconSet`; `iconRequestOverrides` → `collections.iconRequest`; `includeIconSet:
-  false` → `collections.iconSet: false`; `trackRequests: false` → `collections.iconRequest: false`;
-  `usagePanel` → `admin.usagePanel`.
-- **BREAKING** `@pro-laico/payload-fonts` — `fontOverrides` → `collections.font`;
-  `fontOriginalOverrides` → `collections.fontOriginal`; `fontOptimizedOverrides` →
-  `collections.fontOptimized`; `fontSetOverrides` → `globals.fontSet`; `includeFontSet: false` →
-  `globals.fontSet: false`.
-- **BREAKING** `@pro-laico/payload-images` — `imagesOverrides` → `collections.images`;
-  `generatedImagesOverrides` → `collections.generatedImages`; `focalUI` → `admin.focalUI` (and its
-  bare `true` form is gone — pass `{}` or omit); `folders` → `admin.folders`; `prewarm: true` →
-  `prewarm: {}`.
-- **BREAKING** `@pro-laico/payload-mux` — `adminThumbnail` → `admin.thumbnail`. The `MuxVideo`
-  collection factory is no longer exported; the new `collections.muxVideo` overrides cover it.
-  Defaults that were implicit fallthroughs are now explicit: `playbackPolicy: 'public'`,
-  `posterExtension: 'png'`, `animatedGifExtension: 'gif'`, `admin.thumbnail: 'gif'`.
-- **BREAKING** `@pro-laico/payload-mux` — `access` is now two gates, one axis each:
-  `access: (req) => …` → `access: { read: (req) => …, upload: (req) => … }`. One function used to
-  gate both collection reads and the direct-upload endpoints, so "let the public read videos but
-  keep uploads admin-only" was not expressible. Both still default to a logged-in admin-collection
-  user. Under `extendCollection`, `access.read` is ignored (you own that collection's access) and
-  the plugin warns.
-- **BREAKING** `@pro-laico/payload-mux` — `extendCollection` now merges the way `payload-images`
-  does: **target → plugin → your `collections.muxVideo` overrides last**. It used to merge the
-  target *over* the plugin, which meant the collection you were extending silently beat both the
-  plugin's config and your own overrides — an override like
-  `collections: { muxVideo: { admin: { useAsTitle: 'assetId' } } }` simply did nothing, and a
-  target that defined `access` silently replaced the plugin's read gate. The extended collection
-  now also keeps its own identity (slug, labels, admin config) and its own access rules, instead of
-  inheriting the plugin's `Video` / `Videos` labels and admin-only read; the plugin contributes only
-  its fields, hooks, `forceSelect` for the fields its list cells read, and `custom.seedAsset`.
-  **If you relied on the plugin's access gate landing on an extended collection, set that access on
-  the collection itself** (or via `collections.muxVideo.access`, which still applies).
+- **BREAKING** `@pro-laico/payload-icons` — `iconOverrides` → `collections.icon.overrides`;
+  `iconSetOverrides` → `collections.iconSet.overrides`; `iconRequestOverrides` →
+  `collections.iconRequest.overrides`; `includeIconSet: false` → `collections.iconSet: false`;
+  `trackRequests: false` → `collections.iconRequest: false`; `usagePanel` →
+  `collections.iconSet.options.usagePanel`; `iconRowFields` → `collections.iconSet.options.iconRowFields`.
+- **BREAKING** `@pro-laico/payload-fonts` — `fontOverrides` → `collections.font.overrides`;
+  `fontOriginalOverrides` → `collections.fontOriginal.overrides`; `fontOptimizedOverrides` →
+  `collections.fontOptimized.overrides`; `fontSetOverrides` → `globals.fontSet.overrides`;
+  `includeFontSet: false` → `globals.fontSet: false`; `charset` / `families` → `options.charset` /
+  `options.families`.
+- **BREAKING** `@pro-laico/payload-images` — `imagesOverrides` → `collections.images.overrides`;
+  `generatedImagesOverrides` → `collections.generatedImages.overrides`; `focalUI` →
+  `collections.images.options.focalUI` (bare `true` form gone — pass `{}` or omit); `folders` →
+  `collections.images.options.folders`; `localizeAlt` / `mimeTypes` / `maxOriginalSize` →
+  `collections.images.options.*`; `transform` / `prewarm` / `pixelStep` / `presetTemplates` /
+  `variantLimit` → `options.*`; `prewarm: true` → `prewarm: {}`.
+- **BREAKING** `@pro-laico/payload-mux` — `adminThumbnail` → `collections.muxVideo.options.thumbnail`;
+  `initSettings` / `uploadSettings` / `signedUrlOptions` / `playbackPolicy` / `posterExtension` /
+  `animatedGifExtension` / `autoCreateOnWebhook` / `access` → `options.*`. The `MuxVideo` collection
+  factory is no longer exported; `collections.muxVideo.overrides` covers it. Defaults that were
+  implicit fallthroughs are now explicit: `playbackPolicy: 'public'`, `posterExtension: 'png'`,
+  `animatedGifExtension: 'gif'`, and the thumbnail cell `'gif'`.
+- **BREAKING** all seven — `collections.<name>` / `globals.<name>` is now a three-part entry
+  (`slug`, `overrides`, `options`), not a bare `Partial<CollectionConfig>`. Renaming stays
+  `collections: { images: { slug: 'media' } }`; your Payload keys move under `overrides`
+  (`collections: { images: { overrides: { fields: [...] } } }`); a plugin's own per-collection knobs
+  live under `options`. `payload-revalidate` is the exception — it annotates your collections rather
+  than registering its own, so its `collections.<yourSlug>` is the tracking config directly, with
+  no `slug` / `overrides`.
+- **BREAKING** `@pro-laico/payload-icons` — collection overrides are a plain `Partial<CollectionConfig>`
+  (under `overrides`) instead of a per-collection allowlist, so keys the allowlist silently dropped
+  now apply: `labels`, `versions`, `defaultPopulate`, `forceSelect`, `defaultSort`, `timestamps`,
+  `endpoints`, `custom`, every `admin.*` beyond `group`, and `access` on `iconSet` / `iconRequest`
+  (which had no access key at all). Three bespoke keys fold into what Payload already has: `adminGroup`
+  / `group` → `overrides.admin.group`, `livePreviewUrl` → `overrides.admin.preview` +
+  `overrides.admin.livePreview`, `drafts: boolean` → `overrides.versions`.
+- **BREAKING** `@pro-laico/payload-icons` — fields passed to `collections.iconSet.overrides.fields`
+  now land at the collection's top level, below the tabs, rather than inside the Settings tab. Fields
+  append at the collection level in every plugin now; the old builder spliced them into that tab. Only
+  the admin layout moves — the data is unchanged. Put a field back inside a tab by overriding the tabs
+  field itself.
+- **BREAKING** `@pro-laico/payload-mux` — `access` is now two gates, one axis each, under `options`:
+  `access: (req) => …` → `options: { access: { read: (req) => …, upload: (req) => … } }`. One function
+  used to gate both collection reads and the direct-upload endpoints, so "let the public read videos
+  but keep uploads admin-only" was not expressible. Both still default to a logged-in admin-collection
+  user.
 - **BREAKING** `@pro-laico/payload-seed` — gains `enabled` (default `true`), matching every other
-  plugin.
+  plugin; `assetsDir` / `assetSubDirs` move under `options`, `definitions` stays at the root.
+- **BREAKING** `@pro-laico/payload-revalidate` — `prefix` / `rules` / `observe` move under `options`;
+  `collections` / `globals` stay at the root.
+- **BREAKING** `@pro-laico/payload-dev-tools` — `devRoute` moves under `options`.
 - `@pro-laico/payload-dev-tools` — `enabled` now gates the config once instead of being re-checked
   per request by four endpoint handlers, so when it's off the dev endpoints don't exist at all
   rather than registering and 404ing. Same default (`NODE_ENV === 'development'`).
@@ -106,6 +169,16 @@ and with `observe: false` they aren't registered at all, which is stronger than 
   plugin isn't registered.
 
 ### Added
+
+- `@pro-laico/payload-icons` — `readIconsMarker`, and `@pro-laico/payload-fonts` — `readFontsMarker`.
+  Both plugins already stashed a marker on `config.custom` and both defined the reader internally,
+  but neither exported it, so the convention every other plugin follows — and that the docs describe
+  as the way to discover a slug — was unavailable for these two. It matters more now that a slug can
+  be renamed: the marker is the answer to "which slug did this plugin actually register?".
+
+- `@pro-laico/payload-images` — `collections.renderProfiles`, so the render-profiles collection
+  prewarming writes to can be renamed and reshaped like the other two. It's a table in your
+  database; it gets a `collections` key like anything else. `prewarm` still owns whether it exists.
 
 - `@pro-laico/payload-images` — **`aspectRatio` is declared once, on the read.** The fetched doc now
   carries the ratio it was cropped to (the read's, else the image's natural one), so spreading it
@@ -154,9 +227,31 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 - **BREAKING** `@pro-laico/payload-seed` — `adminButton`. The button is always registered;
   `ENABLE_SEED=true` governs it, as it always did.
 - **BREAKING** `@pro-laico/payload-revalidate` — `endpoint`. `observe` governs the map endpoints.
+- **BREAKING** `@pro-laico/payload-images`, `@pro-laico/payload-mux` — `extendCollection`. Attaching a
+  plugin's fields to a collection you declared yourself was a second way to say what renaming now
+  says, and the confusing one: it inverted ownership, needed its own merge order, its own boot
+  errors, and a set of "this option is ignored while extending" warnings. Rename the plugin's
+  collection instead — it stays the plugin's, wired and working, and your overrides shape it:
+  ```ts
+  // before
+  imagesPlugin({ extendCollection: 'media' })
+  // after
+  imagesPlugin({ collections: { images: { slug: 'media', fields: [/* yours */] } } })
+  ```
+  With it go `[payload-mux] extendCollection: collection '<slug>' not found` and the `access.read is
+  ignored` warning — neither is reachable now.
 
 ### Fixed
 
+- `@pro-laico/payload-fonts` — renaming the font collection no longer breaks the boot.
+  `collections: { font: { slug: 'typefaces' } }` type-checked but then threw `Field Font has invalid
+  relationship 'font'`, because the plugin hardcoded `'font'` when wiring the `fontOptimized ->
+  font` relationship while its marker reported the real slug. Every internal reference now follows
+  the resolved slug, and a test asserts the relationship lands on the renamed collection.
+- `@pro-laico/payload-dev-tools` — the Mux panel now reports on a renamed Mux collection instead of
+  showing it as absent. It read the slug from `options.extendCollection`, so it only ever saw a
+  rename made through that option; it now reads `muxVideoSlug` off the marker, which is the slug the
+  plugin actually registered.
 - `@pro-laico/payload-fonts` — `PAYLOAD_FONTS_*` env vars set in `.env.local` / `.env` now actually
   apply. The download CLI read them out of `process.env` *before* it loaded the env file, so
   `PAYLOAD_FONTS_OUTPUT_DIR` and friends silently fell back to their defaults unless you exported
@@ -223,43 +318,85 @@ and with `observe: false` they aren't registered at all, which is stronger than 
 ### Upgrade notes
 
 1. Run `pnpm install` (or your package manager's equivalent) to pull the new versions.
-2. Apply the renames in **Changed** — all mechanical, no semantic change. The two `true` forms that
-   are gone (`prewarm: true`, `focalUI: true`) become `{}`.
+2. **Adopt the nested shape.** A collection's Payload overrides move under `overrides`, a plugin's
+   own per-collection knobs under `options`, and the root domain options under a root `options`.
+   Renaming stays a direct `slug` key. Mechanical, but touches every plugin you configure — the
+   **Changed** section is the field-by-field map. The two `true` forms that are gone
+   (`prewarm: true`, `focalUI: true`) become `{}`.
+   ```ts
+   // before
+   imagesPlugin({ folders: false, prewarm: {}, collections: { images: { fields: [credit] } } })
+   // after
+   imagesPlugin({
+     collections: { images: { options: { folders: false }, overrides: { fields: [credit] } } },
+     options: { prewarm: {} },
+   })
+   ```
 3. `@pro-laico/payload-images`: **folders now default on.** This adds a nullable `folder`
    relationship and Payload's hidden `payload-folders` collection — additive, so it needs a schema
    push (`pnpm payload migrate` or a dev push) but no data migration. It also registers Payload's
    folder admin components, so **run `pnpm payload generate:importmap`** and restart, or the admin
-   fails to resolve them. Pass `admin: { folders: false }` to keep the old behavior.
+   fails to resolve them. Pass `collections: { images: { options: { folders: false } } }` to keep the
+   old behavior.
 4. `@pro-laico/payload-images`: **`localizeAlt` now defaults to `Boolean(config.localization)`.** If
    your app configures localization and your `alt` field is currently unlocalized, this flips
-   `localized` on an existing field — a real data migration. Set `localizeAlt: false` explicitly to
-   keep the old behavior, or migrate deliberately.
+   `localized` on an existing field — a real data migration. Set
+   `collections: { images: { options: { localizeAlt: false } } }` to keep the old behavior, or
+   migrate deliberately.
 5. `@pro-laico/payload-images`: if you passed `transform: false` or `virtualFields: false`, there is
    no replacement — those modes are gone. Drop the option.
 6. `@pro-laico/payload-seed`: remove `adminButton`; set `ENABLE_SEED=true` where you want the button.
+   Move `assetsDir` / `assetSubDirs` under `options`; leave `definitions` at the root.
 7. `@pro-laico/payload-revalidate`: remove `endpoint`; use `observe` to govern the map endpoints.
+   Move `prefix` / `rules` / `observe` under `options`; `collections` / `globals` stay at the root.
 8. `@pro-laico/payload-mux`: if you imported `MuxVideo` directly, move those overrides to
-   `collections: { muxVideo }`.
-9. `@pro-laico/payload-mux`: split your `access` function in two. The same function in both slots
-   reproduces today's behavior exactly:
+   `collections: { muxVideo: { overrides: { … } } }`.
+9. `@pro-laico/payload-mux`: split your `access` function in two, under `options`. The same function
+   in both slots reproduces today's behavior exactly:
    ```ts
    // before
    muxVideoPlugin({ access: (req) => Boolean(req.user) })
    // after
    const gate = (req) => Boolean(req.user)
-   muxVideoPlugin({ access: { read: gate, upload: gate } })
+   muxVideoPlugin({ options: { access: { read: gate, upload: gate } } })
    ```
-10. `@pro-laico/payload-mux`: if you use `extendCollection`, re-check the collection after upgrading.
-    The merge order changed (your `collections.muxVideo` overrides now win, where the target used to),
-    and the extended collection now keeps its own labels, admin config, and **access** rather than
-    inheriting the plugin's admin-only read. If you were relying on the plugin's gate landing there,
-    set `access.read` on the collection itself. If the boot now throws a `[payload-mux]
-    extendCollection: … already defines field(s) …` error, that collision was previously a silent
-    duplicate field — rename your field or drop it.
-11. `@pro-laico/payload-revalidate`: audit any cached getter that reads an access-gated collection.
+10. `@pro-laico/payload-images`, `@pro-laico/payload-mux`: **`extendCollection` is gone.** Rename the
+    plugin's own collection instead, and move the fields you had on your collection into `overrides`:
+    ```ts
+    // before — your `media` collection, with the plugin's fields attached to it
+    const media = { slug: 'media', labels: { singular: 'Medium', plural: 'Media' }, fields: [caption] }
+    export default buildConfig({ collections: [media], plugins: [muxVideoPlugin({ extendCollection: 'media' })] })
+
+    // after — the plugin's collection, renamed to `media` and shaped by you
+    export default buildConfig({
+      plugins: [
+        muxVideoPlugin({
+          collections: { muxVideo: { slug: 'media', overrides: { labels: { singular: 'Medium', plural: 'Media' }, fields: [caption] } } },
+        }),
+      ],
+    })
+    ```
+    Two behavior changes to check. **Access**: the collection is now the plugin's, so its read gate
+    defaults to a logged-in admin user, where your own collection's access previously stood. Set
+    `collections.muxVideo.overrides.access.read` (or the plugin's `options.access.read`) to what your
+    collection had. And the **table name follows the slug**, so if the slug you rename to is the one
+    your collection already used, the data stays put; renaming to anything else is a table rename and
+    needs a migration.
+11. `@pro-laico/payload-icons`: overrides are now a plain `Partial<CollectionConfig>` (under
+    `overrides`) rather than an allowlist, so keys that were silently dropped before — `labels`,
+    `defaultPopulate`, `versions`, and the rest — now take effect. If you passed any of those and
+    worked around them being ignored, remove the workaround. Rename the bespoke keys under
+    `overrides`: `adminGroup` / `group` → `overrides.admin.group`, `livePreviewUrl` →
+    `overrides.admin.preview` + `overrides.admin.livePreview`, `drafts: true` →
+    `overrides.versions: { drafts: true }`. Move `usagePanel` / `iconRowFields` to
+    `collections.iconSet.options`. And if you pass icon-set fields, **look at the edit view after
+    upgrading** — they now render below the tabs instead of inside the Settings tab. Data is
+    untouched; it's a layout change only.
+12. `@pro-laico/payload-revalidate`: audit any cached getter that reads an access-gated collection.
     Finders no longer force `overrideAccess: false`, so a read that used to come back `null` may now
     return the doc. Pass `overrideAccess: false` on that call to keep the old anonymous scoping.
-12. Beyond the images folders/localizeAlt notes above, no data migration is required.
+13. Beyond the images folders/localizeAlt notes above, and a slug rename if you replaced
+    `extendCollection`, no data migration is required.
 
 ## [0.3.0] - 2026-07-15
 

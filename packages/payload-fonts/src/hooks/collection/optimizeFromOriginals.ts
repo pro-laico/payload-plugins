@@ -1,7 +1,7 @@
 import type { CollectionAfterChangeHook } from 'payload'
 
 import { refId } from '../../lib/refs'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 import { isNotFound } from '../../lib/isNotFound'
 import { originalIdsFromDoc } from '../../lib/fontDoc'
 import { readUploadBytes } from '../../lib/uploadBytes'
@@ -32,10 +32,9 @@ const desiredFromDoc = (data: Record<string, unknown>): Desired[] => {
   return desired
 }
 
-export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions = {}): CollectionAfterChangeHook => {
+export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions): CollectionAfterChangeHook => {
+  const { originalSlug, optimizedSlug } = opts
   const charsetText = resolveCharsetText(opts.charset)
-  const originalSlug = opts.originalSlug || 'fontOriginal'
-  const optimizedSlug = opts.optimizedSlug || 'fontOptimized'
 
   return async ({ doc, operation, previousDoc, req }) => {
     const data: Record<string, unknown> = isRecord(doc) ? doc : {}

@@ -13,6 +13,8 @@
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
     "test": "turbo run test",
+    "kit:sync": "node tools/plugin-kit/sync.mjs",
+    "kit:check": "node tools/plugin-kit/sync.mjs --check",
     "smoke": "pnpm --filter @tools/smoke smoke",
     "docs": "pnpm --filter docs dev",
     "clean": "rimraf --glob \"packages/*/dist\" \"packages/*/*.tsbuildinfo\" \"examples/*/.next\" \"examples/*/*.tsbuildinfo\" \"tools/*/*.tsbuildinfo\" \"docs/.next\" \"docs/*.tsbuildinfo\" \".turbo\"",

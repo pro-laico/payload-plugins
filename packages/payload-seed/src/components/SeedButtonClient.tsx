@@ -4,7 +4,7 @@ import type React from 'react'
 import { useCallback, useState } from 'react'
 import { toast, useConfig } from '@payloadcms/ui'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { SeedButtonProps } from '../types'
 
 export type { SeedButtonProps }

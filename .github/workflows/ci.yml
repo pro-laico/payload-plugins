@@ -29,6 +29,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The vendored copies of tools/plugin-kit are committed (the packages' exports point `import`
+      # at ./src, so they must exist in a fresh clone). This is what stops them drifting.
+      - name: Vendored plugin-kit is in sync
+        run: pnpm kit:check
+
       - name: Format + lint (biome)
         run: pnpm check:ci
 

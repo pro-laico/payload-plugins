@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { SeedError, SeedSnapshot, SpecimenStyle } from '../types'
 
 export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute: string }) {

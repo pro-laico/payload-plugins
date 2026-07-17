@@ -1,10 +1,11 @@
 export type Family = string
 
 export interface ExportFontsEndpointOptions {
-  path?: string
-  fontSetGlobalSlug?: string
-  fontOptimizedSlug?: string
-  families?: Family[]
+  path: string
+  /** `null` when the app opted the `fontSet` global out. */
+  fontSetGlobalSlug: string | null
+  fontOptimizedSlug: string
+  families: Family[]
 }
 
 export type FontSelection = Partial<Record<Family, TypefaceRef | TypefaceRef[]>>

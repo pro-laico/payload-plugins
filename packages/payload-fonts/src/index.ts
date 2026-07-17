@@ -1,5 +1,10 @@
 export { default, fontsPlugin } from './plugin'
 
+// The typed view of `config.custom.payloadFonts` — the supported way to discover the slugs the
+// plugin registered, which follow `collections.<name>.slug`.
+export { readFontsMarker } from './lib/marker'
+export type { PayloadFontsMarker } from './types'
+
 export type { FontFamilyConfig } from './types'
 export { DEFAULT_FONT_FAMILIES } from './lib/families'
 

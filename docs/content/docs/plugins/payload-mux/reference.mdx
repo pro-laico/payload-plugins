@@ -13,50 +13,79 @@ the upload + webhook endpoints, and the admin uploader. It's zero-config: every 
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing: no collection, endpoints, or hooks.` },
-  { name: 'collections.muxVideo', type: "Omit<Partial<CollectionConfig>, 'slug'>", description: `Merged onto the collection the plugin manages — mux-video, or the one named by extendCollection. Applied last, so it wins over both the plugin's own config and (when extending) the collection's. Use it for tighter access or an admin group. slug is not overridable — use extendCollection to put the Mux fields on a collection of your own instead. The collection is always registered — there is no false.` },
   {
-    name: 'initSettings',
-    type: 'MuxVideoInitSettings',
-    default: 'MUX_* env vars',
-    description: `Mux credentials and secrets. Every field is optional; an omitted field is read from its MUX_* env var (the plugin resolves these itself, which is what lets it accept the alias names below and warn at boot when a credential is missing). Pass a field only to override it (e.g. a non-standard env var name).`,
+    name: 'collections',
+    type: '{ muxVideo? }',
+    description: `The collections the plugin registers, one key each.`,
     options: [
-      { name: 'tokenId', type: 'string', default: 'process.env.MUX_TOKEN_ID', description: `Mux API token ID.` },
-      { name: 'tokenSecret', type: 'string', default: 'process.env.MUX_TOKEN_SECRET', description: `Mux API token secret.` },
-      { name: 'webhookSecret', type: 'string', default: 'MUX_WEBHOOK_SECRET ?? MUX_WEBHOOK_SIGNING_SECRET', description: `Secret used to verify incoming Mux webhooks. Falls back to MUX_WEBHOOK_SIGNING_SECRET (the @oversightstudio/mux-video name) when the first is unset.` },
-      { name: 'jwtSigningKey', type: 'string', default: 'MUX_SIGNING_KEY ?? MUX_JWT_KEY_ID', description: `JWT signing key ID, for signed playback. Falls back to MUX_JWT_KEY_ID.` },
-      { name: 'jwtPrivateKey', type: 'string', default: 'MUX_PRIVATE_KEY ?? MUX_JWT_KEY', description: `JWT private key, for signed playback. Falls back to MUX_JWT_KEY.` },
+      {
+        name: 'muxVideo',
+        type: 'CollectionOption<MuxVideoCollectionOptions>',
+        description: `The one collection the plugin registers — always registered, there is no false.`,
+        options: [
+          { name: 'slug', type: 'string', default: "'mux-video'", description: `Rename it; the plugin follows the new slug everywhere — the webhook's lookup, ingestMuxVideo's default, and the muxVideoSlug on the marker.` },
+          { name: 'overrides', type: "Omit<Partial<CollectionConfig>, 'slug'>", description: `Payload config merged onto the plugin's by the shared merge rules. Add your own fields under overrides.fields. Rename with the sibling slug key, not here. Don't redeclare a field the plugin injects (muxUploader, source, title, assetId, status, error, duration, posterTimestamp, aspectRatio, maxWidth, maxHeight, playbackOptions) — that's a named boot error.` },
+          {
+            name: 'options',
+            type: 'MuxVideoCollectionOptions',
+            description: `This collection's own knobs.`,
+            options: [
+              { name: 'thumbnail', type: "'gif' | 'image' | 'none'", default: "'gif'", description: `List-view thumbnail style: animated gif, static image, or none.` },
+            ],
+          },
+        ],
+      },
     ],
   },
   {
-    name: 'uploadSettings',
-    type: 'MuxVideoUploadSettings',
-    description: `Settings applied to every upload.`,
+    name: 'options',
+    type: 'MuxOptions',
+    description: `The plugin's own domain knobs: credentials, upload / playback settings, and the access gates.`,
     options: [
-      { name: 'cors_origin', type: 'string', default: "process.env.NEXT_PUBLIC_SERVER_URL ?? '*'", description: `CORS origin for the direct-upload URL, usually your site URL. Resolves to uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'.` },
-      { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy; the top-level playbackPolicy option is the shorthand, and an explicit value here wins.` },
+      {
+        name: 'initSettings',
+        type: 'MuxVideoInitSettings',
+        default: 'MUX_* env vars',
+        description: `Mux credentials and secrets. Every field is optional; an omitted field is read from its MUX_* env var (the plugin resolves these itself, which is what lets it accept the alias names below and warn at boot when a credential is missing). Pass a field only to override it (e.g. a non-standard env var name).`,
+        options: [
+          { name: 'tokenId', type: 'string', default: 'process.env.MUX_TOKEN_ID', description: `Mux API token ID.` },
+          { name: 'tokenSecret', type: 'string', default: 'process.env.MUX_TOKEN_SECRET', description: `Mux API token secret.` },
+          { name: 'webhookSecret', type: 'string', default: 'MUX_WEBHOOK_SECRET ?? MUX_WEBHOOK_SIGNING_SECRET', description: `Secret used to verify incoming Mux webhooks. Falls back to MUX_WEBHOOK_SIGNING_SECRET (the @oversightstudio/mux-video name) when the first is unset.` },
+          { name: 'jwtSigningKey', type: 'string', default: 'MUX_SIGNING_KEY ?? MUX_JWT_KEY_ID', description: `JWT signing key ID, for signed playback. Falls back to MUX_JWT_KEY_ID.` },
+          { name: 'jwtPrivateKey', type: 'string', default: 'MUX_PRIVATE_KEY ?? MUX_JWT_KEY', description: `JWT private key, for signed playback. Falls back to MUX_JWT_KEY.` },
+        ],
+      },
+      {
+        name: 'uploadSettings',
+        type: 'MuxVideoUploadSettings',
+        description: `Settings applied to every upload.`,
+        options: [
+          { name: 'cors_origin', type: 'string', default: "process.env.NEXT_PUBLIC_SERVER_URL ?? '*'", description: `CORS origin for the direct-upload URL, usually your site URL. Resolves to options.uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'.` },
+          { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy; the options.playbackPolicy knob is the shorthand, and an explicit value here wins.` },
+        ],
+      },
+      { name: 'playbackPolicy', type: "'public' | 'signed'", default: "'public'", description: `Playback policy for newly uploaded videos. Shorthand for uploadSettings.new_asset_settings.playback_policy; set 'signed' (plus MUX_SIGNING_KEY / MUX_PRIVATE_KEY) for JWT-signed URLs.` },
+      {
+        name: 'access',
+        type: 'MuxAccessOptions',
+        description: `Who may read videos and who may request an upload — one gate each. Both default to a logged-in admin-collection user. Create / update / delete fall back to Payload's collection access.`,
+        options: [
+          { name: 'read', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates reads of the mux-video collection. Keep it closed under a signed playback policy: playback URLs are JWT-signed on read, so an anonymous read hands out a working signed URL.` },
+          { name: 'upload', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates the direct-upload endpoints (POST / GET /mux/upload).` },
+        ],
+      },
+      { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
+      { name: 'posterExtension', type: "'webp' | 'jpg' | 'png'", default: "'png'", description: `Image format for the poster (posterUrl).` },
+      { name: 'animatedGifExtension', type: "'gif' | 'webp'", default: "'gif'", description: `Format for the animated preview (gifUrl).` },
+      { name: 'autoCreateOnWebhook', type: 'boolean', default: 'false', description: `When true, the webhook backfills a Payload doc for an asset uploaded directly in Mux (on created / ready / updated for an asset Payload doesn't have yet). Off by default: one Mux account shared across dev / staging / prod would cross-backfill every environment's assets into the others.` },
     ],
   },
-  { name: 'playbackPolicy', type: "'public' | 'signed'", default: "'public'", description: `Playback policy for newly uploaded videos. Shorthand for uploadSettings.new_asset_settings.playback_policy; set 'signed' (plus MUX_SIGNING_KEY / MUX_PRIVATE_KEY) for JWT-signed URLs.` },
-  { name: 'extendCollection', type: 'keyof TypedCollection', description: `Slug of an existing collection to extend with the Mux fields, hooks, and uploader instead of creating the mux-video collection. The collection stays yours: it keeps its slug, labels, admin config, and access rules. On top of its fields and hooks the plugin adds only two things: forceSelect for playbackOptions + title (the list cells need them however you fetch), and custom.seedAsset so payload-seed can ingest through the source field. Your collections.muxVideo overrides are applied last, so they always win. access.read is ignored (the collection's own read access stands) and the plugin warns; set read access on the collection, or via collections.muxVideo.access. A field of yours named like one the plugin injects (muxUploader, source, title, assetId, status, error, duration, posterTimestamp, aspectRatio, maxWidth, maxHeight, playbackOptions) is a boot error naming the collision.` },
-  {
-    name: 'access',
-    type: 'MuxAccessOptions',
-    description: `Who may read videos and who may request an upload — one gate each. Both default to a logged-in admin-collection user. Create / update / delete fall back to Payload's collection access.`,
-    options: [
-      { name: 'read', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates reads of the mux-video collection. Keep it closed under a signed playback policy: playback URLs are JWT-signed on read, so an anonymous read hands out a working signed URL. Ignored under extendCollection — you own that collection's access.` },
-      { name: 'upload', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates the direct-upload endpoints (POST / GET /mux/upload).` },
-    ],
-  },
-  { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
-  { name: 'posterExtension', type: "'webp' | 'jpg' | 'png'", default: "'png'", description: `Image format for the poster (posterUrl).` },
-  { name: 'animatedGifExtension', type: "'gif' | 'webp'", default: "'gif'", description: `Format for the animated preview (gifUrl).` },
-  { name: 'admin.thumbnail', type: "'gif' | 'image' | 'none'", default: "'gif'", description: `List-view thumbnail style: animated gif, static image, or none.` },
-  { name: 'autoCreateOnWebhook', type: 'boolean', default: 'false', description: `When true, the webhook backfills a Payload doc for an asset uploaded directly in Mux (on created / ready / updated for an asset Payload doesn't have yet). Off by default: one Mux account shared across dev / staging / prod would cross-backfill every environment's assets into the others.` },
 ]
 
-Pass options to customize. The **Reference** tab is the interactive view (`initSettings` /
-`uploadSettings` expand to their nested fields); **TypeScript** is the same shape in code, every option
-at its default.
+Pass options to customize. The plugin's own knobs live under `options`; the `mux-video` collection is
+reshaped under `collections.muxVideo` (`slug` renames it, `overrides` is the Payload passthrough,
+`options` its own knobs). The **Reference** tab is the interactive view (each group expands to its
+nested fields); **TypeScript** is the same shape in code, every option at its default.
 
 <Tabs items={['Reference', 'TypeScript']}>
 
@@ -74,20 +103,26 @@ import { muxVideoPlugin } from '@pro-laico/payload-mux'
 // Every option at its default — this is the zero-config behaviour, written out.
 muxVideoPlugin({
   enabled: true,
-  // collections: { muxVideo: { /* … */ } }, // optional, no default — merged onto the `mux-video` collection (`slug` excluded)
-  // initSettings: { /* … */ },   // optional, no default — all fields fall back to MUX_* env vars
-  // uploadSettings: { /* … */ }, // optional — cors_origin defaults to process.env.NEXT_PUBLIC_SERVER_URL ?? '*'
-  // extendCollection: 'media',   // optional, no default — extend an existing collection instead of creating `mux-video`
-  // access: {                    // both default to a logged-in admin user
-  //   read:   (req) => Boolean(req.user && req.user.collection === config.admin.user),
-  //   upload: (req) => Boolean(req.user && req.user.collection === config.admin.user),
-  // },
-  playbackPolicy: 'public', // 'signed' issues JWT-signed URLs
-  signedUrlOptions: { expiration: '1d' },
-  posterExtension: 'png',
-  animatedGifExtension: 'gif',
-  admin: { thumbnail: 'gif' },
-  autoCreateOnWebhook: false,
+  collections: {
+    muxVideo: {
+      // slug: 'mux-video',        // optional — renames the collection; the plugin follows the rename
+      // overrides: { /* … */ },   // optional — Payload CollectionConfig keys merged onto the plugin's
+      options: { thumbnail: 'gif' }, // list-view thumbnail: 'gif' | 'image' | 'none'
+    },
+  },
+  options: {
+    // initSettings: { /* … */ },   // optional, no default — all fields fall back to MUX_* env vars
+    // uploadSettings: { /* … */ }, // optional — cors_origin defaults to process.env.NEXT_PUBLIC_SERVER_URL ?? '*'
+    // access: {                    // both default to a logged-in admin user
+    //   read:   (req) => Boolean(req.user && req.user.collection === config.admin.user),
+    //   upload: (req) => Boolean(req.user && req.user.collection === config.admin.user),
+    // },
+    playbackPolicy: 'public', // 'signed' issues JWT-signed URLs
+    signedUrlOptions: { expiration: '1d' },
+    posterExtension: 'png',
+    animatedGifExtension: 'gif',
+    autoCreateOnWebhook: false,
+  },
 })
 ```
 
@@ -117,7 +152,7 @@ option only to override a value or point at a non-standard variable name.
 
 ## Endpoints
 
-The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `access.upload`
+The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `options.access.upload`
 option. See [Endpoints & webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) for the webhook
 setup and what breaks without it.
 
@@ -133,21 +168,22 @@ setup and what breaks without it.
 | --- | --- | --- |
 | `muxVideoPlugin` (default + named) | `@pro-laico/payload-mux` | The plugin factory. |
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
-| `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath }`. The supported way to discover the managed slug — it's your collection's slug under `extendCollection`. Returns `undefined` when the plugin isn't registered. |
+| `MuxOptions`, `MuxVideoCollectionOptions` | `@pro-laico/payload-mux` | The nested option groups: the plugin's own domain knobs (`options`) and the `mux-video` collection's own knobs (`collections.muxVideo.options`). |
+| `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath }`. The supported way to discover the managed slug — it follows `collections.muxVideo.slug`. Returns `undefined` when the plugin isn't registered. |
 | `PayloadMuxMarker` | `@pro-laico/payload-mux` | The marker's type. |
-| `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a video doc from a local file / URL (seeding, imports, migrations). Pass `collection` if you used `extendCollection`. |
+| `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a video doc from a local file / URL (seeding, imports, migrations). `collection` defaults to the slug on the marker, so a renamed collection needs no argument. |
 | `IngestMuxVideoOptions` | `@pro-laico/payload-mux` | Options for `ingestMuxVideo`: `{ source, title, playbackPolicy?, posterTimestamp?, collection? }`. |
 | `MuxAccessFn`, `MuxAccessOptions` | `@pro-laico/payload-mux` | The `access` gate types, for factoring a shared `read` / `upload` gate out. |
 | `MuxVideoInitSettings`, `MuxVideoUploadSettings`, `MuxVideoNewAssetSettings`, `MuxVideoSignedUrlOptions` | `@pro-laico/payload-mux` | The nested settings types. |
 | `MuxPlaybackPolicy`, `MuxPosterExtension`, `MuxAnimatedGifExtension`, `MuxAdminThumbnail` | `@pro-laico/payload-mux` | The option value unions. |
 | `MuxUploaderField` | `@pro-laico/payload-mux/components/MuxUploaderField` | Admin uploader + player field (wired via the import map). |
-| `MuxVideoGifCell` | `@pro-laico/payload-mux/components/MuxVideoGifCell` | List-view animated-gif thumbnail cell (selected by `admin.thumbnail`). |
-| `MuxVideoImageCell` | `@pro-laico/payload-mux/components/MuxVideoImageCell` | List-view static-image thumbnail cell (selected by `admin.thumbnail`). |
+| `MuxVideoGifCell` | `@pro-laico/payload-mux/components/MuxVideoGifCell` | List-view animated-gif thumbnail cell (selected by `collections.muxVideo.options.thumbnail`). |
+| `MuxVideoImageCell` | `@pro-laico/payload-mux/components/MuxVideoImageCell` | List-view static-image thumbnail cell (selected by `collections.muxVideo.options.thumbnail`). |
 
 ## Collections & globals
 
-The plugin registers one collection, `mux-video` (or extends an existing collection when you pass
-`extendCollection`). Reshape it with `collections.muxVideo`. See
+The plugin registers one collection, `mux-video`. Reshape it with `collections.muxVideo` — including
+`slug`, which renames it and takes the plugin's own references with it. See
 [Using video](/docs/plugins/payload-mux/using-video) for its playback fields and how to relate to it.
 
 ## Next

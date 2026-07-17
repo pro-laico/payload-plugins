@@ -1,4 +1,4 @@
-import { isRecord } from './lib/isRecord'
+import { isRecord } from './_kit'
 import type { AnyToken, FileToken, Ref, RegistryCollectionSlug, RegistryCollections } from './types'
 
 export type { AnyRef, AnyToken, FileToken, Ref } from './types'

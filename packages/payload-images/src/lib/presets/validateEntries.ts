@@ -1,4 +1,4 @@
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { PresetSpec } from '../../types'
 import { ENCODABLE_FORMATS, FITS } from '../transform/params'
 

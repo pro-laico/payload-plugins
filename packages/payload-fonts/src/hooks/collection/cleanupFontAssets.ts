@@ -2,12 +2,15 @@ import type { CollectionBeforeDeleteHook } from 'payload'
 
 import { isNotFound } from '../../lib/isNotFound'
 import { originalIdsFromDoc } from '../../lib/fontDoc'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
-export const cleanupFontAssetsHook = (opts: { originalSlug?: string; optimizedSlug?: string } = {}): CollectionBeforeDeleteHook => {
-  const originalSlug = opts.originalSlug || 'fontOriginal'
-  const optimizedSlug = opts.optimizedSlug || 'fontOptimized'
-
+export const cleanupFontAssetsHook = ({
+  originalSlug,
+  optimizedSlug,
+}: {
+  originalSlug: string
+  optimizedSlug: string
+}): CollectionBeforeDeleteHook => {
   return async ({ collection, id, req }) => {
     let data: Record<string, unknown> | undefined
     try {

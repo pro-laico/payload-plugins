@@ -21,7 +21,7 @@ export const plugins: Plugin[] = [
   iconsPlugin(),
   imagesPlugin(),
   revalidatePlugin({
-    observe: process.env.NODE_ENV !== 'production',
     collections: { posts: { lists: { featured: ['featured'] } } },
+    options: { observe: process.env.NODE_ENV !== 'production' },
   }),
 ]

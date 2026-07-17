@@ -4,7 +4,7 @@ import type { Payload } from 'payload'
 import { facesToStyles } from './specimen'
 import { RevalidatePanel } from './revalidatePanel'
 import { FontSpecimen, IconSetSwitcher } from './client'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { DevSnapshot, OptimizedFace } from '../types'
 
 export async function IconsView({ payload, snapshot }: { payload: Payload; snapshot: DevSnapshot }) {

@@ -150,12 +150,14 @@ result.skipped  // → [{ slug, reason }] definitions skipped this run (disabled
 
 ### `SeedResult` fields
 
-`seed()` returns `{ created, order, deferred, skipped }`. `created` and `order` are the same shape the
-endpoint response carries (alongside `success: true`) and the CLI logs on completion.
+`seed()` returns `{ created, collections, globals, order, deferred, skipped }` — the same shape the
+endpoint response carries (alongside `success: true`) and the source the CLI's completion log summarizes.
 
 | Field | Type | What |
 | --- | --- | --- |
 | `created` | `Record<slug, number>` | Count of docs created per collection. |
+| `collections` | `string[]` | Slugs of the collections seeded this run. |
+| `globals` | `string[]` | Slugs of the globals seeded this run. |
 | `order` | `string[]` | Topo-sorted create order, e.g. `['media:hero', 'services:consulting', 'posts:launch']`. |
 | `deferred` | — | Fields created `null` to break a ref cycle, then set in the second pass. |
 | `skipped` | `[{ slug, reason }]` | Definitions skipped this run (their own `disabled`, or a collection's `custom.seedDisabled`). |

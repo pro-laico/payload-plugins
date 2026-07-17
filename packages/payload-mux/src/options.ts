@@ -1,18 +1,26 @@
 import type { MuxVideoPluginOptions, ResolvedMuxVideoOptions } from './types'
 
 export function resolveOptions(options: MuxVideoPluginOptions = {}): ResolvedMuxVideoOptions {
+  const muxVideo = options.collections?.muxVideo
+  const opts = options.options
   return {
     enabled: options.enabled ?? true,
-    muxVideo: options.collections?.muxVideo,
-    adminThumbnail: options.admin?.thumbnail ?? 'gif',
-    extendCollection: options.extendCollection,
-    initSettings: options.initSettings,
-    uploadSettings: options.uploadSettings,
-    signedUrlOptions: options.signedUrlOptions,
-    playbackPolicy: options.playbackPolicy ?? 'public',
-    posterExtension: options.posterExtension ?? 'png',
-    animatedGifExtension: options.animatedGifExtension ?? 'gif',
-    autoCreateOnWebhook: options.autoCreateOnWebhook ?? false,
-    access: { read: options.access?.read, upload: options.access?.upload },
+    collections: {
+      muxVideo: {
+        slug: muxVideo?.slug,
+        overrides: muxVideo?.overrides,
+        options: { thumbnail: muxVideo?.options?.thumbnail ?? 'gif' },
+      },
+    },
+    options: {
+      initSettings: opts?.initSettings,
+      uploadSettings: opts?.uploadSettings,
+      signedUrlOptions: opts?.signedUrlOptions,
+      playbackPolicy: opts?.playbackPolicy ?? 'public',
+      posterExtension: opts?.posterExtension ?? 'png',
+      animatedGifExtension: opts?.animatedGifExtension ?? 'gif',
+      autoCreateOnWebhook: opts?.autoCreateOnWebhook ?? false,
+      access: { read: opts?.access?.read, upload: opts?.access?.upload },
+    },
   }
 }

@@ -1,5 +1,6 @@
-import type { CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
+import type { CollectionConfig, PayloadRequest } from 'payload'
 
+import type { CollectionOption } from '../../_kit'
 import type { MuxVideoInitSettings } from '../settings/initSettings'
 import type { MuxVideoUploadSettings } from '../settings/uploadSettings'
 import type { MuxVideoSignedUrlOptions } from '../settings/signedUrlOptions'
@@ -9,42 +10,24 @@ export type MuxAnimatedGifExtension = 'gif' | 'webp'
 export type MuxAdminThumbnail = 'gif' | 'image' | 'none'
 export type MuxPlaybackPolicy = 'public' | 'signed'
 
-export interface MuxCollectionsOptions {
-  /** Merged onto the muxVideo collection. `slug` is not overridable — use `extendCollection` instead. */
-  muxVideo?: Omit<Partial<CollectionConfig>, 'slug'>
-}
-
-export interface MuxAdminOptions {
-  /** The list-view cell. Defaults to the animated `gif` preview. */
-  thumbnail?: MuxAdminThumbnail
-}
-
 export type MuxAccessFn = (request: PayloadRequest) => Promise<boolean> | boolean
 
 export interface MuxAccessOptions {
   /** Who may read videos. Defaults to a logged-in admin-collection user — an anonymous read of a
-   * signed-policy video would hand out a signed playback URL. Ignored under `extendCollection`:
-   * you own that collection's access. Create / update / delete fall back to Payload's own. */
+   * signed-policy video would hand out a signed playback URL. Create / update / delete fall back to
+   * Payload's own. */
   read?: MuxAccessFn
   /** Who may request a direct upload (`POST` / `GET /mux/upload`). Defaults to a logged-in
    * admin-collection user. */
   upload?: MuxAccessFn
 }
 
-export interface MuxVideoPluginOptions {
-  /** Register nothing when false — no collection, endpoints, or hooks. Default `true`. */
-  enabled?: boolean
-  /** The collections this plugin registers.
-   *
-   * - `muxVideo` */
-  collections?: MuxCollectionsOptions
-  /** Admin-only toggles.
-   *
-   * - `thumbnail` */
-  admin?: MuxAdminOptions
-  /** Put the Mux fields on an existing collection instead of registering `mux-video`. That
-   * collection keeps its own labels, admin config, and access. */
-  extendCollection?: CollectionSlug
+export interface MuxVideoCollectionOptions {
+  /** The list-view thumbnail cell. Defaults to the animated `gif` preview. */
+  thumbnail?: MuxAdminThumbnail
+}
+
+export interface MuxOptions {
   /** Mux credentials. Every field falls back to its `MUX_*` env var.
    *
    * - `tokenId`
@@ -78,17 +61,48 @@ export interface MuxVideoPluginOptions {
   access?: MuxAccessOptions
 }
 
+export interface MuxVideoPluginOptions {
+  /** Register nothing when false — no collection, endpoints, or hooks. Default `true`. */
+  enabled?: boolean
+  /** The collections this plugin registers.
+   *
+   * - `muxVideo` */
+  collections?: {
+    /** The `mux-video` collection: `slug` renames it, `overrides` is the Payload passthrough, and
+     * `options` is this plugin's own knobs for it. Always registered — no `false`. */
+    muxVideo?: CollectionOption<MuxVideoCollectionOptions>
+  }
+  /** This plugin's own knobs.
+   *
+   * - `initSettings`
+   * - `uploadSettings`
+   * - `signedUrlOptions`
+   * - `playbackPolicy`
+   * - `posterExtension`
+   * - `animatedGifExtension`
+   * - `autoCreateOnWebhook`
+   * - `access` */
+  options?: MuxOptions
+}
+
+/** `MuxVideoPluginOptions` with the defaults applied — same keys, same nesting. */
 export interface ResolvedMuxVideoOptions {
   enabled: boolean
-  muxVideo: Omit<Partial<CollectionConfig>, 'slug'> | undefined
-  adminThumbnail: MuxAdminThumbnail
-  extendCollection: CollectionSlug | undefined
-  initSettings: MuxVideoInitSettings | undefined
-  uploadSettings: MuxVideoUploadSettings | undefined
-  signedUrlOptions: MuxVideoSignedUrlOptions | undefined
-  playbackPolicy: MuxPlaybackPolicy
-  posterExtension: MuxPosterExtension
-  animatedGifExtension: MuxAnimatedGifExtension
-  autoCreateOnWebhook: boolean
-  access: { read: MuxAccessFn | undefined; upload: MuxAccessFn | undefined }
+  collections: {
+    muxVideo: {
+      slug: string | undefined
+      overrides: Partial<CollectionConfig> | undefined
+      options: { thumbnail: MuxAdminThumbnail }
+    }
+  }
+  options: {
+    initSettings: MuxVideoInitSettings | undefined
+    uploadSettings: MuxVideoUploadSettings | undefined
+    signedUrlOptions: MuxVideoSignedUrlOptions | undefined
+    playbackPolicy: MuxPlaybackPolicy
+    posterExtension: MuxPosterExtension
+    animatedGifExtension: MuxAnimatedGifExtension
+    autoCreateOnWebhook: boolean
+    access: { read: MuxAccessFn | undefined; upload: MuxAccessFn | undefined }
+  }
 }

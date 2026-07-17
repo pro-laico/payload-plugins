@@ -1,8 +1,7 @@
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
 import type { CollectionConfig, Config, GlobalConfig, Plugin, SanitizedConfig } from 'payload'
 
 import { createTags } from './lib/tags'
+import { binScriptPath } from './_kit'
 import { stashInspect } from './lib/inspect'
 import { scanGettersLive } from './lib/scan/live'
 import { collectJoinMembership } from './lib/diff/joins'
@@ -17,21 +16,13 @@ import { changeDetectionFields, topLevelFieldNames } from './lib/fields'
 import { globalEnabled, resolveCollectionSettings, resolveOptions } from './options'
 import type { PayloadRevalidateMarker, ReferenceGraph, RevalidatePluginOptions } from './types'
 
-function binScriptPath(name: string): string {
-  const here = fileURLToPath(import.meta.url)
-  const ext = here.endsWith('.ts') ? 'ts' : 'js'
-  return resolve(dirname(here), 'bin', `${name}.${ext}`)
-}
-
 /** Atomic Next.js cache revalidation: edit one document and only the pages that show it go
  * stale. Field-driven busts, id-keyed cache entries, and a live dependency map.
  *
  * - `enabled`
- * - `prefix`
  * - `collections`
  * - `globals`
- * - `rules`
- * - `observe`
+ * - `options`
  */
 export const revalidatePlugin =
   (opts: RevalidatePluginOptions = {}): Plugin =>
@@ -40,7 +31,7 @@ export const revalidatePlugin =
     if (!resolved.enabled) return config
 
     const optedOut = new Set<string>()
-    const tagBuilders = createTags(resolved.prefix)
+    const tagBuilders = createTags(resolved.options.prefix)
     const joinIndex = collectJoinMembership(config.collections)
     const settingsBySlug: Record<string, ReturnType<typeof resolveCollectionSettings> & object> = {}
     const collections = (config.collections ?? []).map((collection): CollectionConfig => {
@@ -54,9 +45,9 @@ export const revalidatePlugin =
       const input = {
         slug: collection.slug,
         settings,
-        rules: resolved.rules,
+        rules: resolved.options.rules,
         tags: tagBuilders,
-        observe: resolved.observe,
+        observe: resolved.options.observe,
         diffSchema: { relationFields: relations, ignoreFields: joins },
         joinRules: joinIndex[collection.slug] ?? [],
       }
@@ -72,11 +63,11 @@ export const revalidatePlugin =
 
     const extraTags = Object.fromEntries(Object.entries(settingsBySlug).map(([slug, s]) => [slug, s.extraTags]))
     const lists = Object.fromEntries(Object.entries(settingsBySlug).map(([slug, s]) => [slug, Object.keys(s.lists)]))
-    registerSeedListener({ tags: tagBuilders, lists, extraTags, rules: resolved.rules, observe: resolved.observe })
+    registerSeedListener({ tags: tagBuilders, lists, extraTags, rules: resolved.options.rules, observe: resolved.options.observe })
 
     const globals = (config.globals ?? []).map((global): GlobalConfig => {
       if (!globalEnabled(global, resolved)) return global
-      const hook = createGlobalAfterChange(global.slug, { tags: tagBuilders, observe: resolved.observe })
+      const hook = createGlobalAfterChange(global.slug, { tags: tagBuilders, observe: resolved.options.observe })
       return { ...global, hooks: { ...global.hooks, afterChange: [...(global.hooks?.afterChange ?? []), hook] } }
     })
 
@@ -100,32 +91,32 @@ export const revalidatePlugin =
       )
       return {
         graph,
-        prefix: resolved.prefix,
-        observing: resolved.observe,
-        rules: resolved.rules,
+        prefix: resolved.options.prefix,
+        observing: resolved.options.observe,
+        rules: resolved.options.rules,
         settings,
-        getters: resolved.observe ? scanGettersLive() : [],
+        getters: resolved.options.observe ? scanGettersLive() : [],
         ...getObservations(),
       }
     })
 
     const marker: PayloadRevalidateMarker = {
       options: opts,
-      endpointPath: resolved.observe ? `/api${MAP_ENDPOINT_PATH}` : null,
-      prefix: resolved.prefix,
-      observe: resolved.observe,
+      endpointPath: resolved.options.observe ? `/api${MAP_ENDPOINT_PATH}` : null,
+      prefix: resolved.options.prefix,
+      observe: resolved.options.observe,
       lists,
       extraTags,
-      rules: resolved.rules,
+      rules: resolved.options.rules,
     }
 
     return {
       ...config,
       collections,
       globals,
-      bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath('revalidateMap') }],
+      bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath(import.meta.url, 'revalidateMap') }],
       // The map endpoints only ever serve observations, so `observe` alone governs them.
-      endpoints: resolved.observe ? [...(config.endpoints ?? []), ...createMapEndpoints()] : config.endpoints,
+      endpoints: resolved.options.observe ? [...(config.endpoints ?? []), ...createMapEndpoints()] : config.endpoints,
       custom: { ...config.custom, payloadRevalidate: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)

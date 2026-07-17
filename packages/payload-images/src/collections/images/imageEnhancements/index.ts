@@ -1,6 +1,6 @@
 import type { CollectionConfig, GetAdminThumbnail, JoinField, NumberField, SelectType, UIField } from 'payload'
 
-import { asSlug } from '../../../lib/asSlug'
+import { asSlug } from '../../../_kit'
 import { presetsField } from './fields/presets'
 import { hotspotFields } from './fields/hotspot'
 import type { CreateImagesOptions } from '../../../types'
@@ -33,22 +33,17 @@ const d = {
 export const FocalPreviewFieldPath = '@pro-laico/payload-images/admin/focalPreview'
 export const PresetManagerFieldPath = '@pro-laico/payload-images/admin/presetManager'
 
-export const resolveAdminThumbnail = (adminThumbnail: number | false | undefined, apiRoute = '/api'): GetAdminThumbnail | undefined => {
-  if (adminThumbnail === false) return undefined
-  // A custom size keeps the dimension URL; the default rides the always-servable `thumbnail`
-  // preset template — stable spec, pre-generatable, exempt from the variant cap.
-  if (typeof adminThumbnail === 'number') {
-    const w = adminThumbnail
-    return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?w=${w}&h=${w}&fit=cover&fmt=auto` : null)
-  }
-  return ({ doc }) => (doc?.id ? `${apiRoute}/img/${String(doc.id)}?preset=thumbnail` : null)
-}
+// The list-view thumbnail rides the always-servable `thumbnail` preset template — stable spec,
+// pre-generatable, and exempt from the variant cap.
+export const resolveAdminThumbnail =
+  (apiRoute = '/api'): GetAdminThumbnail =>
+  ({ doc }) =>
+    doc?.id ? `${apiRoute}/img/${String(doc.id)}?preset=thumbnail` : null
 
 export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<CollectionConfig> => {
-  const { focalUI = true, previewRatios, purgePath, folders } = opts
+  const { focalUI = true, previewRatios, purgePath } = opts
   const presetTemplates = resolvePresetTemplates(opts.presetTemplates)
   const variantSlug = asSlug(opts.variantSlug || GENERATED_IMAGES_SLUG)
-  const adminThumbnail = resolveAdminThumbnail(opts.adminThumbnail, opts.apiRoute)
 
   // The admin image-management fields, shown only when `focalUI` is on. Without it the collection
   // is a clean upload and the import map isn't needed.
@@ -133,7 +128,5 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
     },
     defaultPopulate,
     forceSelect,
-    upload: { focalPoint: true, ...(adminThumbnail ? { adminThumbnail } : {}) },
-    ...(folders ? { folders: true } : {}),
   }
 }

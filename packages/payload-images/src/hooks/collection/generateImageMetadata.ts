@@ -1,7 +1,7 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 
 import { analyzeImageMetadata } from '../../lib/metadata/analyze'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
 const isUnsetFocal = (x: unknown, y: unknown): boolean => (x == null && y == null) || (x === 50 && y === 50)
 

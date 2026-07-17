@@ -18,42 +18,52 @@ export const revalidateOptions = [
     description: 'Master switch. Set `false` to register no hooks or endpoints at all.',
   },
   {
-    name: 'prefix',
-    type: 'string',
-    default: "''",
-    required: false,
-    description: 'Namespaces every emitted tag (e.g. `prefix: "app:"` → `app:posts:my-slug`). Use it to isolate tags when two Payload apps share a cache.',
-  },
-  {
     name: 'collections',
-    type: 'Record<string, { idField?: string | false; lists?: Record<string, string[] | { fields: string[] }>; extraTags?: string[] } | false>',
+    type: 'Record<string, CollectionRevalidateConfig | false>',
     default: '{}',
     required: false,
     description:
-      "Per-collection config. `lists` declares list scopes — each scope gives a list surface its own tag and names the fields that reorder or filter it (`name: [fields]`, or the longer `name: { fields: [...] }`). `idField` (default `'slug'` when a `slug` field exists, otherwise id-keyed only) sets the field for the alias doc tag (`posts:my-slug`). `extraTags` adds fixed tags to every doc. Set a slug to `false` to opt the collection out entirely. Omit it and every collection still gets doc tags — just one bare list tag per collection instead of scoped ones.",
+      "Tracking config for YOUR collections, keyed by slug — this plugin registers none of its own, so there's no `slug`/`overrides` here, just the per-collection settings below. Set a slug to `false` to opt the collection out entirely. Omit it and every collection still gets doc tags — just one bare list tag per collection instead of scoped ones.",
+    options: [
+      { name: 'idField', type: 'string | false', default: "'slug' when a slug field exists, else false", description: `The field for the alias doc tag (\`posts:my-slug\`). Defaults to \`'slug'\` when the collection has a slug field, otherwise the collection is id-keyed only.` },
+      { name: 'lists', type: 'Record<string, string[] | { fields: string[] }>', description: `Declares list scopes — each scope gives a list surface its own tag and names the fields that reorder or filter it (\`name: [fields]\`, or the longer \`name: { fields: [...] }\`).` },
+      { name: 'extraTags', type: 'string[]', description: `Fixed tags added to every doc in the collection.` },
+    ],
   },
   {
     name: 'globals',
     type: 'Partial<Record<string, false>>',
     default: '{}',
     required: false,
-    description: 'Opt a global out of revalidation by setting its slug to `false`. Every global is tracked by default.',
+    description: 'Opt one of YOUR globals out of revalidation by setting its slug to `false`. Every global is tracked by default.',
   },
   {
-    name: 'rules',
-    type: 'Array<{ on: string; bust: string[]; whenFields?: string[] }>',
-    default: '[]',
+    name: 'options',
+    type: 'RevalidateOptions',
     required: false,
-    description:
-      "Manual busts for data the field-walk can't see (e.g. content denormalized by an app-level build step). A rule fires when one of its `whenFields` changed, or on any membership event; deletes fire it unconditionally.",
-  },
-  {
-    name: 'observe',
-    type: 'boolean',
-    default: 'dev only',
-    required: false,
-    description:
-      "Force the dependency-map observation and dev warnings on in production. By default they run in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
+    description: "The plugin's own knobs.",
+    options: [
+      {
+        name: 'prefix',
+        type: 'string',
+        default: "''",
+        description: 'Namespaces every emitted tag (e.g. `prefix: "app:"` → `app:posts:my-slug`). Use it to isolate tags when two Payload apps share a cache.',
+      },
+      {
+        name: 'rules',
+        type: 'Array<{ on: string; bust: string[]; whenFields?: string[] }>',
+        default: '[]',
+        description:
+          "Manual busts for data the field-walk can't see (e.g. content denormalized by an app-level build step). A rule fires when one of its `whenFields` changed, or on any membership event; deletes fire it unconditionally.",
+      },
+      {
+        name: 'observe',
+        type: 'boolean',
+        default: 'dev only',
+        description:
+          "Force the dependency-map observation and dev warnings on in production. By default they run in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
+      },
+    ],
   },
 ]
 
@@ -90,6 +100,14 @@ Two dependency-map routes, governed entirely by [`observe`](#plugin-options) —
 
 These power the `/dev/revalidate` map — see [Troubleshooting](/docs/plugins/payload-revalidate/troubleshooting#the-devrevalidate-map).
 
+## CLI commands
+
+The plugin registers one bin, so it runs through Payload's own CLI.
+
+| Command | What |
+| --- | --- |
+| `payload revalidate-map` | Renders the **static** dependency map from your config alone — no running site, no observations, so it's the build-time / CI view of what busts what. Prints a text report by default; `--json` emits the raw inspection, and `--out <file>` (`-o`) writes it to a file instead of stdout. |
+
 ## Exports
 
 Two import entry points, plus the finders and primitives you get back from the factory.
@@ -101,6 +119,8 @@ Two import entry points, plus the finders and primitives you get back from the f
 | `revalidatePlugin` | The plugin. Add it **last** in `plugins: []`. |
 | `tagsFor` | `tagsFor(payload)` builds prefix-correct raw tags for the rare hand-spelled `cacheTag` need. |
 | `readRevalidateMarker` | `readRevalidateMarker(config)` returns the typed `config.custom.payloadRevalidate` — the resolved `prefix`, `observe`, `lists`, `extraTags`, `rules`, and the map `endpointPath` (non-null only while observing). |
+| `getInspection` | The **live** dependency map for this process (observed reads + graph), or `null` when the plugin isn't active. What `GET /api/revalidate-map` and `/dev/revalidate` serve. |
+| `buildStaticInspection` · `renderRevalidateMap` | Build the **static** map from a config (`MapConfigSource`) and render it to the text report — the machinery behind `payload revalidate-map`, for custom CI checks or map UIs. |
 
 **Cache helpers** — `@pro-laico/payload-revalidate/cache`
 

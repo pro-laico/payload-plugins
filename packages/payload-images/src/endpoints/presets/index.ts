@@ -1,7 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
-import { asSlug } from '../../lib/asSlug'
-import { isRecord } from '../../lib/isRecord'
+import { asSlug, isRecord } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
 import { variantCacheKey } from '../../lib/transform/variantKey'
 import { parseTransformParams } from '../../lib/transform/params'

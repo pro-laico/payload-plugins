@@ -1,7 +1,7 @@
 import type { Access, Where } from 'payload'
 
-export const anyone: Access = () => true
-export const authd: Access = ({ req }) => Boolean(req.user)
+// The shared primitives, re-exported so this stays the one access import for the package.
+export { anyone, authd } from './_kit'
 
 // Re-roots a source-collection where-constraint through the variant's `source` relationship.
 const prefixWhere = (where: Where, prefix: string): Where =>

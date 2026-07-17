@@ -15,13 +15,22 @@ const variantSourceRelTo = (c: Config, variantSlug = 'generated-images'): string
   const source = (gen?.fields ?? []).find((f) => 'name' in f && f.name === 'source')
   return (source as { relationTo?: string } | undefined)?.relationTo
 }
-const presetManagerClientProps = (c: Config, slug = 'images'): { prewarmPath?: string; presetsPath?: string } | undefined => {
+type PresetManagerProps = { prewarmPath?: string; presetsPath?: string; variantSlug?: string }
+const presetManagerClientProps = (c: Config, slug = 'images'): PresetManagerProps | undefined => {
   const images = (c.collections ?? []).find((col) => col.slug === slug)
   const field = byName(images?.fields ?? [], 'presetManager') as
-    | { admin?: { components?: { Field?: { clientProps?: { prewarmPath?: string; presetsPath?: string } } } } }
+    | { admin?: { components?: { Field?: { clientProps?: PresetManagerProps } } } }
     | undefined
   return field?.admin?.components?.Field?.clientProps
 }
+/** The `variants` join on the source collection — its `collection` must track the variant-cache slug. */
+const variantsJoinCollection = (c: Config, slug = 'images'): string | undefined => {
+  const images = (c.collections ?? []).find((col) => col.slug === slug)
+  return (byName(images?.fields ?? [], 'variants') as { collection?: string } | undefined)?.collection
+}
+type MarkerShape = { sourceSlug?: string; variantSlug?: string; prewarm?: { profilesSlug?: string } }
+
+const imagesMarker = (c: Config): MarkerShape => (c.custom as { payloadImages: MarkerShape }).payloadImages
 
 describe('imagesPlugin — default (creates the images collection)', () => {
   const out = run()
@@ -59,16 +68,16 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(def.folders).toBe(true)
     expect(def.upload?.resizeOptions).toBeUndefined() // original kept untouched
 
-    expect(imagesOf(run({ admin: { folders: false } })).folders).toBeUndefined()
+    expect(imagesOf(run({ collections: { images: { options: { folders: false } } } })).folders).toBeUndefined()
 
-    const capped = imagesOf(run({ maxOriginalSize: 4096 }))
+    const capped = imagesOf(run({ collections: { images: { options: { maxOriginalSize: 4096 } } } }))
     expect(capped.upload?.resizeOptions).toMatchObject({ width: 4096, height: 4096, fit: 'inside', withoutEnlargement: true })
   })
 
-  it('key-merges collections.images.forceSelect instead of replacing the plugin required select', () => {
+  it('key-merges collections.images.overrides.forceSelect instead of replacing the plugin required select', () => {
     const images = (c: Config) =>
       (c.collections ?? []).find((col) => col.slug === 'images') as CollectionConfig & { forceSelect?: Record<string, boolean> }
-    const merged = images(run({ collections: { images: { forceSelect: { credit: true } as CollectionConfig['forceSelect'] } } }))
+    const merged = images(run({ collections: { images: { overrides: { forceSelect: { credit: true } as CollectionConfig['forceSelect'] } } } }))
     expect(merged.forceSelect?.credit).toBe(true) // the override key is added…
     expect(merged.forceSelect?.width).toBe(true) // …without dropping the plugin's virtual-field inputs
   })
@@ -95,7 +104,7 @@ describe('imagesPlugin — default (creates the images collection)', () => {
     expect(byName(images.fields, 'presetManager')).toBeTruthy() // the admin ui field
     expect(images.hooks?.afterChange).toHaveLength(3) // purge + prewarm enqueue + preset generation
     // A custom cap default threads through:
-    const capped = (run({ variantLimit: 50 }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    const capped = (run({ options: { variantLimit: 50 } }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
     expect((byName(capped.fields, 'variantLimit') as { defaultValue?: number }).defaultValue).toBe(50)
   })
 
@@ -117,15 +126,15 @@ describe('imagesPlugin — default (creates the images collection)', () => {
   it('folds an array pixelStep into the snap width ladder (sanitized) instead of the grid', () => {
     const marker = (out: Config) =>
       (out.custom as { payloadImages?: { prewarm?: { constraints?: { dimensionStep?: number; widthLadder?: number[] } } } }).payloadImages
-    const ladder = marker(run({ prewarm: {}, pixelStep: [750, 220, 220, -5, 9999] }))
+    const ladder = marker(run({ options: { prewarm: {}, pixelStep: [750, 220, 220, -5, 9999] } }))
     expect(ladder?.prewarm?.constraints?.widthLadder).toEqual([220, 750]) // sorted, deduped, bounds-checked
     expect(ladder?.prewarm?.constraints?.dimensionStep).toBe(50) // the grid stays at the default
-    const grid = marker(run({ prewarm: {}, pixelStep: 100 }))
+    const grid = marker(run({ options: { prewarm: {}, pixelStep: 100 } }))
     expect(grid?.prewarm?.constraints?.dimensionStep).toBe(100)
     expect(grid?.prewarm?.constraints?.widthLadder).toBeUndefined()
   })
 
-  it('admin.focalUI accepts an object form carrying the preview ratios', () => {
+  it('collections.images.options.focalUI accepts an object form carrying the preview ratios', () => {
     const focalPreviewOf = (c: Config) => {
       const images = (c.collections ?? []).find((col) => col.slug === 'images') as CollectionConfig
       return byName(images.fields, 'focalPreview') as
@@ -133,9 +142,12 @@ describe('imagesPlugin — default (creates the images collection)', () => {
         | undefined
     }
     expect(
-      focalPreviewOf(run({ admin: { focalUI: { previewRatios: ['21:9'] } } }))?.admin?.components?.Field?.clientProps?.previewRatios,
+      focalPreviewOf(run({ collections: { images: { options: { focalUI: { previewRatios: ['21:9'] } } } } }))?.admin?.components?.Field
+        ?.clientProps?.previewRatios,
     ).toEqual(['21:9'])
-    const images = (run({ admin: { focalUI: false } }).collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    const images = (run({ collections: { images: { options: { focalUI: false } } } }).collections ?? []).find(
+      (c) => c.slug === 'images',
+    ) as CollectionConfig
     expect(byName(images.fields, 'focalPreview')).toBeUndefined()
   })
 })
@@ -154,7 +166,7 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
   })
 
   it('prewarm: false registers nothing prewarm-related — the opt-out escape hatch', () => {
-    const out = run({ prewarm: false })
+    const out = run({ options: { prewarm: false } })
     expect(slugs(out)).not.toContain('image-render-profiles')
     expect(out.jobs).toBeUndefined()
     expect((out.bin ?? []).map((b) => b.key)).not.toContain('images:prewarm')
@@ -167,14 +179,14 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
   })
 
   it('prewarm registers the status + trigger endpoints and hands the panel the path', () => {
-    const out = run({ prewarm: {} })
+    const out = run({ options: { prewarm: {} } })
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
     expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
     expect(presetManagerClientProps(out)?.prewarmPath).toBe('/img/prewarm')
   })
 
   it('prewarm registers the registry collection, jobs task, bin script, hook, and marker', () => {
-    const out = run({ prewarm: {} })
+    const out = run({ options: { prewarm: {} } })
     expect(slugs(out)).toContain('image-render-profiles')
     expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
     expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
@@ -191,108 +203,122 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
 
   it('derives avif from transform.preferAvif and composes autoRun over existing shapes', async () => {
     const marker = (c: Config) => (c.custom as { payloadImages: { prewarm: { formats: string[] } } }).payloadImages
-    expect(marker(run({ prewarm: {}, transform: { preferAvif: true } })).prewarm.formats).toEqual(['webp', 'avif'])
+    expect(marker(run({ options: { prewarm: {}, transform: { preferAvif: true } } })).prewarm.formats).toEqual(['webp', 'avif'])
 
     const cron = { autoRun: '0 * * * *' }
-    const fresh = run({ prewarm: cron })
+    const fresh = run({ options: { prewarm: cron } })
     expect(fresh.jobs?.autoRun).toEqual([{ cron: '0 * * * *', queue: 'default', limit: 10 }])
 
-    const withArray = imagesPlugin({ prewarm: cron })({ ...baseConfig(), jobs: { autoRun: [{ cron: '* * * * *' }] } } as Config) as Config
+    const withArray = imagesPlugin({ options: { prewarm: cron } })({
+      ...baseConfig(),
+      jobs: { autoRun: [{ cron: '* * * * *' }] },
+    } as Config) as Config
     expect(withArray.jobs?.autoRun).toHaveLength(2)
 
     const fn = async () => [{ cron: '* * * * *' }]
-    const withFn = imagesPlugin({ prewarm: cron })({ ...baseConfig(), jobs: { autoRun: fn } } as Config) as Config
+    const withFn = imagesPlugin({ options: { prewarm: cron } })({ ...baseConfig(), jobs: { autoRun: fn } } as Config) as Config
     expect(typeof withFn.jobs?.autoRun).toBe('function')
     const composed = await (withFn.jobs?.autoRun as (p: unknown) => Promise<unknown[]>)({})
     expect(composed).toHaveLength(2)
   })
 })
 
-describe('imagesPlugin — extendCollection (enhances an existing upload collection)', () => {
-  const media: CollectionConfig = { slug: 'media', upload: true, fields: [{ name: 'alt', type: 'text' }] }
-  const out = run({ extendCollection: 'media' }, [media])
+// Renaming replaces the deleted `extendCollection`: instead of pointing the plugin at an existing
+// upload collection, you rename the one it registers and add your fields to it. The whole point is
+// that the new slug reaches every internal reference — a rename that only changes `slug` would boot
+// as `Field Variants has invalid relationship 'images'`.
+describe('imagesPlugin — collections.images.slug (rename propagates to every internal reference)', () => {
+  const out = run({ collections: { images: { slug: 'media', overrides: { fields: [{ name: 'credit', type: 'text' }] } } } })
 
-  it('does NOT create a second `images` collection', () => {
-    expect(slugs(out)).not.toContain('images')
+  it('registers the collection under the new slug, and not the default one', () => {
     expect(slugs(out)).toEqual(expect.arrayContaining(['media', 'generated-images']))
+    expect(slugs(out)).not.toContain('images')
   })
 
-  it('injects the variants join, focalPoint, and purge hooks onto the target (keeping its own fields)', () => {
-    const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
-    expect(byName(m.fields, 'variants')?.type).toBe('join')
-    expect(byName(m.fields, 'alt')).toBeTruthy() // the target's own field is preserved
-    expect((m.upload as { focalPoint?: boolean }).focalPoint).toBe(true)
-    expect(m.hooks?.afterChange ?? []).not.toHaveLength(0)
-    expect(m.hooks?.beforeDelete ?? []).not.toHaveLength(0)
-  })
-
-  it('points the variant cache `source` at the extended collection', () => {
+  it('repoints the variant cache `source` relationship at the new slug', () => {
     expect(variantSourceRelTo(out)).toBe('media')
   })
 
-  it('hands the extended target the prewarm panel path (on by default; gone only when prewarm: false)', () => {
-    const warmed = run({ extendCollection: 'media', prewarm: {} }, [media])
-    expect(presetManagerClientProps(warmed, 'media')?.prewarmPath).toBe('/img/prewarm')
-    expect(presetManagerClientProps(out, 'media')?.prewarmPath).toBe('/img/prewarm') // default run — prewarm is on
-    const off = run({ extendCollection: 'media', prewarm: false }, [media])
-    expect(presetManagerClientProps(off, 'media')?.prewarmPath).toBeUndefined()
+  it('repoints the marker at the new slug (bin scripts + imageFor read the source collection off it)', () => {
+    expect(imagesMarker(out).sourceSlug).toBe('media')
+    expect(imagesMarker(out).variantSlug).toBe('generated-images')
   })
 
-  it('applies folders to the extended target by default, and honors an opt-out', () => {
-    const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig & { folders?: unknown }
-    expect(m.folders).toBe(true)
-    const off = run({ extendCollection: 'media', admin: { folders: false } }, [media])
-    const noFolders = (off.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig & { folders?: unknown }
-    expect(noFolders.folders).toBeUndefined()
-  })
-
-  it('wires defaultPopulate + forceSelect parity so virtual URLs survive select/populated reads (target keys win)', () => {
+  it('keeps the plugin surface on the renamed collection and appends the override fields', () => {
     const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
-    expect((m.defaultPopulate as Record<string, boolean>).src).toBe(true)
-    expect((m.defaultPopulate as Record<string, boolean>).variants).toBeUndefined()
-    expect((m.forceSelect as Record<string, boolean>).width).toBe(true)
-    const opinionated: CollectionConfig = { ...media, defaultPopulate: { caption: true } as CollectionConfig['defaultPopulate'] }
-    const kept = (run({ extendCollection: 'media' }, [opinionated]).collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
-    expect((kept.defaultPopulate as Record<string, boolean>).caption).toBe(true) // merged, never overwritten
-    expect((kept.defaultPopulate as Record<string, boolean>).src).toBe(true)
-  })
-
-  it('adds the on-demand admin thumbnail only when the target has not set its own', () => {
-    const m = (out.collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
-    const thumb = (m.upload as { adminThumbnail?: (a: { doc: Record<string, unknown> }) => string | null }).adminThumbnail
-    expect(thumb?.({ doc: { id: 'abc' } })).toBe('/api/img/abc?preset=thumbnail')
-    const own: CollectionConfig = { ...media, upload: { adminThumbnail: 'card' } }
-    const kept = (run({ extendCollection: 'media' }, [own]).collections ?? []).find((c) => c.slug === 'media') as CollectionConfig
-    expect((kept.upload as { adminThumbnail?: unknown }).adminThumbnail).toBe('card')
-  })
-
-  it('throws a clear error for a missing or non-upload target', () => {
-    expect(() => imagesPlugin({ extendCollection: 'nope' })(baseConfig([media]))).toThrow(/not found/)
-    const pages: CollectionConfig = { slug: 'pages', fields: [] }
-    expect(() => imagesPlugin({ extendCollection: 'pages' })(baseConfig([pages]))).toThrow(/not an upload/)
-  })
-
-  it('throws a plugin-attributed error when the target already defines an injected field name', () => {
-    const clashing: CollectionConfig = { ...media, fields: [...media.fields, { name: 'placeholder', type: 'text' }] }
-    expect(() => imagesPlugin({ extendCollection: 'media' })(baseConfig([clashing]))).toThrow(/payload-images.*placeholder/)
-    // Nested inside a presentational row is the same data level — still a collision.
-    const rowClash: CollectionConfig = { ...media, fields: [{ type: 'row', fields: [{ name: 'palette', type: 'json' }] }] }
-    expect(() => imagesPlugin({ extendCollection: 'media' })(baseConfig([rowClash]))).toThrow(/payload-images.*palette/)
+    expect(byName(m.fields, 'variants')?.type).toBe('join')
+    expect(variantsJoinCollection(out, 'media')).toBe('generated-images') // the join still finds the cache
+    expect(byName(m.fields, 'alt')).toBeTruthy() // the plugin's own base field survives
+    expect(byName(m.fields, 'credit')).toBeTruthy() // …and the override's field is appended
+    expect((m.upload as { focalPoint?: boolean }).focalPoint).toBe(true)
+    expect(m.hooks?.afterChange ?? []).not.toHaveLength(0)
+    expect(m.hooks?.beforeDelete ?? []).not.toHaveLength(0)
+    expect(presetManagerClientProps(out, 'media')?.prewarmPath).toBe('/img/prewarm')
   })
 })
 
-describe('imagesPlugin — override slug safety', () => {
-  // `slug` is Omit-ed from both override types, so this is a type error for callers; the runtime
-  // guard still has to hold for JS consumers and `as`-casts, hence the cast on the way IN only.
-  it('ignores a slug in collections.images / collections.generatedImages (internal references stay bound)', () => {
+describe('imagesPlugin — collections.generatedImages.slug (the variant cache renames too)', () => {
+  const out = run({ collections: { generatedImages: { slug: 'variant-cache' } } })
+
+  it('registers the cache under the new slug and repoints the join + panel + marker at it', () => {
+    expect(slugs(out)).toEqual(expect.arrayContaining(['images', 'variant-cache']))
+    expect(slugs(out)).not.toContain('generated-images')
+    expect(variantsJoinCollection(out)).toBe('variant-cache')
+    expect(presetManagerClientProps(out)?.variantSlug).toBe('variant-cache') // the admin panel lists variants from it
+    expect(imagesMarker(out).variantSlug).toBe('variant-cache')
+    expect(variantSourceRelTo(out, 'variant-cache')).toBe('images') // …and it still points back at images
+  })
+
+  it('renames both at once and every cross-reference still resolves', () => {
+    const both = run({ collections: { images: { slug: 'media' }, generatedImages: { slug: 'variant-cache' } } })
+    expect(slugs(both)).toEqual(expect.arrayContaining(['media', 'variant-cache']))
+    expect(variantSourceRelTo(both, 'variant-cache')).toBe('media')
+    expect(variantsJoinCollection(both, 'media')).toBe('variant-cache')
+    expect(presetManagerClientProps(both, 'media')?.variantSlug).toBe('variant-cache')
+    expect(imagesMarker(both)).toMatchObject({ sourceSlug: 'media', variantSlug: 'variant-cache' })
+  })
+})
+
+// The render-profiles collection is a table in your database, so it gets a `collections` key like
+// any other. `prewarm` owns whether it exists at all — the key only shapes it.
+describe('imagesPlugin — collections.renderProfiles (the prewarm registry is yours to shape too)', () => {
+  it('renames it, and prewarm records its observations against the new slug', () => {
+    const out = run({ collections: { renderProfiles: { slug: 'render-shapes' } } })
+    expect(slugs(out)).toContain('render-shapes')
+    expect(slugs(out)).not.toContain('image-render-profiles')
+    expect(imagesMarker(out).prewarm?.profilesSlug).toBe('render-shapes')
+  })
+
+  it('merges an override onto it without touching what the plugin needs', () => {
     const out = run({
-      collections: {
-        images: { slug: 'renamed-images' } as Omit<Partial<CollectionConfig>, 'slug'>,
-        generatedImages: { slug: 'renamed-variants' } as Omit<Partial<CollectionConfig>, 'slug'>,
-      },
+      collections: { renderProfiles: { overrides: { admin: { group: 'Diagnostics' }, fields: [{ name: 'note', type: 'text' }] } } },
     })
-    expect(slugs(out)).toEqual(expect.arrayContaining(['images', 'generated-images']))
-    expect(slugs(out)).not.toContain('renamed-variants')
-    expect(slugs(out)).not.toContain('renamed-images')
+    const profiles = out.collections?.find((c) => c.slug === 'image-render-profiles')
+    expect(profiles?.admin?.group).toBe('Diagnostics')
+    const names = (profiles?.fields ?? []).flatMap((f) => ('name' in f && f.name ? [f.name] : []))
+    expect(names).toEqual(expect.arrayContaining(['profileKey', 'note'])) // the plugin's, then yours
+  })
+
+  it('is not registered when prewarm is off — prewarm owns its existence, not the key', () => {
+    const out = run({ options: { prewarm: false }, collections: { renderProfiles: { slug: 'render-shapes' } } })
+    expect(slugs(out)).not.toContain('render-shapes')
+    expect(slugs(out)).not.toContain('image-render-profiles')
+  })
+})
+
+describe('imagesPlugin — field collisions are a named boot error', () => {
+  it('names the plugin, the collections key, and the colliding field', () => {
+    const clash = (fields: CollectionConfig['fields']) => () =>
+      imagesPlugin({ collections: { images: { overrides: { fields } } } })(baseConfig())
+    expect(clash([{ name: 'placeholder', type: 'text' }])).toThrow(/\[payload-images\] collections\.images:.*placeholder/)
+    // Nested inside a presentational row is the same data level — still a collision.
+    expect(clash([{ type: 'row', fields: [{ name: 'palette', type: 'json' }] }])).toThrow(/\[payload-images\] collections\.images:.*palette/)
+    expect(clash([{ name: 'credit', type: 'text' }])).not.toThrow()
+  })
+
+  it('guards the variant cache fields too', () => {
+    const clash = () =>
+      imagesPlugin({ collections: { generatedImages: { overrides: { fields: [{ name: 'cacheKey', type: 'text' }] } } } })(baseConfig())
+    expect(clash).toThrow(/\[payload-images\] collections\.generatedImages:.*cacheKey/)
   })
 })

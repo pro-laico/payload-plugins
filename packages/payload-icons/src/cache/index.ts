@@ -2,7 +2,7 @@ import { cache } from 'react'
 import type { Payload, Where } from 'payload'
 
 import type { IconSetMap } from '../types'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import { iconSetSlugOf } from '../lib/marker'
 import { ICONS_REVALIDATE_TAG } from '../lib/revalidateTag'
 

@@ -69,19 +69,42 @@ afterAll(async () => {
 })
 
 describe('boot-time config guards (thrown from buildConfig)', () => {
-  it("extendCollection pointing at a collection that doesn't exist throws a named error", async () => {
-    const e = await expectBootError([imagesPlugin({ extendCollection: 'nope' })])
-    expect(e.message).toContain("[payload-images] extendCollection: collection 'nope' not found")
-    record('extendCollection → unknown collection', e.message)
+  it('a collections.images field named like an injected one throws a named error, not a bare DuplicateFieldName', async () => {
+    const e = await expectBootError([
+      imagesPlugin({ collections: { images: { overrides: { fields: [{ name: 'placeholder', type: 'text' }] } } } }),
+    ])
+    expect(e.message).toContain('[payload-images] collections.images: field(s) placeholder are already defined by the plugin')
+    record('collections.images → field collision', e.message)
   })
 
-  it('extendCollection pointing at a NON-upload collection throws a named error', async () => {
-    const e = await expectBootError(
-      [imagesPlugin({ extendCollection: 'posts' })],
-      [{ slug: 'posts', fields: [{ name: 'title', type: 'text' }] }],
-    )
-    expect(e.message).toContain("[payload-images] extendCollection: collection 'posts' is not an upload collection")
-    record('extendCollection → non-upload collection', e.message)
+  it('a collections.generatedImages field collision is named the same way', async () => {
+    const e = await expectBootError([
+      imagesPlugin({ collections: { generatedImages: { overrides: { fields: [{ name: 'cacheKey', type: 'text' }] } } } }),
+    ])
+    expect(e.message).toContain('[payload-images] collections.generatedImages: field(s) cacheKey are already defined by the plugin')
+    record('collections.generatedImages → field collision', e.message)
+  })
+})
+
+// Renaming is a first-class override, so it has to survive Payload's own relationship validation:
+// a slug that reached the collection but not the `source` relationship / `variants` join would boot
+// as "Field Variants has invalid relationship 'images'". Boot for real to prove it doesn't.
+describe('renaming a registered collection boots (slug reaches every internal reference)', () => {
+  it('collections.images.slug + collections.generatedImages.slug build a valid config', async () => {
+    const b = await bootLab({
+      plugins: [
+        imagesPlugin({ collections: { images: { slug: 'media' }, generatedImages: { slug: 'variant-cache' } }, options: { prewarm: false } }),
+      ],
+      sharp,
+    })
+    const media = b.payload.config.collections.find((c) => c.slug === 'media')
+    const cache = b.payload.config.collections.find((c) => c.slug === 'variant-cache')
+    const join = media?.fields.find((f) => 'name' in f && f.name === 'variants')
+    const source = cache?.fields.find((f) => 'name' in f && f.name === 'source')
+    await b.cleanup()
+    expect((join as { collection?: string } | undefined)?.collection).toBe('variant-cache')
+    expect((source as { relationTo?: string } | undefined)?.relationTo).toBe('media')
+    record('rename → config boots, references follow', 'images→media, generated-images→variant-cache; join + source relationship resolved')
   })
 })
 

@@ -1,5 +1,5 @@
 import { refId } from './refs'
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 
 export const hasVariable = (data: Record<string, unknown> | undefined): boolean => {
   const v: Record<string, unknown> = isRecord(data?.variable) ? data.variable : {}

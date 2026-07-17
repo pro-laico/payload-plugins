@@ -10,6 +10,12 @@ derive from it, and the `fontSet` global decides which typeface fills each famil
 `font` → `fontOriginal` (archive) → `fontOptimized` (served), each font file flowing one slot at a
 time.
 
+<Callout type="info">
+  The slugs on this page are the defaults. Any of them — and the `fontSet` global's — can be renamed
+  with a `slug` override, and every internal reference follows: see
+  [Renaming](/docs/plugins/payload-fonts/reference#renaming).
+</Callout>
+
 ## `font`
 
 One document per **typeface** (e.g. "Inter"), and the only one you touch. It's *not* an upload
@@ -25,7 +31,7 @@ collections. Read and writes are logged-in-admin only.
 <TypeTable
   type={{
     title: { description: "The typeface name. Required; the admin title and list-search field.", type: "text" },
-    family: { description: "The generic family it fills: sans / serif / mono / display by default (customisable via the plugin's families option). Required.", type: "radio" },
+    family: { description: "The generic family it fills: sans / serif / mono / display by default (customisable via the plugin's options.families). Required.", type: "radio" },
     variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added; use this OR weights, not both.", type: "group" },
     weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
   }}
@@ -116,11 +122,13 @@ the generated `font<Key>` / `--font-set<Key>` names.
 
 ```ts
 fontsPlugin({
-  families: [
-    { key: 'sans' },                                              // label defaults to "Sans"
-    { key: 'display' },
-    { key: 'brand', label: 'Brand', fallback: 'Georgia, serif' }, // a new family
-  ],
+  options: {
+    families: [
+      { key: 'sans' },                                              // label defaults to "Sans"
+      { key: 'display' },
+      { key: 'brand', label: 'Brand', fallback: 'Georgia, serif' }, // a new family
+    ],
+  },
 })
 // EXACTLY these three; serif and mono are dropped. family options + fontSet slots
 // sans/display/brand; exports fontSans/fontDisplay/fontBrand; vars --font-set{Sans,Display,Brand}.
@@ -131,7 +139,7 @@ To **add** a family while keeping the defaults, spread `DEFAULT_FONT_FAMILIES`:
 ```ts
 import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
 
-fontsPlugin({ families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] })
+fontsPlugin({ options: { families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] } })
 ```
 
 `<DevFonts>` auto-discovers the slots from the `fontSet` global, so custom families just work. Pass

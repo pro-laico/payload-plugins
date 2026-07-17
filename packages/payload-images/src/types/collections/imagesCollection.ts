@@ -3,7 +3,6 @@ export interface CreateImagesOptions {
   previewRatios?: string[]
   variantSlug?: string
   purgePath?: string
-  adminThumbnail?: number | false
   apiRoute?: string
   localizeAlt?: boolean
   mimeTypes?: string[]

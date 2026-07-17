@@ -28,7 +28,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
   try {
     payload = await getPayload({ config })
     const manifest = await buildFontsExport(payload, {
-      ...(marker.fontSetSlug ? { fontSetGlobalSlug: marker.fontSetSlug } : {}),
+      fontSetGlobalSlug: marker.fontSetSlug,
       fontOptimizedSlug: marker.fontOptimizedSlug,
       families: marker.familyKeys,
     })

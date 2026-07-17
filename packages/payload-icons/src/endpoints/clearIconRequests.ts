@@ -1,22 +1,22 @@
 import type { Endpoint } from 'payload'
 
-import { ICON_REQUEST_SLUG } from '../collections/IconRequest'
-
 export const CLEAR_ICON_REQUESTS_PATH = '/payload-icons/icon-requests'
 
-export function createClearIconRequestsEndpoint(): Endpoint {
+/** `slug` is the resolved `iconRequest` slug — the plugin renames the collection, so the endpoint is
+ * handed the same slug the marker carries rather than assuming the default. */
+export function createClearIconRequestsEndpoint(slug: string): Endpoint {
   return {
     path: CLEAR_ICON_REQUESTS_PATH,
     method: 'delete',
     handler: async (req) => {
       try {
         if (!req.user) return Response.json({ success: false, message: 'Not authorized to clear icon requests.' }, { status: 401 })
-        if (!req.payload.collections?.[ICON_REQUEST_SLUG]) {
+        if (!req.payload.collections?.[slug]) {
           return Response.json({ success: false, message: 'Request tracking is not enabled.' })
         }
 
         const res = await req.payload.delete({
-          collection: ICON_REQUEST_SLUG,
+          collection: slug,
           where: { id: { exists: true } },
           user: req.user,
           overrideAccess: false,

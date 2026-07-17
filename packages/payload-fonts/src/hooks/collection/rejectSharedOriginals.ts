@@ -1,7 +1,7 @@
 import { APIError, type CollectionBeforeValidateHook, type Where } from 'payload'
 
 import { originalIdsFromDoc } from '../../lib/fontDoc'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
 const idOf = (v: unknown): string | number | undefined =>
   isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number') ? v.id : undefined

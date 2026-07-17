@@ -13,12 +13,12 @@ const posts = (
 
 describe('resolveOptions', () => {
   it('applies defaults', () => {
-    expect(resolveOptions()).toMatchObject({ enabled: true, prefix: '', collections: {}, globals: {}, rules: [] })
+    expect(resolveOptions()).toMatchObject({ enabled: true, collections: {}, globals: {}, options: { prefix: '', rules: [] } })
   })
 
   it('keeps explicit values', () => {
-    const resolved = resolveOptions({ enabled: false, prefix: 'shop', observe: true })
-    expect(resolved).toMatchObject({ enabled: false, prefix: 'shop', observe: true })
+    const resolved = resolveOptions({ enabled: false, options: { prefix: 'shop', observe: true } })
+    expect(resolved).toMatchObject({ enabled: false, options: { prefix: 'shop', observe: true } })
   })
 })
 

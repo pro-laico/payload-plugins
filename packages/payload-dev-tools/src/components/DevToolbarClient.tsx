@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { ChromeSlot, Corner, DevLink, DevSnapshot, SeedError, Settings, Size, StageSelection, TestMeta, View } from '../types'
 
 const STORE_KEY = 'pdt-settings'

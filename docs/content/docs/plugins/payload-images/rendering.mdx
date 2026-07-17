@@ -211,7 +211,7 @@ export async function Image({ id, image, blur, ...rest }: ImageProps) {
 ```
 
 `fetch()` resolves `null` for an empty source or a missing doc, and reads the source collection
-off the plugin config (`extendCollection` setups included).
+off the plugin config (a renamed `collections.images` included).
 
 <Callout type="info">
   `fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their

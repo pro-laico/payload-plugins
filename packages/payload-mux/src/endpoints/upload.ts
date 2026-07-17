@@ -7,12 +7,12 @@ import type { ResolvedMuxVideoOptions } from '../types'
 export const createMuxUploadHandler =
   (mux: Mux, options: ResolvedMuxVideoOptions): PayloadHandler =>
   async (req) => {
-    if (!(await isAllowed(options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(options.options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     try {
       const upload = await mux.video.uploads.create({
-        cors_origin: options.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
-        new_asset_settings: { playback_policy: [options.playbackPolicy], ...options.uploadSettings?.new_asset_settings },
+        cors_origin: options.options.uploadSettings?.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*',
+        new_asset_settings: { playback_policy: [options.options.playbackPolicy], ...options.options.uploadSettings?.new_asset_settings },
       })
       return Response.json(upload)
     } catch (err) {
@@ -24,7 +24,7 @@ export const createMuxUploadHandler =
 export const getMuxUploadHandler =
   (mux: Mux, options: ResolvedMuxVideoOptions): PayloadHandler =>
   async (req) => {
-    if (!(await isAllowed(options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+    if (!(await isAllowed(options.options.access.upload, req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
 
     const id = typeof req.query?.id === 'string' ? req.query.id : undefined
     if (!id) return Response.json({ error: 'Missing upload id.' }, { status: 400 })

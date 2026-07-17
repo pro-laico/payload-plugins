@@ -32,12 +32,23 @@ const signableUrlField = (
   hooks: { afterRead: [signableUrlAfterRead(mux, options, type, buildUrl)] },
 })
 
-/** Everything the plugin injects — the Mux fields, hooks, and the selects the admin cells need.
- * Deliberately no `slug`, `labels`, `admin`, or `access`: under `extendCollection` these merge onto
- * a collection you own, and you keep its identity, its admin config, and its access rules.
- * `forceSelect` is what the list cells actually need, and it holds however you fetch. */
-export const muxEnhancements = (mux: Mux, options: ResolvedMuxVideoOptions): Partial<CollectionConfig> => ({
+/** The slug the collection registers under unless `collections.muxVideo.slug` renames it. */
+export const MUX_VIDEO_SLUG = 'mux-video'
+
+/** The `mux-video` collection: the Mux fields, the hooks that keep them in sync with the asset, and
+ * the selects the admin list cells need. `forceSelect` is what those cells actually need, and it
+ * holds however you fetch. A `collections.muxVideo` override merges over the whole thing. */
+export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): CollectionConfig => ({
+  slug: MUX_VIDEO_SLUG,
+  labels: { singular: 'Video', plural: 'Videos' },
   custom: { seedAsset: { sourceField: 'source' } },
+  access: { read: ({ req }) => isAllowed(options.options.access.read, req) },
+  admin: {
+    group: 'Assets',
+    enableListViewSelectAPI: true,
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'muxUploader', 'duration'],
+  },
   forceSelect: { playbackOptions: true, title: true },
   hooks: {
     afterDelete: [getAfterDeleteHook(mux)],
@@ -49,7 +60,9 @@ export const muxEnhancements = (mux: Mux, options: ResolvedMuxVideoOptions): Par
       name: 'muxUploader',
       label: 'Video Preview',
       type: 'ui',
-      admin: { components: { Field: `${C}/MuxUploaderField#MuxUploaderField`, Cell: thumbnailCell(options.adminThumbnail) } },
+      admin: {
+        components: { Field: `${C}/MuxUploaderField#MuxUploaderField`, Cell: thumbnailCell(options.collections.muxVideo.options.thumbnail) },
+      },
     },
     { name: 'source', type: 'json', admin: { hidden: true, disableListColumn: true, disableBulkEdit: true } },
     {
@@ -115,7 +128,7 @@ export const muxEnhancements = (mux: Mux, options: ResolvedMuxVideoOptions): Par
           'posterUrl',
           'Poster URL',
           'thumbnail',
-          (id) => new URL(`https://image.mux.com/${id}/thumbnail.${options.posterExtension}`),
+          (id) => new URL(`https://image.mux.com/${id}/thumbnail.${options.options.posterExtension}`),
         ),
         signableUrlField(
           mux,
@@ -123,30 +136,9 @@ export const muxEnhancements = (mux: Mux, options: ResolvedMuxVideoOptions): Par
           'gifUrl',
           'Gif URL',
           'gif',
-          (id) => new URL(`https://image.mux.com/${id}/animated.${options.animatedGifExtension}`),
+          (id) => new URL(`https://image.mux.com/${id}/animated.${options.options.animatedGifExtension}`),
         ),
       ],
     },
   ],
 })
-
-/** The standalone `mux-video` collection: the enhancements plus the identity and access rules the
- * plugin owns when it registers the collection itself. */
-export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): CollectionConfig => {
-  const enh = muxEnhancements(mux, options)
-  return {
-    slug: 'mux-video',
-    labels: { singular: 'Video', plural: 'Videos' },
-    custom: enh.custom,
-    access: { read: ({ req }) => isAllowed(options.access.read, req) },
-    admin: {
-      group: 'Assets',
-      enableListViewSelectAPI: true,
-      useAsTitle: 'title',
-      defaultColumns: ['title', 'muxUploader', 'duration'],
-    },
-    ...(enh.forceSelect ? { forceSelect: enh.forceSelect } : {}),
-    hooks: enh.hooks,
-    fields: enh.fields ?? [],
-  }
-}

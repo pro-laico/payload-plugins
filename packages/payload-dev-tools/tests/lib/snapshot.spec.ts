@@ -128,14 +128,26 @@ describe('buildDevSnapshot', () => {
     })
   })
 
-  it('builds the mux panel: slug from options, credentials from the seedDisabled marker, ready via where', async () => {
+  it('builds the mux panel: slug from the marker, credentials from the seedDisabled marker, ready via where', async () => {
     const payload = fakePayload({
-      custom: { payloadMux: { options: {} } },
+      custom: { payloadMux: { muxVideoSlug: 'mux-video' } },
       collections: [{ slug: 'mux-video', custom: { seedDisabled: 'Mux credentials not set' } }],
       docs: { 'mux-video': 8 },
     })
     const { mux } = await buildDevSnapshot(payload)
     expect(mux).toEqual({ slug: 'mux-video', credentialed: false, total: 8, ready: 4 })
+  })
+
+  // The marker carries whatever `collections.muxVideo.slug` renamed the collection to; the panel
+  // has to follow it, or it reports on a collection that isn't there.
+  it('follows a renamed mux collection via the marker', async () => {
+    const payload = fakePayload({
+      custom: { payloadMux: { muxVideoSlug: 'media' } },
+      collections: [{ slug: 'media' }],
+      docs: { media: 8 },
+    })
+    const { mux } = await buildDevSnapshot(payload)
+    expect(mux).toEqual({ slug: 'media', credentialed: true, total: 8, ready: 4 })
   })
 
   it('builds the images panel from the payloadImages marker', async () => {

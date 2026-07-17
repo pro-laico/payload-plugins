@@ -1,25 +1,17 @@
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
 import type { Config, Plugin } from 'payload'
 
 import { resolveOptions } from './options'
+import { binScriptPath } from './_kit'
 import { buildSeedRegistry } from './typegen'
 import { createSeedEndpoint } from './endpoints/seed'
 import type { PayloadSeedMarker, SeedPluginOptions } from './types'
-
-function binScriptPath(name: string): string {
-  const here = fileURLToPath(import.meta.url)
-  const ext = here.endsWith('.ts') ? 'ts' : 'js'
-  return resolve(dirname(here), 'bin', `${name}.${ext}`)
-}
 
 /** Declarative, typed seeding: your `defineSeed` exports become one repeatable run. A
  * bootstrap tool for the data a project stands up with — every run is destructive.
  *
  * - `enabled`
  * - `definitions`
- * - `assetsDir`
- * - `assetSubDirs`
+ * - `options`
  */
 export const seedPlugin =
   (opts: SeedPluginOptions = {}): Plugin =>
@@ -31,7 +23,7 @@ export const seedPlugin =
     // is the real switch, so registering them unconditionally costs nothing and removes the trap of
     // opting into seeding and still getting no button.
     const components = incomingConfig.admin?.components ?? {}
-    const marker: PayloadSeedMarker = { options: opts, endpointPath: '/api/seed', assetsDir: resolved.assetsDir }
+    const marker: PayloadSeedMarker = { options: opts, endpointPath: '/api/seed', assetsDir: resolved.options.assetsDir }
 
     const config: Config = {
       ...incomingConfig,
@@ -39,7 +31,7 @@ export const seedPlugin =
         ...incomingConfig.admin,
         components: { ...components, actions: [...(components.actions ?? []), '@pro-laico/payload-seed/components/SeedButton#SeedButton'] },
       },
-      bin: [...(incomingConfig.bin ?? []), { key: 'seed', scriptPath: binScriptPath('seed') }],
+      bin: [...(incomingConfig.bin ?? []), { key: 'seed', scriptPath: binScriptPath(import.meta.url, 'seed') }],
       custom: { ...incomingConfig.custom, payloadSeed: marker },
       endpoints: [...(incomingConfig.endpoints ?? []), createSeedEndpoint(resolved)],
     }

@@ -11,21 +11,45 @@ the [Collections](/docs/plugins/payload-fonts/collections) page.
 
 Everything the plugin registers is one key under `collections` (Payload collections) or `globals`
 (`fontSet` is a Payload global, so it lives there, not under `collections`) — mirroring Payload's own
-config shape. Each key has a single axis: `false` means "don't register it", an object means
-"override it".
+config shape. The plugin's own knobs — `charset`, `families` — live in a separate `options` bucket,
+kept apart from the collections and globals it registers.
+
+Each `collections.<name>` / `globals.fontSet` entry is the same uniform shape: `slug` renames it (see
+[Renaming](#renaming) below), `overrides` is a plain `Partial<CollectionConfig>` (or
+`Partial<GlobalConfig>`) merged onto the plugin's config, and `options` would carry that entry's own
+plugin knobs — the fonts collections and global have none. `globals.fontSet` also takes `false` to
+skip it.
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin is a no-op and registers nothing.` },
-  { name: 'charset', type: "'latin' | 'latin-ext' | string", default: "'latin'", description: `Characters the subsetter keeps in the served WOFF2 files: a preset (latin is ASCII + Latin-1 + common punctuation, latin-ext widens it), or an explicit string of characters to retain.` },
-  { name: 'families', type: 'FontFamilyConfig[]', default: 'sans / serif / mono / display', description: `Font slots. The COMPLETE list: it replaces the four defaults wholesale (spread DEFAULT_FONT_FAMILIES to keep them). Each entry:`, options: [
-    { name: 'key', type: 'string', required: true, description: `Family id. Becomes a family option, a fontSet slot, and (capitalised) font<Key> / --font-set<Key>.` },
-    { name: 'label', type: 'string', default: 'capitalised key', description: `Admin label for the family option and fontSet slot.` },
-    { name: 'fallback', type: 'string', default: 'generic sans stack', description: `CSS fallback appended after the served family in the family variable.` },
+  { name: 'collections', type: '{ font?, fontOriginal?, fontOptimized? }', description: `The collections the plugin registers, one key each. All three are always registered — there is no false, and none takes plugin-specific options.`, options: [
+    { name: 'font', type: 'CollectionOption', description: `The visible font typeface collection. No plugin options.`, options: [
+      { name: 'slug', type: 'string', default: "'font'", description: `Rename it; the plugin follows it (see Renaming).` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's by the shared merge rules, e.g. tighter access. Rename with the sibling slug key, not here.` },
+    ] },
+    { name: 'fontOriginal', type: 'CollectionOption', description: `The hidden fontOriginal upload collection. No plugin options.`, options: [
+      { name: 'slug', type: 'string', default: "'fontOriginal'", description: `Rename it; the plugin follows it.` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's, e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter. Rename with the sibling slug key, not here.` },
+    ] },
+    { name: 'fontOptimized', type: 'CollectionOption', description: `The hidden fontOptimized upload collection (the served WOFF2s). No plugin options.`, options: [
+      { name: 'slug', type: 'string', default: "'fontOptimized'", description: `Rename it; the plugin follows it.` },
+      { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's, e.g. an upload.staticDir. Rename with the sibling slug key, not here.` },
+    ] },
   ] },
-  { name: 'collections.font', type: 'Partial<CollectionConfig>', description: `Merged onto the visible font typeface collection, e.g. tighter access. The font collection is always registered — there is no false.` },
-  { name: 'collections.fontOriginal', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOriginal upload collection, e.g. an upload.staticDir or a client-uploads (direct-to-Blob) adapter. Always registered — there is no false.` },
-  { name: 'collections.fontOptimized', type: 'Partial<CollectionConfig>', description: `Merged onto the hidden fontOptimized upload collection (the served WOFF2s), e.g. an upload.staticDir. Always registered — there is no false.` },
-  { name: 'globals.fontSet', type: 'false | Partial<GlobalConfig>', default: '{}', description: `The fontSet global: the active per-family selection the export endpoint and your frontend read. Registered by default; an object is merged onto it. false skips the global entirely — set it only if you drive that selection some other way (without it the export endpoint has nothing to resolve).` },
+  { name: 'globals', type: '{ fontSet? }', description: `The globals the plugin registers.`, options: [
+    { name: 'fontSet', type: 'false | GlobalOption', description: `The fontSet global: the active per-family selection the export endpoint and your frontend read. Registered by default; false skips it entirely — set that only if you drive the selection some other way (without it the export endpoint has nothing to resolve). No plugin options.`, options: [
+      { name: 'slug', type: 'string', default: "'fontSet'", description: `Rename the global; the export endpoint follows it.` },
+      { name: 'overrides', type: 'Partial<GlobalConfig>', description: `Payload GlobalConfig merged onto the plugin's by the shared merge rules. Rename with the sibling slug key, not here.` },
+    ] },
+  ] },
+  { name: 'options', type: 'FontsOptions', description: `The plugin's own knobs.`, options: [
+    { name: 'charset', type: "'latin' | 'latin-ext' | string", default: "'latin'", description: `Characters the subsetter keeps in the served WOFF2 files: a preset (latin is ASCII + Latin-1 + common punctuation, latin-ext widens it), or an explicit string of characters to retain.` },
+    { name: 'families', type: 'FontFamilyConfig[]', default: 'sans / serif / mono / display', description: `Font slots. The COMPLETE list: it replaces the four defaults wholesale (spread DEFAULT_FONT_FAMILIES to keep them). Each entry:`, options: [
+      { name: 'key', type: 'string', required: true, description: `Family id. Becomes a family option, a fontSet slot, and (capitalised) font<Key> / --font-set<Key>.` },
+      { name: 'label', type: 'string', default: 'capitalised key', description: `Admin label for the family option and fontSet slot.` },
+      { name: 'fallback', type: 'string', default: 'generic sans stack', description: `CSS fallback appended after the served family in the family variable.` },
+    ] },
+  ] },
 ]
 
 Pass options to customize. **Reference** is the interactive view; **TypeScript** is the same shape
@@ -47,18 +71,20 @@ import { fontsPlugin } from '@pro-laico/payload-fonts'
 // Every option at its default. This is the zero-config behaviour, written out.
 fontsPlugin({
   enabled: true,
-  charset: 'latin',
-  globals: {
-    fontSet: {}, // {} registers the global as-is; an object overrides it, false skips it
-  },
-  // families: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
-  //   ^ the default, written out. Pass your own COMPLETE list to replace it
-  //     (spread DEFAULT_FONT_FAMILIES to keep these and add more).
-  // collections: {                        // optional, no defaults; each merged onto its collection
-  //   font: { /* … */ },                  // the visible font typeface collection
-  //   fontOriginal: { /* … */ },          // the hidden originals upload collection
-  //   fontOptimized: { /* … */ },         // the hidden served-WOFF2 upload collection
+  // collections: {                        // optional, no defaults; each is { slug?, overrides? }
+  //   font: { overrides: { /* … */ } },         // the visible font typeface collection
+  //   fontOriginal: { overrides: { /* … */ } }, // the hidden originals upload collection
+  //   fontOptimized: { overrides: { /* … */ } },// the hidden served-WOFF2 upload collection
+  // },                                    // overrides is any Partial<CollectionConfig>; `slug` renames it
+  // globals: {
+  //   fontSet: {}, // {} registers the global as-is; { slug?, overrides? } tweaks it, false skips it
   // },
+  options: {
+    charset: 'latin',
+    // families: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
+    //   ^ the default, written out. Pass your own COMPLETE list to replace it
+    //     (spread DEFAULT_FONT_FAMILIES to keep these and add more).
+  },
 })
 ```
 
@@ -66,9 +92,38 @@ fontsPlugin({
 
 </Tabs>
 
-Overrides merge non-destructively: `fields` append, `access` / `admin` / `upload` shallow-merge,
-and `hooks` merge per phase, so `collections: { fontOriginal: { upload: { staticDir } } }` keeps the
-built-in font-mime whitelist.
+Overrides merge non-destructively, by the same rules in every plugin here:
+
+| Key | Merge |
+| --- | --- |
+| `slug` | Renames the collection or global. Every internal reference follows it. |
+| `fields` | Appended after the plugin's. A duplicate name is a boot error naming the field. |
+| `hooks` | Merged per phase — yours run after the plugin's. |
+| `access` / `admin` / `upload` / `custom` | Shallow-merged. |
+| `defaultPopulate` / `forceSelect` | Merged as selects. |
+| everything else | Replaced. |
+
+So `collections: { fontOriginal: { overrides: { upload: { staticDir } } } }` keeps the built-in
+font-mime whitelist, and adding a field via `collections: { font: { overrides: { fields } } }` keeps
+`title` / `family` / `variable` / `weights`.
+
+### Renaming
+
+`slug` is an ordinary override. Rename anything the plugin registers and every internal reference is
+rebuilt around the new name — the `fontOptimized` → `font` relationship, the `fontSet` slots, the
+upload relationships, the cleanup and optimize hooks' queries, and the slugs the export endpoint and
+`payload fonts:download` read:
+
+```ts
+fontsPlugin({
+  collections: { font: { slug: 'typefaces' } },
+  globals: { fontSet: { slug: 'typography' } },
+})
+// → editors get a `typefaces` collection and a `typography` global; nothing else to update.
+```
+
+Renaming is a schema change, not a label change: on an existing database it's a migration, so do it
+before you have font data (or migrate the tables/collections yourself).
 
 ## Environment variables
 
@@ -106,11 +161,15 @@ endpoint pair is dead weight there.
 | Export | From | What |
 | --- | --- | --- |
 | `fontsPlugin` | `@pro-laico/payload-fonts` | The plugin factory. |
+| `readFontsMarker` | `@pro-laico/payload-fonts` | The typed view of `config.custom.payloadFonts`: `{ options, fontSlug, fontOriginalSlug, fontOptimizedSlug, fontSetSlug, familyKeys, exportPath }`. The supported way to discover the slugs the plugin registered — they follow `collections.<name>.slug` / `globals.fontSet.slug`, and `fontSetSlug` is `null` when the global is off. Returns `undefined` when the plugin isn't registered. |
+| `PayloadFontsMarker` | `@pro-laico/payload-fonts` | The marker's type. |
 | `FontFamilyConfig` | `@pro-laico/payload-fonts` | The `{ key, label?, fallback? }` shape of a `families` entry. |
 | `DEFAULT_FONT_FAMILIES` | `@pro-laico/payload-fonts` | The built-in sans/serif/mono/display families (spread to extend them). |
 | `extractFonts` | `@pro-laico/payload-fonts` | Collect the generated `next/font` classes for the root `<html>` className. |
 | `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<DevFonts>`, for custom UIs. |
-| `ExportFontsResponse` | `@pro-laico/payload-fonts` | The shape of `GET /api/fonts/export`, for custom consumers. |
+| `buildFontFaceCss` | `@pro-laico/payload-fonts` | Turn the resolved faces from `getActiveFontFaces` into the `@font-face` + `--font-set*` CSS `<DevFonts>` inlines; for custom serving. |
+| `ActiveTypeface` / `ActiveFace` | `@pro-laico/payload-fonts` | The types `getActiveFontFaces` returns and `buildFontFaceCss` accepts. |
+| `ExportFontsResponse` / `ExportFamilyDiagnostics` | `@pro-laico/payload-fonts` | The shape of `GET /api/fonts/export` (and its per-family diagnostics), for custom consumers. |
 | `DevFonts` | `@pro-laico/payload-fonts/DevFonts` | The dev-only runtime font component. |
 | `payload-fonts-download` | `bin` | The CLI the production build runs to write fonts to disk. |
 

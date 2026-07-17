@@ -1,5 +1,5 @@
 import { bust } from '../bust'
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { Bust, SeedFlushState, SeedResultLike } from '../../types'
 
 const AFTER_SEED_SLOT = Symbol.for('pro-laico.payload-seed.afterSeed')

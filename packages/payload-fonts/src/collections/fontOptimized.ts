@@ -1,16 +1,15 @@
 import type { CollectionConfig } from 'payload'
 
-import { authd } from '../access'
-import { FONT_ORIGINAL_SLUG } from './fontOriginal'
+import { authd } from '../_kit'
 import type { CreateFontOptimizedCollectionOptions } from '../types'
 
+/** The default slug — see the note on `FONT_SLUG`. */
 export const FONT_OPTIMIZED_SLUG = 'fontOptimized'
 
-export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectionOptions = {}): CollectionConfig => {
-  const fontSlug = opts.fontSlug || 'font'
-  const originalSlug = opts.originalSlug || FONT_ORIGINAL_SLUG
+export const createFontOptimizedCollection = (opts: CreateFontOptimizedCollectionOptions): CollectionConfig => {
+  const { slug, fontSlug, originalSlug } = opts
   return {
-    slug: FONT_OPTIMIZED_SLUG,
+    slug,
     access: { create: authd, delete: authd, read: () => true, update: authd },
     custom: { revalidate: false },
     admin: {

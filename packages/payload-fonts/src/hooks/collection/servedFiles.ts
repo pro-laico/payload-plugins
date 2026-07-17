@@ -1,6 +1,6 @@
 import type { CollectionAfterReadHook } from 'payload'
 
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
 export const servedFilesHook =
   (optimizedSlug: string): CollectionAfterReadHook =>

@@ -11,9 +11,16 @@ does nothing useful without `definitions`.
 
 export const options = [
   { name: 'enabled', type: 'boolean', default: 'true', description: `When false, the plugin registers nothing: no command, endpoint, button, or type augmentation. This is a build-time switch — to turn seeding itself off at runtime, leave ENABLE_SEED unset (it already is by default).` },
-  { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions: your defineSeed exports. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do.` },
-  { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. A native upload's file is looked up under its per-collection subdir (see assetSubDirs) then the root; providers look under their own subdir.` },
-  { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' } or { fontOriginal: 'font' }.` },
+  { name: 'definitions', type: 'SeedDefinition[]', description: `The seed definitions: your defineSeed exports. The same array feeds the seed run and the typed SeedRegistry injected into payload-types.ts. Omit it and the seed runs but warns there is nothing to do. Kept at the root — it's what the plugin is.` },
+  {
+    name: 'options',
+    type: 'SeedOptions',
+    description: `The plugin's own knobs.`,
+    options: [
+      { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. A native upload's file is looked up under its per-collection subdir (see assetSubDirs) then the root; providers look under their own subdir.` },
+      { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' } or { fontOriginal: 'font' }.` },
+    ],
+  },
 ]
 
 <Callout type="info">
@@ -43,8 +50,10 @@ import { seedPlugin } from '@pro-laico/payload-seed'
 seedPlugin({
   enabled: true,
   // definitions: [media, services, posts], // no default; your seed.ts exports
-  assetsDir: 'assets',
-  assetSubDirs: {}, // default folder per collection is its slug; override here, e.g. { media: 'images' }
+  options: {
+    assetsDir: 'assets',
+    assetSubDirs: {}, // default folder per collection is its slug; override here, e.g. { media: 'images' }
+  },
 })
 ```
 
@@ -75,9 +84,14 @@ seedPlugin({
 | Export | From | What |
 | --- | --- | --- |
 | `seedPlugin` | `@pro-laico/payload-seed` | The plugin factory. |
+| `SeedPluginOptions` | `@pro-laico/payload-seed` | The `seedPlugin()` / `seed()` options type — `{ enabled?, definitions?, options? }`. |
 | `readSeedMarker` | `@pro-laico/payload-seed` | `readSeedMarker(config)` returns the typed `config.custom.payloadSeed` — `{ options, endpointPath, assetsDir }` — so a script can resolve the configured paths off a live config instead of restating them. |
+| `PayloadSeedMarker` | `@pro-laico/payload-seed` | The marker's type — the shape `readSeedMarker` returns. |
 | `defineSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records or a global's seed data (inferred from the slug; one default export per `seed.ts`). |
 | `seed` | `@pro-laico/payload-seed` | Run the seed from a script / test / migration (see [Running the seed](/docs/plugins/payload-seed/running)). |
+| `SeedResult` | `@pro-laico/payload-seed` | What `seed()` returns — `{ created, collections, globals, order, deferred, skipped }`. |
+| `registerAfterSeedListener` / `AfterSeedListener` | `@pro-laico/payload-seed` | Register a callback (and its type) that runs after every seed, `(result, { payload, req })` — a cross-package channel a sibling plugin can hook without importing the run. |
+| `SeedRunError` / `SeedValidationError` | `@pro-laico/payload-seed` | The error classes the engine throws — a create failure, and collected validation issues (the `400`'s `issues`). |
 | `ref` / `file` / `isRef` / `isFileToken` | `@pro-laico/payload-seed` | The token constructors + type guards, for code that builds seed data *outside* a builder callback (unit tests, composed fragments). Inside a builder, use the supplied tokens. |
 | `SeedTokens` / `WithRefs` / `CollectionSeedData` / `GlobalSeedData` | `@pro-laico/payload-seed` | Types for seed helpers composed across files: type a fragment's `{ ref, file }` parameter, widen generated data types to accept `Ref` tokens. |
 | `Ref` / `FileToken` | `@pro-laico/payload-seed` | The token value types themselves. |

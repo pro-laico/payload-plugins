@@ -4,7 +4,9 @@ export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOpt
   return {
     enabled: options.enabled ?? true,
     definitions: options.definitions,
-    assetsDir: options.assetsDir ?? 'assets',
-    assetSubDirs: options.assetSubDirs ?? {},
+    options: {
+      assetsDir: options.options?.assetsDir ?? 'assets',
+      assetSubDirs: options.options?.assetSubDirs ?? {},
+    },
   }
 }

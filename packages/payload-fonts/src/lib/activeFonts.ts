@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 
 import { refId } from './refs'
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import { DEFAULT_FONT_FAMILIES, familyVarSuffix } from './families'
 import type { ActiveFace, ActiveTypeface, BuildFontFaceCssOptions, FontFamily, GetActiveFontFacesOptions, RawFace } from '../types'
 

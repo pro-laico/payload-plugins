@@ -60,9 +60,11 @@ export default buildConfig({
 ```
 
 <Callout type="info">
-  **Already have a `media`/`images` collection?** Pass `imagesPlugin({ extendCollection: 'media' })`
-  to add the pipeline to your existing upload collection instead of creating a second one. See
-  [Extending a collection](/docs/plugins/payload-images/collections#extending-a-collection).
+  **Want it called `media`?** Pass
+  `imagesPlugin({ collections: { images: { slug: 'media' } } })` to rename the collection the plugin
+  registers — and delete your own, since this one is a full upload collection. Add your fields in the
+  same override. See
+  [Renaming a collection](/docs/plugins/payload-images/collections#renaming-a-collection-and-adding-your-own-fields).
 </Callout>
 </Step>
 
@@ -82,8 +84,9 @@ export default nextConfig
 <Step>
 **Generate the admin import map**
 
-`admin.focalUI` is on by default, so the plugin registers custom admin components — the focal-point
-picker and the **Preset manager** panel. Regenerate the import map so they load:
+`collections.images.options.focalUI` is on by default, so the plugin registers custom admin
+components — the focal-point picker and the **Preset manager** panel. Regenerate the import map so
+they load:
 
 ```bash
 pnpm payload generate:importmap

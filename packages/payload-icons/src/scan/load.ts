@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { IconUsageManifest } from '../types'
 
 const isIconUsageManifest = (value: unknown): value is IconUsageManifest =>

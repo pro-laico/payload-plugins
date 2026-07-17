@@ -1,7 +1,6 @@
 import type { Payload } from 'payload'
 
-import { asSlug } from './asSlug'
-import { isRecord } from './isRecord'
+import { asSlug, isRecord } from '../_kit'
 import { readImagesMarker } from './marker'
 import { RESPONSIVE_IMAGE_SELECT } from './renderIntent'
 import type {

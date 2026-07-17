@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { routeId } from './routeId'
-import { asSlug } from '../lib/asSlug'
+import { asSlug } from '../_kit'
 
 /**
  * Shared guard for the per-source admin endpoints (purge, prewarm, presets):

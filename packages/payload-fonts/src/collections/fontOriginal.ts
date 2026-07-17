@@ -1,7 +1,9 @@
 import type { CollectionConfig } from 'payload'
 
-import { authd } from '../access'
+import { authd } from '../_kit'
+import type { CreateFontOriginalCollectionOptions } from '../types'
 
+/** The default slug — see the note on `FONT_SLUG`. */
 export const FONT_ORIGINAL_SLUG = 'fontOriginal'
 
 export const FONT_MIME_TYPES = [
@@ -17,7 +19,7 @@ export const FONT_MIME_TYPES = [
   'application/x-font-truetype',
 ]
 
-export const createFontOriginalCollection = ({ slug = FONT_ORIGINAL_SLUG }: { slug?: string } = {}): CollectionConfig => ({
+export const createFontOriginalCollection = ({ slug }: CreateFontOriginalCollectionOptions): CollectionConfig => ({
   slug,
   access: { create: authd, delete: authd, read: authd, update: authd },
   custom: { revalidate: false },

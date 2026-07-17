@@ -1,7 +1,6 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, DateField, NumberField, TextField } from 'payload'
 
-import { authd } from '../access/authenticated'
-import type { IconRequestCollectionOverrides } from '../types'
+import { authd } from '../_kit'
 
 const d = {
   iconRequestDescription:
@@ -10,28 +9,26 @@ const d = {
 
 export const ICON_REQUEST_SLUG = 'iconRequest'
 
-export const createIconRequestCollection = (opts: IconRequestCollectionOverrides = {}): CollectionConfig => {
-  const { group = 'Sets', fields: extraFields = [], hooks } = opts
+const nameField: TextField = { name: 'name', type: 'text', required: true, unique: true, index: true, admin: { readOnly: true } }
 
-  return {
-    slug: ICON_REQUEST_SLUG,
-    access: { create: authd, delete: authd, read: authd, update: authd },
-    custom: { revalidate: false },
-    admin: {
-      group,
-      enableListViewSelectAPI: true,
-      useAsTitle: 'name',
-      defaultColumns: ['name', 'count', 'lastRequestedAt'],
-      hidden: true,
-      description: d.iconRequestDescription,
-    },
-    fields: [
-      { name: 'name', type: 'text', required: true, unique: true, index: true, admin: { readOnly: true } },
-      { name: 'count', type: 'number', defaultValue: 1, admin: { readOnly: true } },
-      { name: 'firstRequestedAt', type: 'date', admin: { readOnly: true } },
-      { name: 'lastRequestedAt', type: 'date', admin: { readOnly: true } },
-      ...extraFields,
-    ],
-    ...(hooks ? { hooks } : {}),
-  }
-}
+const countField: NumberField = { name: 'count', type: 'number', defaultValue: 1, admin: { readOnly: true } }
+
+const firstRequestedAtField: DateField = { name: 'firstRequestedAt', type: 'date', admin: { readOnly: true } }
+
+const lastRequestedAtField: DateField = { name: 'lastRequestedAt', type: 'date', admin: { readOnly: true } }
+
+/** The base `iconRequest` collection. `collections.iconRequest` is merged onto it by the kit's `mergeCollection`. */
+export const createIconRequestCollection = (): CollectionConfig => ({
+  slug: ICON_REQUEST_SLUG,
+  access: { create: authd, delete: authd, read: authd, update: authd },
+  custom: { revalidate: false },
+  admin: {
+    group: 'Sets',
+    enableListViewSelectAPI: true,
+    useAsTitle: 'name',
+    defaultColumns: ['name', 'count', 'lastRequestedAt'],
+    hidden: true,
+    description: d.iconRequestDescription,
+  },
+  fields: [nameField, countField, firstRequestedAtField, lastRequestedAtField],
+})

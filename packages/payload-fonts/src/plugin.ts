@@ -1,23 +1,17 @@
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
 import type { Config, Plugin } from 'payload'
 
 import { resolveOptions } from './options'
 import { probeSubsetter } from './lib/optimizeFont'
 import { resolveFontFamilies } from './lib/families'
-import { createFontCollection } from './collections/font'
-import { exportFontsEndpoint } from './endpoints/exportFonts'
-import { mergeCollection, mergeGlobal } from './lib/mergeConfig'
 import { createFontSetGlobal, FONT_SET_SLUG } from './globals/fontSet'
 import type { FontsPluginOptions, PayloadFontsMarker } from './types'
+import { createFontCollection, FONT_SLUG } from './collections/font'
+import { assertNoFieldCollisions, binScriptPath, mergeCollection, mergeGlobal } from './_kit'
+import { exportFontsEndpoint, FONTS_EXPORT_PATH } from './endpoints/exportFonts'
 import { createFontOriginalCollection, FONT_ORIGINAL_SLUG } from './collections/fontOriginal'
 import { createFontOptimizedCollection, FONT_OPTIMIZED_SLUG } from './collections/fontOptimized'
 
-function binScriptPath(name: string): string {
-  const here = fileURLToPath(import.meta.url)
-  const ext = here.endsWith('.ts') ? 'ts' : 'js'
-  return resolve(dirname(here), 'bin', `${name}.${ext}`)
-}
+const PLUGIN = 'payload-fonts'
 
 /** Self-hosted fonts editors control: upload a typeface, it's subsetted on save and served
  * through `next/font/local`.
@@ -25,38 +19,61 @@ function binScriptPath(name: string): string {
  * - `enabled`
  * - `collections`
  * - `globals`
- * - `charset`
- * - `families`
+ * - `options`
  */
 export const fontsPlugin =
   (opts: FontsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const { enabled, font, fontOriginal, fontOptimized, fontSet, charset, families } = resolveOptions(opts)
+    const { enabled, collections: cols, globals: globs, options } = resolveOptions(opts)
     if (!enabled) return config
 
+    const { charset, families } = options
     const familyKeys = resolveFontFamilies(families).map((r) => r.key)
+
+    // Each slug is resolved exactly once, here: the override's `slug` or the default. Every
+    // internal reference — the fontOptimized→font relationship, the fontSet slots, the upload
+    // relationships, the hooks' queries, the export endpoint, the marker the bin reads — is built
+    // from these, so renaming a collection can't leave a dangling reference behind.
+    const { fontSet } = globs
+    const fontSlug = cols.font.slug ?? FONT_SLUG
+    const originalSlug = cols.fontOriginal.slug ?? FONT_ORIGINAL_SLUG
+    const optimizedSlug = cols.fontOptimized.slug ?? FONT_OPTIMIZED_SLUG
+    const fontSetSlug = fontSet === false ? null : (fontSet.slug ?? FONT_SET_SLUG)
+
+    const fontBase = createFontCollection({ slug: fontSlug, originalSlug, optimizedSlug, charset, families })
+    const originalBase = createFontOriginalCollection({ slug: originalSlug })
+    const optimizedBase = createFontOptimizedCollection({ slug: optimizedSlug, fontSlug, originalSlug })
+    assertNoFieldCollisions(PLUGIN, 'font', fontBase.fields, cols.font.overrides?.fields)
+    assertNoFieldCollisions(PLUGIN, 'fontOriginal', originalBase.fields, cols.fontOriginal.overrides?.fields)
+    assertNoFieldCollisions(PLUGIN, 'fontOptimized', optimizedBase.fields, cols.fontOptimized.overrides?.fields)
 
     const collections = [
       ...(config.collections ?? []),
-      mergeCollection(createFontCollection({ charset, families, originalSlug: FONT_ORIGINAL_SLUG, optimizedSlug: FONT_OPTIMIZED_SLUG }), font),
-      mergeCollection(createFontOriginalCollection(), fontOriginal),
-      mergeCollection(createFontOptimizedCollection({ fontSlug: 'font', originalSlug: FONT_ORIGINAL_SLUG }), fontOptimized),
+      mergeCollection(fontBase, cols.font.overrides),
+      mergeCollection(originalBase, cols.fontOriginal.overrides),
+      mergeCollection(optimizedBase, cols.fontOptimized.overrides),
     ]
 
-    const globals = fontSet !== false ? [...(config.globals ?? []), mergeGlobal(createFontSetGlobal({ families }), fontSet)] : config.globals
+    let globals = config.globals
+    if (fontSet !== false && fontSetSlug) {
+      const fontSetBase = createFontSetGlobal({ slug: fontSetSlug, fontSlug, families })
+      assertNoFieldCollisions(PLUGIN, 'fontSet', fontSetBase.fields, fontSet.overrides?.fields)
+      globals = [...(config.globals ?? []), mergeGlobal(fontSetBase, fontSet.overrides)]
+    }
+
     const endpoints = [
       ...(config.endpoints ?? []),
-      exportFontsEndpoint({ fontSetGlobalSlug: FONT_SET_SLUG, fontOptimizedSlug: FONT_OPTIMIZED_SLUG, families: familyKeys }),
+      exportFontsEndpoint({ path: FONTS_EXPORT_PATH, fontSetGlobalSlug: fontSetSlug, fontOptimizedSlug: optimizedSlug, families: familyKeys }),
     ]
 
     const marker: PayloadFontsMarker = {
       options: opts,
-      fontSlug: font?.slug ?? 'font',
-      fontOriginalSlug: FONT_ORIGINAL_SLUG,
-      fontOptimizedSlug: FONT_OPTIMIZED_SLUG,
-      fontSetSlug: fontSet !== false ? FONT_SET_SLUG : null,
+      fontSlug,
+      fontOriginalSlug: originalSlug,
+      fontOptimizedSlug: optimizedSlug,
+      fontSetSlug,
       familyKeys,
-      exportPath: '/fonts/export',
+      exportPath: FONTS_EXPORT_PATH,
     }
 
     return {
@@ -66,7 +83,7 @@ export const fontsPlugin =
       endpoints,
       // `payload fonts:download` — the build reads fonts through the Local API, so it needs no
       // running site (the `payload-fonts-download` CLI's HTTP path stays for remote builds).
-      bin: [...(config.bin ?? []), { key: 'fonts:download', scriptPath: binScriptPath('downloadFonts') }],
+      bin: [...(config.bin ?? []), { key: 'fonts:download', scriptPath: binScriptPath(import.meta.url, 'downloadFonts') }],
       custom: { ...config.custom, payloadFonts: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)

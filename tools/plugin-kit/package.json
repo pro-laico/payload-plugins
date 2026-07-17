@@ -1,0 +1,14 @@
+{
+  "name": "@tools/plugin-kit",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "The one implementation of the config contract every @pro-laico/* plugin honours. Vendored into each package's src/_kit by `pnpm kit:sync` — never a runtime dependency.",
+  "scripts": {
+    "sync": "node ./sync.mjs",
+    "check": "node ./sync.mjs --check"
+  },
+  "peerDependencies": {
+    "payload": "^3.0.0"
+  }
+}

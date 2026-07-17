@@ -1,9 +1,9 @@
 import type { Charset } from './charset'
 
 export interface OptimizeFromOriginalsOptions {
-  charset?: Charset
-  originalSlug?: string
-  optimizedSlug?: string
+  charset: Charset | undefined
+  originalSlug: string
+  optimizedSlug: string
 }
 
 export interface Desired {

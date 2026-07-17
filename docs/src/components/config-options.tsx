@@ -78,8 +78,8 @@ const Options = ({ items }: { items: ConfigOption[] }) => (
               <Meta o={o} />
             </span>
           </summary>
-          <div className="px-3 pb-3 pl-6 sm:pl-9">
-            {o.description ? <p className="mb-3 text-sm text-fd-muted-foreground">{o.description}</p> : null}
+          <div className="pb-3 pl-3 pr-1.5">
+            {o.description ? <p className="mb-3 pl-6 text-sm text-fd-muted-foreground">{o.description}</p> : null}
             <Options items={o.options} />
           </div>
         </details>

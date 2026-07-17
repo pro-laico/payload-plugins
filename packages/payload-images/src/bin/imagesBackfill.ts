@@ -1,7 +1,6 @@
 import { getPayload, type SanitizedConfig } from 'payload'
 
-import { asSlug } from '../lib/asSlug'
-import { isRecord } from '../lib/isRecord'
+import { asSlug, isRecord } from '../_kit'
 import type { UploadDocLike } from '../types'
 import { readBytes } from '../lib/transform/source'
 

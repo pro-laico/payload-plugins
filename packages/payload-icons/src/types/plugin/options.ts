@@ -1,19 +1,47 @@
-import type { IconCollectionOverrides } from '../collections/icon-collection'
-import type { IconSetCollectionOverrides } from '../collections/icon-set-collection'
-import type { IconRequestCollectionOverrides } from '../collections/icon-request-collection'
+import type { CollectionConfig } from 'payload'
 
-export interface IconsCollectionsOptions {
-  /** Merged onto the `icon` upload collection. Always registered. */
-  icon?: IconCollectionOverrides
-  /** Merged onto the `iconSet` collection; `false` skips it entirely. */
-  iconSet?: false | IconSetCollectionOverrides
-  /** Merged onto the `iconRequest` collection; `false` skips it and its clear endpoint — nothing tracks missing icons. */
-  iconRequest?: false | IconRequestCollectionOverrides
+import type { CollectionOption } from '../../_kit'
+
+/** A resolved `collections.<name>` entry — same shape as {@link CollectionOption}, but `options` is
+ * always populated with this plugin's defaults for the collection. */
+export type ResolvedCollectionOption<O = Record<string, never>> = CollectionOption<O> & { options: O }
+
+/** This plugin's own knobs for the `iconSet` collection.
+ *
+ * - `usagePanel`
+ * - `iconRowFields` */
+export interface IconSetOptions {
+  /** Render the "Requested icons" panel on the set's edit view. Default `true`. */
+  usagePanel?: boolean
+  /** Appended to every row of the set's icon array, beside the name and upload. */
+  iconRowFields?: CollectionConfig['fields']
 }
 
-export interface IconsAdminOptions {
-  /** The "Requested icons" panel on the iconSet edit view. Default `true`. */
-  usagePanel?: boolean
+/** Mirrors {@link IconSetOptions} — every key present, defaults applied. */
+export interface ResolvedIconSetOptions {
+  usagePanel: boolean
+  iconRowFields: CollectionConfig['fields']
+}
+
+/** The collections this plugin registers.
+ *
+ * - `icon`
+ * - `iconSet`
+ * - `iconRequest` */
+export interface IconsCollectionsOptions {
+  /** The core `icon` upload collection. Always registered. */
+  icon?: CollectionOption
+  /** The `iconSet` collection; `false` skips it. */
+  iconSet?: false | CollectionOption<IconSetOptions>
+  /** The `iconRequest` collection; `false` skips it and its clear endpoint — nothing tracks missing icons. */
+  iconRequest?: false | CollectionOption
+}
+
+/** Mirrors {@link IconsCollectionsOptions} — every key present, defaults applied. */
+export interface ResolvedIconsCollectionsOptions {
+  icon: ResolvedCollectionOption
+  iconSet: false | ResolvedCollectionOption<ResolvedIconSetOptions>
+  iconRequest: false | ResolvedCollectionOption
 }
 
 export interface IconsPluginOptions {
@@ -25,16 +53,10 @@ export interface IconsPluginOptions {
    * - `iconSet`
    * - `iconRequest` */
   collections?: IconsCollectionsOptions
-  /** Admin-only toggles.
-   *
-   * - `usagePanel` */
-  admin?: IconsAdminOptions
 }
 
+/** Mirrors {@link IconsPluginOptions}: same keys, same nesting, defaults applied. */
 export interface ResolvedIconsOptions {
   enabled: boolean
-  icon: IconCollectionOverrides
-  iconSet: false | IconSetCollectionOverrides
-  iconRequest: false | IconRequestCollectionOverrides
-  usagePanel: boolean
+  collections: ResolvedIconsCollectionsOptions
 }

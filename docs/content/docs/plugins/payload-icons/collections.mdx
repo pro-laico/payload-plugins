@@ -65,13 +65,13 @@ bundle) and:
 A named, ordered `name → icon` mapping into the shared `icon` pool, with a single-active toggle. Build
 a second set (a different `arrow-right`, a heavier weight, a seasonal pack) and flip it active to
 re-skin every icon at once, without touching the frontend. Writes and reads are logged-in-admin only.
-Drafts / versions are on by default; toggle with `collections.iconSet.drafts` (default `true`). Lives
-under a **Sets** admin group.
+Drafts / versions are on by default; override with `collections.iconSet.overrides.versions` like any
+other Payload collection. Lives under a **Sets** admin group.
 
-- **Settings tab:** the `active` toggle and `title` (plus any `fields` you add, and the [usage panel](#icon-use-detection) unless `admin: { usagePanel: false }`).
+- **Settings tab:** the `active` toggle and `title` (plus the [usage panel](#icon-use-detection) unless `collections.iconSet.options.usagePanel: false`).
 - **Icons tab:** the `iconsArray`, one row per icon, each a `name` (auto kebab-cased, what the
   frontend looks up, independent of the uploaded filename) and an `icon` upload relationship into
-  the `icon` collection.
+  the `icon` collection — plus anything you add via `collections.iconSet.options.iconRowFields`.
 
 <Callout type="info">
   Only one set is active at a time. Activating a set runs a `beforeChange` hook that deactivates the
@@ -114,8 +114,8 @@ sources:
   `name={slug}` the scan can't see) into the hidden [`iconRequest`](#iconrequest) collection, with hit
   counts, last-seen, and a clear button.
 
-Both are on with `iconsPlugin()`; pass `admin: { usagePanel: false }` / `collections: { iconRequest: false }`
-to omit either.
+Both are on with `iconsPlugin()`; pass `collections: { iconSet: { options: { usagePanel: false } } }` /
+`collections: { iconRequest: false }` to omit either.
 
 ```bash
 payload-icons-scan            # production/CI: scans ./src and ./app; -o sets the manifest path

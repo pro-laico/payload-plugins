@@ -1,9 +1,7 @@
 import type { ArrayField, CollectionConfig, GroupField, NumberField, RadioField, TextField } from 'payload'
 
-import { authd } from '../access'
-import { FONT_ORIGINAL_SLUG } from './fontOriginal'
+import { authd, isRecord } from '../_kit'
 import { resolveFontFamilies } from '../lib/families'
-import { FONT_OPTIMIZED_SLUG } from './fontOptimized'
 import { hasVariable, hasWeights } from '../lib/fontDoc'
 import type { CreateFontCollectionOptions } from '../types'
 import { servedFilesHook } from '../hooks/collection/servedFiles'
@@ -11,7 +9,6 @@ import { requireFontFiles } from '../hooks/collection/requireFontFiles'
 import { cleanupFontAssetsHook } from '../hooks/collection/cleanupFontAssets'
 import { optimizeFromOriginalsHook } from '../hooks/collection/optimizeFromOriginals'
 import { makeRejectSharedOriginals } from '../hooks/collection/rejectSharedOriginals'
-import { isRecord } from '../lib/isRecord'
 
 const d = {
   servedFiles:
@@ -26,11 +23,13 @@ const WEIGHT_OPTIONS = ['100', '200', '300', '400', '500', '600', '700', '800', 
 export const FontOriginalUploadPath = '@pro-laico/payload-fonts/admin/FontOriginalUpload'
 const createOnlyUpload = () => ({ components: { Field: { path: FontOriginalUploadPath } } })
 
-export const createFontCollection = (opts: CreateFontCollectionOptions = {}): CollectionConfig => {
-  const fontSlug = 'font'
+/** The default slug. A `collections.font.slug` override replaces it; `plugin.ts` resolves which and
+ * hands the answer to every factory and hook that references this collection. */
+export const FONT_SLUG = 'font'
+
+export const createFontCollection = (opts: CreateFontCollectionOptions): CollectionConfig => {
+  const { slug: fontSlug, originalSlug, optimizedSlug } = opts
   const families = resolveFontFamilies(opts.families)
-  const optimizedSlug = opts.optimizedSlug || FONT_OPTIMIZED_SLUG
-  const originalSlug = opts.originalSlug || FONT_ORIGINAL_SLUG
 
   const fields: [TextField, RadioField, NumberField, GroupField, ArrayField] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },

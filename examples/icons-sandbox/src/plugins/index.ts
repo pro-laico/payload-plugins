@@ -6,4 +6,4 @@ import icons from '../seed/icons'
 import pages from '../seed/pages'
 import iconSets from '../seed/iconSets'
 
-export const plugins: Plugin[] = [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages], assetsDir: 'seed-assets' })]
+export const plugins: Plugin[] = [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages], options: { assetsDir: 'seed-assets' } })]

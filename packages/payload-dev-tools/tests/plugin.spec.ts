@@ -30,7 +30,7 @@ describe('devToolsPlugin', () => {
   it('marks config.custom.payloadDevTools (with the resolved devRoute) and preserves existing custom entries', () => {
     const config = apply({ custom: { other: 1 } })
     expect(config.custom).toMatchObject({ other: 1, payloadDevTools: { options: { enabled: true }, devRoute: '/dev' } })
-    expect(apply({}, { devRoute: '/lab' }).custom).toMatchObject({ payloadDevTools: { devRoute: '/lab' } })
+    expect(apply({}, { options: { devRoute: '/lab' } }).custom).toMatchObject({ payloadDevTools: { devRoute: '/lab' } })
   })
 
   it("wraps onInit (config stash) without dropping the app's own onInit", async () => {

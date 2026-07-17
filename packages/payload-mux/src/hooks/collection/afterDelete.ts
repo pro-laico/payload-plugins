@@ -1,7 +1,7 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionAfterDeleteHook } from 'payload'
 
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
 export const getAfterDeleteHook =
   (mux: Mux): CollectionAfterDeleteHook =>

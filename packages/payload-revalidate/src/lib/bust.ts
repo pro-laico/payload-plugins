@@ -1,5 +1,5 @@
 import { createOnce } from './once'
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import { recordEvent } from './observe/registry'
 import type { Bust, RevalidateEvent } from '../types'
 

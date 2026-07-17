@@ -1,9 +1,10 @@
 import type { GlobalConfig } from 'payload'
 
-import { authd } from '../access'
-import type { FontFamilyConfig } from '../types'
+import { authd } from '../_kit'
 import { fontUploadFields } from '../fields/font'
+import type { CreateFontSetGlobalOptions } from '../types'
 
+/** The default slug — see the note on `FONT_SLUG`. */
 export const FONT_SET_SLUG = 'fontSet'
 
 const d = {
@@ -11,14 +12,8 @@ const d = {
     'Choose which uploaded typeface fills each slot. This is what actually puts a font on your site — upload in Font first, then activate it here.',
 }
 
-export const createFontSetGlobal = ({
-  fontSlug = 'font',
-  families,
-}: {
-  fontSlug?: string
-  families?: FontFamilyConfig[]
-} = {}): GlobalConfig => ({
-  slug: FONT_SET_SLUG,
+export const createFontSetGlobal = ({ slug, fontSlug, families }: CreateFontSetGlobalOptions): GlobalConfig => ({
+  slug,
   admin: { group: 'Assets', description: d.fontSet },
   access: { read: authd, update: authd },
   fields: fontUploadFields({ fontSlug, families }),

@@ -14,7 +14,7 @@ const signIfNeeded = async (
 ): Promise<void> => {
   if (policy !== 'signed') return
   const params = typeof posterTimestamp === 'number' ? { time: posterTimestamp.toString() } : undefined
-  const token = await mux.jwt.signPlaybackId(playbackId, { expiration: options.signedUrlOptions?.expiration ?? '1d', type, params })
+  const token = await mux.jwt.signPlaybackId(playbackId, { expiration: options.options.signedUrlOptions?.expiration ?? '1d', type, params })
   url.searchParams.set('token', token)
 }
 

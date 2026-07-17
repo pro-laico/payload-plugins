@@ -1,6 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
-import { asSlug } from '../../lib/asSlug'
+import { asSlug } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
 import type { PurgeEndpointConfig } from '../../types'
 import { GENERATED_IMAGES_SLUG } from '../../collections/generatedImages'

@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 import path from 'node:path'
 
 import { familyExportName, familyVarSuffix } from '../lib/families'
-import { isRecord } from '../lib/isRecord'
+import { isRecord } from '../_kit'
 import type { ExportFontsResponse, Family, RunDownloadFontsOptions, WeightFile } from '../types'
 
 const colors = {

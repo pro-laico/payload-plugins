@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { PrewarmReason } from '../../types'
 
 const ENQUEUE_DELAY_MS = 30_000

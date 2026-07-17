@@ -1,6 +1,6 @@
 export type RevalidateMarker = { endpointPath?: string | null }
 
-export type MuxMarker = { options?: { extendCollection?: string } }
+export type MuxMarker = { muxVideoSlug?: string }
 
 export type ImagesMarker = { sourceSlug?: string; variantSlug?: string | null; basePath?: string }
 

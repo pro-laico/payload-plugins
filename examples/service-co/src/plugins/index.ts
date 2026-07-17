@@ -35,7 +35,7 @@ export const seedDefinitions = [
   videos,
 ]
 
-export const seedOptions = { definitions: seedDefinitions, assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } }
+export const seedOptions = { definitions: seedDefinitions, options: { assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } } }
 
 export const plugins: Plugin[] = [
   imagesPlugin(),

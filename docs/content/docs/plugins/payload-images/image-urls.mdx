@@ -99,7 +99,7 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 | `w` / `h` | — | Target width / height in px. At least one is required. |
 | `ar` | — | Aspect ratio (`16:9` or `1.78` — `:` is the only accepted separator). Derives the missing dimension. |
 | `fit` | `cover` | How the source maps into the box: `cover` (focal crop) · `contain` · `inside` · `outside` · `fill`. |
-| `q` | `75` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
+| `q` | `90` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
 | `fmt` | `auto` | Encode format: `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
 | `v` | — | Cache-busting token (derived from filename + focal). Ignored by the server. |
 

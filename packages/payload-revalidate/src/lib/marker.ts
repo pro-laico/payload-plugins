@@ -1,6 +1,6 @@
 import type { Payload, SanitizedConfig } from 'payload'
 
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import { createTags } from './tags'
 import type { PayloadRevalidateMarker, Tags } from '../types'
 

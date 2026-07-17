@@ -1,7 +1,6 @@
 import type { CollectionSlug, Payload } from 'payload'
 
-import { asSlug } from '../asSlug'
-import { isRecord } from '../isRecord'
+import { asSlug, isRecord } from '../../_kit'
 import { readBytes } from '../transform/source'
 import { getServerSideURL } from '../getServerSideURL'
 import { IMAGE_MIME_TYPES } from '../transform/params'

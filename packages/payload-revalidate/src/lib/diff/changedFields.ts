@@ -1,4 +1,4 @@
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { ChangeDetectionSchema } from '../../types'
 
 const normalizeRelation = (value: unknown): unknown => {

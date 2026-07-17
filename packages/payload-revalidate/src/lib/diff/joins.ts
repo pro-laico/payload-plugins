@@ -1,7 +1,7 @@
 import type { Field, Where } from 'payload'
 
 import { isId } from '../values'
-import { isRecord } from '../isRecord'
+import { isRecord } from '../../_kit'
 import type { JoinMembership } from '../../types'
 
 export const whereFields = (where: Where | undefined): string[] => {

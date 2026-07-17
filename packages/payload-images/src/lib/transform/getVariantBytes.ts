@@ -1,7 +1,6 @@
 import { after } from 'next/server'
 
-import { asSlug } from '../asSlug'
-import { isRecord } from '../isRecord'
+import { asSlug, isRecord } from '../../_kit'
 import { readBytes } from './source'
 import { transformImage } from './sharp'
 import { variantCacheKey } from './variantKey'

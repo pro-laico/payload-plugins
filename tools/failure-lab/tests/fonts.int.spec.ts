@@ -38,8 +38,8 @@ beforeAll(async () => {
     plugins: [
       fontsPlugin({
         collections: {
-          fontOriginal: { upload: { staticDir: join(dir, 'original') } },
-          fontOptimized: { upload: { staticDir: join(dir, 'optimized') } },
+          fontOriginal: { overrides: { upload: { staticDir: join(dir, 'original') } } },
+          fontOptimized: { overrides: { upload: { staticDir: join(dir, 'optimized') } } },
         },
       }),
     ],

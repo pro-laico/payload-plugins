@@ -1,4 +1,4 @@
-import { isRecord } from '../../../lib/isRecord'
+import { isRecord } from '../../../_kit'
 
 // REST responses are external data — narrow them at the boundary into the panel's own view types.
 

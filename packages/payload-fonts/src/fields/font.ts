@@ -1,9 +1,9 @@
 import type { RelationshipField, RowField } from 'payload'
 
-import type { FontFamilyConfig } from '../types'
 import { resolveFontFamilies } from '../lib/families'
+import type { FontUploadFieldsOptions } from '../types'
 
-export const fontUploadFields = ({ fontSlug = 'font', families }: { fontSlug?: string; families?: FontFamilyConfig[] } = {}): RowField[] => {
+export const fontUploadFields = ({ fontSlug, families }: FontUploadFieldsOptions): RowField[] => {
   const relationTo = fontSlug
   const resolved = resolveFontFamilies(families)
   const slots: RelationshipField[] = resolved.map((family) => ({

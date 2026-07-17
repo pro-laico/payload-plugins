@@ -1,6 +1,6 @@
 import type { Payload, Where } from 'payload'
 
-import { isRecord } from './isRecord'
+import { isRecord } from '../_kit'
 import { readDevToolsMarker } from './marker'
 import type {
   CollectionCount,
@@ -130,7 +130,7 @@ const fontsSnapshot = async (payload: Payload, marker: FontsMarker): Promise<Fon
 }
 
 const muxSnapshot = async (payload: Payload, marker: MuxMarker): Promise<MuxSnapshot> => {
-  const slug = marker.options?.extendCollection ?? 'mux-video'
+  const slug = marker.muxVideoSlug ?? 'mux-video'
   const collection = payload.config.collections.find((c) => c.slug === slug)
   return {
     slug,

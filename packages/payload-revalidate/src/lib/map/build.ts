@@ -31,9 +31,9 @@ export function buildStaticInspection(config: MapConfigSource, optionsOverride?:
 
   return {
     graph,
-    prefix: resolved.prefix,
+    prefix: resolved.options.prefix,
     observing: false,
-    rules: resolved.rules,
+    rules: resolved.options.rules,
     settings,
     getters: [],
     reads: [],

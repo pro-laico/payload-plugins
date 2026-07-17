@@ -7,7 +7,7 @@ import type { ImageDocLike } from '../../types/placeholders/blurhashDoc'
 import { cropBlurhashCoefficients } from '../../lib/placeholders/cropCoefficients'
 import { cropWindow, storedHash, storedWebp } from '../../lib/placeholders/stored'
 import { DEFAULT_BLURHASH_QUALITY, isBlurhashQuality, isWebpQuality } from '../../lib/placeholders/qualities'
-import { isRecord } from '../../lib/isRecord'
+import { isRecord } from '../../_kit'
 
 const isImageDoc = (v: unknown): v is ImageDocLike => isRecord(v)
 

@@ -1,7 +1,6 @@
 import type { Payload } from 'payload'
 
-import { asSlug } from '../asSlug'
-import { isRecord } from '../isRecord'
+import { asSlug, isRecord } from '../../_kit'
 import { isDuplicateKeyError } from '../errors'
 import type { ProfileParts, RenderProfileDoc, WidthHistogram } from '../../types'
 import { canonicalProfileKey, type RatioCandidate, ratioToken } from './profileKey'

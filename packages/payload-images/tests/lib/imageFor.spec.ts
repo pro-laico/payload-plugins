@@ -37,7 +37,7 @@ describe('createImageFor', () => {
     expect(findByID).toHaveBeenCalledWith(expect.objectContaining({ id: 7, context: {} }))
   })
 
-  it('reads the source collection off the plugin marker (extendCollection setups)', async () => {
+  it('reads the source collection off the plugin marker (a renamed collections.images)', async () => {
     const { payload, findByID } = fakePayload('media')
     await createImageFor(payload)('1').fetch()
     expect(findByID).toHaveBeenCalledWith(expect.objectContaining({ collection: 'media' }))

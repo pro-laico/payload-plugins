@@ -22,13 +22,13 @@ The browser cached the `/api/fontOptimized/file/…` font file.
 Hard-refresh.
 
 **The `families` you passed dropped sans / serif / mono / display.**
-`families` is the *complete* list — it replaces the four defaults wholesale, so `families: [{ key: 'brand' }]` drops them all.
+`options.families` is the *complete* list — it replaces the four defaults wholesale, so `options: { families: [{ key: 'brand' }] }` drops them all.
 Spread `DEFAULT_FONT_FAMILIES` to keep them and add yours:
 
 ```ts
 import { fontsPlugin, DEFAULT_FONT_FAMILIES } from '@pro-laico/payload-fonts'
 
-fontsPlugin({ families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] })
+fontsPlugin({ options: { families: [...DEFAULT_FONT_FAMILIES, { key: 'brand', fallback: 'Georgia, serif' }] } })
 ```
 
 **Reshaping `families` broke existing data.**
@@ -56,7 +56,7 @@ You're on the HTTP CLI (`payload-fonts-download`), which fetches from `FONT_DOWN
 
 **A production font change didn't show.**
 The build bakes the `fontSet` selection via `next/font`; there's no runtime cache to revalidate.
-Publish a swap by re-running the download and rebuilding (`payload-fonts-download` → `next build`), or wire a deploy hook via `globals.fontSet`. See [Revalidation & caching](/docs/plugins/payload-fonts/how-it-works#revalidation--caching).
+Publish a swap by re-running the download and rebuilding (`payload fonts:download` → `next build`), or wire a deploy hook via `globals.fontSet`. See [Revalidation & caching](/docs/plugins/payload-fonts/how-it-works#revalidation--caching).
 
 **Some characters render in the fallback font.**
 Subsetting is lossy to your `charset` — characters outside it aren't in the served WOFF2.
