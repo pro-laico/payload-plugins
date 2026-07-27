@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { connection } from 'next/server'
 import { Icon } from '@/components/ui/Icon'
 import { ImageFor } from '@/components/ImageFor'
 import { SectionHeading } from '@/components/SectionHeading'
@@ -24,7 +23,6 @@ export default function ServicesPage() {
 }
 
 async function ServiceSections() {
-  await connection()
   const serviceIds = await getServiceIds()
   return (
     <div className="mt-16 space-y-20">

@@ -39,6 +39,16 @@ packages share one lockstep version.
   plugin you installed. Presence only — no values ever leave the server. All of it is in
   `GET /api/dev` under `env`, for CI and agents.
 
+### Fixed
+
+- **payload-dev-tools: `/dev` pages could prerender with build-time data.** The snapshot is a
+  database read through Payload's Local API, and Next only marks a subtree dynamic when it sees
+  `fetch`, `cookies()`, or `headers()` — so the prerender pass resolved it and froze the build box's
+  counts into the HTML. `createDevPage` now calls `connection()` itself. Only reachable on a
+  deployment that forces `enabled: true` (a dev server never prerenders), but that's precisely
+  where a diagnostics page reporting someone else's machine does the most damage. The `<Suspense>`
+  boundary decides where the dynamic hole goes; it was never what decided there was one.
+
 ### Changed
 
 - **payload-dev-tools: the snapshot's `env` grew from two fields to a block.** `DevSnapshot['env']`

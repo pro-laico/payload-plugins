@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { connection } from 'next/server'
 import { getProjectIds } from '@/lib/data'
 import { ProjectCard } from '@/components/ProjectCard'
 import { SectionHeading } from '@/components/SectionHeading'
@@ -23,7 +22,6 @@ export default function WorkPage() {
 }
 
 async function WorkGrid() {
-  await connection()
   const projectIds = await getProjectIds()
 
   return projectIds.length === 0 ? (

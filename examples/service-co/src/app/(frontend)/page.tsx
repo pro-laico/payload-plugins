@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import { connection } from 'next/server'
 import { firstPlayback } from '@/lib/mux'
 import { Image } from '@/components/Image'
 import { MuxVideo } from '@/components/MuxVideo'
@@ -27,7 +26,6 @@ export default function HomePage() {
 }
 
 async function HomeContent() {
-  await connection()
   const [settings, serviceIds, projectIds, featuredId, testimonialIds] = await Promise.all([
     getSiteSettings(),
     getServiceIds(),

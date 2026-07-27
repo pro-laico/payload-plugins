@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { connection } from 'next/server'
 import { getSiteSettings } from '@/lib/data'
 import { CmsIcon } from '@/components/ui/CmsIcon'
 import { ButtonLink } from '@/components/ui/Button'
@@ -24,7 +23,6 @@ export default function ContactPage() {
 }
 
 async function ContactDetails() {
-  await connection()
   const settings = await getSiteSettings()
   const c = settings.contact ?? {}
 

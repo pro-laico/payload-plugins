@@ -100,8 +100,16 @@ One file, all views. It lives in your `(frontend)` group, so the pages inherit y
 fonts, and styles. Pass `createDevPage` a Payload handle — `getPayload({ config })` from your
 app's `@payload-config`. The pages read live data, so render them inside `<Suspense>` — a dynamic
 hole that streams at request time while the rest of the route prerenders. Don't reach for
-`export const dynamic = 'force-dynamic'`; with `cacheComponents` on, the Suspense boundary is all
-you need.
+`export const dynamic = 'force-dynamic'`: the page calls `connection()` itself, so the boundary is
+all you have to supply.
+
+<Callout type="info">
+That `connection()` call is doing real work, and it's worth knowing why if you write your own dev
+pages. Next marks a subtree dynamic when it sees `fetch`, `cookies()`, or `headers()` — it can't
+see a database read through Payload's Local API. Left alone, the prerender pass resolves that read
+and freezes build-time counts into the HTML. `<Suspense>` decides *where* the dynamic hole goes;
+something has to decide *that there is one*.
+</Callout>
 
 <Callout type="info">
 The Seed view needs the seed plugin's preconditions: `ENABLE_SEED=true` in `.env.local` and a

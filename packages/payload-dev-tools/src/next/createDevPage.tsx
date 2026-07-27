@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
+import { connection } from 'next/server'
 import { notFound } from 'next/navigation'
 
 import { SeedCard } from './client'
@@ -15,6 +16,13 @@ export function createDevPage(options: CreateDevPageOptions) {
 
   return async function DevPage({ params, searchParams }: DevPageProps) {
     if (!(enabled ?? process.env.NODE_ENV === 'development')) notFound()
+    // The snapshot is a live database read through the Local API, which Next can't see — it
+    // instruments `fetch`, `cookies()`, and friends, not a database driver. Without this the
+    // prerender pass resolves it and bakes build-time counts into the HTML, which only bites on a
+    // deployment that forces `enabled: true`, and bites exactly where a diagnostics page mustn't:
+    // it would report the state of the build box, forever. The `<Suspense>` boundary the app wraps
+    // this in decides where the dynamic hole goes; this decides that there is one.
+    await connection()
 
     const { view = [] } = await params
     const query = (await searchParams) ?? {}

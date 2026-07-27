@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
 import { SandboxShell } from '@pro-laico/sandbox-shell'
 import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 
@@ -30,7 +29,6 @@ export default function HomePage() {
 }
 
 async function Content() {
-  await connection()
   const [postIds, featuredIds, serviceIds, imageIds] = await Promise.all([getPostIds(), getFeaturedPostIds(), getServiceIds(), getImageIds()])
   return (
     <>
