@@ -7,44 +7,110 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-27
+
+Gating a plugin used to mean learning whichever mechanism that plugin happened to pick.
+Now every plugin answers the question the same way: one `options.access` block, one gate
+per endpoint. Only `payload-mux` consumers have anything to change.
+
+### Uniform endpoint access
+
+Each plugin's HTTP endpoints are gated by a per-endpoint entry under its root
+`options.access`. Every value is an `EndpointAccess` — `(req) => boolean | Promise<boolean>`,
+the request-first cousin of Payload's collection `Access`:
+
+```ts
+imagesPlugin({
+  options: {
+    access: {
+      manage: (req) => Boolean(req.user),  // purge / presets / prewarm
+      serve: () => true,                    // public image serving
+    },
+  },
+})
+```
+
+The default is any logged-in user. Endpoints that must answer anonymous traffic default to
+public instead, and the machine endpoints — the ones a build or a webhook calls, with no
+user session — keep their own secret or signature check. Setting a gate replaces that
+default, machine ones included, so override those only if you terminate the check upstream.
+
+| Plugin | Keys | Defaults |
+| --- | --- | --- |
+| `payload-images` | `manage`, `serve` | logged-in user (source read still enforced) · public |
+| `payload-mux` | `upload`, `webhook` | logged-in user · Mux signature verification |
+| `payload-fonts` | `export` | `PAYLOAD_SECRET` bearer |
+| `payload-icons` | `clearRequests` | logged-in user |
+| `payload-seed` | `run` | logged-in user |
+| `payload-revalidate` | `inspect` | open outside production; logged-in user in production |
+| `payload-dev-tools` | `dev` | public (endpoints only register in development) |
+
+Collection reads and writes are unaffected — those stay on
+`collections.<name>.overrides.access`, the Payload way. Env kill-switches are a separate
+axis and still run first: `payload-seed`'s `/seed` needs both `ENABLE_SEED=true` and a
+caller its `run` gate admits.
+
+`EndpointAccess` and each plugin's `<Plugin>AccessOptions` are exported everywhere. A
+conformance test pins the contract, including that an explicit `false` from your gate is
+honored rather than falling through to the default.
+
 ### Changed
 
-- **Uniform endpoint access, every plugin.** "How do I gate this plugin's endpoints?" now
-  has one answer across all seven: a per-endpoint gate under the plugin's root
-  `options.access`, each value an `EndpointAccess` — `(req) => boolean | Promise<boolean>`.
-  The default is any logged-in user; endpoints that must serve anonymous traffic default to
-  public (`payload-images`'s `serve`), and the machine endpoints default to their own
-  secret/signature check (`payload-fonts`'s `export` → `PAYLOAD_SECRET` bearer;
-  `payload-mux`'s `webhook` → Mux signature). Env kill-switches (`ENABLE_SEED`) are unchanged
-  and run first. Keys per plugin: mux `{ upload, webhook }`, images `{ manage, serve }`, icons
-  `{ clearRequests }`, seed `{ run }`, fonts `{ export }`, revalidate `{ inspect }`, dev-tools
-  `{ dev }`. `EndpointAccess` is now exported from every plugin.
+- **BREAKING (`@pro-laico/payload-mux`):** the `options.access.read` option is removed —
+  it gated the collection, not an endpoint. The `mux-video` collection ships
+  `read: authd` (any logged-in user). **Migrate by** moving any `access.read` gate to
+  `collections.muxVideo.overrides.access.read`. Keep it closed under a signed playback
+  policy: playback URLs are JWT-signed on read, so an anonymous read hands out a working
+  signed URL.
+- **BREAKING (`@pro-laico/payload-mux`):** the `/mux/upload` endpoints now default to any
+  logged-in user, where they previously required an admin-collection user. **Migrate by**
+  passing `options.access.upload` if you need the stricter gate.
+- The CI lint gate fails on warnings. `check:ci` runs `biome check --error-on-warnings`,
+  and the repo's 97 pre-existing warnings are resolved. `noNonNullAssertion` is disabled —
+  with a stated reason — only for the image-processing pixel-loop kernels, where Biome's
+  `?.` autofix would inject a per-pixel runtime check, and for test assertions. Config
+  moved to `biome.jsonc` so those reasons live inline.
 
-  **Breaking (`@pro-laico/payload-mux`):** the `access.read` option is gone — collection read
-  is `collections.muxVideo.overrides.access.read` like every other collection. And the upload
-  endpoint's default loosened from admin-collection users to any logged-in user; pass
-  `options.access.upload` to restore a stricter gate.
+### Added
 
-- `@pro-laico/payload-fonts` now exports `FontsPluginOptions`, `FontsOptions`, and `Charset`.
-  The reference docs named these types but nothing could import them; every other plugin
-  exports its own options types.
-- Documentation accuracy pass across all seven plugins, verified claim-by-claim against
-  source. Two code samples were broken (a cache-getter example imported `cacheDoc` /
-  `getPayloadClient`, which have never existed — the `/cache` subpath exports
-  `createCacheHelpers`; and a `payload-seed` example passed `assetSubDirs` flat instead of
-  under `options`). Also corrected: `payload-images`' env-var precedence was stated backwards
-  (an explicit `options.transform.*` wins over `IMAGES_*`, not the reverse), its endpoint
-  table listed two of five routes, and `RESPONSIVE_IMAGE_SELECT` omitted `aspectRatio`.
+- `@pro-laico/payload-fonts` exports `FontsPluginOptions`, `FontsOptions`, and `Charset`.
+  The reference named these types but nothing could import them.
 
-- `@pro-laico/payload-mux` — the factory is now `muxPlugin`, for parity with every
-  other `<packageNoun>Plugin` (`imagesPlugin`, `iconsPlugin`, `fontsPlugin`, …). The
-  old `muxVideoPlugin` export stays as a deprecated alias for this release; it will
-  be removed in 0.5.0. No behaviour change — swap the import name at your leisure.
-- CI lint gate now fails on warnings. `check:ci` runs `biome check --error-on-warnings`,
-  and the repo's 97 pre-existing warnings are resolved — genuine issues fixed, and
-  `noNonNullAssertion` disabled (with a stated reason) only for the image-processing
-  pixel-loop kernels and for test assertions. A new warning now fails CI instead of
-  joining a pile. The Biome config moved to `biome.jsonc` to carry those reasons inline.
+### Deprecated
+
+- `muxVideoPlugin` is now `muxPlugin`, for parity with every other `<packageNoun>Plugin`.
+  The old name remains as an alias for this release and is removed in 0.6.0. No behavior
+  change — **migrate by** swapping the import name at your leisure.
+
+### Fixed
+
+- `docs` typecheck failed deterministically on a cold cache: `next typegen` truncated the
+  `.source/server.ts` that `fumadocs-mdx` had just generated. CI runs typecheck before
+  build, so this was a live failure waiting on the next cache miss.
+
+### Docs
+
+- Accuracy pass over all seven plugins, verified claim-by-claim against source. Two samples
+  were broken: a cache-getter example imported `cacheDoc` / `getPayloadClient`, which have
+  never existed (the `/cache` subpath exports `createCacheHelpers`), and a `payload-seed`
+  example passed `assetSubDirs` flat instead of under `options`. Also corrected:
+  `payload-images`' env-var precedence was stated backwards (an explicit
+  `options.transform.*` wins over `IMAGES_*`), its endpoint table listed two of five routes,
+  `RESPONSIVE_IMAGE_SELECT` omitted `aspectRatio`, `payload-revalidate`'s join tags were
+  undocumented, and several collections were described as admin-only when the gate is any
+  logged-in user.
+- `options.access` gates HTTP endpoints, not rendered pages. `payload-dev-tools`' `access.dev`
+  closes `/api/dev*` but not the `/dev` pages, which are gated by `enabled` alone — now
+  stated in the conventions and the plugin's own reference.
+
+### Upgrade notes
+
+1. Run `pnpm install`.
+2. `payload-mux` only: move any `options.access.read` gate to
+   `collections.muxVideo.overrides.access.read`.
+3. `payload-mux` only: if the upload endpoints must stay admin-only, set
+   `options.access.upload` — the default is now any logged-in user.
+4. Optionally swap `muxVideoPlugin` imports for `muxPlugin` before 0.6.0 removes the alias.
 
 ## [0.4.1] - 2026-07-17
 

@@ -169,7 +169,7 @@ what breaks without it.
 | Export | From | What |
 | --- | --- | --- |
 | `muxPlugin` (default + named) | `@pro-laico/payload-mux` | The plugin factory. |
-| `muxVideoPlugin` | `@pro-laico/payload-mux` | **Deprecated** alias for `muxPlugin`, kept for one release — removed in 0.5.0. |
+| `muxVideoPlugin` | `@pro-laico/payload-mux` | **Deprecated** alias for `muxPlugin`, kept for one release — removed in 0.6.0. |
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxOptions`, `MuxVideoCollectionOptions` | `@pro-laico/payload-mux` | The nested option groups: the plugin's own domain knobs (`options`) and the `mux-video` collection's own knobs (`collections.muxVideo.options`). |
 | `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath }`. The supported way to discover the managed slug — it follows `collections.muxVideo.slug`. Returns `undefined` when the plugin isn't registered. |

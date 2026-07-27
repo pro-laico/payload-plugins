@@ -69,5 +69,5 @@ export const muxPlugin =
 export default muxPlugin
 
 /** @deprecated Renamed to {@link muxPlugin} for parity with every other `<packageNoun>Plugin`
- * factory. This alias is kept for one release and will be removed in 0.5.0. */
+ * factory. This alias is kept for one release and will be removed in 0.6.0. */
 export const muxVideoPlugin = muxPlugin
