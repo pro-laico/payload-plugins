@@ -40,7 +40,9 @@ guess the next:
 
 ```ts
 pluginName({
-  enabled: true,        // always defaults true; false makes the plugin a no-op
+  enabled: true,        // defaults true; false makes the plugin a no-op
+                        // (payload-dev-tools is the exception — it defaults to
+                        //  NODE_ENV === 'development')
   collections: { … },   // one entry per collection the plugin registers
   globals: { … },       // …and per global, where the plugin has any
   // …the one or two items that ARE the plugin (payload-seed's `definitions`)
@@ -110,6 +112,57 @@ The rule of thumb: anything the plugin depends on to work is merged, never clobb
 anything else is yours. Renaming plus overrides is the only way to reshape a plugin's
 collection — there's no separate option for attaching a plugin's fields to a collection you
 declared yourself.
+
+## Gating endpoints
+
+Collection reads and writes are gated the Payload way — `collections.<name>.overrides.access`,
+in the table above. Everything a plugin exposes *outside* a collection — its HTTP endpoints — is
+gated one way too: a per-endpoint gate under the plugin's root `options.access`.
+
+```ts
+imagesPlugin({
+  options: {
+    access: {
+      manage: ({ user }) => Boolean(user),  // the per-source admin endpoints
+      serve: () => true,                     // public image serving
+    },
+  },
+})
+```
+
+- **One key per endpoint.** Each plugin's reference lists its endpoints and the key that gates
+  each. The value is an `EndpointAccess` — `(req) => boolean | Promise<boolean>`, the request-first
+  cousin of Payload's collection `Access`. Return `false` to deny; leave a key unset to take the
+  endpoint's own default.
+- **The default is any logged-in user**, except where an endpoint's job makes that wrong. Setting a
+  gate *replaces* the default, machine ones included — so override those only if you terminate the
+  check upstream.
+
+  | Plugin | Key | Default |
+  | --- | --- | --- |
+  | `payload-images` | `manage` | any logged-in user (the source doc's own read access still applies) |
+  | `payload-images` | `serve` | **public** — image serving has to answer anonymous traffic |
+  | `payload-mux` | `upload` | any logged-in user |
+  | `payload-mux` | `webhook` | **Mux's signature verification** — a machine caller, no user session |
+  | `payload-fonts` | `export` | **`PAYLOAD_SECRET` bearer** — a build calls it, no user session |
+  | `payload-icons` | `clearRequests` | any logged-in user |
+  | `payload-seed` | `run` | any logged-in user (plus `ENABLE_SEED`, below) |
+  | `payload-revalidate` | `inspect` | **open outside production**; a logged-in user in production |
+  | `payload-dev-tools` | `dev` | **public** — the endpoints only register in development |
+
+- **Env switches are a separate axis.** A gate answers *who*; an env var like `ENABLE_SEED` is a
+  deployment kill-switch that decides *whether the endpoint answers at all*, and it runs first.
+  `payload-seed`'s `/seed` needs both `ENABLE_SEED=true` and a caller its `run` gate admits.
+  Likewise `enabled` (and `payload-revalidate`'s `observe`) decides whether an endpoint is
+  registered in the first place — a gate only ever runs on an endpoint that exists.
+
+`EndpointAccess` is exported from every plugin, for typing a gate you share across endpoints.
+
+<Callout type="warn">
+  `options.access` gates **HTTP endpoints**. It does not gate rendered admin panels or pages —
+  notably `payload-dev-tools`' `access.dev` closes `/api/dev*` but not the `/dev` pages, which are
+  gated by `enabled` alone. Don't rely on a gate to hide a page.
+</Callout>
 
 ## Reading a plugin's config back
 

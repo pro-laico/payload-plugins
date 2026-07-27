@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import type { CollectionOption } from '../../_kit'
+import type { CollectionOption, EndpointAccess } from '../../_kit'
 import type { PresetSpec } from '../presets/preset'
 import type { PrewarmOptions } from '../prewarm/options'
 import type { TransformEndpointConfig } from '../transform/transformEndpoint'
@@ -20,6 +20,16 @@ export interface ImagesCollectionOptions {
   mimeTypes?: string[]
   /** Max accepted upload size in bytes. */
   maxOriginalSize?: number
+}
+
+/** Per-endpoint gates for the plugin's HTTP endpoints. */
+export interface ImagesAccessOptions {
+  /** Who may call the per-source admin endpoints (`/img/purge`, `/img/presets`, `/img/prewarm`).
+   * Defaults to any logged-in user; the source doc's own read access is still enforced on top. */
+  manage?: EndpointAccess
+  /** Who may call the on-demand transform endpoint (`GET /img/:id`). Defaults to public — image
+   * serving must answer anonymous traffic; the source collection's read access still applies. */
+  serve?: EndpointAccess
 }
 
 /** The render engine — the transform endpoint, its prewarming, and the variant/preset ladder. */
@@ -59,6 +69,11 @@ export interface ImagesOptions {
   presetTemplates?: Record<string, PresetSpec>
   /** Max cached variants per image before new sizes are served from a nearby one instead. */
   variantLimit?: number
+  /** Per-endpoint gates.
+   *
+   * - `manage` — the per-source admin endpoints; defaults to any logged-in user
+   * - `serve` — the transform endpoint; defaults to public */
+  access?: ImagesAccessOptions
 }
 
 export interface ImagesPluginOptions {
@@ -104,6 +119,7 @@ export interface ResolvedImagesOptions {
   pixelStep: number | number[]
   presetTemplates: Record<string, PresetSpec>
   variantLimit: number
+  access: { manage: EndpointAccess | undefined; serve: EndpointAccess | undefined }
 }
 
 /** Mirrors {@link ImagesPluginOptions} key for key, with the defaults applied. */

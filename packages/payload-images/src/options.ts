@@ -41,6 +41,7 @@ export function resolveOptions(
       pixelStep: engine?.pixelStep ?? DEFAULT_WIDTH_LADDER,
       presetTemplates: resolvePresetTemplates(engine?.presetTemplates),
       variantLimit: engine?.variantLimit ?? DEFAULT_VARIANT_LIMIT,
+      access: { manage: engine?.access?.manage, serve: engine?.access?.serve },
     },
   }
 }

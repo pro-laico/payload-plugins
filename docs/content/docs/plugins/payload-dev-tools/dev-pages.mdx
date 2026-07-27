@@ -35,16 +35,19 @@ curl -s localhost:3000/api/dev | jq '.seed.seeded, .icons.misses'
 
 ```jsonc
 {
+  "generatedAt": "2025-01-01T12:00:00.000Z",
   "env": { "nodeEnv": "development", "nodeVersion": "v22.x" },
+  "adminRoute": "/admin",
+  "devRoute": "/dev",
   "plugins": { "seed": true, "images": true, "icons": true, "fonts": true, "mux": true, "revalidate": true },
   "seed": { "enabled": true, "seeded": true, "totalDocs": 42, "counts": { "services": 4 }, "definitions": [/* … */] },
   "images": { "sourceSlug": "images", "basePath": "/api/img", "sourceCount": 12, "variantCount": 96 },
   "icons": { "iconCount": 9, "activeSet": "Brand icons", "misses": [{ "name": "sparkles", "count": 7 }] },
   "fonts": { "familyKeys": ["sans", "serif"], "slots": { "sans": "Inter", "serif": null } },
   "mux": { "slug": "mux-video", "credentialed": false, "total": 0, "ready": 0 },
+  "revalidate": { "endpointPath": "/api/revalidate-map", "prefix": "", "observing": true, "edges": 12, "reads": 8, "events": 3 },
   "collections": [{ "slug": "services", "count": 4 }/* … */],
-  "globals": ["site-settings"],
-  "devRoute": "/dev"
+  "globals": ["site-settings"]
 }
 ```
 

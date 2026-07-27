@@ -1,12 +1,22 @@
 import type { Endpoint } from 'payload'
 
+import { isAllowed, publicRequest } from '../_kit'
 import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
+import type { ResolvedDevToolsOptions } from '../types'
 
-export function createStageEndpoint({ devRoute }: { devRoute: string }): Endpoint {
+export function createStageEndpoint({
+  devRoute,
+  access,
+}: {
+  devRoute: string
+  access?: ResolvedDevToolsOptions['options']['access']
+}): Endpoint {
   return {
     path: '/dev/stage',
     method: 'get',
     handler: async (req) => {
+      if (!(await isAllowed(access?.dev, req, publicRequest))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+
       const url = new URL(req.url ?? '/api/dev/stage', 'http://localhost')
       const test = url.searchParams.get('test')
       const slotParam = url.searchParams.get('slot')

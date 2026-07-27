@@ -21,7 +21,7 @@ export const options = [
   {
     name: 'collections',
     type: '{ images?, generatedImages?, renderProfiles? }',
-    description: `The collections the plugin registers, one key each. Every key takes the same shape: slug renames the collection (the plugin repoints every internal reference at the new name), overrides is a Payload CollectionConfig passthrough merged onto the plugin's (upload/access/admin/custom shallow-merged, fields/hooks appended, everything else replaced), and images additionally takes options — its own knobs.`,
+    description: `The collections the plugin registers, one key each. Every key takes the same shape: slug renames the collection (the plugin repoints every internal reference at the new name), overrides is a Payload CollectionConfig passthrough merged onto the plugin's (upload/access/admin/custom shallow-merged, fields/hooks appended, defaultPopulate/forceSelect merged as selects — which matters on images, where the plugin sets both — everything else replaced), and images additionally takes options — its own knobs.`,
     options: [
       {
         name: 'images',
@@ -92,6 +92,15 @@ export const options = [
       { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
       { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
       { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
+      {
+        name: 'access',
+        type: 'ImagesAccessOptions',
+        description: `Per-endpoint gates for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) per endpoint. The source doc's own read access is still enforced on top of both. See Gating endpoints.`,
+        options: [
+          { name: 'manage', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates the per-source admin endpoints (/img/purge/:id, /img/presets/:id, /img/prewarm/:id).` },
+          { name: 'serve', type: 'EndpointAccess', default: 'public', description: `Gates the transform/serve endpoint (GET /img/:id). Public by default — image serving must answer anonymous traffic; the source collection's read access still applies.` },
+        ],
+      },
     ],
   },
 ]
@@ -152,6 +161,10 @@ imagesPlugin({
       thumbnail: { width: 160, height: 160, fit: 'cover', quality: 70, format: 'webp' },
     },
     variantLimit: 200,
+    // access: {                    // per-endpoint gates for the plugin's HTTP endpoints
+    //   manage: ({ user }) => Boolean(user), // default: any logged-in user (source read still enforced)
+    //   serve:  () => true,                  // default: public (source read still applies)
+    // },
   },
 })
 ```
@@ -173,13 +186,18 @@ imagesPlugin({
 
 ## Environment variables
 
-Two env vars override the transform endpoint's concurrency knobs (handy for serverless, where you
-tune per-process throughput without changing code).
+These set per-process defaults without changing code (handy for serverless). An explicit
+`options.transform.*` value **wins** over the matching env var — the env var is the default when the
+option is unset.
 
 | Variable | Default | What |
 | --- | --- | --- |
-| `IMAGES_TRANSFORM_CONCURRENCY` | `cpus - 1` (computed) | Max concurrent Sharp transforms in this process. Overrides `transform.maxConcurrency`. |
-| `IMAGES_SHARP_CONCURRENCY` | `1` | Per-image libvips thread cap; `0` = CPU cores. Overrides `transform.sharpConcurrency`. |
+| `IMAGES_TRANSFORM_CONCURRENCY` | `cpus - 1` (computed) | Max concurrent Sharp transforms in this process. The default for `transform.maxConcurrency`. |
+| `IMAGES_TRANSFORM_MAX_QUEUE` | `max(64, concurrency × 32)` | Queued transforms allowed before the endpoint sheds load with a `503`. |
+| `IMAGES_SHARP_CONCURRENCY` | `1` | Per-image libvips thread cap; `0` = CPU cores. The default for `transform.sharpConcurrency`. |
+| `IMAGES_PREWARM_FLUSH_MS` | `30000` | How often buffered prewarm observations flush to the render-profiles collection. |
+| `NEXT_PUBLIC_SERVER_URL` | — | Base URL for generated image URLs. |
+| `VERCEL_PROJECT_PRODUCTION_URL` | — | Fallback base URL when `NEXT_PUBLIC_SERVER_URL` is unset. |
 
 ## CLI commands
 
@@ -192,10 +210,17 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 
 ## Endpoints
 
+`GET /img/:id` is gated by `options.access.serve` (public by default); the per-source admin endpoints
+(purge, presets, prewarm) by `options.access.manage` (any logged-in user). The source doc's own read
+access is enforced on top of both. See [Gating endpoints](../conventions#gating-endpoints).
+
 | Route | What |
 | --- | --- |
 | `GET /api/img/:id` | The on-demand transform endpoint: reads the image `id` and the transform query params, renders the variant once, then caches it. See [Image URLs](/docs/plugins/payload-images/image-urls). |
 | `POST /api/img/purge/:id` | Purge this image's cached variants (the **Preset manager** panel's purge button posts here). |
+| `GET /api/img/presets/:id` | Which presets exist for this image, each mapped to its cache key and cached variant. |
+| `GET /api/img/prewarm/:id` | Prewarm plan and job status (pending job, last run). Registered only while `options.prewarm` is on. |
+| `POST /api/img/prewarm/:id` | Enqueue and kick a prewarm job for this image (`202 { queued: true }`). Registered only while `options.prewarm` is on. |
 
 ## Exports
 
@@ -204,9 +229,11 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 | `imagesPlugin` | `@pro-laico/payload-images` | The Payload plugin; put `imagesPlugin()` in your config's `plugins`. |
 | `ResponsiveImage` | `@pro-laico/payload-images/components/image` | The passive responsive `<img>` component. |
 | `createImageFor` | `@pro-laico/payload-images` | Seed once with your Payload handle → `imageFor(id).aspectRatio('16:9').blur('md').fetch()` resolves the render-ready doc for `<ResponsiveImage>`. |
-| `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
+| `RESPONSIVE_IMAGE_SELECT` | `@pro-laico/payload-images` | The lean select for a render-declared read (`alt` + `src` + `aspectRatio` + `srcset` + `placeholder`) — for writing the `findByID` yourself. |
 | `getImageUrl` | `@pro-laico/payload-images/utils/urls` | Build one transform URL for an image (an id or a populated doc): OG tags, CSS backgrounds, emails. |
 | `buildSrcset` | `@pro-laico/payload-images/utils/urls` | Build a responsive `srcset` + default `src` for an image (an id or a populated doc — a doc also supplies the width cap and cache-busting token). |
+| URL-builder types | `@pro-laico/payload-images/utils/urls` | `GetImageUrlOptions`, `ImageResource`, `BuildSrcsetOptions`, `BuildSrcsetResult`, `BuildUrlOptions`, plus `Fit` and `Format` re-exported alongside them. |
+| Component prop types | `@pro-laico/payload-images/components/image` | `ImageProps`, `ResponsiveImageProps` — for typing a wrapper around `<ResponsiveImage>`. |
 | `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `collections.images.options.focalUI` is on). |
 | `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `collections.images.options.focalUI` is on). |
 | `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
@@ -214,7 +241,8 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 | `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm jobs task slug (`imagesPrewarm`) — for queueing/running the job yourself. |
 | `readImagesMarker` | `@pro-laico/payload-images` | Read the resolved config (slugs + settings) off `config.custom.payloadImages` from a script or app — `readImagesMarker(config).sourceSlug`. |
 | `GENERATED_IMAGES_SLUG` / `IMAGE_RENDER_PROFILES_SLUG` | `@pro-laico/payload-images` | The default slugs of the variant-cache and render-profiles collections (before any `slug` rename). |
-| Option & marker types | `@pro-laico/payload-images` | `ImagesPluginOptions`, `ImagesOptions`, `ImagesCollectionOptions`, `TransformEndpointConfig`, `PayloadImagesMarker`, `PayloadImagesPrewarmMarker`. |
+| Option & marker types | `@pro-laico/payload-images` | `ImagesPluginOptions`, `ImagesOptions`, `ImagesCollectionOptions`, `ImagesAccessOptions`, `TransformEndpointConfig`, `PayloadImagesMarker`, `PayloadImagesPrewarmMarker`. |
+| `EndpointAccess` | `@pro-laico/payload-images` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | Render-contract types | `@pro-laico/payload-images` | `ImageFor`, `ImageForChain`, `ImageSource`, `ResponsiveImageDoc`, `AspectRatio`, `Fit`, `Format`, `OutputFormat`, `ImageRenderContext`, `ImageRenderIntent`, `BlurRenderIntent`, `ImagePalette`, `PaletteSwatch`, `PlaceholderFormat`, `PlaceholderQuality`. |
 
 ## Collections & globals

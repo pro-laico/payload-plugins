@@ -3,7 +3,8 @@ title: "Image URLs"
 description: "Read an image doc and get ready-made src and srcset — plus the full anatomy and every transform parameter behind the /api/img URL."
 ---
 
-Every optimized image on your site is one URL against one public endpoint, `/api/img`.
+Every optimized image on your site is one URL against one endpoint, `/api/img` — public by default,
+and closable with `options.access.serve`.
 
 You rarely write these URLs by hand. Every read of an image doc hands you a ready-made `src` and `srcset`, so the fastest integration is: read the doc, use the URL. Reading a single URL is also the fastest way to understand the whole pipeline.
 
@@ -108,10 +109,11 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 Snapping and bucketing aren't cosmetic. They collapse the continuous parameter space into a finite set of possible variants. That's what makes the endpoint safe to expose ([the DoS bounds](/docs/plugins/payload-images/caching#caching--abuse-limits)) and the cache effective. See [Reference](/docs/plugins/payload-images/reference) for these options and their defaults.
 
 <Callout type="info">
-  **The endpoint is public and unsigned.** Generation is gated by the bounds above rather than a
-  shared secret. For fully untrusted traffic, raise `pixelStep` or lower `maxDimension` /
+  **The endpoint is public and unsigned by default.** Generation is gated by the bounds above rather
+  than a shared secret. For fully untrusted traffic, raise `pixelStep` or lower `maxDimension` /
   `maxInputPixels` and put a rate limiter or CDN in front —
-  [Reference](/docs/plugins/payload-images/reference) has every knob.
+  [Reference](/docs/plugins/payload-images/reference) has every knob. To gate the endpoint itself,
+  set `options.access.serve`; the source collection's read access is enforced either way.
 </Callout>
 
 ## Format negotiation

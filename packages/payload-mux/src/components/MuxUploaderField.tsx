@@ -51,7 +51,7 @@ export const MuxUploaderField = () => {
       if (!title?.value) setTitle(resolvedTitle)
       setFile(new File([], resolvedTitle, { type: file.type, lastModified: file.lastModified }))
     },
-    [title?.value, setTitle, setFile],
+    [title, setTitle, setFile],
   )
 
   const onSuccess = useCallback(async () => {

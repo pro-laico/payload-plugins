@@ -1,10 +1,11 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { EndpointAccess } from '../../src/_kit'
 import { createClearIconRequestsEndpoint } from '../../src/endpoints/clearIconRequests'
 
-const handlerOf = (slug: string) => {
-  const endpoint = createClearIconRequestsEndpoint(slug)
+const handlerOf = (slug: string, access?: EndpointAccess) => {
+  const endpoint = createClearIconRequestsEndpoint(slug, access)
   if (typeof endpoint.handler !== 'function') throw new Error('expected a handler')
   return endpoint.handler
 }
@@ -35,5 +36,12 @@ describe('createClearIconRequestsEndpoint', () => {
   it('401s an anonymous caller', async () => {
     const res = await handlerOf('iconRequest')({ payload: {} } as unknown as PayloadRequest)
     expect(res.status).toBe(401)
+  })
+
+  it('honours a custom gate that denies a logged-in caller', async () => {
+    const { req, del } = reqWith('iconRequest')
+    const res = await handlerOf('iconRequest', () => false)(req)
+    expect(res.status).toBe(401)
+    expect(del).not.toHaveBeenCalled()
   })
 })

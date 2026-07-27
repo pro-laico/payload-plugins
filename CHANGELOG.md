@@ -7,6 +7,45 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Changed
+
+- **Uniform endpoint access, every plugin.** "How do I gate this plugin's endpoints?" now
+  has one answer across all seven: a per-endpoint gate under the plugin's root
+  `options.access`, each value an `EndpointAccess` — `(req) => boolean | Promise<boolean>`.
+  The default is any logged-in user; endpoints that must serve anonymous traffic default to
+  public (`payload-images`'s `serve`), and the machine endpoints default to their own
+  secret/signature check (`payload-fonts`'s `export` → `PAYLOAD_SECRET` bearer;
+  `payload-mux`'s `webhook` → Mux signature). Env kill-switches (`ENABLE_SEED`) are unchanged
+  and run first. Keys per plugin: mux `{ upload, webhook }`, images `{ manage, serve }`, icons
+  `{ clearRequests }`, seed `{ run }`, fonts `{ export }`, revalidate `{ inspect }`, dev-tools
+  `{ dev }`. `EndpointAccess` is now exported from every plugin.
+
+  **Breaking (`@pro-laico/payload-mux`):** the `access.read` option is gone — collection read
+  is `collections.muxVideo.overrides.access.read` like every other collection. And the upload
+  endpoint's default loosened from admin-collection users to any logged-in user; pass
+  `options.access.upload` to restore a stricter gate.
+
+- `@pro-laico/payload-fonts` now exports `FontsPluginOptions`, `FontsOptions`, and `Charset`.
+  The reference docs named these types but nothing could import them; every other plugin
+  exports its own options types.
+- Documentation accuracy pass across all seven plugins, verified claim-by-claim against
+  source. Two code samples were broken (a cache-getter example imported `cacheDoc` /
+  `getPayloadClient`, which have never existed — the `/cache` subpath exports
+  `createCacheHelpers`; and a `payload-seed` example passed `assetSubDirs` flat instead of
+  under `options`). Also corrected: `payload-images`' env-var precedence was stated backwards
+  (an explicit `options.transform.*` wins over `IMAGES_*`, not the reverse), its endpoint
+  table listed two of five routes, and `RESPONSIVE_IMAGE_SELECT` omitted `aspectRatio`.
+
+- `@pro-laico/payload-mux` — the factory is now `muxPlugin`, for parity with every
+  other `<packageNoun>Plugin` (`imagesPlugin`, `iconsPlugin`, `fontsPlugin`, …). The
+  old `muxVideoPlugin` export stays as a deprecated alias for this release; it will
+  be removed in 0.5.0. No behaviour change — swap the import name at your leisure.
+- CI lint gate now fails on warnings. `check:ci` runs `biome check --error-on-warnings`,
+  and the repo's 97 pre-existing warnings are resolved — genuine issues fixed, and
+  `noNonNullAssertion` disabled (with a stated reason) only for the image-processing
+  pixel-loop kernels and for test assertions. A new warning now fails CI instead of
+  joining a pile. The Biome config moved to `biome.jsonc` to carry those reasons inline.
+
 ## [0.4.1] - 2026-07-17
 
 ### Changed

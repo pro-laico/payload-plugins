@@ -7,6 +7,7 @@ export function resolveOptions(options: SeedPluginOptions = {}): ResolvedSeedOpt
     options: {
       assetsDir: options.options?.assetsDir ?? 'assets',
       assetSubDirs: options.options?.assetSubDirs ?? {},
+      access: { run: options.options?.access?.run },
     },
   }
 }

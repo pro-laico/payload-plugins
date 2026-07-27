@@ -82,6 +82,7 @@ collection's change/delete hooks.
     fit: { description: "The resize fit used to generate it.", type: "text" },
     format: { description: "Output format.", type: "text" },
     quality: { description: "Encode quality.", type: "number" },
+    windowed: { description: "Which render path produced the pixels: a windowed cover crop (width + height) rather than a full-frame width-only render. The fallback picker matches on it when a zoomed hotspot makes the two differ.", type: "checkbox" },
     focalX: { description: "Focal point X baked into the crop.", type: "number" },
     focalY: { description: "Focal point Y baked into the crop.", type: "number" },
   }}
@@ -146,10 +147,11 @@ imagesPlugin({ collections: { generatedImages: { slug: 'image-variants' } } })
   **`slug`, `overrides`, and `options` — one key each.** Every `collections.<name>` splits the same
   way: `slug` renames it, `overrides` is a plain `Partial<CollectionConfig>` (`upload`, `access`,
   `admin`, `custom` shallow-merge over the plugin's, `fields` and `hooks` append after them,
-  everything else replaces), and `options` is the plugin's own knobs for the collection. So a
-  `collections.images.options.mimeTypes` / `localizeAlt` / `maxOriginalSize` and a
-  `collections.images.overrides.upload` both reach `upload` — set either, and the explicit
-  `overrides.upload` wins.
+  `defaultPopulate` and `forceSelect` merge as selects, everything else replaces), and `options` is
+  the plugin's own knobs for the collection. So a `collections.images.options.mimeTypes` /
+  `maxOriginalSize` and a `collections.images.overrides.upload` both reach `upload` — set either, and
+  the explicit `overrides.upload` wins. (`localizeAlt` isn't one of them: it localizes the `alt`
+  field, not `upload`.)
 </Callout>
 
 <Callout type="warn">

@@ -36,7 +36,7 @@ const change = async (
   await hook({ doc, previousDoc, operation, req: { context: overrides.context ?? {} } } as never)
 }
 
-const bustedTags = (): string[] => (bust.mock.calls[0]?.[0] as { tag: string }[]).map((b) => b.tag)
+const bustedTags = (): string[] => (bust.mock.calls[0]![0] as { tag: string }[]).map((b) => b.tag)
 const trigger = () => bust.mock.calls[0]?.[1] as Record<string, unknown>
 
 describe('createAfterChange — field-driven decision table', () => {

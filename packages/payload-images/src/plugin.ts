@@ -117,16 +117,34 @@ export const imagesPlugin =
 
     const endpoints = [
       ...(config.endpoints ?? []),
-      createPurgeEndpoint({ variantSlug, sourceSlug }),
-      createPresetStatusEndpoint({ sourceSlug, variantSlug, templates: presetTemplates, constraints }),
+      createPurgeEndpoint({ variantSlug, sourceSlug, access: o.options.access.manage }),
+      createPresetStatusEndpoint({ sourceSlug, variantSlug, templates: presetTemplates, constraints, access: o.options.access.manage }),
       ...(prewarm && prewarmDeps
         ? [
-            createPrewarmStatusEndpoint({ deps: prewarmDeps, taskSlug: prewarm.taskSlug, queue: prewarm.queue }),
-            createPrewarmTriggerEndpoint({ deps: prewarmDeps, taskSlug: prewarm.taskSlug, queue: prewarm.queue }),
+            createPrewarmStatusEndpoint({
+              deps: prewarmDeps,
+              taskSlug: prewarm.taskSlug,
+              queue: prewarm.queue,
+              access: o.options.access.manage,
+            }),
+            createPrewarmTriggerEndpoint({
+              deps: prewarmDeps,
+              taskSlug: prewarm.taskSlug,
+              queue: prewarm.queue,
+              access: o.options.access.manage,
+            }),
           ]
         : []),
       createTransformEndpoint(
-        { ...o.options.transform, ...snapping, variantSlug, sourceSlug, variantLimit: o.options.variantLimit, presetTemplates },
+        {
+          ...o.options.transform,
+          ...snapping,
+          variantSlug,
+          sourceSlug,
+          variantLimit: o.options.variantLimit,
+          presetTemplates,
+          access: o.options.access.serve,
+        },
         prewarmObserve,
       ),
     ]
@@ -182,7 +200,7 @@ export const imagesPlugin =
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
           )
-        if (prewarm && prewarm.droppedFormats.length)
+        if (prewarm !== false && prewarm.droppedFormats.length)
           payload.logger.warn(
             `[payload-images] prewarm.formats: ${prewarm.droppedFormats.join(', ')} not in transform.formats — the endpoint could never serve those variants, so they are not warmed. Warming: ${prewarm.formats.join(', ') || 'none'}.`,
           )

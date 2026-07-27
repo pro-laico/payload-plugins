@@ -1,6 +1,7 @@
 // The plugin (safe to import from payload.config — no next/react-client imports here)
 export { default, devToolsPlugin } from './plugin'
-export type { DevToolsPluginOptions } from './types'
+export type { EndpointAccess } from './_kit'
+export type { DevToolsAccessOptions, DevToolsPluginOptions } from './types'
 
 // The typed view of `config.custom.payloadDevTools`.
 export { readDevToolsMarker } from './lib/marker'

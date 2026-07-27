@@ -1,3 +1,4 @@
+import type { EndpointAccess } from '../../_kit'
 import type { PresetSpec } from '../presets/preset'
 import type { TransformConstraints } from './transformConstraints'
 
@@ -19,4 +20,5 @@ export interface TransformEndpointArgs extends TransformEndpointConfig {
   presetTemplates: Record<string, PresetSpec>
   dimensionStep?: number
   widthLadder?: number[]
+  access?: EndpointAccess
 }

@@ -27,7 +27,7 @@ export const fontsPlugin =
     const { enabled, collections: cols, globals: globs, options } = resolveOptions(opts)
     if (!enabled) return config
 
-    const { charset, families } = options
+    const { charset, families, access } = options
     const familyKeys = resolveFontFamilies(families).map((r) => r.key)
 
     // Each slug is resolved exactly once, here: the override's `slug` or the default. Every
@@ -63,7 +63,13 @@ export const fontsPlugin =
 
     const endpoints = [
       ...(config.endpoints ?? []),
-      exportFontsEndpoint({ path: FONTS_EXPORT_PATH, fontSetGlobalSlug: fontSetSlug, fontOptimizedSlug: optimizedSlug, families: familyKeys }),
+      exportFontsEndpoint({
+        path: FONTS_EXPORT_PATH,
+        fontSetGlobalSlug: fontSetSlug,
+        fontOptimizedSlug: optimizedSlug,
+        families: familyKeys,
+        access: access.export,
+      }),
     ]
 
     const marker: PayloadFontsMarker = {

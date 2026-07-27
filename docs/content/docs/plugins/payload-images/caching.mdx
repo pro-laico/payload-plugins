@@ -59,7 +59,8 @@ The endpoint is public-facing, so it's bounded on several fronts:
   (`alt`) doesn't.
 - **Access control.** Source reads run with the collection's access rules. A source you can't
   read returns `404`; a non-public source is served `private` with no shared CDN caching. The
-  purge endpoint requires a logged-in user who can read that source.
+  purge endpoint gates on `options.access.manage` (default: any logged-in user) and, always, on
+  being able to read that source.
 - **Bounded variant space (DoS).** Requested dimensions snap to the `pixelStep` grid (or, for an
   array `pixelStep`, to the grid + the ladder's exact widths) and quality buckets to a small set,
   both clamped to `maxDimension`, so a caller can't spin up unbounded variants with `w=1,2,3,…`.
@@ -171,7 +172,7 @@ Serve one by name — the URL is short and self-documenting, and (being a finite
 ```tsx
 import { getImageUrl } from '@pro-laico/payload-images/utils/urls'
 
-const ogUrl = getImageUrl(page.heroImage, { preset: 'og' }) // → /api/img/<id>?preset=og
+const ogUrl = getImageUrl(page.heroImage, { preset: 'og' }) // → https://<site>/api/img/<id>?preset=og&v=…
 ```
 
 Presets honor **exact** dimensions (no snap grid), so an `og` really is 1200×630. They're
@@ -282,15 +283,18 @@ cached anywhere, so the accurate image takes over on the very next request.
 </Callout>
 
 With [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) installed that's
-automatic and atomic: fetch the image doc through an id-keyed `cacheDoc` getter and render from it —
+automatic and atomic: fetch the image doc through an id-keyed getter and render from it —
 
 ```ts
-import { cacheDoc, getPayloadClient } from '@pro-laico/payload-revalidate/cache'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { createCacheHelpers } from '@pro-laico/payload-revalidate/cache'
+
+const { findDocByID } = createCacheHelpers(getPayload({ config }))
 
 export async function getImage(id: string | number) {
   'use cache'
-  const payload = await getPayloadClient()
-  return cacheDoc(await payload.findByID({ collection: 'images', id, depth: 0, disableErrors: true }), 'images')
+  return findDocByID('images', id)
 }
 ```
 
@@ -325,8 +329,14 @@ export const cachingOptions = [
     description: 'Pre-generate the renders the site actually serves for new images. On by default; enabling adds a hidden collection — a schema change. Pass an object to tune it, or `false` to opt out.',
   },
   {
+    name: 'options.prewarm.seeds',
+    type: 'RenderProfileSeed[]',
+    default: '[]',
+    description: 'Renders to warm before the site has served any, so a new project isn’t cold. Each seed takes `aspectRatio`, `fit`, `quality`, and `widths`.',
+  },
+  {
     name: 'options.prewarm.formats',
-    type: 'Format[]',
+    type: 'OutputFormat[]',
     default: "['webp']",
     description: "Formats to warm. `'avif'` is added automatically when `options.transform.preferAvif` is set.",
   },

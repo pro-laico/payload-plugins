@@ -1,6 +1,6 @@
 import { createOnce } from '../lib/once'
 import { recordRead } from '../lib/observe/registry'
-import type { BakedEmbed, FinishInput, IndexSource } from '../types'
+import type { FinishInput, IndexSource } from '../types'
 import { collectDepTags, indexSchema } from '../lib/walk/collectTags'
 
 const dev = (): boolean => process.env.NODE_ENV === 'development'

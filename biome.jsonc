@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.4/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -103,6 +103,26 @@
     {
       "includes": ["**/*.config.{js,mjs,cjs,ts}", "**/scripts/**"],
       "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    },
+    {
+      // Image-processing kernels — blurhash/DCT codecs, palette/metadata analysis, focal tiling —
+      // index just-built typed arrays and fixed-size grids that are non-null by construction. The
+      // `?.` autofix biome suggests injects a per-pixel runtime check into these hot loops and
+      // changes behavior (undefined vs throw), so the non-null assertion is the correct tool here.
+      "includes": [
+        "packages/payload-images/src/lib/placeholders/**",
+        "packages/payload-images/src/lib/metadata/**",
+        "packages/payload-images/src/lib/transform/**",
+        "packages/payload-images/src/components/admin/focalPreview/**"
+      ],
+      "linter": { "rules": { "style": { "noNonNullAssertion": "off" } } }
+    },
+    {
+      // Tests assert against known fixture and mock shapes; a `!` that would be a smell in product
+      // code is the intent of an assertion here — a wrong shape should throw and fail the test
+      // loudly rather than be silently narrowed.
+      "includes": ["**/*.spec.{ts,tsx}"],
+      "linter": { "rules": { "style": { "noNonNullAssertion": "off" } } }
     }
   ]
 }

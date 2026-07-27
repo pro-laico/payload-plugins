@@ -5,7 +5,7 @@ import { createGlobalAfterChange } from '../../../src/hooks/global/afterChange'
 const bust = vi.fn()
 vi.mock('../../../src/lib/bust', () => ({ bust: (...args: unknown[]) => bust(...args) }))
 
-const bustedTags = (): string[] => (bust.mock.calls[0]?.[0] as { tag: string }[]).map((b) => b.tag)
+const bustedTags = (): string[] => (bust.mock.calls[0]![0] as { tag: string }[]).map((b) => b.tag)
 const hook = (slug: string) => createGlobalAfterChange(slug, { tags: createTags(), observe: false })
 
 describe('createGlobalAfterChange', () => {

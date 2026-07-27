@@ -1,13 +1,18 @@
 import type { Endpoint } from 'payload'
 
+import { isAllowed, publicRequest } from '../_kit'
+import type { ResolvedDevToolsOptions } from '../types'
+
 const TRUTHY = new Set(['1', 'true', 'on'])
 const FALSY = new Set(['0', 'false', 'off'])
 
-export function createDraftEndpoint(): Endpoint {
+export function createDraftEndpoint({ access }: { access?: ResolvedDevToolsOptions['options']['access'] } = {}): Endpoint {
   return {
     path: '/dev/draft',
     method: 'get',
     handler: async (req) => {
+      if (!(await isAllowed(access?.dev, req, publicRequest))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+
       let draft: { isEnabled: boolean; enable: () => void; disable: () => void }
       try {
         const { draftMode } = await import('next/headers')

@@ -39,6 +39,11 @@ export const options = [
       { name: 'overrides', type: 'Partial<CollectionConfig>', description: `Payload config merged onto the plugin's by the shared merge rules. Rename with the sibling slug key, not here.` },
     ] },
   ] },
+  { name: 'options', type: 'IconsOptions', default: '{}', description: `The plugin's own knobs.`, options: [
+    { name: 'access', type: 'IconsAccessOptions', description: `Per-endpoint gates for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) per endpoint. See Gating endpoints.`, options: [
+      { name: 'clearRequests', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates DELETE /payload-icons/icon-requests (the usage panel's Clear button). Only registered while the iconRequest collection is on.` },
+    ] },
+  ] },
 ]
 
 ### How an override merges
@@ -103,6 +108,11 @@ iconsPlugin({
     // the iconRequest diagnostics collection; `false` omits it (no runtime miss tracking):
     iconRequest: {},
   },
+  options: {
+    access: {
+      // clearRequests: ({ user }) => Boolean(user), // default: any logged-in user
+    },
+  },
 })
 ```
 
@@ -131,7 +141,7 @@ Two env vars tune usage detection at runtime, independent of the plugin options.
 
 | Method & path | What |
 | --- | --- |
-| `DELETE /api/payload-icons/icon-requests` | Clears every `iconRequest` doc — the action behind the usage panel's **Clear** button. Logged-in only (401 otherwise). Registered only while the `iconRequest` collection is on; the path follows its resolved slug via the marker. |
+| `DELETE /api/payload-icons/icon-requests` | Clears every `iconRequest` doc — the action behind the usage panel's **Clear** button. Gated by `options.access.clearRequests` (any logged-in user by default; see [Gating endpoints](../conventions#gating-endpoints)). The gate is the outer door only — the delete runs as the caller (`overrideAccess: false`), so the `iconRequest` collection's own delete access still applies and a caller the gate admits can still clear nothing. Registered only while the `iconRequest` collection is on; the path follows its resolved slug via the marker. |
 
 Icon-set activation itself happens in the admin, or through the companion
 [`@pro-laico/payload-dev-tools`](/docs/plugins/payload-dev-tools) `/dev` panel.
@@ -141,9 +151,12 @@ Icon-set activation itself happens in the admin, or through the companion
 | Export | From | What |
 | --- | --- | --- |
 | `iconsPlugin` | `@pro-laico/payload-icons` | The plugin factory and single entry point (also the default export). |
-| `IconsPluginOptions` | `@pro-laico/payload-icons` | The `iconsPlugin(options?)` argument type: `{ enabled?, collections? }`. |
+| `IconsPluginOptions` | `@pro-laico/payload-icons` | The `iconsPlugin(options?)` argument type: `{ enabled?, collections?, options? }`. |
 | `IconsCollectionsOptions` | `@pro-laico/payload-icons` | The `collections` shape: `{ icon?, iconSet?, iconRequest? }`. |
 | `IconSetOptions` | `@pro-laico/payload-icons` | The `iconSet` collection's own knobs: `{ usagePanel?, iconRowFields? }`. |
+| `IconsOptions` | `@pro-laico/payload-icons` | The root `options` shape: `{ access? }`. |
+| `IconsAccessOptions` | `@pro-laico/payload-icons` | The `options.access` gate-map shape: `{ clearRequests? }`. |
+| `EndpointAccess` | `@pro-laico/payload-icons` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | `IconDoc` | `@pro-laico/payload-icons` | The `icon` document type: `{ id, filename?, svgString?, optimized? }`. |
 | `readIconsMarker` | `@pro-laico/payload-icons` | The typed view of `config.custom.payloadIcons`: `{ options, iconSlug, iconSetSlug, iconRequestSlug }`. The supported way to discover the slugs the plugin registered — they follow `collections.<name>.slug`, and `iconSetSlug` / `iconRequestSlug` are `null` when that collection is off. Returns `undefined` when the plugin isn't registered. |
 | `PayloadIconsMarker` | `@pro-laico/payload-icons` | The marker's type. |
@@ -151,7 +164,7 @@ Icon-set activation itself happens in the admin, or through the companion
 | `extractSvgProps` | `@pro-laico/payload-icons` | Parse an `svgString`'s root attributes (viewBox, etc.) onto your own `<svg>`. |
 | `createIcon` | `@pro-laico/payload-icons/components/Icon` | Factory that takes a Payload handle and returns the `<Icon name="…" />` server component — `const Icon = createIcon(getPayload({ config }))` (resolves through the active set). |
 | `getIconSvg` | `@pro-laico/payload-icons/cache` | Resolve one icon name to its `svgString` through the active set (server-only, memoized). |
-| `payload-icons-scan` | `@pro-laico/payload-icons` | CLI that scans source for `<Icon name>` and writes the usage manifest. |
+| `payload-icons-scan` | `bin` | CLI that scans source for `<Icon name>` and writes the usage manifest. |
 
 ## Collections & globals
 

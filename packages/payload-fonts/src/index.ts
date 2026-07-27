@@ -8,6 +8,9 @@ export type { PayloadFontsMarker } from './types'
 export type { FontFamilyConfig } from './types'
 export { DEFAULT_FONT_FAMILIES } from './lib/families'
 
+export type { EndpointAccess } from './_kit'
+export type { Charset, FontsAccessOptions, FontsOptions, FontsPluginOptions } from './types'
+
 export { extractFonts } from './extractFonts'
 export type { ActiveFace, ActiveTypeface } from './types'
 export { buildFontFaceCss, getActiveFontFaces } from './lib/activeFonts'

@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto'
-import { muxVideoPlugin, readMuxMarker } from '@pro-laico/payload-mux'
+import { muxPlugin, readMuxMarker } from '@pro-laico/payload-mux'
 import type { Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { bootLab, expectBootError, type LabBoot } from '@/boot'
@@ -51,7 +51,7 @@ beforeAll(async () => {
   // The missing-creds warning is console.warn at plugin-apply time — capture it around the boot.
   const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
   try {
-    lab = await bootLab({ plugins: [muxVideoPlugin()] })
+    lab = await bootLab({ plugins: [muxPlugin()] })
     bootWarns = spy.mock.calls.map((c) => c.join(' '))
   } finally {
     spy.mockRestore()
@@ -78,18 +78,14 @@ describe('boot without credentials', () => {
 // by name — the webhook lookup, `ingestMuxVideo` — reads the marker rather than the literal.
 describe('collections.muxVideo', () => {
   it('a field of yours colliding with one the plugin injects throws a named error, not a bare DuplicateFieldName', async () => {
-    const e = await expectBootError([
-      muxVideoPlugin({ collections: { muxVideo: { overrides: { fields: [{ name: 'title', type: 'text' }] } } } }),
-    ])
+    const e = await expectBootError([muxPlugin({ collections: { muxVideo: { overrides: { fields: [{ name: 'title', type: 'text' }] } } } })])
     expect(e.message).toContain('[payload-mux] collections.muxVideo: field(s) title are already defined by the plugin')
     record('collections.muxVideo → field collision', e.message)
   })
 
   it('slug renames the collection, and the marker follows', async () => {
     const lab = await bootLab({
-      plugins: [
-        muxVideoPlugin({ collections: { muxVideo: { slug: 'media', overrides: { labels: { singular: 'Medium', plural: 'Media' } } } } }),
-      ],
+      plugins: [muxPlugin({ collections: { muxVideo: { slug: 'media', overrides: { labels: { singular: 'Medium', plural: 'Media' } } } } })],
     })
     try {
       const coll = lab.payload.config.collections.find((c) => c.slug === 'media')
@@ -108,7 +104,7 @@ describe('collections.muxVideo', () => {
   it('your fields and overrides merge onto the renamed collection', async () => {
     const lab = await bootLab({
       plugins: [
-        muxVideoPlugin({
+        muxPlugin({
           collections: {
             muxVideo: { slug: 'media', overrides: { admin: { useAsTitle: 'assetId' }, fields: [{ name: 'caption', type: 'text' }] } },
           },
@@ -128,7 +124,7 @@ describe('collections.muxVideo', () => {
   })
 
   it('options.thumbnail selects the list cell — image swaps the gif cell for the static-image one', async () => {
-    const lab = await bootLab({ plugins: [muxVideoPlugin({ collections: { muxVideo: { options: { thumbnail: 'image' } } } })] })
+    const lab = await bootLab({ plugins: [muxPlugin({ collections: { muxVideo: { options: { thumbnail: 'image' } } } })] })
     try {
       const coll = lab.payload.config.collections.find((c) => c.slug === 'mux-video')
       const uploader = (coll?.fields ?? []).find((f) => 'name' in f && f.name === 'muxUploader')

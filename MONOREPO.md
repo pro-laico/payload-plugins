@@ -15,7 +15,7 @@ payload-plugins/
 │   ├── sandbox-shell/         # shared example frontend shell
 │   └── failure-lab/           # Payload integration-test rig
 ├── tsconfig.base.json         # shared TS config every package extends
-├── biome.json                 # formatter + linter (144-col, organizeImports off)
+├── biome.jsonc                # formatter + linter (144-col, organizeImports off)
 ├── .swcrc                     # package build config (src -> dist)
 ├── turbo.json                 # task graph (build, typecheck)
 └── package.json               # workspace root

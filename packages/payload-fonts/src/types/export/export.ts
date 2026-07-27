@@ -1,3 +1,5 @@
+import type { EndpointAccess } from '../../_kit'
+
 export type Family = string
 
 export interface ExportFontsEndpointOptions {
@@ -6,6 +8,8 @@ export interface ExportFontsEndpointOptions {
   fontSetGlobalSlug: string | null
   fontOptimizedSlug: string
   families: Family[]
+  /** Consumer gate for the endpoint; unset falls through to the `PAYLOAD_SECRET` bearer check. */
+  access: EndpointAccess | undefined
 }
 
 export type FontSelection = Partial<Record<Family, TypefaceRef | TypefaceRef[]>>

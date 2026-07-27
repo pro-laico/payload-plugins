@@ -18,13 +18,23 @@ export const muxWebhookHandler =
     const body = await req.json()
     if (!body) return Response.json({ error: 'Bad request.' }, { status: 400 })
 
+    // `access.webhook` gates this endpoint. Its default IS the signature check (which also parses +
+    // types the event), so the abstraction stretches here on purpose: a consumer gate replaces
+    // signature verification, and the body is taken as the event — use it only if you terminate the
+    // signature upstream.
     let event: Awaited<ReturnType<typeof mux.webhooks.unwrap>>
-    try {
-      event = await mux.webhooks.unwrap(JSON.stringify(body), req.headers)
-    } catch (err) {
-      const hint = 'check that MUX_WEBHOOK_SECRET (or MUX_WEBHOOK_SIGNING_SECRET) matches the signing secret in the Mux dashboard'
-      req.payload.logger.error({ err, msg: `[payload-mux] Webhook signature verification failed — ${hint}` })
-      return Response.json({ error: `Invalid signature — ${hint}.` }, { status: 401 })
+    const gate = options.options.access.webhook
+    if (gate) {
+      if (!(await gate(req))) return Response.json({ error: 'Forbidden.' }, { status: 403 })
+      event = body as typeof event
+    } else {
+      try {
+        event = await mux.webhooks.unwrap(JSON.stringify(body), req.headers)
+      } catch (err) {
+        const hint = 'check that MUX_WEBHOOK_SECRET (or MUX_WEBHOOK_SIGNING_SECRET) matches the signing secret in the Mux dashboard'
+        req.payload.logger.error({ err, msg: `[payload-mux] Webhook signature verification failed — ${hint}` })
+        return Response.json({ error: `Invalid signature — ${hint}.` }, { status: 401 })
+      }
     }
 
     if (!verifiedLogged) {

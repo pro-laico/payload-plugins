@@ -428,11 +428,11 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                       </p>
                     ) : null}
                     <p className="pdt-note" style={{ marginBottom: 0 }}>
-                      Needs a logged-in{' '}
+                      Needs a logged-in user — sign in via{' '}
                       <a href={snapshot?.adminRoute ?? '/admin'} style={{ textDecoration: 'underline' }}>
                         admin
                       </a>{' '}
-                      user · CLI: <span className="pdt-code">ENABLE_SEED=true pnpm seed</span>
+                      · CLI: <span className="pdt-code">ENABLE_SEED=true pnpm seed</span>
                     </p>
                     {seedError ? (
                       <div className="pdt-error">

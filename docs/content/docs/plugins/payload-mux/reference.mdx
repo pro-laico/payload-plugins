@@ -7,7 +7,7 @@ Every option, environment variable, endpoint, and export for `@pro-laico/payload
 
 ## Plugin options
 
-`muxVideoPlugin(options?)` is the single entry point. One call registers the `mux-video` collection,
+`muxPlugin(options?)` is the single entry point. One call registers the `mux-video` collection,
 the upload + webhook endpoints, and the admin uploader. It's zero-config: every option falls back to a
 `MUX_*` env var or a sensible default.
 
@@ -60,7 +60,7 @@ export const options = [
         type: 'MuxVideoUploadSettings',
         description: `Settings applied to every upload.`,
         options: [
-          { name: 'cors_origin', type: 'string', default: "process.env.NEXT_PUBLIC_SERVER_URL ?? '*'", description: `CORS origin for the direct-upload URL, usually your site URL. Resolves to options.uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'.` },
+          { name: 'cors_origin', type: 'string', default: "process.env.NEXT_PUBLIC_SERVER_URL ?? '*'", description: `CORS origin for the direct-upload URL, usually your site URL. On POST /mux/upload (the browser uploader) it resolves to options.uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'. Server-side ingest never reads the env var: it takes the source's own corsOrigin, then this option, then '*'.` },
           { name: 'new_asset_settings', type: 'MuxVideoNewAssetSettings', description: `Extra new_asset_settings forwarded to Mux when the asset is created. Includes playback_policy; the options.playbackPolicy knob is the shorthand, and an explicit value here wins.` },
         ],
       },
@@ -68,10 +68,10 @@ export const options = [
       {
         name: 'access',
         type: 'MuxAccessOptions',
-        description: `Who may read videos and who may request an upload — one gate each. Both default to a logged-in admin-collection user. Create / update / delete fall back to Payload's collection access.`,
+        description: `Per-endpoint gates for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) per endpoint. Collection reads and writes are gated the Payload way, under collections.muxVideo.overrides.access — the collection ships read: authd (any logged-in user). Keep it closed under a signed playback policy: playback URLs are JWT-signed on read, so an anonymous read hands out a working signed URL. See Gating endpoints.`,
         options: [
-          { name: 'read', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates reads of the mux-video collection. Keep it closed under a signed playback policy: playback URLs are JWT-signed on read, so an anonymous read hands out a working signed URL.` },
-          { name: 'upload', type: '(req) => boolean | Promise<boolean>', default: '(req) => Boolean(req.user && req.user.collection === config.admin.user)', description: `Gates the direct-upload endpoints (POST / GET /mux/upload).` },
+          { name: 'upload', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates the direct-upload endpoints (POST / GET /mux/upload).` },
+          { name: 'webhook', type: 'EndpointAccess', default: 'Mux signature verification', description: `Gates POST /mux/webhook. Defaults to verifying the Mux webhook signature; override only if you terminate that check upstream.` },
         ],
       },
       { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
@@ -98,10 +98,10 @@ nested fields); **TypeScript** is the same shape in code, every option at its de
 <Tab value="TypeScript">
 
 ```ts
-import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxPlugin } from '@pro-laico/payload-mux'
 
 // Every option at its default — this is the zero-config behaviour, written out.
-muxVideoPlugin({
+muxPlugin({
   enabled: true,
   collections: {
     muxVideo: {
@@ -112,10 +112,10 @@ muxVideoPlugin({
   },
   options: {
     // initSettings: { /* … */ },   // optional, no default — all fields fall back to MUX_* env vars
-    // uploadSettings: { /* … */ }, // optional — cors_origin defaults to process.env.NEXT_PUBLIC_SERVER_URL ?? '*'
-    // access: {                    // both default to a logged-in admin user
-    //   read:   (req) => Boolean(req.user && req.user.collection === config.admin.user),
-    //   upload: (req) => Boolean(req.user && req.user.collection === config.admin.user),
+    // uploadSettings: { /* … */ }, // optional — on POST /mux/upload, cors_origin defaults to process.env.NEXT_PUBLIC_SERVER_URL ?? '*'
+    // access: {                    // per-endpoint gates for the plugin's HTTP endpoints
+    //   upload:  ({ user }) => Boolean(user), // default: any logged-in user
+    //   webhook: () => true,                  // default: Mux signature verification — override only if terminated upstream
     // },
     playbackPolicy: 'public', // 'signed' issues JWT-signed URLs
     signedUrlOptions: { expiration: '1d' },
@@ -142,7 +142,7 @@ option only to override a value or point at a non-standard variable name.
 | `MUX_WEBHOOK_SECRET` | — | Verifies incoming Mux webhook signatures. **Required** for the webhook. Also accepts `MUX_WEBHOOK_SIGNING_SECRET`. |
 | `MUX_SIGNING_KEY` | — | JWT signing key ID. **Required when `playbackPolicy: 'signed'`.** Also accepts `MUX_JWT_KEY_ID`. |
 | `MUX_PRIVATE_KEY` | — | JWT private key. **Required when `playbackPolicy: 'signed'`.** Also accepts `MUX_JWT_KEY`. |
-| `NEXT_PUBLIC_SERVER_URL` | `'*'` | Your site URL — becomes the upload `cors_origin`. Falls back to `'*'` when unset. |
+| `NEXT_PUBLIC_SERVER_URL` | `'*'` | Your site URL — becomes the `cors_origin` for the browser upload endpoint (`POST /api/mux/upload`). Falls back to `'*'` when unset; server-side ingest doesn't read it. |
 
 <Callout type="info">
   **Migrating from `@oversightstudio/mux-video`?** Keep your env as-is. The three names above where
@@ -152,28 +152,32 @@ option only to override a value or point at a non-standard variable name.
 
 ## Endpoints
 
-The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `options.access.upload`
-option. See [Endpoints & webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) for the webhook
-setup and what breaks without it.
+The plugin registers three endpoints under Payload's API route. The upload pair is gated by
+`options.access.upload` (default any logged-in user) and the webhook by `options.access.webhook`
+(default Mux signature verification) — see [Gating endpoints](../conventions#gating-endpoints). See
+[Endpoints & webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) for the webhook setup and
+what breaks without it.
 
 | Endpoint | What it does |
 | --- | --- |
 | `POST /api/mux/upload` | Mint a Mux direct-upload. The admin uploader posts files to it. |
 | `GET /api/mux/upload?id=…` | Read a direct-upload, to pick up its `asset_id`. |
-| `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, log on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
+| `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, mark the doc `errored` (with the Mux message) on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
 
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
-| `muxVideoPlugin` (default + named) | `@pro-laico/payload-mux` | The plugin factory. |
+| `muxPlugin` (default + named) | `@pro-laico/payload-mux` | The plugin factory. |
+| `muxVideoPlugin` | `@pro-laico/payload-mux` | **Deprecated** alias for `muxPlugin`, kept for one release — removed in 0.5.0. |
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxOptions`, `MuxVideoCollectionOptions` | `@pro-laico/payload-mux` | The nested option groups: the plugin's own domain knobs (`options`) and the `mux-video` collection's own knobs (`collections.muxVideo.options`). |
 | `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath }`. The supported way to discover the managed slug — it follows `collections.muxVideo.slug`. Returns `undefined` when the plugin isn't registered. |
 | `PayloadMuxMarker` | `@pro-laico/payload-mux` | The marker's type. |
 | `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a video doc from a local file / URL (seeding, imports, migrations). `collection` defaults to the slug on the marker, so a renamed collection needs no argument. |
 | `IngestMuxVideoOptions` | `@pro-laico/payload-mux` | Options for `ingestMuxVideo`: `{ source, title, playbackPolicy?, posterTimestamp?, collection? }`. |
-| `MuxAccessFn`, `MuxAccessOptions` | `@pro-laico/payload-mux` | The `access` gate types, for factoring a shared `read` / `upload` gate out. |
+| `MuxAccessOptions` | `@pro-laico/payload-mux` | The `options.access` gate-map shape: `{ upload?, webhook? }`. |
+| `EndpointAccess` | `@pro-laico/payload-mux` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | `MuxVideoInitSettings`, `MuxVideoUploadSettings`, `MuxVideoNewAssetSettings`, `MuxVideoSignedUrlOptions` | `@pro-laico/payload-mux` | The nested settings types. |
 | `MuxPlaybackPolicy`, `MuxPosterExtension`, `MuxAnimatedGifExtension`, `MuxAdminThumbnail` | `@pro-laico/payload-mux` | The option value unions. |
 | `MuxUploaderField` | `@pro-laico/payload-mux/components/MuxUploaderField` | Admin uploader + player field (wired via the import map). |
@@ -185,6 +189,11 @@ setup and what breaks without it.
 The plugin registers one collection, `mux-video`. Reshape it with `collections.muxVideo` — including
 `slug`, which renames it and takes the plugin's own references with it. See
 [Using video](/docs/plugins/payload-mux/using-video) for its playback fields and how to relate to it.
+
+It ships closed to anonymous traffic: `access: { read: authd }`, so a read needs a logged-in user —
+an anonymous `mux-video` fetch gets a 403. Open or narrow it under
+`collections.muxVideo.overrides.access`, but keep read closed under a signed playback policy, since
+an anonymous read would hand out a working signed URL.
 
 ## Next
 

@@ -1,6 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
-import { asSlug, isRecord } from '../../_kit'
+import { asSlug, isRecord, type EndpointAccess } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
 import { variantCacheKey } from '../../lib/transform/variantKey'
 import { parseTransformParams } from '../../lib/transform/params'
@@ -12,6 +12,7 @@ export interface PresetStatusEndpointConfig {
   variantSlug: string
   templates: Record<string, PresetSpec>
   constraints: TransformConstraints
+  access?: EndpointAccess
 }
 
 // The plugin owns the image collection's schema but can't name its app-generated type.
@@ -36,7 +37,7 @@ export const createPresetStatusEndpoint = (cfg: PresetStatusEndpointConfig): End
   path: '/img/presets/:id',
   method: 'get',
   handler: async (req: PayloadRequest): Promise<Response> => {
-    const guarded = await guardSourceRequest(req, cfg.sourceSlug)
+    const guarded = await guardSourceRequest(req, cfg.sourceSlug, cfg.access)
     if (guarded instanceof Response) return guarded
     const { id, doc: raw } = guarded
     if (!isRecord(raw)) return Response.json({ error: 'Not found' }, { status: 404 })

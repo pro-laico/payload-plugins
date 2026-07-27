@@ -23,6 +23,19 @@ export const options = [
         default: `'/dev'`,
         description: `Where the host app mounts the createDevPage catch-all. Drives the toolbar's built-in link and the browser redirect from GET /api/dev.`,
       },
+      {
+        name: 'access',
+        type: 'DevToolsAccessOptions',
+        description: `Per-endpoint gate for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) covering all /dev* routes. See Gating endpoints.`,
+        options: [
+          {
+            name: 'dev',
+            type: 'EndpointAccess',
+            default: 'public',
+            description: `Gates every /dev* endpoint. Public by default — they only register in development — but this knob lets you close them (e.g. on a preview deployment you force on with enabled: true).`,
+          },
+        ],
+      },
     ],
   },
 ]
@@ -39,12 +52,22 @@ interface DevToolsPluginOptions {
   enabled?: boolean
   options?: {
     devRoute?: string // default '/dev'
+    access?: {
+      dev?: EndpointAccess // default: public (the /dev* endpoints already only register in dev)
+    }
   }
 }
 ```
 </Tab>
 
 </Tabs>
+
+<Callout type="warn">
+**`access.dev` gates the endpoints, not the pages.** It's checked in the `/api/dev*` handlers only.
+The `/dev` HTML pages check `enabled` and nothing else, so a gate that closes the endpoints still
+leaves the pages — and the counts, slugs, and seed state they render — open to anyone with the URL.
+To close the pages, set `enabled: false` (or don't deploy the catch-all route).
+</Callout>
 
 `createDevPage({ payload, tests, enabled })` and `<DevToolbar tests links enabled />` take the same
 `enabled` override and the same `tests` array (from `defineTest`). `createDevPage` also requires a
@@ -59,13 +82,16 @@ The Seed view surfaces the seed plugin's `ENABLE_SEED`, but that variable belong
 
 ## Endpoints
 
-All four routes 404 outside development. See [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages)
-for the snapshot shape and what each view renders.
+All four routes 404 outside development — with `enabled` off they're never registered. Where they are
+registered, `options.access.dev` gates them (public by default; the knob lets you close them — see
+[Gating endpoints](../conventions#gating-endpoints)). A denial is `403 {"error":"Forbidden."}`, not a
+404. See [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) for the snapshot shape and what
+each view renders.
 
 | Route | What |
 | --- | --- |
 | `GET /api/dev` | Machine-readable app snapshot (env, plugins, seed status, counts, misses). Browsers are redirected to `/dev`. |
-| `GET /api/dev/stage` | Stages a URL for the toolbar (sets the stage cookie). |
+| `GET /api/dev/stage` | Stages a test version (`?test=…&version=…`) or a header/footer chrome slot (`?slot=header\|footer`) in a cookie, then redirects (`?to=` targets it, `?clear=1` resets). |
 | `GET /api/dev/draft` | Toggles Next.js draft mode. |
 | `POST /api/dev/icons/activate` | Sets the active icon set. |
 
@@ -76,11 +102,20 @@ for the snapshot shape and what each view renders.
 | `devToolsPlugin` | `@pro-laico/payload-dev-tools` | Plugin factory; registers the `/api/dev*` endpoints. |
 | `defineTest` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | Identity helper defining a test's versions with full typing. |
 | `readDevToolsMarker` | `@pro-laico/payload-dev-tools` | Reads this plugin's `config.custom` marker (`PayloadDevToolsMarker`) — the resolved `devRoute`, for custom tooling. |
-| `DevSnapshot` (+ per-plugin types) | `@pro-laico/payload-dev-tools` | The `GET /api/dev` response shape, for typed consumers. |
+| `PayloadDevToolsMarker` | `@pro-laico/payload-dev-tools` | The marker's type: `{ options, devRoute }`. |
+| `DevToolsPluginOptions` | `@pro-laico/payload-dev-tools` | The `devToolsPlugin(options?)` argument type: `{ enabled?, options? }`. |
+| `DevToolsAccessOptions` | `@pro-laico/payload-dev-tools` | The `options.access` gate-map shape: `{ dev? }`. |
+| `EndpointAccess` | `@pro-laico/payload-dev-tools` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
+| `Test` / `TestKind` / `TestVersion` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | What `defineTest` returns and takes — a test, its kind (`page` / `header` / `footer` / `block` / `custom`), and one version. |
+| `TestMeta` | `@pro-laico/payload-dev-tools` | A test stripped of its `render` functions — the label-only shape the toolbar receives. |
+| `DevSnapshot` / `CollectionCount` / `SeedSnapshot` / `ImagesSnapshot` / `IconsSnapshot` / `FontsSnapshot` / `MuxSnapshot` | `@pro-laico/payload-dev-tools` | The `GET /api/dev` response shape and its per-plugin panels, for typed consumers. |
 | `STAGE_COOKIE` | `@pro-laico/payload-dev-tools` | The stage cookie name, for custom staging tooling. |
 | `createDevPage` | `@pro-laico/payload-dev-tools/next` | The `/dev` pages; one catch-all drop-in file. |
+| `CreateDevPageOptions` | `@pro-laico/payload-dev-tools/next` | `createDevPage`'s argument type: `{ payload, tests?, enabled? }`. |
 | `DevToolbar` | `@pro-laico/payload-dev-tools/toolbar` | The floating toolbar server component; one line in your layout. |
+| `DevToolbarProps` / `DevLink` | `@pro-laico/payload-dev-tools/toolbar` | The toolbar's props (`{ tests?, links?, enabled? }`), and one `links` entry (`{ href, title }`). |
 | `resolveDevChrome` | `@pro-laico/payload-dev-tools/toolbar` | The chrome-swap seam: returns the real header/footer, or the toolbar-selected variant. |
+| `ResolveDevChromeOptions` | `@pro-laico/payload-dev-tools/toolbar` | `resolveDevChrome`'s argument type: `{ tests, header, footer, enabled? }`. |
 
 ## Collections & globals
 

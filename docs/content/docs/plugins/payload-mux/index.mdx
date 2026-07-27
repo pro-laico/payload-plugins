@@ -30,7 +30,7 @@ Video hosting that lives inside Payload, powered by Mux:
 
 - **Upload and it just plays:** drop a clip in the admin and Mux encodes it to adaptive HLS with posters and preview GIFs — no media server, no huge files bloating your storage.
 - **Direct-to-Mux uploads:** the browser posts bytes straight to Mux, so video never touches your server or database.
-- **Playback URLs computed on read:** every video exposes virtual `playbackUrl` (HLS), `posterUrl`, and `gifUrl`, JWT-signed automatically under a signed policy.
+- **Playback URLs computed on read:** each row of a video's `playbackOptions` carries virtual `playbackUrl` (HLS), `posterUrl`, and `gifUrl`, JWT-signed automatically under a signed policy.
 - **Kept in sync both ways:** a webhook finishes slow-encoding videos and mirrors Mux-dashboard deletes back into Payload.
 - **Server ingest and declarative seeding:** create a video from a file or URL in code, or seed one like any other doc through [`@pro-laico/payload-seed`](/docs/plugins/payload-seed).
 
@@ -55,7 +55,7 @@ NEXT_PUBLIC_SERVER_URL=https://your-site.com   # your site URL — becomes the u
 <Step>
 **Add the plugin**
 
-Zero-config reads the env vars above. Uploads' `cors_origin` resolves to
+Zero-config reads the env vars above. For browser uploads, `cors_origin` resolves to
 `options.uploadSettings.cors_origin ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '*'`. Pass options only
 to override: a non-standard env var name, a custom CORS origin, or signed playback.
 
@@ -65,10 +65,10 @@ to override: a non-standard env var name, a custom CORS origin, or signed playba
 
 ```ts title="payload.config.ts"
 import { buildConfig } from 'payload'
-import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxPlugin } from '@pro-laico/payload-mux'
 
 export default buildConfig({
-  plugins: [muxVideoPlugin()], // credentials from MUX_*, cors_origin from NEXT_PUBLIC_SERVER_URL
+  plugins: [muxPlugin()], // credentials from MUX_*, cors_origin from NEXT_PUBLIC_SERVER_URL
 })
 ```
 
@@ -84,7 +84,7 @@ MUX_PRIVATE_KEY=...
 ```
 
 ```ts title="payload.config.ts"
-muxVideoPlugin({
+muxPlugin({
   options: {
     playbackPolicy: 'signed',               // new videos upload as signed
     signedUrlOptions: { expiration: '1d' }, // signed URL lifetime

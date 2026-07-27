@@ -1,6 +1,7 @@
 // The plugin
 export { default, imagesPlugin } from './plugin'
-export type { ImagesCollectionOptions, ImagesOptions, ImagesPluginOptions, TransformEndpointConfig } from './types'
+export type { EndpointAccess } from './_kit'
+export type { ImagesAccessOptions, ImagesCollectionOptions, ImagesOptions, ImagesPluginOptions, TransformEndpointConfig } from './types'
 
 // The typed view of `config.custom.payloadImages` — resolve the configured slugs/settings from a
 // script or app instead of hand-casting the marker.

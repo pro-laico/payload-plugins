@@ -19,7 +19,7 @@ export const revalidateOptions = [
   },
   {
     name: 'collections',
-    type: 'Record<string, CollectionRevalidateConfig | false>',
+    type: 'Partial<Record<string, CollectionRevalidateConfig | false>>',
     default: '{}',
     required: false,
     description:
@@ -63,6 +63,21 @@ export const revalidateOptions = [
         description:
           "Force the dependency-map observation and dev warnings on in production. By default they run in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
       },
+      {
+        name: 'access',
+        type: 'RevalidateAccessOptions',
+        default: 'open in non-production, logged-in user in production',
+        description:
+          "Per-endpoint gate for the map endpoints — one `EndpointAccess` (`(req) => boolean | Promise<boolean>`). Only relevant while `observe` is on; otherwise the endpoints aren't registered. See [Gating endpoints](../conventions#gating-endpoints).",
+        options: [
+          {
+            name: 'inspect',
+            type: 'EndpointAccess',
+            default: 'open in non-production; requires a logged-in user in production',
+            description: 'Gates `GET` / `POST /revalidate-map`. Denials answer `404` to hide that the endpoint exists.',
+          },
+        ],
+      },
     ],
   },
 ]
@@ -91,7 +106,7 @@ None. The plugin reads no environment variables — everything is configured thr
 
 ## Endpoints
 
-Two dependency-map routes, governed entirely by [`observe`](#plugin-options) — dev-only by default. They serve nothing but observations, so with `observe: false` (the production posture) they are not registered at all. With `observe: true` forced on in production they additionally require an authenticated Payload user.
+Two dependency-map routes, governed entirely by [`observe`](#plugin-options) — dev-only by default. They serve nothing but observations, so with `observe: false` (the production posture) they are not registered at all. When registered, access is `options.access.inspect`: open in non-production, a logged-in Payload user in production. Override it to change who gets in; denials answer `404` to hide the endpoint. See [Gating endpoints](../conventions#gating-endpoints).
 
 | Route | Purpose |
 | --- | --- |
@@ -116,11 +131,25 @@ Two import entry points, plus the finders and primitives you get back from the f
 
 | Export | Purpose |
 | --- | --- |
-| `revalidatePlugin` | The plugin. Add it **last** in `plugins: []`. |
+| `revalidatePlugin` | The plugin, also the default export. Add it **last** in `plugins: []`. |
 | `tagsFor` | `tagsFor(payload)` builds prefix-correct raw tags for the rare hand-spelled `cacheTag` need. |
 | `readRevalidateMarker` | `readRevalidateMarker(config)` returns the typed `config.custom.payloadRevalidate` — the resolved `prefix`, `observe`, `lists`, `extraTags`, `rules`, and the map `endpointPath` (non-null only while observing). |
 | `getInspection` | The **live** dependency map for this process (observed reads + graph), or `null` when the plugin isn't active. What `GET /api/revalidate-map` and `/dev/revalidate` serve. |
 | `buildStaticInspection` · `renderRevalidateMap` | Build the **static** map from a config (`MapConfigSource`) and render it to the text report — the machinery behind `payload revalidate-map`, for custom CI checks or map UIs. |
+
+**Types** — same entry point, `@pro-laico/payload-revalidate`
+
+| Type | What it types |
+| --- | --- |
+| `RevalidatePluginOptions` | The `revalidatePlugin()` options object. |
+| `CollectionRevalidateConfig` · `RevalidateMarker` | One collection's tracking config (`idField`, `lists`, `extraTags`), and the `custom.revalidate` marker a collection ships without importing anything — `CollectionRevalidateConfig \| false`. |
+| `DependencyRule` | One `options.rules` entry: `{ on, bust, whenFields? }`. |
+| `RevalidateAccessOptions` · `EndpointAccess` | The `options.access` gate-map (`{ inspect? }`) and the gate function `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
+| `PayloadRevalidateMarker` | What `readRevalidateMarker(config)` hands back. |
+| `Tags` | The tag builders `tagsFor(payload)` returns: `doc`, `list`, `join`, `global`, `all`. |
+| `RevalidateInspection` · `InspectedCollection` · `ObservedRead` · `RevalidateEvent` · `ScannedGetter` | The inspection payload and its parts — resolved settings, observed reads, bust events, and scanned getters. |
+| `ReferenceGraph` · `ReferenceEdge` | The reference graph inside an inspection: collections, globals, and one edge per reference (`relationship` / `upload` / `join` / `richText`). |
+| `MapConfigSource` · `RenderMapOptions` | The config shape `buildStaticInspection` accepts, and `renderRevalidateMap`'s options (`{ live? }`). |
 
 **Cache helpers** — `@pro-laico/payload-revalidate/cache`
 

@@ -1,6 +1,6 @@
-import type { CollectionConfig, PayloadRequest } from 'payload'
+import type { CollectionConfig } from 'payload'
 
-import type { CollectionOption } from '../../_kit'
+import type { CollectionOption, EndpointAccess } from '../../_kit'
 import type { MuxVideoInitSettings } from '../settings/initSettings'
 import type { MuxVideoUploadSettings } from '../settings/uploadSettings'
 import type { MuxVideoSignedUrlOptions } from '../settings/signedUrlOptions'
@@ -10,16 +10,13 @@ export type MuxAnimatedGifExtension = 'gif' | 'webp'
 export type MuxAdminThumbnail = 'gif' | 'image' | 'none'
 export type MuxPlaybackPolicy = 'public' | 'signed'
 
-export type MuxAccessFn = (request: PayloadRequest) => Promise<boolean> | boolean
-
 export interface MuxAccessOptions {
-  /** Who may read videos. Defaults to a logged-in admin-collection user — an anonymous read of a
-   * signed-policy video would hand out a signed playback URL. Create / update / delete fall back to
-   * Payload's own. */
-  read?: MuxAccessFn
-  /** Who may request a direct upload (`POST` / `GET /mux/upload`). Defaults to a logged-in
-   * admin-collection user. */
-  upload?: MuxAccessFn
+  /** Who may request a direct upload (`POST` / `GET /mux/upload`). Defaults to any logged-in user.
+   * Collection read/write is not here — it lives on `collections.muxVideo.overrides.access`. */
+  upload?: EndpointAccess
+  /** Who may post to the Mux webhook (`POST /mux/webhook`). Defaults to Mux's own signature
+   * verification; override only if you terminate the signature check upstream. */
+  webhook?: EndpointAccess
 }
 
 export interface MuxVideoCollectionOptions {
@@ -54,10 +51,10 @@ export interface MuxOptions {
   /** Backfill a Payload doc for an asset created outside Payload (e.g. in the Mux dashboard).
    * Off by default: one Mux account shared across environments would cross-backfill each of them. */
   autoCreateOnWebhook?: boolean
-  /** Who may read videos and who may request an upload; both default to a logged-in admin user.
+  /** Per-endpoint gates for the plugin's HTTP endpoints.
    *
-   * - `read`
-   * - `upload` */
+   * - `upload` — direct-upload URL endpoint; defaults to any logged-in user
+   * - `webhook` — Mux event receiver; defaults to Mux signature verification */
   access?: MuxAccessOptions
 }
 
@@ -103,6 +100,6 @@ export interface ResolvedMuxVideoOptions {
     posterExtension: MuxPosterExtension
     animatedGifExtension: MuxAnimatedGifExtension
     autoCreateOnWebhook: boolean
-    access: { read: MuxAccessFn | undefined; upload: MuxAccessFn | undefined }
+    access: { upload: EndpointAccess | undefined; webhook: EndpointAccess | undefined }
   }
 }

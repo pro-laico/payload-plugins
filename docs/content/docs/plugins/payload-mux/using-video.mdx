@@ -65,21 +65,9 @@ The three URL fields aren't stored — they compute from the playback id on ever
 
 ## Signed playback
 
-Under a **signed** policy each read signs all three URLs (`playbackUrl` / `posterUrl` / `gifUrl`), and JWT signing isn't free.
-
-<Callout type="info">
-  If you only render one URL (e.g. just the player), `select` it — alongside the `playbackId` /
-  `playbackPolicy` it's built from — so the other two aren't signed:
-
-  ```ts
-  payload.find({
-    collection: 'mux-video',
-    select: { playbackOptions: { playbackId: true, playbackPolicy: true, playbackUrl: true } },
-  })
-  ```
-
-  Public playback does no signing, so this doesn't apply there.
-</Callout>
+Under a **signed** policy each read signs all three URLs (`playbackUrl` / `posterUrl` / `gifUrl`),
+whether or not you render them — the collection's `forceSelect` keeps `playbackOptions` whole, so a
+narrower `select` doesn't skip any of them. Public playback does no signing.
 
 Turn signed playback on with the plugin's `options.playbackPolicy: 'signed'` — see [Quickstart](/docs/plugins/payload-mux#quickstart) and [Plugin options](/docs/plugins/payload-mux/reference#plugin-options).
 

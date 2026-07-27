@@ -63,7 +63,7 @@ export const readNodes = [
   { id: 'getter', label: "getPost(id) — 'use cache'", detail: 'the entry is keyed by its arguments, shared across requesters', x: 300, y: 150 },
   { id: 'live', kind: 'check', label: 'Cache entry live?', x: 300, y: 320 },
   { id: 'serve', kind: 'result', label: 'Served from cache', detail: 'no Payload query runs', x: 40, y: 480 },
-  { id: 'finder', label: 'findDocByID runs payload.find', detail: 'depth 0, null on error', x: 560, y: 480 },
+  { id: 'finder', label: 'findDocByID runs payload.findByID', detail: 'depth 0, disableErrors — a miss is null', x: 560, y: 480 },
   { id: 'tag', kind: 'store', label: 'Entry cached + tagged posts:{id}', detail: 'live until a write to that doc busts the tag', x: 560, y: 640 },
 ]
 
@@ -80,7 +80,7 @@ export const readEdges = [
 
 ## The finders
 
-Each finder runs `payload.find` (or `findGlobal`) and tags the entry. All remaining local-API options pass through (`where`, `sort`, `locale`, `select`, `populate`, `context`, …).
+Each finder runs the matching local-API call (`payload.find`, `findByID`, `findGlobal`) and tags the entry. The remaining local-API options pass through (`where`, `sort`, `locale`, `select`, `populate`, `context`, …) — minus the ones a finder owns, which differ per finder.
 
 | Finder | Call | Returns |
 | --- | --- | --- |
@@ -91,11 +91,22 @@ Each finder runs `payload.find` (or `findGlobal`) and tags the entry. All remain
 
 `findIds` returns pagination meta without a second query.
 
+What each finder does **not** take:
+
+| Finder | Omits |
+| --- | --- |
+| `findDoc` | `limit` / `page` / `pagination` — it's always one doc |
+| `findDocByID` | the above, plus `where` / `sort` (the id is the query) and `as` (the alias tag is `findDoc`'s) |
+| `findIds` | `select` / `populate` / `depth` / `joins` / `showHiddenFields` — the read is forced to ids only — plus `as` and `walk`, which are doc-entry concerns |
+| `findGlobal` | the collection-only options — a global read takes `depth`, `locale`, `fallbackLocale`, `select`, `populate`, `overrideAccess`, `showHiddenFields`, `context` |
+
+And all four refuse `user` / `req`.
+
 Finder-specific params:
 
 - **`as`** (`findDoc`) — the alias value for the doc's alias tag. It overrides the collection's `idField` (default `slug`), and it tags even a `null` result, so a cached miss purges the moment that slug is created.
 - **`list`** (`findIds`) — names a declared list scope, giving the id-list its own scope tag (`posts:list:recent`).
-- **`draft`** (`findDoc`, `findIds`) — one flag drives both the fetch and the `:draft` tag variants.
+- **`draft`** (all four) — one flag drives both the fetch and the `:draft` tag variants.
 
 For the tag vocabulary these produce, see [The atomic model](/docs/plugins/payload-revalidate/atomic-model).
 

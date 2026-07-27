@@ -188,7 +188,7 @@ const doc = await payload.findByID({
   id,
   collection: 'images',
   depth: 0,
-  select: RESPONSIVE_IMAGE_SELECT, // alt + src + srcset + placeholder
+  select: RESPONSIVE_IMAGE_SELECT, // alt + src + aspectRatio + srcset + placeholder
   context: { image: { aspectRatio: '16:9', quality: 80 }, blur: { quality: 'md' } },
 })
 ```

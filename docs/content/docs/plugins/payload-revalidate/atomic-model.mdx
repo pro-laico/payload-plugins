@@ -70,6 +70,7 @@ them.
 | `posts:my-slug` | alias doc tag (`idField`, default `slug`) | same — old AND new alias on renames |
 | `posts:list:recent` | a declared list scope | membership events + its declared fields change |
 | `posts` | the bare (unscoped) list tag | membership events only |
+| `posts:join:author:7` | an entry that populated a join field — `{child}:join:{on}:{parentId}` | a `posts` doc joins or leaves author `7`, or a field in that join's `where` changes |
 | `global:header` | a global | the global's writes |
 | `all` | on every tagged entry | `revalidateAll()` / post-seed flush |
 | `…:draft` | draft-lane variant of any of the above | lane-aware — draft saves touch only these |
@@ -114,6 +115,8 @@ The full field-by-field map:
 | a scope's declared field (`publishedAt`) | doc tags + every scope declaring that field (`posts:list:recent`, …) |
 | the `idField` (slug) | doc tags + old and new alias — id-lists hold ids, so **no list bust** |
 | membership (create / delete / publish / unpublish) | doc tags + bare list + **all** declared scopes |
+| the field a join points at (`author`) on a child doc | `posts:join:author:{id}` for the parent it left **and** the one it joined — a delete busts every parent it was on |
+| a field in a join's `where` on a child doc | that join's tag for every parent the child is on — the `where` fields are the join's determinants, read off your config |
 | trash / restore-from-trash (`trash: true`) | same as membership — a soft delete changes list membership exactly like a delete, it just arrives as an update |
 | anything, on a draft-only doc | the `:draft` variants only |
 

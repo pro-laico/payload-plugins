@@ -2,7 +2,7 @@ import type { Plugin } from 'payload'
 import { seedPlugin } from '@pro-laico/payload-seed'
 import { fontsPlugin } from '@pro-laico/payload-fonts'
 import { iconsPlugin } from '@pro-laico/payload-icons'
-import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxPlugin } from '@pro-laico/payload-mux'
 import { imagesPlugin } from '@pro-laico/payload-images'
 import { devToolsPlugin } from '@pro-laico/payload-dev-tools'
 import { revalidatePlugin } from '@pro-laico/payload-revalidate'
@@ -40,7 +40,7 @@ export const seedOptions = { definitions: seedDefinitions, options: { assetsDir:
 export const plugins: Plugin[] = [
   imagesPlugin(),
   iconsPlugin(),
-  muxVideoPlugin(),
+  muxPlugin(),
   fontsPlugin(),
   seedPlugin(seedOptions),
   devToolsPlugin(),

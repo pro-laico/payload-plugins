@@ -41,7 +41,7 @@ export const getBeforeValidateHook =
       const raw = err instanceof Error ? err.message : String(err)
       const inner = raw.replace(/^\[payload-mux\]\s*/, '')
       const hint = /Could not resolve authentication method/i.test(raw)
-        ? ' — Mux credentials are missing; set MUX_TOKEN_ID / MUX_TOKEN_SECRET (or pass initSettings to muxVideoPlugin).'
+        ? ' — Mux credentials are missing; set MUX_TOKEN_ID / MUX_TOKEN_SECRET (or pass initSettings to muxPlugin).'
         : ''
       const title = typeof d.title === 'string' && d.title ? d.title : '(untitled)'
       const message = `[payload-mux] ingest failed for '${title}' (source: ${norm.ref}): ${inner}${hint}`

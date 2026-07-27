@@ -218,7 +218,7 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     const fn = async () => [{ cron: '* * * * *' }]
     const withFn = imagesPlugin({ options: { prewarm: cron } })({ ...baseConfig(), jobs: { autoRun: fn } } as Config) as Config
     expect(typeof withFn.jobs?.autoRun).toBe('function')
-    const composed = await (withFn.jobs?.autoRun as (p: unknown) => Promise<unknown[]>)({})
+    const composed = await (withFn.jobs!.autoRun as (p: unknown) => Promise<unknown[]>)({})
     expect(composed).toHaveLength(2)
   })
 })

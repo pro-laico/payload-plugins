@@ -25,9 +25,11 @@ These are working as designed, not bugs.
 </Callout>
 
 <Callout type="info">
-  **`title` is unique and auto-deduped.** A duplicate title doesn't fail the save — it's suffixed to
-  stay unique, so the stored title can differ from what was typed. When extending an upload collection,
-  the deduped title is mirrored onto `filename`.
+  **`title` is unique, and deduped on upload only.** When a save brings a new asset in — an upload or a
+  server-side ingest — a duplicate title doesn't fail: it's suffixed to stay unique, so the stored title
+  can differ from what was typed. When extending an upload collection, the deduped title is mirrored onto
+  `filename`. Renaming an existing, already-ready video doesn't go through that path, so a duplicate title
+  there fails the save with Payload's normal `unique` error.
 </Callout>
 
 ## Next

@@ -2,7 +2,7 @@ import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
 
 import { routeId } from '../routeId'
-import { asSlug, isRecord } from '../../_kit'
+import { asSlug, isAllowed, isRecord, publicRequest } from '../../_kit'
 import { readSourceDoc } from './sourceDoc'
 import { resolveConstraints } from './config'
 import { createSingleFlight } from './coalesce'
@@ -48,6 +48,9 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
     path: '/img/:id',
     method: 'get',
     handler: async (req: PayloadRequest): Promise<Response> => {
+      // `serve` defaults to public — image serving must answer anonymous traffic; the source
+      // collection's own read access is still enforced below via `readSourceDoc`.
+      if (!(await isAllowed(cfg.access, req, publicRequest))) return new Response('Forbidden', { status: 403 })
       const { payload } = req
       const base = payload.config.serverURL || getServerSideURL()
 

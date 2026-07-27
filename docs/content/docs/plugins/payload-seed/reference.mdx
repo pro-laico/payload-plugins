@@ -19,6 +19,14 @@ export const options = [
     options: [
       { name: 'assetsDir', type: 'string', default: "'assets'", description: `The assets root where _file source files live, relative to the project root. A native upload's file is looked up under its per-collection subdir (see assetSubDirs) then the root; providers look under their own subdir.` },
       { name: 'assetSubDirs', type: 'Partial<Record<CollectionSlug, string>>', default: '{}', description: `Per-collection subdirectory (under assetsDir) for a collection's _file source files. Defaults to the collection slug (media resolves under assets/media/), so a folder named after the collection just works. Set an entry to use a different folder name, e.g. { media: 'images' } or { fontOriginal: 'font' }.` },
+      {
+        name: 'access',
+        type: 'SeedAccessOptions',
+        description: `Per-endpoint gates for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) per endpoint. See Gating endpoints.`,
+        options: [
+          { name: 'run', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates POST /seed. Runs after the ENABLE_SEED=true env kill-switch, not instead of it — ENABLE_SEED decides whether the endpoint answers at all, this gate decides who may call it. Both are required.` },
+        ],
+      },
     ],
   },
 ]
@@ -53,6 +61,9 @@ seedPlugin({
   options: {
     assetsDir: 'assets',
     assetSubDirs: {}, // default folder per collection is its slug; override here, e.g. { media: 'images' }
+    // access: {
+    //   run: ({ user }) => Boolean(user), // default: any logged-in user (still requires ENABLE_SEED=true)
+    // },
   },
 })
 ```
@@ -77,7 +88,7 @@ seedPlugin({
 
 | Route | What |
 | --- | --- |
-| `POST /api/seed` | Run the seed over HTTP. Gated by `ENABLE_SEED=true`. See [Running the seed](/docs/plugins/payload-seed/running). |
+| `POST /api/seed` | Run the seed over HTTP. Requires `ENABLE_SEED=true` (the kill-switch, checked first) **and** a caller `options.access.run` admits (any logged-in user by default; see [Gating endpoints](../conventions#gating-endpoints)). See [Running the seed](/docs/plugins/payload-seed/running). |
 
 ## Exports
 
@@ -85,6 +96,8 @@ seedPlugin({
 | --- | --- | --- |
 | `seedPlugin` | `@pro-laico/payload-seed` | The plugin factory. |
 | `SeedPluginOptions` | `@pro-laico/payload-seed` | The `seedPlugin()` / `seed()` options type — `{ enabled?, definitions?, options? }`. |
+| `SeedAccessOptions` | `@pro-laico/payload-seed` | The `options.access` gate-map shape: `{ run? }`. |
+| `EndpointAccess` | `@pro-laico/payload-seed` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | `readSeedMarker` | `@pro-laico/payload-seed` | `readSeedMarker(config)` returns the typed `config.custom.payloadSeed` — `{ options, endpointPath, assetsDir }` — so a script can resolve the configured paths off a live config instead of restating them. |
 | `PayloadSeedMarker` | `@pro-laico/payload-seed` | The marker's type — the shape `readSeedMarker` returns. |
 | `defineSeed` | `@pro-laico/payload-seed` | Declare a collection's seed records or a global's seed data (inferred from the slug; one default export per `seed.ts`). |

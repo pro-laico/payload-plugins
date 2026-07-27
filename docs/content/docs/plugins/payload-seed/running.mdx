@@ -18,7 +18,7 @@ export const runNodes = [
   { id: 'trigger', kind: 'start', label: 'Trigger a seed', detail: 'admin button, POST /api/seed, or the CLI — seed() in code skips the gate', x: 300, y: 0 },
   { id: 'gate', kind: 'check', label: "ENABLE_SEED === 'true'?", x: 300, y: 170 },
   { id: 'refuse', kind: 'result', label: '403 — nothing runs', detail: 'leave it unset in production and the surface is inert', x: 20, y: 330 },
-  { id: 'validate', label: 'Build + validate the model', detail: 'every ref resolves, files exist, no duplicate _key — issues collected and thrown at once (400)', x: 300, y: 330 },
+  { id: 'validate', label: 'Build + validate the model', detail: 'every ref resolves, no unknown field, no duplicate _key — issues collected and thrown at once (400)', x: 300, y: 330 },
   { id: 'clear', label: 'Clear the seeded collections', detail: 'destructive — delete hooks fire so external assets clean up', x: 300, y: 520 },
   { id: 'create', label: 'Create docs in dependency order', detail: 'topo-sorted by ref() edges — cycles broken via deferred fields', x: 300, y: 690 },
   { id: 'finish', kind: 'store', label: 'Globals last, then one revalidation flush', detail: 'returns { created, order, deferred, skipped }', x: 300, y: 860 },
@@ -39,16 +39,16 @@ export const runEdges = [
 
 | Entry point | How you trigger it | `ENABLE_SEED` gate | Needs a user |
 | --- | --- | --- | --- |
-| **Admin button** | Click **"Seed your database"** in the admin header | Yes | Yes |
-| **HTTP endpoint** | `POST /api/seed` | Yes | Yes |
+| **Admin button** | Click **"Seed your database"** in the admin header | Yes | Yes — `access.run` |
+| **HTTP endpoint** | `POST /api/seed` | Yes | Yes — `access.run` |
 | **CLI** | `payload seed` (Local API) | Yes | No |
 | **Programmatic** | `seed()` in code | No | No |
 
 <Callout type="info">
-  **Do you need a user first?** The admin button and `POST /api/seed` require a logged-in Payload user
-  (any user — not just an admin). The **CLI** and **`seed()`** run over the Local API with access control
-  bypassed, so they need no user at all — reach for them to bootstrap an **empty** database (you can even
-  seed your first admin user as part of the run).
+  **Do you need a user first?** The admin button and `POST /api/seed` run the `options.access.run` gate —
+  by default any logged-in Payload user (not just an admin), and yours to narrow to a role. The **CLI** and
+  **`seed()`** run over the Local API with access control bypassed, so they need no user at all — reach for
+  them to bootstrap an **empty** database (you can even seed your first admin user as part of the run).
 </Callout>
 
 ## Admin button
@@ -75,8 +75,9 @@ pass:
 
 - **`ENABLE_SEED` must equal `"true"`**, or it returns `403` and does nothing (the primary safety —
   leave it unset in production and the route is inert).
-- **The request must be authenticated** — a Payload auth cookie or API key — or `403`. Any logged-in
-  user qualifies, so gate by environment with `ENABLE_SEED`, not by role.
+- **The caller must pass `options.access.run`**, or `403`. By default that's any authenticated request —
+  a Payload auth cookie or API key — and you can narrow it to a role. It never widens the kill switch:
+  `ENABLE_SEED` is checked first and independently. See [Gating endpoints](../conventions#gating-endpoints).
 
 ```bash
 # Send your Payload auth cookie or API key (here: an API key on the `users` collection).
@@ -89,15 +90,15 @@ curl -X POST https://your-app.com/api/seed \
 
 | Status | Body | When |
 | --- | --- | --- |
-| `200` | `{ success, created, order }` | Seed ran and committed. |
+| `200` | `{ success, created, collections, globals, order, deferred, skipped }` | Seed ran and committed. Carries a `message` instead of counts when no definitions are registered. |
 | `400` | `{ error, issues }` | Validation failed — bad ref, duplicate `_key`, unknown field or slug. The same named, collected issues the engine produces, so you can fix them without digging through server logs. |
-| `403` | — | The gate is closed (`ENABLE_SEED` ≠ `"true"`), **or** the request wasn't authenticated. |
+| `403` | `{ error }` | The gate is closed (`ENABLE_SEED` ≠ `"true"`), **or** the caller didn't pass `access.run`. The `error` string tells you which. |
 | `500` | `{ error: 'Error seeding data.' }` | Any other failure. It's logged server-side; internals never reach the client. |
 
 <Callout type="info">
-  **Which `403` is it?** An unauthenticated request fails on auth. A request that carries a valid auth
-  cookie or API key and still gets `403` means the `ENABLE_SEED` gate is closed. Send credentials first,
-  then a lingering `403` points at the switch.
+  **Which `403` is it?** Read the `error` string — the two denials word themselves differently.
+  `"Seeding is disabled. Set ENABLE_SEED=true …"` is the kill switch. `"Seeding requires an
+  authenticated Payload user …"` is the `access.run` gate turning the caller away.
 </Callout>
 
 **Best for:** CI/CD, or seeding a deployed environment over HTTP.

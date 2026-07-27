@@ -73,7 +73,8 @@ plugins: [
   fontsPlugin(),
   seedPlugin({
     definitions: [fontOriginals, fonts, fontSet],
-    assetSubDirs: { fontOriginal: 'font' }, // font files live in <assetsDir>/font/, not /fontOriginal/
+    // font files live in <assetsDir>/font/, not /fontOriginal/
+    options: { assetSubDirs: { fontOriginal: 'font' } },
   }),
 ]
 ```

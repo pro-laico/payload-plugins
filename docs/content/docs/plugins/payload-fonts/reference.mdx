@@ -49,6 +49,9 @@ export const options = [
       { name: 'label', type: 'string', default: 'capitalised key', description: `Admin label for the family option and fontSet slot.` },
       { name: 'fallback', type: 'string', default: 'generic sans stack', description: `CSS fallback appended after the served family in the family variable.` },
     ] },
+    { name: 'access', type: 'FontsAccessOptions', description: `Per-endpoint gates for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) per endpoint. See Gating endpoints.`, options: [
+      { name: 'export', type: 'EndpointAccess', default: 'PAYLOAD_SECRET bearer-token check', description: `Gates GET /fonts/export. A machine endpoint with no user session — defaults to the PAYLOAD_SECRET bearer-token check the download CLI sends. Override only if you terminate auth upstream.` },
+    ] },
   ] },
 ]
 
@@ -84,6 +87,9 @@ fontsPlugin({
     // families: [{ key: 'sans' }, { key: 'serif' }, { key: 'mono' }, { key: 'display' }],
     //   ^ the default, written out. Pass your own COMPLETE list to replace it
     //     (spread DEFAULT_FONT_FAMILIES to keep these and add more).
+    // access: {
+    //   export: () => true, // default: PAYLOAD_SECRET bearer-token check — override only if terminated upstream
+    // },
   },
 })
 ```
@@ -152,18 +158,27 @@ endpoint pair is dead weight there.
 
 ## Endpoints
 
+`GET /fonts/export` is gated by `options.access.export`, which defaults to the `PAYLOAD_SECRET`
+bearer-token check the download CLI sends — a machine endpoint with no user session. Override it only
+if you terminate auth upstream. See [Gating endpoints](../conventions#gating-endpoints).
+
 | Route | Auth | What |
 | --- | --- | --- |
-| `GET /api/fonts/export` | Bearer `PAYLOAD_SECRET` | Returns each active family's `fontOptimized` bytes; the source the download CLI fetches. Response shape is `ExportFontsResponse`. See [Serving](/docs/plugins/payload-fonts/serving#building-where-the-database-isnt-reachable). |
+| `GET /api/fonts/export` | Bearer `PAYLOAD_SECRET` (default; `options.access.export` replaces it) | Returns each active family's `fontOptimized` bytes; the source the download CLI fetches. Response shape is `ExportFontsResponse`. See [Serving](/docs/plugins/payload-fonts/serving#building-where-the-database-isnt-reachable). |
 
 ## Exports
 
 | Export | From | What |
 | --- | --- | --- |
-| `fontsPlugin` | `@pro-laico/payload-fonts` | The plugin factory. |
+| `fontsPlugin` | `@pro-laico/payload-fonts` | The plugin factory (also the default export). |
+| `FontsPluginOptions` | `@pro-laico/payload-fonts` | The `fontsPlugin(options?)` argument type: `{ enabled?, collections?, globals?, options? }`. |
+| `FontsOptions` | `@pro-laico/payload-fonts` | The `options` bucket's shape: `{ charset?, families?, access? }`. |
+| `Charset` | `@pro-laico/payload-fonts` | The `options.charset` type: `'latin' \| 'latin-ext'` or an explicit string of characters to keep. |
 | `readFontsMarker` | `@pro-laico/payload-fonts` | The typed view of `config.custom.payloadFonts`: `{ options, fontSlug, fontOriginalSlug, fontOptimizedSlug, fontSetSlug, familyKeys, exportPath }`. The supported way to discover the slugs the plugin registered — they follow `collections.<name>.slug` / `globals.fontSet.slug`, and `fontSetSlug` is `null` when the global is off. Returns `undefined` when the plugin isn't registered. |
 | `PayloadFontsMarker` | `@pro-laico/payload-fonts` | The marker's type. |
 | `FontFamilyConfig` | `@pro-laico/payload-fonts` | The `{ key, label?, fallback? }` shape of a `families` entry. |
+| `FontsAccessOptions` | `@pro-laico/payload-fonts` | The `options.access` gate-map shape: `{ export? }`. |
+| `EndpointAccess` | `@pro-laico/payload-fonts` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | `DEFAULT_FONT_FAMILIES` | `@pro-laico/payload-fonts` | The built-in sans/serif/mono/display families (spread to extend them). |
 | `extractFonts` | `@pro-laico/payload-fonts` | Collect the generated `next/font` classes for the root `<html>` className. |
 | `getActiveFontFaces` | `@pro-laico/payload-fonts` | Resolve the active `fontSet` selection to its served files; the read behind `<PreviewFonts>`, for custom UIs. |

@@ -1,6 +1,7 @@
 export { iconsPlugin, default } from './plugin'
 
-export type { IconDoc, IconSetOptions, IconsCollectionsOptions, IconsPluginOptions } from './types'
+export type { EndpointAccess } from './_kit'
+export type { IconDoc, IconsAccessOptions, IconSetOptions, IconsCollectionsOptions, IconsOptions, IconsPluginOptions } from './types'
 
 // The typed view of `config.custom.payloadIcons` — the supported way to discover the slugs the
 // plugin registered, which follow `collections.<name>.slug`.

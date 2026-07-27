@@ -1,5 +1,6 @@
 import type { Endpoint } from 'payload'
 
+import { isAllowed } from '../_kit'
 import { runSeed } from '../engine/run'
 import type { ResolvedSeedOptions } from '../types'
 import { SEED_DISABLED_MESSAGE, seedingEnabled } from '../guard'
@@ -11,7 +12,7 @@ export function createSeedEndpoint(options: ResolvedSeedOptions): Endpoint {
     method: 'post',
     handler: async (req) => {
       if (!seedingEnabled()) return Response.json({ error: SEED_DISABLED_MESSAGE }, { status: 403 })
-      if (!req.user)
+      if (!(await isAllowed(options.options.access.run, req)))
         return Response.json({ error: 'Seeding requires an authenticated Payload user (any user) - log in first.' }, { status: 403 })
 
       try {

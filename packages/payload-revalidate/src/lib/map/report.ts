@@ -75,7 +75,8 @@ export function renderRevalidateMap(inspection: RevalidateInspection, opts: Rend
   w('## Collections')
   w()
   for (const slug of slugs) {
-    const s = settings[slug]!
+    const s = settings[slug]
+    if (!s) continue
     w(`### ${slug}`)
     w()
     w(

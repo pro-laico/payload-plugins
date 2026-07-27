@@ -7,32 +7,39 @@ import type { PrewarmOptions, TransformConstraints } from '../../../src/types'
 const constraints = DEFAULT_CONSTRAINTS
 const resolve = (opts: false | PrewarmOptions, c: TransformConstraints = constraints) => resolvePrewarmOptions(opts, c)
 
+// resolve() returns `false | ResolvedPrewarmOptions`; narrow to the options for the enabled-path assertions
+// (`?.` would not guard the `false` case, only nullish).
+const on = (r: ReturnType<typeof resolve>) => {
+  if (r === false) throw new Error('expected prewarm to resolve to options, got false')
+  return r
+}
+
 describe('resolvePrewarmOptions formats', () => {
   it('defaults to webp, adding avif when the transform prefers it', () => {
     const base = resolve({})
-    expect(base && base.formats).toEqual(['webp'])
+    expect(on(base).formats).toEqual(['webp'])
     const avif = resolve({}, { ...constraints, preferAvif: true })
-    expect(avif && avif.formats).toEqual(['webp', 'avif'])
+    expect(on(avif).formats).toEqual(['webp', 'avif'])
   })
 
   it('drops formats the transform endpoint can never serve, and reports them', () => {
     const c: TransformConstraints = { ...constraints, formats: ['auto', 'webp', 'jpeg'] }
     const r = resolve({ formats: ['avif', 'webp'] }, c)
-    expect(r && r.formats).toEqual(['webp'])
-    expect(r && r.droppedFormats).toEqual(['avif'])
+    expect(on(r).formats).toEqual(['webp'])
+    expect(on(r).droppedFormats).toEqual(['avif'])
   })
 
   it('falls back to servable defaults when every requested format is unservable', () => {
     const c: TransformConstraints = { ...constraints, formats: ['auto', 'webp', 'jpeg'] }
     const r = resolve({ formats: ['avif'] }, c)
-    expect(r && r.formats).toEqual(['webp'])
-    expect(r && r.droppedFormats).toEqual(['avif'])
+    expect(on(r).formats).toEqual(['webp'])
+    expect(on(r).droppedFormats).toEqual(['avif'])
   })
 
   it('honors an explicit empty array as "no format expansion" instead of substituting defaults', () => {
     const r = resolve({ formats: [] })
-    expect(r && r.formats).toEqual([])
-    expect(r && r.droppedFormats).toEqual([])
+    expect(on(r).formats).toEqual([])
+    expect(on(r).droppedFormats).toEqual([])
   })
 
   it('prewarm: false resolves to the whole surface being off', () => {

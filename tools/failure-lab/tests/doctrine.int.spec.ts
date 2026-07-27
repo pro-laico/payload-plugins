@@ -6,7 +6,7 @@ import { devToolsPlugin } from '@pro-laico/payload-dev-tools'
 import { fontsPlugin, readFontsMarker } from '@pro-laico/payload-fonts'
 import { iconsPlugin, readIconsMarker } from '@pro-laico/payload-icons'
 import { imagesPlugin, readImagesMarker } from '@pro-laico/payload-images'
-import { muxVideoPlugin, readMuxMarker } from '@pro-laico/payload-mux'
+import { muxPlugin, readMuxMarker } from '@pro-laico/payload-mux'
 import { revalidatePlugin } from '@pro-laico/payload-revalidate'
 import { seedPlugin } from '@pro-laico/payload-seed'
 import type { Config, Plugin, SanitizedConfig } from 'payload'
@@ -76,7 +76,7 @@ const ALL_PLUGINS: { pkg: string; off: Plugin }[] = [
   { pkg: 'payload-images', off: imagesPlugin({ enabled: false }) },
   { pkg: 'payload-icons', off: iconsPlugin({ enabled: false }) },
   { pkg: 'payload-fonts', off: fontsPlugin({ enabled: false }) },
-  { pkg: 'payload-mux', off: muxVideoPlugin({ enabled: false }) },
+  { pkg: 'payload-mux', off: muxPlugin({ enabled: false }) },
   { pkg: 'payload-seed', off: seedPlugin({ enabled: false }) },
   { pkg: 'payload-revalidate', off: revalidatePlugin({ enabled: false }) },
   { pkg: 'payload-dev-tools', off: devToolsPlugin({ enabled: false }) },
@@ -98,7 +98,7 @@ const RENAMEABLE: Rename[] = [
     pkg: 'payload-mux',
     from: 'mux-video',
     to: 'lab-video',
-    apply: () => applied(muxVideoPlugin({ collections: { muxVideo: { slug: 'lab-video' } } })),
+    apply: () => applied(muxPlugin({ collections: { muxVideo: { slug: 'lab-video' } } })),
     markerSlug: (c) => readMuxMarker(c)?.muxVideoSlug,
   },
   {
@@ -230,7 +230,7 @@ describe('static source scan of packages/*/src', () => {
     // Every export the kit owns. A local redefinition is how the four merge copies drifted apart in
     // the first place — one of them losing the slug guard, which WAS the payload-fonts rename bug.
     const owned =
-      /\b(const|function)\s+(merge(Collection|Global|Hooks|Select)|namedFields|assertNoFieldCollisions|asSlug|isRecord|authd|anyone|binScriptPath)\b/
+      /\b(const|function)\s+(merge(Collection|Global|Hooks|Select)|namedFields|assertNoFieldCollisions|asSlug|isRecord|authd|anyone|binScriptPath|isAllowed|authedRequest|publicRequest)\b/
     const offenders = outsideKit.filter((path) => codeLines(path).some((line) => owned.test(line)))
     expect(offenders).toEqual([])
     record('kit-owned helpers redefined outside src/_kit', `scanned ${outsideKit.length} files — none`)

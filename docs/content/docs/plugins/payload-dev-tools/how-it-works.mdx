@@ -25,8 +25,11 @@ You don't need any of this to use the plugin — it's here for when you're curio
   navigating between dev pages never remounts it. It injects one `<style>` tag (all
   `.pdt-`/`.pdtp-` prefixed, no host theme dependency; `--pdt-accent` is the override seam), and it
   only ever receives test *labels*, never render functions.
-- **Gating is layered.** Endpoints check per request, pages and toolbar per render. A production
-  build ships neither markup nor data.
+- **Gating is layered.** `enabled` is a *config-time* gate: when it's off the plugin hands back the
+  config untouched, so the `/api/dev*` endpoints are never registered — they don't exist rather than
+  404 per request. The pages and toolbar check the same `enabled` value per render. The one
+  per-request check is `options.access.dev`, and it covers the **endpoints only** — the `/dev` pages
+  are gated by `enabled` alone. A production build ships neither markup nor data.
 - **It sits beside Next's own dev indicator, on purpose.** The launcher borrows its idiom and
   defaults to the opposite corner (Next's is bottom-left).
 

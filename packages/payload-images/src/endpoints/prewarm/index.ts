@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
 
-import { isRecord } from '../../_kit'
+import { isRecord, type EndpointAccess } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
 import { enqueuePrewarmJob } from '../../lib/prewarm/enqueue'
 import { loadPrewarmPlan, type PrewarmSourceDeps } from '../../lib/prewarm/prewarmSource'
@@ -11,6 +11,7 @@ export interface PrewarmEndpointConfig {
   deps: PrewarmSourceDeps
   taskSlug: string
   queue: string
+  access?: EndpointAccess
 }
 
 // The plugin can't name the app-generated payload-jobs type; narrow the fields it reads.
@@ -39,7 +40,7 @@ export const createPrewarmStatusEndpoint = (cfg: PrewarmEndpointConfig): Endpoin
   path: '/img/prewarm/:id',
   method: 'get',
   handler: async (req: PayloadRequest): Promise<Response> => {
-    const guarded = await guardSourceRequest(req, cfg.deps.sourceSlug)
+    const guarded = await guardSourceRequest(req, cfg.deps.sourceSlug, cfg.access)
     if (guarded instanceof Response) return guarded
     const { id } = guarded
 
@@ -102,7 +103,7 @@ export const createPrewarmTriggerEndpoint = (cfg: PrewarmEndpointConfig): Endpoi
   path: '/img/prewarm/:id',
   method: 'post',
   handler: async (req: PayloadRequest): Promise<Response> => {
-    const guarded = await guardSourceRequest(req, cfg.deps.sourceSlug)
+    const guarded = await guardSourceRequest(req, cfg.deps.sourceSlug, cfg.access)
     if (guarded instanceof Response) return guarded
     const { id } = guarded
 

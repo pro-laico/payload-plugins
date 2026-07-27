@@ -14,6 +14,7 @@ export function resolveOptions(options: RevalidatePluginOptions = {}): ResolvedR
       prefix: options.options?.prefix ?? '',
       rules: options.options?.rules ?? [],
       observe: options.options?.observe ?? process.env.NODE_ENV === 'development',
+      access: { inspect: options.options?.access?.inspect },
     },
   }
 }

@@ -116,7 +116,9 @@ export const revalidatePlugin =
       globals,
       bin: [...(config.bin ?? []), { key: 'revalidate-map', scriptPath: binScriptPath(import.meta.url, 'revalidateMap') }],
       // The map endpoints only ever serve observations, so `observe` alone governs them.
-      endpoints: resolved.options.observe ? [...(config.endpoints ?? []), ...createMapEndpoints()] : config.endpoints,
+      endpoints: resolved.options.observe
+        ? [...(config.endpoints ?? []), ...createMapEndpoints(resolved.options.access.inspect)]
+        : config.endpoints,
       custom: { ...config.custom, payloadRevalidate: marker },
       onInit: async (payload) => {
         await config.onInit?.(payload)

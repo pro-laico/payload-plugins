@@ -27,11 +27,12 @@ const register = <O>(key: string, base: CollectionConfig, opt: CollectionOption<
  *
  * - `enabled`
  * - `collections`
+ * - `options`
  */
 export const iconsPlugin =
   (opts: IconsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
-    const { enabled, collections } = resolveOptions(opts)
+    const { enabled, collections, options } = resolveOptions(opts)
     if (!enabled) return config
 
     const { icon, iconSet, iconRequest } = collections
@@ -55,7 +56,9 @@ export const iconsPlugin =
     return {
       ...config,
       collections: [...(config.collections ?? []), ...additions],
-      endpoints: iconRequestConfig ? [...(config.endpoints ?? []), createClearIconRequestsEndpoint(iconRequestConfig.slug)] : config.endpoints,
+      endpoints: iconRequestConfig
+        ? [...(config.endpoints ?? []), createClearIconRequestsEndpoint(iconRequestConfig.slug, options.access.clearRequests)]
+        : config.endpoints,
       custom: { ...config.custom, payloadIcons: marker },
     }
   }

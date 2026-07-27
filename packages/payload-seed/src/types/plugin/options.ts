@@ -1,5 +1,13 @@
 import type { CollectionSlug } from 'payload'
+
+import type { EndpointAccess } from '../../_kit'
 import type { SeedDefinition } from '../definitions/definitions'
+
+export interface SeedAccessOptions {
+  /** Who may run the seed (`POST /seed`). Defaults to any logged-in user. The `ENABLE_SEED` env
+   * kill-switch is checked first and independently — this gate never widens it. */
+  run?: EndpointAccess
+}
 
 export interface SeedPluginOptions {
   /** Register nothing when false — no command, endpoint, button, or type augmentation. Default `true`. */
@@ -9,7 +17,8 @@ export interface SeedPluginOptions {
   /** Everything else.
    *
    * - `assetsDir`
-   * - `assetSubDirs` */
+   * - `assetSubDirs`
+   * - `access` */
   options?: SeedOptions
 }
 
@@ -18,11 +27,19 @@ export interface SeedOptions {
   assetsDir?: string
   /** Per-collection subdirectory under `assetsDir`. Defaults to the collection slug. */
   assetSubDirs?: Partial<Record<CollectionSlug, string>>
+  /** Per-endpoint gate for the seed endpoint.
+   *
+   * - `run` — seed runner; defaults to any logged-in user */
+  access?: SeedAccessOptions
 }
 
 /** `SeedPluginOptions` with the defaults applied — same keys, same nesting. */
 export interface ResolvedSeedOptions {
   enabled: boolean
   definitions: SeedDefinition[] | undefined
-  options: { assetsDir: string; assetSubDirs: Partial<Record<CollectionSlug, string>> }
+  options: {
+    assetsDir: string
+    assetSubDirs: Partial<Record<CollectionSlug, string>>
+    access: { run: EndpointAccess | undefined }
+  }
 }

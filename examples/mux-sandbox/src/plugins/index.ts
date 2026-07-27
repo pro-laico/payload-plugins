@@ -1,8 +1,8 @@
 import type { Plugin } from 'payload'
 import { seedPlugin } from '@pro-laico/payload-seed'
-import { muxVideoPlugin } from '@pro-laico/payload-mux'
+import { muxPlugin } from '@pro-laico/payload-mux'
 
 import pages from '../seed/pages'
 import videos from '../seed/videos'
 
-export const plugins: Plugin[] = [muxVideoPlugin(), seedPlugin({ definitions: [videos, pages], options: { assetsDir: 'seed-assets' } })]
+export const plugins: Plugin[] = [muxPlugin(), seedPlugin({ definitions: [videos, pages], options: { assetsDir: 'seed-assets' } })]

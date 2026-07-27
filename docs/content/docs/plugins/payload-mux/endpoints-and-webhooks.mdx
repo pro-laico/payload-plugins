@@ -8,13 +8,15 @@ The plugin mounts three HTTP endpoints and expects one Mux webhook. Together the
 
 ## Endpoints
 
-The plugin registers three endpoints under Payload's API route. The upload pair is gated by the `options.access.upload` option.
+The plugin registers three endpoints under Payload's API route. The upload pair is gated by
+`options.access.upload` (default any logged-in user) and the webhook by `options.access.webhook`
+(default Mux signature verification) — see [Gating endpoints](../conventions#gating-endpoints).
 
 | Endpoint | What it does |
 | --- | --- |
 | `POST /api/mux/upload` | Mint a Mux direct-upload. The admin uploader posts files to it. |
 | `GET /api/mux/upload?id=…` | Read a direct-upload, to pick up its `asset_id`. |
-| `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, log on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
+| `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, mark the doc `errored` (with the Mux message) on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
 
 ## Webhook
 

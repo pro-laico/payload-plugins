@@ -14,7 +14,7 @@ export const createPurgeEndpoint = (cfg: PurgeEndpointConfig = {}): Endpoint => 
     path: '/img/purge/:id',
     method: 'post',
     handler: async (req: PayloadRequest): Promise<Response> => {
-      const guarded = await guardSourceRequest(req, sourceSlug)
+      const guarded = await guardSourceRequest(req, sourceSlug, cfg.access)
       if (guarded instanceof Response) return guarded
       const { id } = guarded
 

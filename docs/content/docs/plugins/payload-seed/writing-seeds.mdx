@@ -215,6 +215,10 @@ export default defineSeed('media', ({ file }) => [
 ])
 ```
 
+The extension is forgiving for images: `file('hero.jpg')` also matches a `hero.webp`, `hero.png`,
+`hero.avif`, `hero.gif`, `hero.svg`, or `hero.jpeg` sitting in that folder — re-encode an asset without
+editing the seed.
+
 A `_file` can also be an **absolute path** (`file('/tmp/logo.svg')`), used as-is for a file outside the tree.
 
 <Callout type="info">

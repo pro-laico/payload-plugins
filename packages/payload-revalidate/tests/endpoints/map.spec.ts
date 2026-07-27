@@ -31,26 +31,26 @@ describe('map endpoints', () => {
   })
 
   it('GET returns the inspection snapshot', async () => {
-    const res = await call(createMapEndpoints(), 'get')
+    const res = await call(createMapEndpoints(undefined), 'get')
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ prefix: '', graph: { edges: [] } })
   })
 
   it('POST busts one tag and records a manual event', async () => {
-    const res = await call(createMapEndpoints(), 'post', { tag: 'posts:42' })
+    const res = await call(createMapEndpoints(undefined), 'post', { tag: 'posts:42' })
     expect(await res.json()).toEqual({ busted: 'posts:42' })
     expect(revalidateTag).toHaveBeenCalledWith('posts:42')
     expect(getObservations().events[0]).toMatchObject({ source: 'manual', busted: [{ tag: 'posts:42', reason: 'manual' }] })
   })
 
   it('POST rejects a missing tag', async () => {
-    expect((await call(createMapEndpoints(), 'post', {})).status).toBe(400)
+    expect((await call(createMapEndpoints(undefined), 'post', {})).status).toBe(400)
   })
 
   it('production requires an authenticated user even with observe forced on (GET discloses the schema, POST busts arbitrary tags)', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     try {
-      const endpoints = createMapEndpoints()
+      const endpoints = createMapEndpoints(undefined)
       expect((await call(endpoints, 'get')).status).toBe(404)
       expect((await call(endpoints, 'post', { tag: 'all' })).status).toBe(404)
       expect(revalidateTag).not.toHaveBeenCalled()
@@ -59,5 +59,29 @@ describe('map endpoints', () => {
     } finally {
       vi.unstubAllEnvs()
     }
+  })
+
+  it('honours a consumer inspect gate: public opens prod, explicit false denies dev', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      expect(
+        (
+          await call(
+            createMapEndpoints(() => true),
+            'get',
+          )
+        ).status,
+      ).toBe(200)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+    expect(
+      (
+        await call(
+          createMapEndpoints(() => false),
+          'get',
+        )
+      ).status,
+    ).toBe(404)
   })
 })

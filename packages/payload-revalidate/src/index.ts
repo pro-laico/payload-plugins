@@ -1,6 +1,7 @@
 export { revalidatePlugin, default } from './plugin'
 export type { CollectionRevalidateConfig, RevalidateMarker } from './types'
-export type { DependencyRule, RevalidatePluginOptions } from './types'
+export type { DependencyRule, RevalidateAccessOptions, RevalidatePluginOptions } from './types'
+export type { EndpointAccess } from './_kit'
 export { readRevalidateMarker, tagsFor } from './lib/marker'
 export type { PayloadRevalidateMarker, Tags } from './types'
 export { getInspection } from './lib/inspect'

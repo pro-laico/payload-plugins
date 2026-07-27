@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import type { CollectionOption } from '../../_kit'
+import type { CollectionOption, EndpointAccess } from '../../_kit'
 
 /** A resolved `collections.<name>` entry — same shape as {@link CollectionOption}, but `options` is
  * always populated with this plugin's defaults for the collection. */
@@ -44,6 +44,25 @@ export interface ResolvedIconsCollectionsOptions {
   iconRequest: false | ResolvedCollectionOption
 }
 
+/** Per-endpoint gates for the plugin's HTTP endpoints.
+ *
+ * - `clearRequests` */
+export interface IconsAccessOptions {
+  /** Who may clear the runtime icon requests (`DELETE /payload-icons/icon-requests`). Defaults to
+   * any logged-in user. Collection read/write is not here — it lives on the collection's `access`. */
+  clearRequests?: EndpointAccess
+}
+
+/** This plugin's own knobs.
+ *
+ * - `access` */
+export interface IconsOptions {
+  /** Per-endpoint gates for the plugin's HTTP endpoints.
+   *
+   * - `clearRequests` — clear-runtime-requests endpoint; defaults to any logged-in user */
+  access?: IconsAccessOptions
+}
+
 export interface IconsPluginOptions {
   /** Register nothing when false — no collections, endpoints, or hooks. Default `true`. */
   enabled?: boolean
@@ -53,10 +72,15 @@ export interface IconsPluginOptions {
    * - `iconSet`
    * - `iconRequest` */
   collections?: IconsCollectionsOptions
+  /** This plugin's own knobs.
+   *
+   * - `access` */
+  options?: IconsOptions
 }
 
 /** Mirrors {@link IconsPluginOptions}: same keys, same nesting, defaults applied. */
 export interface ResolvedIconsOptions {
   enabled: boolean
   collections: ResolvedIconsCollectionsOptions
+  options: { access: { clearRequests: EndpointAccess | undefined } }
 }

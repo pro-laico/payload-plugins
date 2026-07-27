@@ -16,7 +16,7 @@ import { createMuxUploadHandler, getMuxUploadHandler } from './endpoints/upload'
  * - `collections`
  * - `options`
  */
-export const muxVideoPlugin =
+export const muxPlugin =
   (opts: MuxVideoPluginOptions = {}): Plugin =>
   (incomingConfig: Config): Config => {
     const resolved = resolveOptions(opts)
@@ -66,4 +66,8 @@ export const muxVideoPlugin =
     return config
   }
 
-export default muxVideoPlugin
+export default muxPlugin
+
+/** @deprecated Renamed to {@link muxPlugin} for parity with every other `<packageNoun>Plugin`
+ * factory. This alias is kept for one release and will be removed in 0.5.0. */
+export const muxVideoPlugin = muxPlugin

@@ -16,6 +16,7 @@ export function resolveOptions(options: FontsPluginOptions = {}): ResolvedFontsO
     options: {
       charset: options.options?.charset,
       families: options.options?.families,
+      access: { export: options.options?.access?.export },
     },
   }
 }

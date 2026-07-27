@@ -1,7 +1,7 @@
 import type Mux from '@mux/mux-node'
 import type { PayloadHandler } from 'payload'
 
-import { isAllowed } from '../lib/isAllowed'
+import { isAllowed } from '../_kit'
 import type { ResolvedMuxVideoOptions } from '../types'
 
 export const createMuxUploadHandler =

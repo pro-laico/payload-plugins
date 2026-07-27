@@ -1,8 +1,16 @@
 import type { CollectionConfig, GlobalConfig } from 'payload'
 
-import type { CollectionOption, GlobalOption } from '../../_kit'
+import type { CollectionOption, EndpointAccess, GlobalOption } from '../../_kit'
 import type { Charset } from '../subset/charset'
 import type { FontFamilyConfig } from '../families/families'
+
+export interface FontsAccessOptions {
+  /** Who may call the export endpoint (`GET /fonts/export`). Defaults to the `PAYLOAD_SECRET`
+   * bearer-token check: this endpoint is called by headless builds with no user session, so the
+   * default gate ignores `req.user` and compares an `Authorization: Bearer <PAYLOAD_SECRET>`
+   * header instead. Override to gate it however you like. */
+  export?: EndpointAccess
+}
 
 export interface FontsOptions {
   /** Characters the subsetter keeps in the served files. Default `'latin'`. */
@@ -14,6 +22,10 @@ export interface FontsOptions {
    * - `label`
    * - `fallback` */
   families?: FontFamilyConfig[]
+  /** Per-endpoint gates for the plugin's HTTP endpoints.
+   *
+   * - `export` — active-fonts export endpoint; defaults to the `PAYLOAD_SECRET` bearer check */
+  access?: FontsAccessOptions
 }
 
 export interface FontsPluginOptions {
@@ -76,5 +88,6 @@ export interface ResolvedFontsOptions {
   options: {
     charset: Charset | undefined
     families: FontFamilyConfig[] | undefined
+    access: { export: EndpointAccess | undefined }
   }
 }

@@ -1,15 +1,19 @@
 import type { PayloadRequest } from 'payload'
 
 import { routeId } from './routeId'
-import { asSlug } from '../_kit'
+import { asSlug, isAllowed, type EndpointAccess } from '../_kit'
 
 /**
- * Shared guard for the per-source admin endpoints (purge, prewarm, presets):
- * 401 unauthenticated → 400 missing id → 404 when the user can't read the source.
+ * Shared guard for the per-source admin endpoints (purge, prewarm, presets): the `manage` gate
+ * (default: any logged-in user) → 400 missing id → 404 when the user can't read the source.
  * Returns the source doc so handlers that need it don't re-fetch.
  */
-export const guardSourceRequest = async (req: PayloadRequest, sourceSlug: string): Promise<{ id: string; doc: unknown } | Response> => {
-  if (!req.user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+export const guardSourceRequest = async (
+  req: PayloadRequest,
+  sourceSlug: string,
+  gate?: EndpointAccess,
+): Promise<{ id: string; doc: unknown } | Response> => {
+  if (!(await isAllowed(gate, req))) return Response.json({ error: 'Unauthorized' }, { status: 401 })
   const id = routeId(req)
   if (!id) return Response.json({ error: 'Missing id' }, { status: 400 })
   try {

@@ -80,7 +80,7 @@ export function SeedCard({ seed, adminRoute }: { seed: SeedSnapshot; adminRoute:
         </p>
       ) : null}
       <p className="pdtp-note">
-        Needs a logged-in <a href={adminRoute}>admin</a> user · CLI: <span className="pdtp-code">ENABLE_SEED=true pnpm seed</span>
+        Needs a logged-in user — sign in via <a href={adminRoute}>admin</a> · CLI: <span className="pdtp-code">ENABLE_SEED=true pnpm seed</span>
       </p>
       {error ? (
         <div className="pdtp-error">

@@ -1,7 +1,7 @@
 import type Mux from '@mux/mux-node'
 import type { CollectionConfig, TextField } from 'payload'
 
-import { isAllowed } from '../lib/isAllowed'
+import { authd } from '../_kit'
 import type { MuxAdminThumbnail, ResolvedMuxVideoOptions } from '../types'
 import { signableUrlAfterRead } from '../hooks/field/afterRead'
 import { getAfterDeleteHook } from '../hooks/collection/afterDelete'
@@ -42,7 +42,7 @@ export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): Collection
   slug: MUX_VIDEO_SLUG,
   labels: { singular: 'Video', plural: 'Videos' },
   custom: { seedAsset: { sourceField: 'source' } },
-  access: { read: ({ req }) => isAllowed(options.options.access.read, req) },
+  access: { read: authd },
   admin: {
     group: 'Assets',
     enableListViewSelectAPI: true,

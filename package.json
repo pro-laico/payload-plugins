@@ -9,7 +9,7 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check --write .",
-    "check:ci": "biome check .",
+    "check:ci": "biome check --error-on-warnings .",
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
     "test": "turbo run test",

@@ -18,5 +18,6 @@ export function resolveOptions(options: IconsPluginOptions = {}): ResolvedIconsO
       iconSet: iconSet === false ? false : resolveIconSet(iconSet ?? {}),
       iconRequest: iconRequest === false ? false : resolvePlain(iconRequest),
     },
+    options: { access: { clearRequests: options.options?.access?.clearRequests } },
   }
 }
