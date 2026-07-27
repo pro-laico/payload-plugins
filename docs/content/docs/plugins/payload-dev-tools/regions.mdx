@@ -1,0 +1,123 @@
+---
+title: "Testing by location"
+description: "Pretend to be a visitor in Germany, California, or Brazil — and see the consent behaviour your site actually shows them."
+---
+
+Privacy law is a rendering condition. A visitor in Germany has to opt in before your analytics
+loads; one in California only has to be offered a way out; one in Ohio triggers neither. That's
+three different pages, and by default you can only see the one your own IP earns you.
+
+The toolbar's **Region** view sets a location for your session. Your app reads it through
+`resolveDevRegion` and branches exactly as it would in production — same code path, different
+answer.
+
+<Callout type="warn">
+This simulates the *input*, not compliance. It tells your app where the visitor is; whether the
+banner you then render satisfies the GDPR is between you and your lawyer.
+</Callout>
+
+## Wire it up
+
+<Steps>
+
+<Step>
+**Pass your real region through the resolver**
+
+Wherever you work out a visitor's location today — a geo header on Vercel, a CDN header, a
+middleware cookie — hand it to `resolveDevRegion` and use what comes back.
+
+```tsx title="app/(frontend)/layout.tsx"
+import { headers } from 'next/headers'
+import { resolveDevRegion } from '@pro-laico/payload-dev-tools/toolbar'
+
+export default async function Layout({ children }) {
+  const country = (await headers()).get('x-vercel-ip-country')
+  const region = await resolveDevRegion({ region: country })
+
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        {region?.consent === 'opt-in' ? <ConsentGate /> : null}
+        {region?.consent === 'opt-out' ? <DoNotSellLink /> : null}
+      </body>
+    </html>
+  )
+}
+```
+
+In production `resolveDevRegion` returns before it touches cookies, so a page that would prerender
+still does — the override is a development-only substitution.
+</Step>
+
+<Step>
+**Flip between locations**
+
+Open the toolbar → **Region** → pick one. The chip sets a cookie and refreshes the route, so the
+next render sees the new location everywhere, not just on the page you were on. **Real** clears it.
+
+Scriptable for Playwright runs, too:
+
+```bash
+curl -c jar.txt "localhost:3000/api/dev/region?code=DE"   # visit as a German visitor
+curl -c jar.txt "localhost:3000/api/dev/region?clear=1"   # back to the real location
+```
+</Step>
+
+</Steps>
+
+## What a region tells you
+
+```ts
+{ code: 'DE', label: 'Germany', regime: 'gdpr', consent: 'opt-in' }
+```
+
+`consent` is the field to branch on — it's the same three answers for every jurisdiction, so your
+UI doesn't grow a case per country:
+
+| `consent` | Means | Regimes |
+| --- | --- | --- |
+| `opt-in` | Nothing non-essential runs until the visitor agrees. | `gdpr` (EEA), `uk-gdpr`, `lgpd` (Brazil), `pipl` (China) |
+| `opt-out` | It may run, but you owe a visible way to stop it. | `ccpa` (California), `fadp` (Switzerland), `pipeda` (Canada), `appi` (Japan) |
+| `none` | No comprehensive law worth branching on. | `none` |
+
+Resolution covers all 30 EEA countries, not just the chips — a real `x-vercel-ip-country` of `NL`
+comes back as the Netherlands under the GDPR. An unrecognized code resolves to `undefined`, which
+is the honest answer: **decide what "no idea where they are" means for you** (the strictest regime
+is the usual choice).
+
+```ts
+import { regionFor } from '@pro-laico/payload-dev-tools'
+
+const region = regionFor(country) ?? regionFor('DE')  // unknown → treat as GDPR
+```
+
+`regionFor` is pure and framework-free, so it works in middleware and edge routes where
+`resolveDevRegion` (which reads `cookies()`) doesn't belong.
+
+## Choosing the chips
+
+The default list is one region per distinct behaviour: Germany, France, the UK, Switzerland, the
+US, California, Brazil, Canada, Japan. Replace it when your app only ships to two markets — or to
+correct an entry:
+
+```ts
+devToolsPlugin({
+  options: {
+    regions: [
+      { code: 'GB', label: 'United Kingdom', regime: 'uk-gdpr', consent: 'opt-in' },
+      { code: 'IE', label: 'Ireland', regime: 'gdpr', consent: 'opt-in' },
+      { code: 'US', label: 'United States', regime: 'ccpa', consent: 'opt-out' }, // company policy: treat all US as CCPA
+    ],
+  },
+})
+```
+
+Entries here also win over the built-in table during lookup, so that last line changes what a real
+US visitor resolves to as well — configuration, not just chips.
+
+## Next
+
+- [Environments](/docs/plugins/payload-dev-tools/environments) — boot the site against staging, and see what it's connected to.
+- [The test harness](/docs/plugins/payload-dev-tools/test-harness) — the same pattern for page, header, and footer variants.
+- [Reference](/docs/plugins/payload-dev-tools/reference) — the `regions` option, the endpoint, and every export.

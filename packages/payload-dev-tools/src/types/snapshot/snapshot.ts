@@ -1,3 +1,6 @@
+import type { DevRegion } from '../region'
+import type { EnvSnapshot } from './env'
+
 export type CollectionCount = { slug: string; count: number | null }
 
 export type MuxSnapshot = { slug: string; credentialed: boolean; total: number | null; ready: number | null }
@@ -48,9 +51,10 @@ export type RevalidateSnapshot = {
 
 export type DevSnapshot = {
   generatedAt: string
-  env: { nodeEnv: string; nodeVersion: string }
+  env: EnvSnapshot
   adminRoute: string
   devRoute: string
+  regions: DevRegion[]
   plugins: { seed: boolean; images: boolean; icons: boolean; fonts: boolean; mux: boolean; revalidate: boolean }
   seed: SeedSnapshot | null
   images: ImagesSnapshot | null

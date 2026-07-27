@@ -4,4 +4,14 @@
 export { defineTest } from './harness'
 export { DevToolbar } from './components/DevToolbar'
 export { resolveDevChrome } from './components/resolveDevChrome'
-export type { DevLink, DevToolbarProps, ResolveDevChromeOptions, Test, TestKind, TestVersion } from './types'
+export { resolveDevRegion } from './components/resolveDevRegion'
+export type {
+  DevLink,
+  DevRegion,
+  DevToolbarProps,
+  ResolveDevChromeOptions,
+  ResolveDevRegionOptions,
+  Test,
+  TestKind,
+  TestVersion,
+} from './types'

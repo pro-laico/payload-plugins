@@ -1,4 +1,4 @@
 {
   "title": "payload-dev-tools",
-  "pages": ["index", "dev-pages", "test-harness", "how-it-works", "reference", "troubleshooting"]
+  "pages": ["index", "dev-pages", "test-harness", "regions", "environments", "how-it-works", "reference", "troubleshooting"]
 }

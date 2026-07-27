@@ -36,6 +36,11 @@ and one layout line.
 - **`<DevToolbar />`.** A floating corner button on every page (admin included) that navigates the
   dev pages, toggles test versions and Next.js draft mode, seeds, and reads diagnostics. Stays open
   while you browse. Self-styled: no Tailwind, no CSS import, no `isDev` conditional.
+- **A location toggle.** Pick a region in the toolbar and your app renders as it would for a visitor
+  there — GDPR opt-in, CCPA opt-out, or neither. One resolver call, no per-country branching.
+- **Environment awareness.** `payload-dev-env staging -- pnpm dev` boots against another env file
+  without touching `.env.local`, and the toolbar names the env you're in, whether the database is
+  local, and which variables the installed plugins are missing.
 - **`GET /api/dev`.** A machine-readable snapshot: environment, installed plugins, seed status and
   counts, icon misses, font slots, mux readiness, per-collection doc counts. Point an AI agent here
   first. Browsers get redirected to `/dev`.
@@ -66,8 +71,9 @@ export default buildConfig({
 })
 ```
 
-Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /api/dev/draft`
-(draft-mode toggle), and `POST /api/dev/icons/activate` (set switcher). All 404 outside development.
+Registers `GET /api/dev` (snapshot), `GET /api/dev/stage` (URL staging), `GET /api/dev/region`
+(location override), `GET /api/dev/draft` (draft-mode toggle), and `POST /api/dev/icons/activate`
+(set switcher). All 404 outside development.
 </Step>
 
 <Step>
@@ -216,6 +222,12 @@ Zero-config by default — every option has a sensible default. See
   </Card>
   <Card title="The test harness" href="/docs/plugins/payload-dev-tools/test-harness">
     `defineTest`, version switching, site-wide header/footer swaps, and the script hook.
+  </Card>
+  <Card title="Testing by location" href="/docs/plugins/payload-dev-tools/regions">
+    Pretend to be in Germany or California, and see the consent behaviour your site shows them.
+  </Card>
+  <Card title="Environments" href="/docs/plugins/payload-dev-tools/environments">
+    `payload-dev-env`, the env-var checklist, and the "you're on a remote database" warning.
   </Card>
   <Card title="How it works" href="/docs/plugins/payload-dev-tools/how-it-works">
     Marker-based plugin discovery, layered gating, draft mode, and the persistent toolbar.

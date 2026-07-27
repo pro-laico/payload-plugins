@@ -4,8 +4,9 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { CHROME_COOKIES, STAGE_COOKIE } from '../cookies'
 import { isRecord } from '../_kit'
+import { regionFor } from '../lib/regions'
+import { CHROME_COOKIES, REGION_COOKIE, STAGE_COOKIE } from '../cookies'
 import type { ChromeSlot, Corner, DevLink, DevSnapshot, SeedError, Settings, Size, StageSelection, TestMeta, View } from '../types'
 
 const STORE_KEY = 'pdt-settings'
@@ -19,7 +20,14 @@ const CORNERS: { value: Corner; arrow: string }[] = [
   { value: 'bottom-right', arrow: '↘' },
 ]
 const SIZES: Size[] = ['sm', 'md', 'lg']
-const VIEW_TITLE: Record<Exclude<View, 'main'>, string> = { info: 'Info', seed: 'Seed', pages: 'Pages', tests: 'Tests', settings: 'Settings' }
+const VIEW_TITLE: Record<Exclude<View, 'main'>, string> = {
+  info: 'Info',
+  seed: 'Seed',
+  pages: 'Pages',
+  tests: 'Tests',
+  region: 'Region',
+  settings: 'Settings',
+}
 
 const readSettings = (): Settings => {
   try {
@@ -30,11 +38,14 @@ const readSettings = (): Settings => {
   }
 }
 
-const readSelectionCookie = (name: string): StageSelection | null => {
-  const raw = document.cookie
+const readCookie = (name: string): string | null =>
+  document.cookie
     .split('; ')
     .find((c) => c.startsWith(`${name}=`))
-    ?.split('=')[1]
+    ?.split('=')[1] ?? null
+
+const readSelectionCookie = (name: string): StageSelection | null => {
+  const raw = readCookie(name)
   if (!raw) return null
   try {
     const decoded = decodeURIComponent(raw)
@@ -61,12 +72,14 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
   const [settings, setSettings] = useState<Settings>(DEFAULTS)
   const [snapshot, setSnapshot] = useState<DevSnapshot | null>(null)
   const [seedError, setSeedError] = useState<SeedError | null>(null)
+  const [regionCode, setRegionCode] = useState<string | null>(null)
   const [selection, setSelection] = useState<StageSelection | null>(null)
   const [chrome, setChrome] = useState<Record<ChromeSlot, StageSelection | null>>({ header: null, footer: null })
 
   useEffect(() => {
     setHidden(sessionStorage.getItem(HIDE_KEY) === '1')
     setSettings(readSettings())
+    setRegionCode(readCookie(REGION_COOKIE))
     setSelection(readSelectionCookie(STAGE_COOKIE))
     setChrome({ header: readSelectionCookie(CHROME_COOKIES.header), footer: readSelectionCookie(CHROME_COOKIES.footer) })
     setMounted(true)
@@ -140,6 +153,16 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
     [router],
   )
 
+  const selectRegion = useCallback(
+    (code: string | null) => {
+      // biome-ignore lint/suspicious/noDocumentCookie: dev-only synchronous cookie write; Cookie Store API is async and not universal
+      document.cookie = code ? `${REGION_COOKIE}=${code}; path=/; samesite=lax` : `${REGION_COOKIE}=; path=/; max-age=0; samesite=lax`
+      setRegionCode(code)
+      router.refresh()
+    },
+    [router],
+  )
+
   const update = useCallback((patch: Partial<Settings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch }
@@ -198,6 +221,8 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
 
   const corner = CORNER_CLASS[settings.corner]
   const seed = snapshot?.seed
+  const regions = snapshot?.regions ?? []
+  const region = regionFor(regionCode, regions)
 
   const pageLinks: DevLink[] = [
     { href: base, title: 'Overview' },
@@ -251,6 +276,7 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                 ) : null}
                 <MenuRow label="Pages" hint={pathname.startsWith(base) ? pathname : undefined} onClick={() => setView('pages')} />
                 {tests.length ? <MenuRow label="Tests" hint={`${tests.length}`} onClick={() => setView('tests')} /> : null}
+                {regions.length ? <MenuRow label="Region" hint={region ? region.label : 'real'} onClick={() => setView('region')} /> : null}
                 <MenuRow label="Settings" onClick={() => setView('settings')} />
               </ul>
             ) : null}
@@ -269,7 +295,19 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                       </div>
                       <p className="pdt-small" style={{ margin: 0 }}>
                         <span className="pdt-code">{snapshot.env.nodeEnv}</span> · node {snapshot.env.nodeVersion}
+                        {snapshot.env.name ? (
+                          <>
+                            {' '}
+                            · <span className="pdt-code">{snapshot.env.name}</span> from {snapshot.env.file}
+                          </>
+                        ) : null}
                       </p>
+                      {snapshot.env.database ? (
+                        <p className="pdt-small" style={{ margin: '4px 0 0' }}>
+                          {snapshot.env.database.variable} → {snapshot.env.database.host ?? 'unknown host'}
+                          {snapshot.env.database.local ? null : <span className="pdt-warn"> · remote</span>}
+                        </p>
+                      ) : null}
                       <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '3px 12px' }} className="pdt-small">
                         {Object.entries(snapshot.plugins).map(([name, on]) => (
                           <span key={name}>
@@ -278,6 +316,39 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                           </span>
                         ))}
                       </div>
+                      {snapshot.env.warnings.map((warning) => (
+                        <p key={warning} className="pdt-small pdt-warn" style={{ margin: '6px 0 0' }}>
+                          {warning}
+                        </p>
+                      ))}
+                    </div>
+
+                    <div className="pdt-card">
+                      <div className="pdt-card-head">
+                        <span className="pdt-card-title">Env vars</span>
+                        <span className="pdt-kind">
+                          {snapshot.env.vars.filter((v) => v.set).length}/{snapshot.env.vars.length} set
+                        </span>
+                      </div>
+                      <table className="pdt-table">
+                        <tbody>
+                          {snapshot.env.vars.map((v) => (
+                            <tr key={v.name}>
+                              <td>
+                                <span className={`pdt-dot ${v.set ? 'pdt-dot-on' : 'pdt-dot-off'}`} />
+                                {v.name}
+                              </td>
+                              <td className={v.set ? undefined : v.required ? 'pdt-warn' : undefined}>
+                                {v.set ? 'set' : v.required ? 'missing' : 'unset'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="pdt-note" style={{ marginBottom: 0 }}>
+                        Presence only — values never leave the server. Boot another env with{' '}
+                        <span className="pdt-code">payload-dev-env staging -- pnpm dev</span>.
+                      </p>
                     </div>
 
                     <div className="pdt-card">
@@ -536,6 +607,45 @@ export function DevToolbarClient({ tests, links }: { tests: TestMeta[]; links: D
                 <p className="pdt-note">
                   Page tests open as their own page; header/footer overrides swap into the live layout everywhere until you hit Real. Scriptable
                   via <span className="pdt-code">/api/dev/stage?test=…&version=…</span>
+                </p>
+              </div>
+            ) : null}
+
+            {view === 'region' ? (
+              <div>
+                <div className="pdt-card">
+                  <div className="pdt-card-head">
+                    <span className="pdt-card-title">Simulated location</span>
+                    <span className="pdt-kind">{region ? <span className="pdt-viewing">override on</span> : 'real location'}</span>
+                  </div>
+                  <div className="pdt-chips">
+                    <button type="button" className={`pdt-chip ${region ? '' : 'pdt-active'}`} onClick={() => selectRegion(null)}>
+                      Real
+                    </button>
+                    {regions.map((r) => (
+                      <button
+                        key={r.code}
+                        type="button"
+                        className={`pdt-chip ${region?.code === r.code ? 'pdt-active' : ''}`}
+                        onClick={() => selectRegion(r.code)}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="pdt-small" style={{ margin: '8px 0 0' }}>
+                    {region ? (
+                      <>
+                        <span className="pdt-code">{region.code}</span> · {region.regime} · {region.consent} consent
+                      </>
+                    ) : (
+                      'Whatever your app works out from the request.'
+                    )}
+                  </p>
+                </div>
+                <p className="pdt-note">
+                  Your app has to read it: pass its real region through <span className="pdt-code">resolveDevRegion()</span> and branch on{' '}
+                  <span className="pdt-code">consent</span>. Scriptable via <span className="pdt-code">/api/dev/region?code=DE</span>
                 </p>
               </div>
             ) : null}

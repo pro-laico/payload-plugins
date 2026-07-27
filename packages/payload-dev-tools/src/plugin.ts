@@ -4,6 +4,7 @@ import { resolveOptions } from './options'
 import { createDevEndpoint } from './endpoints/dev'
 import { createDraftEndpoint } from './endpoints/draft'
 import { createStageEndpoint } from './endpoints/stage'
+import { createRegionEndpoint } from './endpoints/region'
 import { createActivateIconSetEndpoint } from './endpoints/activateIconSet'
 import type { DevToolsPluginOptions, PayloadDevToolsMarker } from './types'
 
@@ -17,12 +18,12 @@ export const devToolsPlugin =
   (opts: DevToolsPluginOptions = {}): Plugin =>
   (config: Config): Config => {
     const { enabled, options } = resolveOptions(opts)
-    const { devRoute, access } = options
+    const { devRoute, regions, access } = options
     // Gate at config time rather than per-request: when off, the endpoints don't exist at all
     // instead of registering and 404ing.
     if (!enabled) return config
 
-    const marker: PayloadDevToolsMarker = { options: opts, devRoute }
+    const marker: PayloadDevToolsMarker = { options: opts, devRoute, regions }
 
     return {
       ...config,
@@ -31,6 +32,7 @@ export const devToolsPlugin =
         ...(config.endpoints ?? []),
         createDevEndpoint({ devRoute, access }),
         createStageEndpoint({ devRoute, access }),
+        createRegionEndpoint({ regions, access }),
         createDraftEndpoint({ access }),
         createActivateIconSetEndpoint({ access }),
       ],

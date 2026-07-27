@@ -1,0 +1,97 @@
+---
+title: "Environments"
+description: "Boot the site against staging without editing .env.local, and see at a glance what the running process is actually connected to."
+---
+
+Two things go wrong with environments in a Payload app. You edit `.env.local` to point at staging,
+forget, and spend an afternoon debugging seeded data that isn't there. Or worse: you don't forget,
+and `pnpm seed` wipes a real database.
+
+This plugin answers both — a wrapper that picks the environment at boot, and a panel that tells you
+which one you're in.
+
+## Switching: `payload-dev-env`
+
+Environment is read once, when the process boots. So switching can't be a toolbar toggle — it's a
+wrapper around the command, and changing it means a restart. The CLI ships with the plugin:
+
+```bash
+payload-dev-env staging -- pnpm dev
+payload-dev-env staging -- pnpm payload migrate:status
+payload-dev-env prod --file ../secrets/.env.prod -- pnpm build
+```
+
+It looks for `./.env.<name>.local`, then `./.env.<name>` (or the path you pass with `--file` /
+`PAYLOAD_DEV_ENV_FILE`), loads it, and runs your command with those values in front. Nothing is
+copied or overwritten — `.env.local` stays exactly as it is, and if no file matches the command
+doesn't run at all. A wrong environment should be loud, not silent.
+
+Wire the ones you use into `package.json`:
+
+```json title="package.json"
+{
+  "scripts": {
+    "dev": "next dev",
+    "dev:staging": "payload-dev-env staging -- next dev"
+  }
+}
+```
+
+<Callout type="info">
+Next's own env loading doesn't undo this: `@next/env` only fills variables that aren't already
+defined, so what the wrapper injects survives `.env.local`. (Node forbids `--env-file` inside
+`NODE_OPTIONS`, which is why this is a wrapper and not a flag.)
+</Callout>
+
+## Knowing where you are
+
+The wrapper stamps `PAYLOAD_DEV_ENV` and `PAYLOAD_DEV_ENV_FILE` into the process, so the toolbar's
+**Info** view and the `/dev` overview can name the environment you booted:
+
+```
+development · node v22.x · staging from .env.staging
+DATABASE_URI → cluster0.abc.mongodb.net · remote
+```
+
+Alongside it, a present/missing checklist for the variables the installed plugins actually read —
+`PAYLOAD_SECRET`, the database URI, `ENABLE_SEED` if payload-seed is installed, `MUX_TOKEN_ID` and
+`MUX_TOKEN_SECRET` if payload-mux is, and so on. Required-but-missing is called out; optional and
+unset stays quiet.
+
+<Callout type="warn">
+**Presence only, never values.** The snapshot reports `set: true` and the database *host* — with
+credentials and path stripped — and nothing else. A connection string carries a password, and this
+is data the toolbar fetches over HTTP.
+</Callout>
+
+Two warnings are worth the interruption, and appear in red:
+
+- **A development boot pointed at a remote database.** The most expensive mistake in the list — it's
+  how a seed run ends up on staging data.
+- **A required variable missing** for a plugin you installed.
+
+## In the snapshot
+
+Everything above is in `GET /api/dev` under `env`, so CI and agents can assert on it:
+
+```bash
+curl -s localhost:3000/api/dev | jq '.env.warnings, .env.database.local'
+```
+
+```jsonc
+"env": {
+  "nodeEnv": "development",
+  "nodeVersion": "v22.x",
+  "name": "staging",
+  "file": ".env.staging",
+  "database": { "variable": "DATABASE_URI", "host": "cluster0.abc.mongodb.net", "local": false },
+  "vars": [{ "name": "PAYLOAD_SECRET", "owner": "payload", "required": true, "set": true }/* … */],
+  "warnings": ["DATABASE_URI points at cluster0.abc.mongodb.net — this dev boot is writing to a non-local database."]
+}
+```
+
+## Next
+
+- [Testing by location](/docs/plugins/payload-dev-tools/regions) — the other thing you can't see from your own machine.
+- [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) — the rest of the snapshot.
+- [Reference](/docs/plugins/payload-dev-tools/reference) — environment variables and exports.

@@ -1,6 +1,8 @@
 import type { Payload, Where } from 'payload'
 
 import { isRecord } from '../_kit'
+import { buildEnvSnapshot } from './env'
+import { DEFAULT_REGIONS } from './regions'
 import { readDevToolsMarker } from './marker'
 import type {
   CollectionCount,
@@ -163,14 +165,16 @@ export async function buildDevSnapshot(payload: Payload): Promise<DevSnapshot> {
   const imagesMarker = custom.payloadImages
   const revalidateMarker = custom.payloadRevalidate
 
+  const marker = readDevToolsMarker(payload.config)
   const collections: CollectionCount[] = []
   for (const c of payload.config.collections) collections.push({ slug: c.slug, count: await countDocs(payload, c.slug) })
 
   return {
     generatedAt: new Date().toISOString(),
-    env: { nodeEnv: process.env.NODE_ENV ?? 'development', nodeVersion: process.version },
+    env: buildEnvSnapshot(payload),
     adminRoute: payload.config.routes?.admin ?? '/admin',
-    devRoute: readDevToolsMarker(payload.config)?.devRoute ?? '/dev',
+    devRoute: marker?.devRoute ?? '/dev',
+    regions: marker?.regions ?? DEFAULT_REGIONS,
     plugins: {
       seed: !!seedMarker,
       images: !!imagesMarker,

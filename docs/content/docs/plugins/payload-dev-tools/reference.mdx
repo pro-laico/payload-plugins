@@ -24,6 +24,12 @@ export const options = [
         description: `Where the host app mounts the createDevPage catch-all. Drives the toolbar's built-in link and the browser redirect from GET /api/dev.`,
       },
       {
+        name: 'regions',
+        type: 'DevRegion[]',
+        default: 'DEFAULT_REGIONS',
+        description: `The locations the toolbar's Region view offers, each as { code, label, regime, consent }. Defaults to one region per distinct behaviour (DE, FR, GB, CH, US, US-CA, BR, CA, JP). Entries here also win over the built-in lookup table, so this is where you correct or add a region. See Testing by location.`,
+      },
+      {
         name: 'access',
         type: 'DevToolsAccessOptions',
         description: `Per-endpoint gate for the plugin's HTTP endpoints — one EndpointAccess ((req) => boolean | Promise<boolean>) covering all /dev* routes. See Gating endpoints.`,
@@ -52,10 +58,18 @@ interface DevToolsPluginOptions {
   enabled?: boolean
   options?: {
     devRoute?: string // default '/dev'
+    regions?: DevRegion[] // default DEFAULT_REGIONS
     access?: {
       dev?: EndpointAccess // default: public (the /dev* endpoints already only register in dev)
     }
   }
+}
+
+interface DevRegion {
+  code: string // ISO 3166 — 'DE', or 'US-CA' for a subdivision with its own law
+  label: string
+  regime: 'gdpr' | 'uk-gdpr' | 'ccpa' | 'lgpd' | 'pipeda' | 'fadp' | 'appi' | 'pipl' | 'none'
+  consent: 'opt-in' | 'opt-out' | 'none'
 }
 ```
 </Tab>
@@ -76,13 +90,27 @@ To close the pages, set `enabled: false` (or don't deploy the catch-all route).
 
 ## Environment variables
 
-None — everything is gated by the `enabled` option (which defaults to `NODE_ENV === 'development'`).
-The Seed view surfaces the seed plugin's `ENABLE_SEED`, but that variable belongs to
-[payload-seed](/docs/plugins/payload-seed/reference#environment-variables), not this plugin.
+Gating is the `enabled` option (defaulting to `NODE_ENV === 'development'`), not an env var. These
+two exist only as the handoff from the `payload-dev-env` CLI — you set them by using it, not by
+hand. See [Environments](/docs/plugins/payload-dev-tools/environments).
+
+| Variable | What |
+| --- | --- |
+| `PAYLOAD_DEV_ENV` | The env name the CLI booted with; the toolbar and `/dev` show it. Stamped into the child process. |
+| `PAYLOAD_DEV_ENV_FILE` | The env file the CLI loaded. Read as an input too: it overrides the `.env.<name>.local` → `.env.<name>` search. |
+
+The checklist in the Info view reports variables other plugins read (`ENABLE_SEED`, `MUX_TOKEN_ID`,
+…) — presence only, never values. They belong to those plugins, not this one.
+
+## CLI
+
+| Command | What |
+| --- | --- |
+| `payload-dev-env <name> [--file <path>] -- <command…>` | Loads `.env.<name>.local` / `.env.<name>` (or `--file`) and runs the command with those values in front of the ambient environment. Exits non-zero, without running anything, when no file matches. |
 
 ## Endpoints
 
-All four routes 404 outside development — with `enabled` off they're never registered. Where they are
+All five routes 404 outside development — with `enabled` off they're never registered. Where they are
 registered, `options.access.dev` gates them (public by default; the knob lets you close them — see
 [Gating endpoints](../conventions#gating-endpoints)). A denial is `403 {"error":"Forbidden."}`, not a
 404. See [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) for the snapshot shape and what
@@ -92,6 +120,7 @@ each view renders.
 | --- | --- |
 | `GET /api/dev` | Machine-readable app snapshot (env, plugins, seed status, counts, misses). Browsers are redirected to `/dev`. |
 | `GET /api/dev/stage` | Stages a test version (`?test=…&version=…`) or a header/footer chrome slot (`?slot=header\|footer`) in a cookie, then redirects (`?to=` targets it, `?clear=1` resets). |
+| `GET /api/dev/region` | Overrides the visitor's location in a cookie (`?code=DE`, `?clear=1` resets, `?to=` targets the redirect). 400s on a code it can't resolve. |
 | `GET /api/dev/draft` | Toggles Next.js draft mode. |
 | `POST /api/dev/icons/activate` | Sets the active icon set. |
 
@@ -109,13 +138,19 @@ each view renders.
 | `Test` / `TestKind` / `TestVersion` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | What `defineTest` returns and takes — a test, its kind (`page` / `header` / `footer` / `block` / `custom`), and one version. |
 | `TestMeta` | `@pro-laico/payload-dev-tools` | A test stripped of its `render` functions — the label-only shape the toolbar receives. |
 | `DevSnapshot` / `CollectionCount` / `SeedSnapshot` / `ImagesSnapshot` / `IconsSnapshot` / `FontsSnapshot` / `MuxSnapshot` | `@pro-laico/payload-dev-tools` | The `GET /api/dev` response shape and its per-plugin panels, for typed consumers. |
-| `STAGE_COOKIE` | `@pro-laico/payload-dev-tools` | The stage cookie name, for custom staging tooling. |
+| `EnvSnapshot` / `EnvVarStatus` / `DatabaseStatus` | `@pro-laico/payload-dev-tools` | The snapshot's `env` block: what booted, the variable checklist, and the database host. |
+| `regionFor` | `@pro-laico/payload-dev-tools` | Pure code → region lookup (`(code, regions?) => DevRegion \| undefined`). Framework-free, so it works in middleware. |
+| `REGIONS` / `DEFAULT_REGIONS` | `@pro-laico/payload-dev-tools` | Every resolvable region (the EEA plus the countries with their own regime), and the default toolbar chips. |
+| `DevRegion` / `PrivacyRegime` / `ConsentModel` | `@pro-laico/payload-dev-tools` (and `/toolbar`) | One region, the regime it falls under, and the `opt-in` / `opt-out` / `none` model to branch on. |
+| `STAGE_COOKIE` / `REGION_COOKIE` | `@pro-laico/payload-dev-tools` | The stage and region cookie names, for custom staging tooling. |
 | `createDevPage` | `@pro-laico/payload-dev-tools/next` | The `/dev` pages; one catch-all drop-in file. |
 | `CreateDevPageOptions` | `@pro-laico/payload-dev-tools/next` | `createDevPage`'s argument type: `{ payload, tests?, enabled? }`. |
 | `DevToolbar` | `@pro-laico/payload-dev-tools/toolbar` | The floating toolbar server component; one line in your layout. |
 | `DevToolbarProps` / `DevLink` | `@pro-laico/payload-dev-tools/toolbar` | The toolbar's props (`{ tests?, links?, enabled? }`), and one `links` entry (`{ href, title }`). |
 | `resolveDevChrome` | `@pro-laico/payload-dev-tools/toolbar` | The chrome-swap seam: returns the real header/footer, or the toolbar-selected variant. |
 | `ResolveDevChromeOptions` | `@pro-laico/payload-dev-tools/toolbar` | `resolveDevChrome`'s argument type: `{ tests, header, footer, enabled? }`. |
+| `resolveDevRegion` | `@pro-laico/payload-dev-tools/toolbar` | The location seam: returns the real region, or the toolbar-selected one in development. |
+| `ResolveDevRegionOptions` | `@pro-laico/payload-dev-tools/toolbar` | `resolveDevRegion`'s argument type: `{ region?, regions?, enabled? }`. |
 
 ## Collections & globals
 
@@ -126,5 +161,7 @@ through their `config.custom` markers to build the `/dev` pages and snapshot.
 
 - [The /dev pages](/docs/plugins/payload-dev-tools/dev-pages) — every `/dev` route and the `GET /api/dev` snapshot.
 - [The test harness](/docs/plugins/payload-dev-tools/test-harness) — `defineTest`, version switching, and chrome swaps.
+- [Testing by location](/docs/plugins/payload-dev-tools/regions) — the Region toggle and `resolveDevRegion`.
+- [Environments](/docs/plugins/payload-dev-tools/environments) — `payload-dev-env` and the env diagnostics.
 - [How it works](/docs/plugins/payload-dev-tools/how-it-works) — plugin discovery, gating, and the persistent toolbar.
 - [Troubleshooting](/docs/plugins/payload-dev-tools/troubleshooting) — 404s, stale pages, and the `enabled` security note.

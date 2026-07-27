@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { createActivateIconSetEndpoint } from '../../src/endpoints/activateIconSet'
 import { createDevEndpoint } from '../../src/endpoints/dev'
 import { createDraftEndpoint } from '../../src/endpoints/draft'
+import { createRegionEndpoint } from '../../src/endpoints/region'
 import { createStageEndpoint } from '../../src/endpoints/stage'
+import { DEFAULT_REGIONS } from '../../src/lib/regions'
 
 // The draft endpoint lazy-imports `next/headers`; outside a real Next request scope
 // `draftMode()` throws, so stand in a minimal in-memory implementation.
@@ -90,6 +92,40 @@ describe('GET /api/dev/stage', () => {
 
     const clear = await stage().handler(request('http://x/api/dev/stage?slot=footer&clear=1'))
     expect(clear.headers.get('set-cookie')).toContain('pdt-chrome-footer=;')
+  })
+})
+
+describe('GET /api/dev/region', () => {
+  const region = () => createRegionEndpoint({ regions: DEFAULT_REGIONS })
+
+  it('sets the region cookie and redirects home', async () => {
+    const res = await region().handler(request('http://x/api/dev/region?code=DE'))
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/')
+    expect(res.headers.get('set-cookie')).toBe('pdt-region=DE; Path=/; SameSite=Lax')
+  })
+
+  it('normalizes the code it stores, so the cookie always matches the table', async () => {
+    const res = await region().handler(request('http://x/api/dev/region?code=us-ca&to=/pricing'))
+    expect(res.headers.get('set-cookie')).toContain('pdt-region=US-CA;')
+    expect(res.headers.get('location')).toBe('/pricing')
+  })
+
+  it('clears with ?clear (and when no code is given)', async () => {
+    for (const url of ['http://x/api/dev/region?clear=1', 'http://x/api/dev/region']) {
+      const res = await region().handler(request(url))
+      expect(res.headers.get('set-cookie')).toContain('Max-Age=0')
+    }
+  })
+
+  it('400s on a region it cannot resolve rather than staging a lie', async () => {
+    const res = await region().handler(request('http://x/api/dev/region?code=XX'))
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects non-path redirect targets (no open redirect)', async () => {
+    const res = await region().handler(request(`http://x/api/dev/region?code=DE&to=${encodeURIComponent('https://evil.test')}`))
+    expect(res.headers.get('location')).toBe('/')
   })
 })
 

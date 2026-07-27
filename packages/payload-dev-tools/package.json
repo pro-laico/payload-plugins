@@ -42,6 +42,9 @@
   },
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "payload-dev-env": "./dist/scripts/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -96,6 +99,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "3.0.0",
-    "@xyflow/react": "12.11.1"
+    "@xyflow/react": "12.11.1",
+    "dotenv": "^17.4.2"
   }
 }

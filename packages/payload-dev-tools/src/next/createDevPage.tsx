@@ -109,6 +109,7 @@ const DevIndex = ({ snapshot }: { snapshot: DevSnapshot }) => (
     <div className="pdtp-section">
       <div className="pdtp-grid">
         {snapshot.seed ? <SeedCard seed={snapshot.seed} adminRoute={snapshot.adminRoute} /> : null}
+        <EnvCard snapshot={snapshot} />
         <div className="pdtp-card">
           <h2>
             Collections <span className="pdtp-kind">docs</span>
@@ -131,6 +132,47 @@ const DevIndex = ({ snapshot }: { snapshot: DevSnapshot }) => (
       Machine-readable: <span className="pdtp-code">GET /api/dev</span> serves this as JSON (browsers land here instead).
     </p>
   </>
+)
+
+const EnvCard = ({ snapshot }: { snapshot: DevSnapshot }) => (
+  <div className="pdtp-card">
+    <h2>
+      Environment <span className="pdtp-kind">{snapshot.env.name ?? snapshot.env.nodeEnv}</span>
+    </h2>
+    <table className="pdtp-table">
+      <tbody>
+        {snapshot.env.file ? (
+          <tr>
+            <td>env file</td>
+            <td className="pdtp-mono">{snapshot.env.file}</td>
+          </tr>
+        ) : null}
+        {snapshot.env.database ? (
+          <tr>
+            <td>{snapshot.env.database.variable}</td>
+            <td className="pdtp-mono">{snapshot.env.database.host ?? 'unknown host'}</td>
+          </tr>
+        ) : null}
+        {snapshot.env.vars.map((v) => (
+          <tr key={v.name}>
+            <td>
+              <span className={`pdtp-dot ${v.set ? 'pdtp-dot-on' : 'pdtp-dot-off'}`} />
+              {v.name}
+            </td>
+            <td className="pdtp-mono">{v.set ? 'set' : v.required ? 'missing' : 'unset'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {snapshot.env.warnings.map((warning) => (
+      <p key={warning} className="pdtp-note">
+        {warning}
+      </p>
+    ))}
+    <p className="pdtp-note">
+      Presence only — no values. Boot another env with <span className="pdtp-code">payload-dev-env staging -- pnpm dev</span>.
+    </p>
+  </div>
 )
 
 const TestsIndex = ({ tests }: { tests: Test[] }) => (

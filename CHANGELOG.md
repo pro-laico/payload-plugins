@@ -7,6 +7,45 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Added
+
+- **payload-dev-tools: see your site the way a visitor somewhere else does.** Privacy law is a
+  rendering condition — a visitor in Germany has to opt in before analytics loads, one in California
+  only has to be offered a way out — and until now you could only ever see the version your own IP
+  earned you. The toolbar's new **Region** view sets a location for your session; your app reads it
+  through `resolveDevRegion` and branches exactly as it would in production:
+
+  ```tsx
+  const region = await resolveDevRegion({ region: (await headers()).get('x-vercel-ip-country') })
+  {region?.consent === 'opt-in' ? <ConsentGate /> : null}
+  ```
+
+  `consent` is the same three answers everywhere (`opt-in` / `opt-out` / `none`), so your UI doesn't
+  grow a case per country. Resolution covers all 30 EEA countries plus the UK, Switzerland, Brazil,
+  Canada, Japan, China, the US and California; `options.regions` replaces the chips and overrides the
+  built-in table. Scriptable via `GET /api/dev/region?code=DE`. `regionFor` is pure and Next-free for
+  middleware use.
+
+- **payload-dev-tools: `payload-dev-env` — boot against another environment without editing
+  `.env.local`.** `payload-dev-env staging -- pnpm dev` loads `.env.staging` and runs the command
+  with those values in front. Nothing is copied or overwritten, and a name with no matching file
+  fails loudly instead of silently booting the wrong environment. Env is read once at boot, so this
+  is a wrapper, not a toolbar toggle — switching means a restart.
+
+- **payload-dev-tools: the toolbar now tells you what you're connected to.** The Info view and the
+  `/dev` overview name the environment you booted, the database host (credentials stripped), and a
+  present/missing checklist for the variables the installed plugins actually read. Two warnings show
+  in red: a development boot pointed at a remote database, and a required variable missing for a
+  plugin you installed. Presence only — no values ever leave the server. All of it is in
+  `GET /api/dev` under `env`, for CI and agents.
+
+### Changed
+
+- **payload-dev-tools: the snapshot's `env` grew from two fields to a block.** `DevSnapshot['env']`
+  was `{ nodeEnv, nodeVersion }` and is now an `EnvSnapshot` — same two fields, plus `name`, `file`,
+  `database`, `vars`, and `warnings`. Anything reading `snapshot.env.nodeEnv` keeps working.
+  `DevSnapshot` also gains `regions`, and `PayloadDevToolsMarker` gains `regions`.
+
 ## [0.5.0] - 2026-07-27
 
 Gating a plugin used to mean learning whichever mechanism that plugin happened to pick.
