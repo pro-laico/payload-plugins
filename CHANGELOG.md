@@ -9,10 +9,15 @@ packages share one lockstep version.
 
 ## [0.6.0] - 2026-07-28
 
-Pretend to be a visitor in another country, boot against another environment, and see what the
-running process is actually connected to. Plus the fix underneath all three: `payload-icons` now
-caches and tags its own read, so a page of icons prerenders and still heals when an icon changes.
-Anyone rendering icons has upgrade work; everyone else can take this straight.
+`payload-dev-tools` gains three ways to inspect things you normally can't see from your own machine:
+a toolbar toggle that renders your site as it would appear to a visitor in another country, a CLI
+that boots it against a different `.env` file, and a panel reporting which environment and database
+the running process is actually using.
+
+`payload-icons` carries the breaking half. `<Icon>` now caches and tags its own read, so a page full
+of icons can prerender and still update when an icon changes — previously those reads were untagged,
+and an icon baked into a prerendered page never changed again. It requires Cache Components, and
+draft previews now pass a prop. If you don't render icons, this upgrade is a no-op.
 
 ### Added
 
