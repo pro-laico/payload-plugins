@@ -4,6 +4,8 @@ Composable [Payload CMS](https://payloadcms.com/) plugins published under the `@
 
 **[Documentation → payload-plugins.prolaico.com](https://payload-plugins.prolaico.com)**
 
+These plugins are a work in progress and are actively being worked on. Expect kinks/bugs and breaking changes between versions.
+
 | Plugin | |
 | --- | --- |
 | [`@pro-laico/payload-seed`](https://payload-plugins.prolaico.com/docs/plugins/payload-seed) | Type-safe database seeding. |
