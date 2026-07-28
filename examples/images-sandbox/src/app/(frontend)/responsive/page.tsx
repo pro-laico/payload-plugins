@@ -1,9 +1,7 @@
-import config from '@payload-config'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { getPayload } from 'payload'
 import { buildSrcset } from '@pro-laico/payload-images/utils/urls'
 import { EmptyState, SandboxShell } from '@pro-laico/sandbox-shell'
+import { getFirstImage } from '@/lib/getters'
 
 import { shellProps } from '../shell'
 import { Image } from '../../../components/Image'
@@ -23,12 +21,10 @@ export default function ResponsivePage() {
   )
 }
 
-/** The per-request part: read the first seeded image and render it full-bleed with its emitted srcset.
- * `connection()` marks it dynamic, so it streams into the Suspense hole instead of prerendering. */
+/** The first seeded image, rendered full-bleed with its emitted srcset. Cached, so this page
+ * prerenders; uploading or deleting an image busts the tag. */
 async function ResponsiveDemo() {
-  await connection()
-  const payload = await getPayload({ config })
-  const img = (await payload.find({ collection: 'images', limit: 1, depth: 0, sort: 'createdAt' })).docs.at(0)
+  const img = await getFirstImage()
 
   if (!img) {
     return (

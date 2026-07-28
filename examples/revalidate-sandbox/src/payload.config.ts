@@ -22,6 +22,9 @@ export default buildConfig({
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',
   typescript: { outputFile: resolve(currentDir, 'payload-types.ts') },
+  // Dev pushes the schema; nothing here self-migrates. These apps hold nothing but seed data, so
+  // `prebuild` seeds — which boots Payload outside production, pushing the schema on the way and
+  // giving `next build` real content to prerender. Change the seed, reseed; there is no migration.
   db: sqliteAdapter({ client: { url: process.env.DATABASE_URI || 'file:./revalidate-sandbox.db' } }),
   sharp,
   plugins,

@@ -12,7 +12,9 @@
     "generate:importmap": "pnpm payload generate:importmap",
     "generate:fonts": "pnpm payload fonts:download",
     "test": "cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prebuild": "cross-env ENABLE_SEED=true pnpm payload seed",
+    "seed": "pnpm payload seed"
   },
   "dependencies": {
     "@payloadcms/db-sqlite": "^3.86.0",

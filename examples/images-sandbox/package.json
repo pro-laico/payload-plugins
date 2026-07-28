@@ -11,7 +11,9 @@
     "generate:types": "pnpm payload generate:types",
     "generate:importmap": "pnpm payload generate:importmap",
     "test": "node -e \"try{require('fs').rmSync('.vitest.db')}catch{}\" && cross-env PAYLOAD_SECRET=test-secret DATABASE_URI=file:./.vitest.db IMAGES_PREWARM_FLUSH_MS=100 vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prebuild": "cross-env ENABLE_SEED=true pnpm payload seed",
+    "seed": "pnpm payload seed"
   },
   "dependencies": {
     "@payloadcms/db-sqlite": "^3.86.0",

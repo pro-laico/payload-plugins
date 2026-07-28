@@ -49,3 +49,21 @@ describe('devToolsPlugin', () => {
     expect(appOnInit).toHaveBeenCalledOnce()
   })
 })
+
+// `enabled` is a kill switch, not an override: development-only tools that a deployed build could
+// be told to serve are how a diagnostics page ends up publishing the build machine's counts.
+describe('devToolsPlugin — the production clamp', () => {
+  it('registers nothing under NODE_ENV=production, even with enabled: true', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    const config = devToolsPlugin({ enabled: true })({ custom: {} } as Config) as Config
+    expect(config.endpoints).toBeUndefined()
+    expect(config.custom?.payloadDevTools).toBeUndefined()
+    vi.unstubAllEnvs()
+  })
+
+  it('still honors enabled: true outside production, so tests and harnesses can opt in', () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    expect(apply({}).custom?.payloadDevTools).toBeDefined()
+    vi.unstubAllEnvs()
+  })
+})

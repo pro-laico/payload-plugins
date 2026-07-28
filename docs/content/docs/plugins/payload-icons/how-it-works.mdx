@@ -9,7 +9,7 @@ An `<Icon name>` resolves through whichever icon set is currently **active and p
 
 `<Icon name="arrow-right" />` looks the name up in the **active, published** `iconSet`. It finds the `icon` doc that row points at and inlines that doc's stored `svgString` as a real `<svg>`. The result recolors through `currentColor` and takes its size from your own classes.
 
-The lookup reads through `payload.find`, memoized per request. Repeating the same icon on a page costs one query.
+The lookup reads through `payload.find` inside a `'use cache'` entry that tags itself `payload-icons`. One query resolves the whole active set, and it's reused across requests until something busts the tag — so a page of fifty icons costs one read, and usually none.
 
 The name it matches is the *set entry's* name, not the uploaded filename. That is why swapping the active set re-skins every icon at once.
 
@@ -17,7 +17,7 @@ A name the active set doesn't cover renders the fallback warning glyph instead o
 
 export const resolveNodes = [
   { id: 'req', kind: 'start', label: '<Icon name="arrow-right" />', detail: 'renders in a page, block, or component', x: 300, y: 0 },
-  { id: 'lookup', label: 'Look up the active, published iconSet', detail: 'payload.find — memoized per request, one query per page', x: 300, y: 150 },
+  { id: 'lookup', label: 'Look up the active, published iconSet', detail: "payload.find inside a 'use cache' entry tagged payload-icons", x: 300, y: 150 },
   { id: 'match', kind: 'check', label: 'Name in the active set?', x: 300, y: 320 },
   { id: 'inline', kind: 'result', label: 'Inline the stored svgString', detail: 'a real <svg> — recolors via currentColor, sized by your classes', x: 40, y: 480 },
   { id: 'fallback', kind: 'result', label: 'Render the fallback glyph', detail: 'a visible warning mark — never nothing', x: 560, y: 480 },
@@ -36,20 +36,32 @@ export const resolveEdges = [
 
 ## Revalidation
 
-On its own the plugin does no revalidation. `<Icon>` reads via `payload.find`, memoized per request. A **statically rendered** page bakes the SVG at build time. It won't reflect an edit or an active-set swap until the route revalidates.
+The active-set read is a `'use cache'` entry that tags itself `payload-icons`. That's what lets a
+page full of icons prerender: the SVGs come from a cache entry, not from a database read Next would
+have to render around.
 
-Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) and the whole surface becomes self-healing, zero config. Two decoupled halves meet on one shared tag, `payload-icons`:
+Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) and the whole surface becomes self-healing, zero config. Two decoupled halves meet on that one shared tag:
 
 - **Write side** — the `icon` and `iconSet` collections ship a data-only `custom.revalidate` marker carrying `extraTags: ['payload-icons']`. revalidatePlugin's auto-attached hooks bust that tag on every published icon/set write and delete. The after-seed flush busts it too.
-- **Read side** — when an `<Icon>` (or `getIconSvg`) runs inside one of your `'use cache'` scopes and detects the revalidate plugin, it applies the same tag via `cacheTag`. Re-upload an SVG, remap a name, or activate a different set, and every cache entry that inlined an icon re-materializes on the next request.
+- **Read side** — `getIconSvg` (and therefore `<Icon>`) calls `cacheTag` inside its own cached read. Re-upload an SVG, remap a name, or activate a different set, and every page that inlined an icon re-materializes on the next request.
+
+Draft follows the same lane convention as the rest of the repo: a `draft` read claims both
+`payload-icons` and `payload-icons:draft`, a published read claims only the plain tag. Editing a
+draft never disturbs what visitors are served; publishing refreshes both.
 
 <Callout type="info">
   `iconRequest` ships `custom: { revalidate: false }` — a diagnostic feed that busts nothing.
 </Callout>
 
-Without the revalidate plugin, or outside a `'use cache'` scope, the tagging is a silent no-op with no behavior change.
+Without the revalidate plugin nothing busts the tag, and the entry lives out its cache lifetime — the same deal any other cached read gets.
 
-The single coarse tag is deliberate. The active-set read isn't keyed by a doc id, icon writes are rare, and the whole set resolves in a single query. See it wired end-to-end in [`examples/revalidate-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/revalidate-sandbox).
+The single coarse tag is deliberate. The active-set read isn't keyed by a doc id, icon writes are rare, and the whole set resolves in a single query. See it wired end-to-end in [`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox) — which installs both plugins for exactly this reason — and in [`examples/revalidate-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/revalidate-sandbox).
+
+<Callout type="warn">
+Without the revalidate plugin nothing busts `payload-icons`. The read still caches, so a page that
+prerendered an icon keeps serving it until the entry expires — an SVG re-upload or an active-set
+swap won't show. Install the pair, or bust the tag yourself.
+</Callout>
 
 ## Seeding
 

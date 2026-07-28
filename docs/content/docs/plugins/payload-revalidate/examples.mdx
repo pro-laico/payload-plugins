@@ -177,7 +177,7 @@ integrates them with zero config:
 
 | Plugin | What its collections declare |
 | --- | --- |
-| [payload-icons](/docs/plugins/payload-icons) | `icon` + `iconSet` carry `extraTags: ['payload-icons']` — and `<Icon>` applies the same tag via `cacheTag` inside your `'use cache'` scopes, so baked-in SVGs self-heal. `iconRequest` opts out. |
+| [payload-icons](/docs/plugins/payload-icons) | `icon` + `iconSet` carry `extraTags: ['payload-icons']`, and `<Icon>` tags its own cached read with the same tag — so an SVG baked into a prerendered page self-heals on the next request after a write. `iconRequest` opts out. |
 | [payload-images](/docs/plugins/payload-images) | `images` gets the standard hooks (fetch it with an id-keyed `findDocByID` getter); the internal `generated-images` variant cache and `image-render-profiles` observation log both opt out, so on-demand variant writes stay silent. |
 | [payload-mux](/docs/plugins/payload-mux) | `mux-video` gets the standard hooks — webhook writes go through `payload.update`, so a "processing" page heals itself when the asset goes ready. |
 | [payload-fonts](/docs/plugins/payload-fonts) | Derived `fontOriginal` / `fontOptimized` opt out (fonts are build-baked; nothing at runtime to bust). |

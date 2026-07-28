@@ -30,6 +30,29 @@ payload-plugins/
 | `docs`       | no         | no                     | The documentation site.                             |
 | `tools/*`    | no         | no                     | Internal tooling (releaser, sandbox-shell, failure-lab). |
 
+### How the examples read data
+
+Every example reads Payload through cached, tagged getters in `src/lib/getters.ts` — the pattern a
+real site ships — so its pages prerender and a write busts the tag. None of them mark a page dynamic
+to dodge the cache.
+
+That has one consequence worth knowing when you work on them: a build that prerenders a database
+read needs a schema, and Payload only pushes one outside production (`db-sqlite` gates push on
+`NODE_ENV !== 'production'`). Since these apps hold nothing but seed data, `prebuild` simply seeds:
+
+```jsonc
+"prebuild": "cross-env ENABLE_SEED=true pnpm payload seed"
+```
+
+That boots Payload outside production — pushing the schema on the way — and leaves the build real
+content to prerender instead of an empty database. `pnpm build` works on a fresh clone with no `.db`
+file, and CI needs no environment beyond the repo. `pnpm dev` is unchanged.
+
+Two things follow. **A build reseeds**, which is destructive by design — the seeded collections are
+wiped and rewritten, so don't keep anything in an example database you aren't willing to lose. And
+the build opts into `ENABLE_SEED` explicitly rather than relying on `.env.local`, which is gitignored
+and absent in CI; the guard still protects the endpoint and the admin button everywhere else.
+
 ## Commands
 
 All commands run from the monorepo root.

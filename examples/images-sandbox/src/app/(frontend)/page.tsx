@@ -1,14 +1,10 @@
-import config from '@payload-config'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { type CollectionSlug, getPayload } from 'payload'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { EmptyState, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
 import { shellProps } from './shell'
+import { getImageCount, getImages, getPages, getStatus } from '@/lib/getters'
 import { PageCard } from '../../components/PageCard'
 import { ImageCard } from '../../components/ImageCard'
-
-const SEEDED_SLUGS: CollectionSlug[] = ['images', 'pages']
 
 export default function HomePage() {
   return (
@@ -68,23 +64,10 @@ if (img) return <ResponsiveImage {...img} sizes="50vw" />`}</pre>
   )
 }
 
-/** The live, per-request gallery: seed status + the seeded images and pages. `connection()` marks it
- * dynamic, so it streams into the Suspense hole instead of prerendering with build-time data. */
+/** Seed status, the seeded images, and the pages that reference them — all cached getters, read
+ * per change rather than per request, so the gallery prerenders. */
 async function Gallery() {
-  await connection()
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-
-  const images = (
-    await payload.find({
-      collection: 'images',
-      limit: 50,
-      depth: 0,
-      sort: 'createdAt',
-      select: { alt: true, width: true, height: true, focalX: true, focalY: true },
-    })
-  ).docs
-  const pages = (await payload.find({ collection: 'pages', limit: 10, depth: 0, sort: 'createdAt' })).docs
+  const [status, images, pages] = await Promise.all([getStatus(), getImages(), getPages()])
 
   return (
     <>
@@ -131,12 +114,9 @@ async function Gallery() {
   )
 }
 
-/** The live-demo call-to-action, shown only once at least one image exists — a per-request read,
- * so it too streams into a Suspense hole after `connection()`. */
+/** The live-demo call-to-action, shown only once at least one image exists. */
 async function ResponsiveDemoLink() {
-  await connection()
-  const payload = await getPayload({ config })
-  const { totalDocs } = await payload.count({ collection: 'images' })
+  const totalDocs = await getImageCount()
   if (totalDocs === 0) return null
 
   return (

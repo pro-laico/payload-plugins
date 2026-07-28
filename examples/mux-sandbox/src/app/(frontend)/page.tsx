@@ -1,12 +1,8 @@
-import config from '@payload-config'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { type CollectionSlug, getPayload } from 'payload'
-import { getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
 import { VideoList } from '@/components/VideoList'
-
-const SEEDED_SLUGS: CollectionSlug[] = ['mux-video', 'pages']
+import { getStatus, getVideos } from '@/lib/getters'
 
 export default function HomePage() {
   return (
@@ -30,14 +26,9 @@ export default function HomePage() {
   )
 }
 
-/** The live, per-request part: seed status + the seeded/uploaded videos. `connection()` marks it
- * dynamic, so it streams into the Suspense hole instead of prerendering with build-time data. */
+/** Seed status and the seeded videos through cached getters — read per change, not per request. */
 async function Videos() {
-  await connection()
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-
-  const videos = (await payload.find({ collection: 'mux-video', limit: 50, depth: 0, sort: 'createdAt' })).docs
+  const [status, videos] = await Promise.all([getStatus(), getVideos()])
 
   return (
     <>

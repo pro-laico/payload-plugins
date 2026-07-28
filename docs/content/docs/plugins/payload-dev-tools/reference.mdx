@@ -10,7 +10,7 @@ export const options = [
     name: 'enabled',
     type: 'boolean',
     default: "NODE_ENV === 'development'",
-    description: `Forces the endpoints on or off regardless of environment. The default gates everything to development. Only force true on a deployment you'd hand a teammate anyway (a preview env): the snapshot exposes collection counts and config details, unauthenticated.`,
+    description: `Turns the endpoints on or off. The default gates everything to development, and no value forces them on under NODE_ENV=production — a deployed build registers nothing. Pass true for the environments in between, such as a test run or an integration harness.`,
   },
   {
     name: 'options',
@@ -38,7 +38,7 @@ export const options = [
             name: 'dev',
             type: 'EndpointAccess',
             default: 'public',
-            description: `Gates every /dev* endpoint. Public by default — they only register in development — but this knob lets you close them (e.g. on a preview deployment you force on with enabled: true).`,
+            description: `Gates every /dev* endpoint. Public by default — they only register in development — but this knob lets you close them on a shared dev environment.`,
           },
         ],
       },

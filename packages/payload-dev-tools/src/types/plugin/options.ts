@@ -2,7 +2,12 @@ import type { EndpointAccess } from '../../_kit'
 import type { DevRegion } from '../region'
 
 export interface DevToolsPluginOptions {
-  /** Force the toolbar and dev endpoints on or off. Default: `NODE_ENV === 'development'`; when off, nothing is registered. */
+  /** Turn the toolbar and dev endpoints on or off. Default: `NODE_ENV === 'development'`; when off,
+   * nothing is registered.
+   *
+   * It cannot force them on under `NODE_ENV=production` — these tools are development-only, and a
+   * deployed build never serves them whatever you pass. `true` is for the environments in between
+   * (a test run, an integration harness). */
   enabled?: boolean
   /** Everything else.
    *

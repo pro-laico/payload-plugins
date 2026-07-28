@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3060",
     "predev": "pnpm run generate:fonts",
-    "prebuild": "pnpm run generate:fonts",
+    "prebuild": "cross-env ENABLE_SEED=true pnpm payload seed && pnpm run generate:fonts",
     "build": "next build",
     "start": "next start -p 3060",
     "payload": "cross-env NODE_OPTIONS=\"--no-deprecation --conditions=react-server\" payload",

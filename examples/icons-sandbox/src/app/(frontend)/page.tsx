@@ -1,21 +1,15 @@
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { type CollectionSlug, getPayload } from 'payload'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { EmptyState, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
-import config from '@payload-config'
 import { CmsIcon } from '@/components/ui/CmsIcon'
+import { getIcons, getStatus } from '@/lib/getters'
 import { Cell, Section } from '@/components/showcase'
 import { Icon as PayloadIcon } from '@/components/PayloadIcon'
 import type { IconSize, IconTone, IconVariant } from '@/types'
 
-const SEEDED_SLUGS: CollectionSlug[] = ['icon', 'iconSet', 'pages']
-
 const SIZES: IconSize[] = ['xs', 'sm', 'base', 'lg', 'xl']
 const VARIANTS: IconVariant[] = ['standalone', 'outline', 'solid', 'ghost']
 const TONES: IconTone[] = ['current', 'muted', 'primary', 'accent', 'destructive']
-
-const iconName = (filename?: string | null): string => filename?.replace(/\.svg$/i, '') ?? 'icon'
 
 export default function Home() {
   return (
@@ -32,7 +26,7 @@ export default function Home() {
         </>
       }
     >
-      {/* Live reads are a dynamic hole inside Suspense — the shell around them prerenders. */}
+      {/* Cached reads, so this prerenders. Any icon write busts the tag and it re-renders. */}
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading icons…</p>}>
         <Showcase />
       </Suspense>
@@ -40,14 +34,10 @@ export default function Home() {
   )
 }
 
-/** The live, per-request part: seed status + the seeded icons. `connection()` marks it dynamic, so
- * it streams into the Suspense hole instead of prerendering with build-time data. */
+/** Seed status and the seeded icons through cached getters — read per change, not per request. */
 async function Showcase() {
-  await connection()
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-  const { docs } = await payload.find({ collection: 'icon', limit: 24 })
-  const names = docs.map((d) => iconName(d.filename))
+  const [status, docs] = await Promise.all([getStatus(), getIcons()])
+  const names = docs.map((d) => d.filename?.replace(/\.svg$/i, '') ?? 'icon')
   const name = names[0]
 
   return (

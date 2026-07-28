@@ -224,12 +224,35 @@ but each works standalone — you never need to install more than the one you wa
 | [payload-revalidate](/docs/plugins/payload-revalidate) | **Required**, `16+` | It's a Next cache tool — the whole plugin is `next/cache` plus Cache Components. |
 | [payload-images](/docs/plugins/payload-images) | **Required**, `15+` | The transform endpoint, prewarming, and preset generation persist variants with Next's `after()`. |
 | [payload-dev-tools](/docs/plugins/payload-dev-tools) | **Required**, `15+` | The toolbar and dev pages are Next components (`next/link`, `next/navigation`, `next/headers`). |
-| [payload-icons](/docs/plugins/payload-icons) | **Partly**, `15+` | The collection, admin, and SVG pipeline work in any Payload. The `<Icon>` component reads `draftMode()` and runtime miss-tracking uses `after()`, so *rendering* icons needs Next. |
+| [payload-icons](/docs/plugins/payload-icons) | **Partly**, `15+` with `cacheComponents` | The collection, admin, and SVG pipeline work in any Payload. Rendering needs Next: the active-set read is a `'use cache'` entry and runtime miss-tracking uses `after()`. |
 | [payload-fonts](/docs/plugins/payload-fonts) | **Partly**, `15+` | Uploading, subsetting, and exporting work anywhere. The download CLI *writes* a `next/font/local` module, so the serving story is Next-shaped — without it, take the exported `.woff2` files and write your own `@font-face`. |
 | [payload-mux](/docs/plugins/payload-mux) | **No** | Zero `next/` imports, no `next` peer. Any Payload app. |
 | [payload-seed](/docs/plugins/payload-seed) | **No** | Zero `next/` imports, no `next` peer. Any Payload app. |
 
 Each plugin's own page states this up front too.
+
+## Prerendering a page that reads Payload
+
+Worth knowing before you cache anything, because it isn't a plugin behaviour — it's how Payload and
+Next fit together.
+
+Next decides a subtree is dynamic when it sees `fetch`, `cookies()`, `headers()`, or `searchParams`.
+It cannot see a read through Payload's Local API. So an uncached `payload.find` in a component is
+invisible to it: during a build the promise simply resolves, and whatever the database held at that
+moment is frozen into the HTML. The fix is to cache the read (`'use cache'` + `cacheTag`) and let a
+write bust the tag — which is what [payload-revalidate](/docs/plugins/payload-revalidate) automates,
+and what the example apps in this repo do. Reach for `connection()` only when a page must genuinely
+re-read on every request, such as a diagnostics view.
+
+One consequence catches people out: once a page prerenders a Payload read, **the build needs a
+database with a schema**. Payload pushes the schema for you in development, but never under
+`NODE_ENV=production`, where it expects migrations instead. A production app already satisfies this
+— it builds against its real database, with migrations run as part of the deploy.
+
+The example apps in this repo hold nothing but seed data, so they do the simpler equivalent: their
+`prebuild` runs the seed. That boots Payload outside production, which pushes the schema on the way,
+and leaves the build real content to prerender. Change the seed, reseed — there is nothing to
+migrate.
 
 <Callout type="info">
   Payload Plugins is not affiliated with Payload CMS in any capacity.

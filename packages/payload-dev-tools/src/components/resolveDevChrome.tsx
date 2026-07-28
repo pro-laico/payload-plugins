@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import { parseStage } from '../harness'
+import { devEnabled } from '../lib/devEnabled'
 import { CHROME_COOKIES } from '../cookies'
 import type { ChromeSlot, ResolveDevChromeOptions, Test } from '../types'
 
@@ -13,7 +14,7 @@ export async function resolveDevChrome({
   footer,
   enabled,
 }: ResolveDevChromeOptions): Promise<{ header: ReactNode; footer: ReactNode }> {
-  if (!(enabled ?? process.env.NODE_ENV === 'development')) return { header, footer }
+  if (!devEnabled(enabled)) return { header, footer }
 
   const jar = await cookies()
   const resolve = async (slot: ChromeSlot, real: ReactNode): Promise<ReactNode> => {

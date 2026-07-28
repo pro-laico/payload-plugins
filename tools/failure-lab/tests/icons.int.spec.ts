@@ -13,6 +13,11 @@ import { createReport } from './report'
 // only loud signal. Malicious SVGs don't error at all (sanitized by design). Icon-name misses at
 // render time surface as a dev-only console.warn diagnosis.
 
+// `getIconSvg` caches its read and calls `cacheTag` inside it, which only exists once an app turns
+// on `cacheComponents`. This lab boots Payload without Next, so the tag call is stubbed — the
+// failure being studied here is icon-name resolution, not cache wiring.
+vi.mock('next/cache', () => ({ cacheTag: () => {} }))
+
 const record = createReport('payload-icons')
 
 let lab: LabBoot

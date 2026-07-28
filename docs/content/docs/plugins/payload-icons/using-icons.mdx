@@ -72,11 +72,28 @@ import { Icon } from '@/components/Icon' // built with createIcon(getPayload({ c
 
 </Tabs>
 
+## Previewing draft icons
+
+`<Icon>` reads the published lane. That's a deliberate default: reading `draftMode()` on every icon
+would make every page that renders one dynamic, and a page of icons could never be prerendered. A
+preview route opts in per icon:
+
+```tsx
+import { draftMode } from 'next/headers'
+
+const { isEnabled } = await draftMode()
+
+<Icon name="arrow-right" draft={isEnabled} />
+```
+
+The two lanes cache separately, and publishing busts both — see [How it works](/docs/plugins/payload-icons/how-it-works).
+
 ## Rendering it yourself
 
-`<Icon>` is just `getIconSvg` (from the `cache` subpath, server-only and memoized per request) composed
-with the pure `extractSvg*` helpers. Call `getIconSvg` yourself to render an icon in your own markup.
-It's memoized, so a page calling it many times is still one query.
+`<Icon>` is just `getIconSvg` (from the `cache` subpath, server-only and cached) composed with the
+pure `extractSvg*` helpers. Call `getIconSvg` yourself to render an icon in your own markup. One
+query serves the whole active set, and it's cached across requests — a page calling it fifty times
+is one read, and often none.
 
 ```
 getIconSvg(payload: Payload | Promise<Payload>, name: string, draft = false): Promise<string | undefined>

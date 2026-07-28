@@ -39,7 +39,46 @@ packages share one lockstep version.
   plugin you installed. Presence only — no values ever leave the server. All of it is in
   `GET /api/dev` under `env`, for CI and agents.
 
+### BREAKING
+
+- **payload-icons: `<Icon>` no longer reads `draftMode()` — pass `draft` instead.** Preview support
+  was being paid for by every published page: reading a request API on every icon meant a page that
+  rendered one could never be prerendered, which is what pushed consumers into `connection()` and
+  hand-rolled cache wrappers. The published lane is now the default and touches nothing
+  request-scoped. Preview routes opt in per icon:
+
+  ```tsx
+  <Icon name="arrow-right" draft={(await draftMode()).isEnabled} />
+  ```
+
+  Nothing else changes: `name`, `fallback`, and every SVG attribute behave as before. If you don't
+  render icons in a draft-preview route, there is nothing to do.
+
+- **payload-icons: rendering icons now requires `cacheComponents: true`.** The active-set read is a
+  `'use cache'` entry, so an app that renders `<Icon>` (or calls `getIconSvg`) needs Cache Components
+  enabled in `next.config`. Managing icons — the collections, the admin, the SVG pipeline — still
+  needs no Next at all.
+
+- **payload-dev-tools: `enabled` can no longer force the tools on in production.** It still turns
+  them off anywhere, and on anywhere except `NODE_ENV=production`, where a deployed build now
+  registers no endpoints, renders no `/dev` pages, and shows no toolbar whatever you pass. Running
+  them on a preview deployment is no longer a supported case — it published collection counts, slugs,
+  seed state, and which env vars are set, unauthenticated, to anyone with the URL. Passing `true`
+  still works in the environments in between, such as a test run or an integration harness.
+
+  This is also what let `createDevPage` drop its `connection()` call: a page that cannot render under
+  `NODE_ENV=production` cannot be prerendered, so its live snapshot read can never freeze into a
+  build. The guard became unnecessary rather than merely unused.
+
 ### Fixed
+
+- **payload-icons: every icon read materialized untagged, so nothing could bust it.** `cacheTag` was
+  called in the *caller*, outside any `'use cache'` scope, inside a `catch {}` that swallowed the
+  failure — the tag the `icon` and `iconSet` collections declare through `custom.revalidate.extraTags`
+  never reached a cache entry. Icons baked into a prerendered page stayed there through re-uploads,
+  name remaps, and active-set swaps. The read now caches and tags itself, and payload-revalidate
+  busts it as it always meant to. Draft reads claim `payload-icons:draft` as well, following the
+  same lane convention as the rest of the repo.
 
 - **payload-dev-tools: `/dev` pages could prerender with build-time data.** The snapshot is a
   database read through Payload's Local API, and Next only marks a subtree dynamic when it sees
@@ -50,6 +89,14 @@ packages share one lockstep version.
   boundary decides where the dynamic hole goes; it was never what decided there was one.
 
 ### Changed
+
+- **The examples now demonstrate the pattern they're supposed to teach.** Every example app reads
+  Payload through cached, tagged getters and prerenders; none of them reach for `connection()` to
+  opt a page out of the cache. A build that prerenders a database read needs a schema, and Payload
+  only pushes one outside production — so `prebuild` seeds, which pushes the schema on the way and
+  gives the build real content to prerender. `pnpm build` works on a fresh clone with no database
+  and no environment; `pnpm dev` is unchanged. Note that a build therefore reseeds, destructively.
+  See `MONOREPO.md`.
 
 - **payload-dev-tools: the snapshot's `env` grew from two fields to a block.** `DevSnapshot['env']`
   was `{ nodeEnv, nodeVersion }` and is now an `EnvSnapshot` — same two fields, plus `name`, `file`,

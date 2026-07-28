@@ -1,31 +1,8 @@
-import config from '@payload-config'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { type CollectionSlug, getPayload, type Payload } from 'payload'
-import { getActiveFontFaces } from '@pro-laico/payload-fonts'
-import { EmptyState, getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { EmptyState, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
-import type { ActiveEntry } from '@/types'
+import { getActive, getStatus } from '@/lib/getters'
 import { FontSpecimen, SPECIMEN_CSS } from '@/components/FontSpecimen'
-
-const SEEDED_SLUGS: CollectionSlug[] = ['fontOriginal', 'font']
-
-/** The active typefaces (family, title, served faces) — the fonts the layout makes available as
- *  `--font-set*` variables (this playground uses the live `<PreviewFonts />` path). */
-async function getActive(payload: Payload): Promise<ActiveEntry[]> {
-  const faces = await getActiveFontFaces(payload)
-
-  const titleByFamily = new Map<string, string>()
-  try {
-    const fontSet = await payload.findGlobal({ slug: 'fontSet', depth: 1 })
-    const familyDocs = { sans: fontSet.sans, serif: fontSet.serif, mono: fontSet.mono, display: fontSet.display }
-    for (const [family, doc] of Object.entries(familyDocs)) {
-      if (doc && typeof doc === 'object' && doc.title) titleByFamily.set(family, doc.title)
-    }
-  } catch {}
-
-  return faces.map((f) => ({ family: f.family, title: titleByFamily.get(f.family) ?? f.family, faces: f.faces }))
-}
 
 export default function Home() {
   return (
@@ -60,13 +37,9 @@ export default function Home() {
   )
 }
 
-/** The live, per-request part: seed status + the active specimens. `connection()` marks it dynamic,
- * so it streams into the Suspense hole instead of prerendering with build-time data. */
+/** Seed status and the active specimens through cached getters — read per change, not per request. */
 async function Specimens() {
-  await connection()
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-  const active = await getActive(payload)
+  const [status, active] = await Promise.all([getStatus(), getActive()])
 
   return (
     <>

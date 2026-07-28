@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
-import { connection } from 'next/server'
 import { notFound } from 'next/navigation'
 
 import { SeedCard } from './client'
 import { parseStage } from '../harness'
 import { PDTP_CSS } from './pageStyles'
+import { devEnabled } from '../lib/devEnabled'
 import { STAGE_COOKIE } from '../cookies'
 import { buildDevSnapshot } from '../lib/snapshot'
 import { FontsView, IconsView, ImagesView, MuxView, RevalidateView } from './views'
@@ -15,14 +15,12 @@ export function createDevPage(options: CreateDevPageOptions) {
   const { tests = [], enabled } = options
 
   return async function DevPage({ params, searchParams }: DevPageProps) {
-    if (!(enabled ?? process.env.NODE_ENV === 'development')) notFound()
-    // The snapshot is a live database read through the Local API, which Next can't see — it
-    // instruments `fetch`, `cookies()`, and friends, not a database driver. Without this the
-    // prerender pass resolves it and bakes build-time counts into the HTML, which only bites on a
-    // deployment that forces `enabled: true`, and bites exactly where a diagnostics page mustn't:
-    // it would report the state of the build box, forever. The `<Suspense>` boundary the app wraps
-    // this in decides where the dynamic hole goes; this decides that there is one.
-    await connection()
+    // The snapshot is a live database read through the Local API, and Next can't see those — it
+    // instruments `fetch`, `cookies()`, and friends, not a database driver. A prerender would
+    // resolve it and bake the build machine's counts into the HTML. Nothing here guards against
+    // that, because `devEnabled` makes it unreachable: these pages cannot render under
+    // NODE_ENV=production, so `next build` never gets far enough to prerender one.
+    if (!devEnabled(enabled)) notFound()
 
     const { view = [] } = await params
     const query = (await searchParams) ?? {}

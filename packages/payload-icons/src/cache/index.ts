@@ -1,4 +1,4 @@
-import { cache } from 'react'
+import { cacheTag } from 'next/cache'
 import type { Payload, Where } from 'payload'
 
 import type { IconSetMap } from '../types'
@@ -13,8 +13,7 @@ const activeWhere = (payload: Payload, slug: string, draft: boolean): Where => {
   return !draft && hasDrafts ? { and: [{ active: { equals: true } }, { _status: { equals: 'published' } }] } : { active: { equals: true } }
 }
 
-const getActiveIconSet = cache(async (handle: Payload | Promise<Payload>, draft: boolean): Promise<IconSetMap> => {
-  const payload = await handle
+const readIconSet = async (payload: Payload, draft: boolean): Promise<IconSetMap> => {
   const slug = iconSetSlugOf(payload.config)
 
   const res = await payload.find({
@@ -40,19 +39,47 @@ const getActiveIconSet = cache(async (handle: Payload | Promise<Payload>, draft:
     if (typeof name === 'string' && svg) map[name] = svg
   }
   return map
-})
+}
 
-const tagIconRead = async (handle: Payload | Promise<Payload>): Promise<void> => {
-  try {
-    if (!(await handle).config.custom?.payloadRevalidate) return
-    const { cacheTag } = await import('next/cache')
-    cacheTag(ICONS_REVALIDATE_TAG)
-  } catch {}
+/** The app's handle, held at module scope and reached by key — NOT captured in the cached
+ * function's closure.
+ *
+ * That distinction is the whole reason this file is shaped this way. A `'use cache'` entry is keyed
+ * by its arguments *and its closure*, both of which get serialized; a Payload instance is a class,
+ * so capturing the handle fails the build outright with "Only plain objects … can be passed".
+ * Module-scope bindings aren't part of that key, so the lookup has to happen through one. The key
+ * is the icon-set slug, which is stable per config and meaningful on its own.
+ *
+ * The handle still only ever arrives from the app, through `createIcon(payload)` — nothing here
+ * calls `getPayload` or reads a config off a global. */
+const handles = new Map<string, Payload | Promise<Payload>>()
+
+/** `cacheTag` runs INSIDE the cached function, which is the only place it does anything. It used to
+ * run in the caller, outside any cache scope, wrapped in a `catch {}` — so every icon read
+ * materialized untagged: never reused across requests, and impossible to bust when it was. The tag
+ * is the one the icon collections already declare via `custom.revalidate.extraTags`, so an install
+ * with `@pro-laico/payload-revalidate` invalidates it on any icon or set write. Without that
+ * plugin the entry simply lives out its cache lifetime. */
+
+const readCachedIconSet = async (key: string, draft: boolean): Promise<IconSetMap> => {
+  'use cache'
+  // Lanes follow payload-revalidate's convention: a published write busts the plain tag, a
+  // draft-only write busts `:draft`. The draft read claims both, because publishing changes what
+  // the draft lane resolves to as well; the published read claims only the plain tag, so editing a
+  // draft never disturbs what visitors are served.
+  if (draft) cacheTag(ICONS_REVALIDATE_TAG, `${ICONS_REVALIDATE_TAG}:draft`)
+  else cacheTag(ICONS_REVALIDATE_TAG)
+
+  const handle = handles.get(key)
+  if (!handle) return {}
+  return readIconSet(await handle, draft)
 }
 
 export const getIconSvg = async (payload: Payload | Promise<Payload>, name: string, draft = false): Promise<string | undefined> => {
-  await tagIconRead(payload)
-  return (await getActiveIconSet(payload, draft))[name]
+  const resolved = await payload
+  const key = iconSetSlugOf(resolved.config)
+  handles.set(key, resolved)
+  return (await readCachedIconSet(key, draft))[name]
 }
 
 const warnedMisses = new Set<string>()

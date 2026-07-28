@@ -1,12 +1,8 @@
-import config from '@payload-config'
 import { Suspense } from 'react'
-import { connection } from 'next/server'
-import { type CollectionSlug, getPayload } from 'payload'
-import { getSeedStatus, SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
+import { SandboxShell, SeedPanel } from '@pro-laico/sandbox-shell'
 
 import { DocSection } from '@/components/DocSection'
-
-const SEEDED_SLUGS: CollectionSlug[] = ['media', 'services', 'posts']
+import { getMedia, getPosts, getServices, getStatus } from '@/lib/getters'
 
 export default function HomePage() {
   return (
@@ -22,7 +18,7 @@ export default function HomePage() {
         </>
       }
     >
-      {/* Live reads are a dynamic hole inside Suspense — the shell around them prerenders. */}
+      {/* Cached reads, so this prerenders. Seeding busts the tag and the next request re-renders. */}
       <Suspense fallback={<p className="shell-muted">Loading seeded content…</p>}>
         <SeededContent />
       </Suspense>
@@ -30,16 +26,10 @@ export default function HomePage() {
   )
 }
 
-/** The live, per-request part: seed status + the seeded docs. `connection()` marks it dynamic, so it
- * streams into the Suspense hole instead of prerendering with build-time data. */
+/** Seed status and the seeded docs, all through cached getters — nothing here reads the database
+ * per request, so the whole page prerenders and re-renders when the sandbox tag is busted. */
 async function SeededContent() {
-  await connection()
-  const payload = await getPayload({ config })
-  const status = await getSeedStatus(payload, SEEDED_SLUGS)
-
-  const posts = (await payload.find({ collection: 'posts', limit: 50, depth: 0, sort: 'createdAt' })).docs
-  const media = (await payload.find({ collection: 'media', limit: 50, depth: 0, sort: 'createdAt' })).docs
-  const services = (await payload.find({ collection: 'services', limit: 50, depth: 0, sort: 'createdAt' })).docs
+  const [status, posts, media, services] = await Promise.all([getStatus(), getPosts(), getMedia(), getServices()])
 
   return (
     <>

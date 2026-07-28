@@ -1,12 +1,13 @@
 import { Suspense } from 'react'
 
 import { PDT_CSS } from './styles'
+import { devEnabled } from '../lib/devEnabled'
 import { toTestMeta } from '../harness'
 import type { DevToolbarProps } from '../types'
 import { DevToolbarClient } from './DevToolbarClient'
 
 export function DevToolbar({ tests = [], links = [], enabled }: DevToolbarProps) {
-  if (!(enabled ?? process.env.NODE_ENV === 'development')) return null
+  if (!devEnabled(enabled)) return null
 
   return (
     <>
