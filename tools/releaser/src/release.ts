@@ -116,7 +116,11 @@ async function main(): Promise<void> {
   console.log(`✓ Stamped v${next} across ${packages.length + 1} package.json files.`)
 
   if (!values['skip-git']) {
-    git(['add', '-A'])
+    // Stage only what was stamped. This used to be `git add -A`, which swept whatever happened to be
+    // dirty into the release commit — generated files most of all, since a build regenerates them and
+    // a release usually follows a build. A release commit should contain version numbers and nothing
+    // else, or the tag stops being a faithful record of what shipped.
+    git(['add', ROOT_PACKAGE_JSON, ...packages.map((p) => p.pkgJsonPath)])
     git(['commit', '-m', `chore(release): v${next}`])
     git(['tag', '-a', `v${next}`, '-m', `v${next}`])
     console.log(`✓ Committed and tagged v${next}.`)
