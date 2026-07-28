@@ -75,6 +75,10 @@ describe('blurhash crop: resample vs coefficient projection', () => {
     })
   }
 
+  // 9,000 timed iterations plus warmup. It runs ~3s on a developer machine and blew the default
+  // 5s timeout on a loaded CI runner, failing a release that had nothing wrong with it — a
+  // benchmark's wall clock is a property of the box, not of the code under test. The assertions
+  // below are the actual guard, and they're per-op rather than total.
   it('reports timings (µs/op)', () => {
     const window = WINDOWS['16:9 of 4:3, centered']!
     const time = (fn: () => void, iters: number): number => {
@@ -97,7 +101,7 @@ describe('blurhash crop: resample vs coefficient projection', () => {
 
     expect(t1).toBeLessThan(5_000) // both must be sub-5ms even on a slow CI box
     expect(t2).toBeLessThan(5_000)
-  })
+  }, 60_000)
 })
 
 describe('spec format', () => {
