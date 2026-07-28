@@ -7,101 +7,138 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-28
+
+Two things you cannot see from your own machine — what a visitor somewhere else gets, and which
+environment a process actually booted with — plus the fix that made both worth having: `payload-icons`
+now caches and tags its own read, so a page full of icons can prerender and still heal when an icon
+changes. Everyone rendering icons has upgrade work; everyone else can take this straight.
+
+### Testing by location
+
+Privacy law is a rendering condition. A visitor in Germany has to opt in before analytics loads, one
+in California only has to be offered a way out, one in Ohio triggers neither — three different pages,
+and until now you could only ever see the one your own IP earned you.
+
+The toolbar's new **Region** view sets a location for your session. Your app passes the region it
+really determined through `resolveDevRegion` and branches on what comes back, exactly as it would in
+production:
+
+```tsx
+const region = await resolveDevRegion({ region: (await headers()).get('x-vercel-ip-country') })
+{region?.consent === 'opt-in' ? <ConsentGate /> : null}
+```
+
+`consent` is the same three answers everywhere (`opt-in` / `opt-out` / `none`), so the UI doesn't grow
+a case per country. Resolution covers all 30 EEA countries plus the UK, Switzerland, Brazil, Canada,
+Japan, China, the US and California; `options.regions` replaces the toolbar chips and overrides the
+built-in table. Scriptable for Playwright via `GET /api/dev/region?code=DE`, and `regionFor` is pure
+and Next-free for middleware. In production `resolveDevRegion` returns before touching cookies, so a
+page that would prerender still does.
+
+New exports: `resolveDevRegion`, `regionFor`, `REGIONS`, `DEFAULT_REGIONS`, `REGION_COOKIE`, and the
+types `DevRegion` / `PrivacyRegime` / `ConsentModel`.
+
+### Environments you can see and switch
+
+`payload-dev-env staging -- pnpm dev` loads `.env.staging` and runs the command with those values in
+front of the ambient environment. Nothing is copied or overwritten, and a name with no matching file
+fails loudly rather than silently booting the wrong environment. Environment is read once at boot, so
+this is a wrapper, not a toolbar toggle — switching means a restart, and the CLI says so.
+
+It stamps `PAYLOAD_DEV_ENV` / `PAYLOAD_DEV_ENV_FILE`, which the toolbar's Info view and the `/dev`
+overview report alongside the database host (credentials stripped) and a present/missing checklist for
+the variables your installed plugins actually read. Two warnings show in red: a development boot
+pointed at a remote database, and a required variable missing for a plugin you installed. Presence
+only — no values leave the server. All of it lands in `GET /api/dev` under `env`, for CI and agents.
+
+### Icons that cache, and heal
+
+`<Icon>`'s `cacheTag` call ran in the *caller*, outside any `'use cache'` scope, inside a `catch {}`
+that swallowed the failure. Every icon read therefore materialized untagged: the tag the `icon` and
+`iconSet` collections declare through `custom.revalidate.extraTags` never reached a cache entry, so an
+SVG baked into a prerendered page stayed there through re-uploads, name remaps, and active-set swaps.
+
+The read now caches and tags itself, and `payload-revalidate` busts it as it always meant to. Draft
+reads claim `payload-icons:draft` as well, following the same lane convention as the rest of the repo.
+One query resolves the whole active set and is reused across requests, so a page of fifty icons costs
+one read and usually none. Two breaking requirements come with it — see Changed.
+
 ### Added
 
-- **payload-dev-tools: see your site the way a visitor somewhere else does.** Privacy law is a
-  rendering condition — a visitor in Germany has to opt in before analytics loads, one in California
-  only has to be offered a way out — and until now you could only ever see the version your own IP
-  earned you. The toolbar's new **Region** view sets a location for your session; your app reads it
-  through `resolveDevRegion` and branches exactly as it would in production:
-
-  ```tsx
-  const region = await resolveDevRegion({ region: (await headers()).get('x-vercel-ip-country') })
-  {region?.consent === 'opt-in' ? <ConsentGate /> : null}
-  ```
-
-  `consent` is the same three answers everywhere (`opt-in` / `opt-out` / `none`), so your UI doesn't
-  grow a case per country. Resolution covers all 30 EEA countries plus the UK, Switzerland, Brazil,
-  Canada, Japan, China, the US and California; `options.regions` replaces the chips and overrides the
-  built-in table. Scriptable via `GET /api/dev/region?code=DE`. `regionFor` is pure and Next-free for
-  middleware use.
-
-- **payload-dev-tools: `payload-dev-env` — boot against another environment without editing
-  `.env.local`.** `payload-dev-env staging -- pnpm dev` loads `.env.staging` and runs the command
-  with those values in front. Nothing is copied or overwritten, and a name with no matching file
-  fails loudly instead of silently booting the wrong environment. Env is read once at boot, so this
-  is a wrapper, not a toolbar toggle — switching means a restart.
-
-- **payload-dev-tools: the toolbar now tells you what you're connected to.** The Info view and the
-  `/dev` overview name the environment you booted, the database host (credentials stripped), and a
-  present/missing checklist for the variables the installed plugins actually read. Two warnings show
-  in red: a development boot pointed at a remote database, and a required variable missing for a
-  plugin you installed. Presence only — no values ever leave the server. All of it is in
-  `GET /api/dev` under `env`, for CI and agents.
-
-### BREAKING
-
-- **payload-icons: `<Icon>` no longer reads `draftMode()` — pass `draft` instead.** Preview support
-  was being paid for by every published page: reading a request API on every icon meant a page that
-  rendered one could never be prerendered, which is what pushed consumers into `connection()` and
-  hand-rolled cache wrappers. The published lane is now the default and touches nothing
-  request-scoped. Preview routes opt in per icon:
-
-  ```tsx
-  <Icon name="arrow-right" draft={(await draftMode()).isEnabled} />
-  ```
-
-  Nothing else changes: `name`, `fallback`, and every SVG attribute behave as before. If you don't
-  render icons in a draft-preview route, there is nothing to do.
-
-- **payload-icons: rendering icons now requires `cacheComponents: true`.** The active-set read is a
-  `'use cache'` entry, so an app that renders `<Icon>` (or calls `getIconSvg`) needs Cache Components
-  enabled in `next.config`. Managing icons — the collections, the admin, the SVG pipeline — still
-  needs no Next at all.
-
-- **payload-dev-tools: `enabled` can no longer force the tools on in production.** It still turns
-  them off anywhere, and on anywhere except `NODE_ENV=production`, where a deployed build now
-  registers no endpoints, renders no `/dev` pages, and shows no toolbar whatever you pass. Running
-  them on a preview deployment is no longer a supported case — it published collection counts, slugs,
-  seed state, and which env vars are set, unauthenticated, to anyone with the URL. Passing `true`
-  still works in the environments in between, such as a test run or an integration harness.
-
-  This is also what let `createDevPage` drop its `connection()` call: a page that cannot render under
-  `NODE_ENV=production` cannot be prerendered, so its live snapshot read can never freeze into a
-  build. The guard became unnecessary rather than merely unused.
-
-### Fixed
-
-- **payload-icons: every icon read materialized untagged, so nothing could bust it.** `cacheTag` was
-  called in the *caller*, outside any `'use cache'` scope, inside a `catch {}` that swallowed the
-  failure — the tag the `icon` and `iconSet` collections declare through `custom.revalidate.extraTags`
-  never reached a cache entry. Icons baked into a prerendered page stayed there through re-uploads,
-  name remaps, and active-set swaps. The read now caches and tags itself, and payload-revalidate
-  busts it as it always meant to. Draft reads claim `payload-icons:draft` as well, following the
-  same lane convention as the rest of the repo.
-
-- **payload-dev-tools: `/dev` pages could prerender with build-time data.** The snapshot is a
-  database read through Payload's Local API, and Next only marks a subtree dynamic when it sees
-  `fetch`, `cookies()`, or `headers()` — so the prerender pass resolved it and froze the build box's
-  counts into the HTML. `createDevPage` now calls `connection()` itself. Only reachable on a
-  deployment that forces `enabled: true` (a dev server never prerenders), but that's precisely
-  where a diagnostics page reporting someone else's machine does the most damage. The `<Suspense>`
-  boundary decides where the dynamic hole goes; it was never what decided there was one.
+- **payload-dev-tools: `GET /api/dev/region`** stages a location override in a cookie (`?code=DE`,
+  `?clear=1` to reset, `?to=` to target the redirect) and `400`s on a code it can't resolve.
+- **payload-dev-tools: `payload-dev-env`**, a CLI shipped with the package
+  (`<name> [--file <path>] -- <command…>`).
+- **payload-icons: `<Icon draft>`** reads the draft lane instead of the published one.
 
 ### Changed
 
-- **The examples now demonstrate the pattern they're supposed to teach.** Every example app reads
-  Payload through cached, tagged getters and prerenders; none of them reach for `connection()` to
-  opt a page out of the cache. A build that prerenders a database read needs a schema, and Payload
-  only pushes one outside production — so `prebuild` seeds, which pushes the schema on the way and
-  gives the build real content to prerender. `pnpm build` works on a fresh clone with no database
-  and no environment; `pnpm dev` is unchanged. Note that a build therefore reseeds, destructively.
-  See `MONOREPO.md`.
+- **BREAKING (payload-icons): `<Icon>` no longer reads `draftMode()`.** Preview support was being paid
+  for by every published page — reading a request API on every icon meant a page rendering one could
+  never prerender, which is what pushed consumers into `connection()` and hand-rolled cache wrappers.
+  The published lane is now the default and touches nothing request-scoped. `name`, `fallback`, and
+  every SVG attribute are unchanged. **Migrate by** passing the flag in preview routes only:
+  `<Icon name="arrow-right" draft={(await draftMode()).isEnabled} />`. If you don't render icons in a
+  draft-preview route, there is nothing to do.
+
+- **BREAKING (payload-icons): rendering icons now requires `cacheComponents: true`.** The active-set
+  read is a `'use cache'` entry, so an app that renders `<Icon>` or calls `getIconSvg` needs Cache
+  Components on. Without it the read throws `cacheTag() is only available with the cacheComponents
+  config`. Managing icons — the collections, the admin, the SVG pipeline — still needs no Next at all.
+  **Migrate by** adding `cacheComponents: true` to `next.config`, which also requires Next 16.
+
+- **BREAKING (payload-dev-tools): `enabled` can no longer force the tools on in production.** It still
+  turns them off anywhere, and on anywhere except `NODE_ENV=production`, where a deployed build now
+  registers no endpoints, renders no `/dev` pages, and shows no toolbar whatever you pass. Serving them
+  from a deployment published collection counts, slugs, seed state, and which env vars are set —
+  unauthenticated, to anyone with the URL — and `access.dev` never covered the pages, only the
+  endpoints. It also makes the `/dev` snapshot unable to freeze into a build. Passing `true` still
+  works in the environments in between, such as a test run or an integration harness. **Migrate by**
+  dropping `enabled: true` from any deployed environment; there is no replacement, and a preview
+  deployment is no longer a supported place to run these.
 
 - **payload-dev-tools: the snapshot's `env` grew from two fields to a block.** `DevSnapshot['env']`
-  was `{ nodeEnv, nodeVersion }` and is now an `EnvSnapshot` — same two fields, plus `name`, `file`,
-  `database`, `vars`, and `warnings`. Anything reading `snapshot.env.nodeEnv` keeps working.
+  was `{ nodeEnv, nodeVersion }` and is now an `EnvSnapshot` — the same two fields plus `name`,
+  `file`, `database`, `vars`, and `warnings`. Anything reading `snapshot.env.nodeEnv` keeps working.
   `DevSnapshot` also gains `regions`, and `PayloadDevToolsMarker` gains `regions`.
+
+- **The examples now demonstrate the pattern they teach.** Every example app reads Payload through
+  cached, tagged getters and prerenders; none reach for `connection()` to opt a page out of the cache.
+  A build that prerenders a database read needs a schema and Payload only pushes one outside
+  production, so `prebuild` seeds — which pushes the schema on the way and gives the build real content
+  rather than an empty database. `pnpm build` now works on a fresh clone with no database and no
+  environment. It also **reseeds, destructively**, so don't keep anything in an example database you
+  aren't willing to lose. `icons-sandbox` installs `payload-revalidate`, because a demo that caches an
+  icon read without the half that busts it teaches the bug.
+
+### Fixed
+
+- **payload-icons: icon reads could never be invalidated** — see *Icons that cache, and heal* above.
+- **payload-dev-tools: `/dev` could prerender with build-time data.** The snapshot is a Local API read,
+  which Next can't see — it instruments `fetch`, `cookies()`, and `headers()`, not a database driver —
+  so a prerender resolved it and froze the build machine's counts into the HTML. The production clamp
+  removes the possibility rather than guarding against it: a page that never renders under
+  `NODE_ENV=production` can never be prerendered.
+
+### Docs
+
+- Two new payload-dev-tools pages: [Testing by location](https://payload-plugins.prolaico.com/docs/plugins/payload-dev-tools/regions)
+  and [Environments](https://payload-plugins.prolaico.com/docs/plugins/payload-dev-tools/environments).
+- A new **Prerendering a page that reads Payload** section in Conventions: why Next can't see a Local
+  API read, and why prerendering one means the build needs a schema. This is the trap behind most of
+  this release.
+- payload-icons pages corrected throughout — the read is cached and tagged, not memoized per request.
+
+### Upgrade notes
+
+1. `pnpm install`.
+2. If you render icons: set `cacheComponents: true` in `next.config` (Next 16), and pass `draft` to
+   `<Icon>` in preview routes.
+3. If you render icons and want them to update after an edit: install `@pro-laico/payload-revalidate`.
+   Nothing else busts the `payload-icons` tag.
+4. Remove `enabled: true` from any deployed payload-dev-tools config; it no longer does anything there.
+5. Working in this repo's examples: `pnpm build` reseeds their databases.
 
 ## [0.5.0] - 2026-07-27
 
