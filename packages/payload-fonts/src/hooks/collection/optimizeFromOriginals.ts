@@ -54,6 +54,7 @@ export const optimizeFromOriginalsHook = (opts: OptimizeFromOriginalsOptions): C
         where: { font: { equals: fontId } },
         depth: 0,
         limit: 1000,
+        pagination: false,
         req,
       })
       const byOriginal = new Map<string | number, Record<string, unknown>>()

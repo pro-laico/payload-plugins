@@ -24,6 +24,7 @@ export const cleanupFontAssetsHook = ({
         where: { font: { equals: id } },
         depth: 0,
         limit: 1000,
+        pagination: false,
         req,
       })
       for (const d of optimized.docs) {

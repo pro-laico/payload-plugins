@@ -20,6 +20,10 @@ export const makeRejectSharedOriginals =
       where,
       depth: 0,
       limit: 1,
+      // A paginated find runs its count and its query concurrently on one session. This is a
+      // beforeValidate hook, so it is the transaction's first command — the two race
+      // startTransaction and one is rejected with NoSuchTransaction, aborting the transaction.
+      pagination: false,
       req,
     })
     if (res.totalDocs > 0) {

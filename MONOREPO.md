@@ -84,6 +84,20 @@ Each `packages/payload-<name>` is an independently published package:
 Examples consume their plugin with `workspace:*` so package changes are picked up
 immediately in dev.
 
+### Querying from inside a hook
+
+A `payload.find` called from a hook passes `pagination: false` unless it genuinely
+needs the total count. A paginated find issues its count and its query
+**concurrently on one database session**. In the middle of a transaction that is
+harmless, but when such a find is the transaction's first command — which is
+exactly what a `before*` hook is — the two race `startTransaction`: only one can
+carry it, the other is rejected with `NoSuchTransaction`, and MongoDB aborts the
+transaction. Every later command in the same transaction then fails with the same
+message, so the visible error is always fallout and never names the hook.
+
+Prefer `payload.count` when you want a count, and `payload.findByID` when you have
+an id — both issue a single command and are safe anywhere.
+
 ## Releasing & publishing
 
 All `@pro-laico/*` packages share one version (Payload-style lockstep) and are

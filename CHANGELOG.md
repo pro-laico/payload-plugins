@@ -7,6 +7,15 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Fixed
+
+- **payload-fonts: creating a typeface no longer kills the transaction on MongoDB.** Saving a `font`
+  could fail with `NoSuchTransaction` — taking every later write in the same transaction down with
+  it, so a seed run died at the first font and never reached the rest of the database. The duplicate-
+  upload check runs in a `beforeValidate` hook, and its paginated lookup issued a count and a query
+  concurrently as the transaction's first command; the two raced `startTransaction` and Mongo aborted
+  the transaction. The lookup is now unpaginated, as are the two font-cleanup lookups.
+
 ## [0.6.0] - 2026-07-28
 
 `payload-dev-tools` gains three ways to inspect things you normally can't see from your own machine:
