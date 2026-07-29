@@ -1,10 +1,12 @@
 # Payload Plugins
 
-Composable [Payload CMS](https://payloadcms.com/) plugins published under the `@pro-laico/*` scope.
+Standalone [Payload CMS](https://payloadcms.com/) plugins published under the `@pro-laico/*` scope.
 
 **[Documentation → payload-plugins.prolaico.com](https://payload-plugins.prolaico.com)**
 
 These plugins are a work in progress and are actively being worked on. Expect kinks/bugs and breaking changes between versions.
+
+Please note that I only have one set of eyes. If you notice a bug, or have a feature request, please make an issue and I will do my best to address it. All feedback is appreciated!
 
 | Plugin | |
 | --- | --- |
