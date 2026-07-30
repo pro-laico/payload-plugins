@@ -7,6 +7,12 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-30
+
+Three fixes, each one a failure you could only hit outside a test: uploading a font from Windows,
+saving one against MongoDB, and every video poster whose timestamp was left blank. All three were
+invisible locally and are fixed with no migration and no config change.
+
 ### Fixed
 
 - **payload-fonts: font uploads no longer fail on Windows.** Windows registers no content type for
