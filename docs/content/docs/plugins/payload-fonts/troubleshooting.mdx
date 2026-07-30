@@ -9,6 +9,14 @@ Symptom-first. Find your failure in bold, read the cause, apply the fix.
 The plugin registers new admin components by string path, and the import map is stale.
 Run `pnpm payload generate:importmap`, then restart the dev server.
 
+**Upload is rejected with `Invalid file type: 'application/octet-stream'`, or the file picker greys out every font.**
+Windows registers no content type for `.ttf`, `.otf`, `.woff`, or `.woff2`, so the browser reports
+`application/octet-stream` and the upload gate — which checks the browser-reported type — turns the
+file away. The same font uploads fine from macOS, which supplies the type via UTI.
+Update: `fontOriginal`'s whitelist now includes `application/octet-stream` and the file extensions,
+so the upload lands and the picker stops greying fonts out. On an older version, add the same
+strings via `collections.fontOriginal.overrides.upload.mimeTypes`.
+
 **Uploaded a font but nothing renders on the page.**
 Uploading a typeface only adds it to the library — it isn't selected yet.
 Open the `fontSet` global, pick a **Font** for the family you want, and save. See [The `fontSet` global](/docs/plugins/payload-fonts/collections#the-fontset-global).

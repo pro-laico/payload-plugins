@@ -56,7 +56,12 @@ the lossy, subsetted output can be re-derived with a different charset later. An
 whitelisting the four web-font formats; you never see it in nav, only through the `font` fields.
 
 **Fields**: none beyond the upload itself (the stored original bytes). Accepts `woff` / `woff2` /
-`ttf` / `otf` via an `upload.mimeTypes` whitelist (OTF/TTF arrive under several sfnt mime strings).
+`ttf` / `otf` / `ttc` via an `upload.mimeTypes` whitelist. That list carries more than the obvious
+four: OTF/TTF arrive under several sfnt mime strings, plus the file extensions (the admin builds the
+picker's `accept` from this list) and `application/octet-stream` — because Windows registers no
+content type for a font, so browsers there report exactly that. Treat it as a picker filter, not a
+gate: the collection is logged-in-only, and anything that isn't really a font fails the subsetter on
+save and serves no weight.
 
 **Hooks**: none; uploading here is a plain store, which is exactly what lets it run as a
 client-upload (direct-to-Blob) collection in production. Each original belongs to exactly one

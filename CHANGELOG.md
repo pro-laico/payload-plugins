@@ -9,6 +9,11 @@ packages share one lockstep version.
 
 ### Fixed
 
+- **payload-fonts: font uploads no longer fail on Windows.** Windows registers no content type for
+  `.ttf`, `.otf`, `.woff`, or `.woff2`, so browsers report `application/octet-stream` and
+  `fontOriginal`'s mime whitelist rejected every font — while the identical file uploaded fine from
+  macOS, which supplies the type via UTI. The whitelist now covers that, plus the file extensions,
+  which is also what stops the admin's file picker from greying fonts out.
 - **payload-mux: an unset poster timestamp now means the first frame, not the middle of the video.**
   Mux picks the midpoint when a thumbnail URL carries no `time`, so every video whose poster
   timestamp was left blank got an arbitrary frame — and the field said so rather than fixing it.
