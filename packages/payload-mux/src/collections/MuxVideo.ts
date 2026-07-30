@@ -92,7 +92,7 @@ export const MuxVideo = (mux: Mux, options: ResolvedMuxVideoOptions): Collection
       label: 'Poster Timestamp',
       min: 0,
       admin: {
-        description: 'A timestamp (in seconds) from the video to be used as the poster image. When unset, defaults to the middle of the video.',
+        description: 'A timestamp (in seconds) from the video to be used as the poster image. Leave it blank for the first frame.',
         condition: (data) => data.duration,
         step: 0.25,
       },

@@ -9,6 +9,11 @@ packages share one lockstep version.
 
 ### Fixed
 
+- **payload-mux: an unset poster timestamp now means the first frame, not the middle of the video.**
+  Mux picks the midpoint when a thumbnail URL carries no `time`, so every video whose poster
+  timestamp was left blank got an arbitrary frame — and the field said so rather than fixing it.
+  Blank now pins the poster to `0`. Set a timestamp and nothing changes; animated GIF URLs are
+  untouched. Existing videos pick this up on the next read, with no migration.
 - **payload-fonts: creating a typeface no longer kills the transaction on MongoDB.** Saving a `font`
   could fail with `NoSuchTransaction` — taking every later write in the same transaction down with
   it, so a seed run died at the first font and never reached the rest of the database. The duplicate-

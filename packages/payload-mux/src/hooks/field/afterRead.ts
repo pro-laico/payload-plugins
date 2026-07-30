@@ -23,7 +23,10 @@ export const signableUrlAfterRead =
   async ({ data, siblingData }) => {
     const playbackId = siblingData?.playbackId
     if (!playbackId) return null
-    const posterTimestamp = type !== 'video' && typeof data?.posterTimestamp === 'number' ? data.posterTimestamp : undefined
+    const stored = typeof data?.posterTimestamp === 'number' ? data.posterTimestamp : undefined
+    // Mux picks the middle of the video when `time` is absent. The first frame is both the
+    // predictable poster and what leaving the field blank is taken to mean, so pin thumbnails to 0.
+    const posterTimestamp = type === 'thumbnail' ? (stored ?? 0) : type === 'gif' ? stored : undefined
     const url = buildUrl(playbackId)
     if (posterTimestamp !== undefined) url.searchParams.set('time', posterTimestamp.toString())
     await signIfNeeded(mux, options, url, playbackId, siblingData.playbackPolicy, type, posterTimestamp)
