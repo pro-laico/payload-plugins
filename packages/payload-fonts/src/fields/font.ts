@@ -11,7 +11,10 @@ export const fontUploadFields = ({ fontSlug, families }: FontUploadFieldsOptions
     label: family.label,
     type: 'relationship',
     relationTo,
-    filterOptions: { family: { equals: family.key } },
+    // Every slot offers every typeface — `family` is a preference, not a constraint, and filtering
+    // on it would make a typeface that declared none unpickable everywhere. The collection's
+    // `optionLabel` title carries the preference into the option text (`Inter (Sans)`) so the hint
+    // survives without becoming a gate.
   }))
 
   const rows: RowField[] = []

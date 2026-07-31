@@ -7,10 +7,12 @@
  */
 
 /**
+ * Which slot this typeface is offered for first in Font Set. Optional — leaving it blank keeps the typeface available for every slot.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "GenericFontFamily".
  */
-export type GenericFontFamily = 'sans' | 'serif' | 'mono' | 'display';
+export type GenericFontFamily = ('sans' | 'serif' | 'mono' | 'display') | null;
 /**
  * Supported timezones in IANA format.
  *
@@ -597,7 +599,8 @@ export interface IconRequest {
 export interface Font {
   id: number;
   title: string;
-  family: GenericFontFamily;
+  family?: GenericFontFamily;
+  optionLabel?: string | null;
   /**
    * Web-ready files generated from your uploads. 0 means nothing was served yet — re-save; if it stays 0, the upload may have failed to optimize (check server logs).
    */
@@ -1152,6 +1155,7 @@ export interface MuxVideoSelect<T extends boolean = true> {
 export interface FontSelect<T extends boolean = true> {
   title?: T;
   family?: T;
+  optionLabel?: T;
   servedFiles?: T;
   variable?:
     | T

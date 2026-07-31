@@ -7,6 +7,14 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Changed
+
+- **payload-fonts: a typeface's preferred family is now optional.** It was required, which forced a
+  decision at upload time about which slot a typeface was for. Font Set slots no longer filter on it
+  either — every slot offers every typeface, since filtering would have made a typeface that declared
+  no family unpickable everywhere. The preference now shows in the option text instead (`Inter
+  (Sans)`), so it guides the choice without gating it.
+
 ### Fixed
 
 - **payload-mux: a slow encode no longer costs a video its playback URL.** Mux assigns a playback id
@@ -22,6 +30,17 @@ packages share one lockstep version.
   answer, then reloads. That also makes local development work, where Mux can never reach your
   machine, and lets a missed webhook in production recover without a manual save. Gated by
   `options.access.refresh` (any logged-in user by default).
+
+### Upgrade notes
+
+1. **On SQLite, `font` needs a schema push.** Making `family` optional turns a `NOT NULL` column
+   nullable and adds `option_label` alongside it, which SQLite can only do by rebuilding the table —
+   and Drizzle's dev push can't complete that rebuild against an existing database (`no such column:
+   option_label`). Generate a migration, or drop the dev database and reseed. MongoDB is unaffected.
+2. **Gitignore `src/app/definition.ts`** and add `payload fonts:download` to `postinstall`. See the
+   [fonts quickstart](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts) — the file is a
+   snapshot of your database, and every failure path writes an empty definition, so a fresh clone
+   still builds.
 
 ## [0.6.1] - 2026-07-30
 

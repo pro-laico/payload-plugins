@@ -104,7 +104,19 @@ beyond what your Payload app already has (`DATABASE_URI`, `PAYLOAD_SECRET`). Fon
 the read goes through your collection's own storage adapter.
 
 <Callout type="info">
-  `src/app/definition.ts` and `public/fonts/` are both generated — **gitignore** them.
+  **Gitignore both `src/app/definition.ts` and `public/fonts/`, and add the generator to
+  `postinstall`.** They are a snapshot of your database, so committing them means every font change
+  produces a diff, and whoever last ran a build decides what the repo contains.
+
+  ```json title="package.json"
+  { "scripts": { "postinstall": "payload fonts:download", "predev": "payload fonts:download", "prebuild": "payload fonts:download" } }
+  ```
+
+  The usual worry — that ignoring a file the layout imports breaks a fresh clone — doesn't apply:
+  **every failure path writes an empty definition instead of failing.** No database, no
+  `PAYLOAD_SECRET`, an unreachable host: you get `Font download failed — wrote an empty definition so
+  the build can proceed`, valid TypeScript, and a site with fallback fonts. `postinstall` is what
+  makes the file exist before anyone opens their editor, so the import never shows as missing.
 </Callout>
 
 <Callout type="info">

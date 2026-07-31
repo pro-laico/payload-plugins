@@ -18,8 +18,11 @@ export const getBeforeChangeHook =
     let data = { ...incomingData }
     const previousAssetId: string | undefined = originalDoc?.assetId
 
-    // Settled: has something to play AND Mux is done. Anything less is worth a look at the asset.
-    const settled = data.status === 'ready' && Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0
+    // Settled: has something to play, and isn't sitting in the one state that means Mux hasn't
+    // finished. Keyed on `preparing` rather than on `!== 'ready'` so a document that simply never
+    // carried a status — a seed, a programmatic create supplying its own playback options — isn't
+    // dragged to Mux on every save.
+    const settled = Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0 && data.status !== 'preparing'
     if (data.assetId && settled) return data
 
     if (previousAssetId === data.assetId) {

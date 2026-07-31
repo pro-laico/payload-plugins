@@ -69,6 +69,14 @@ describe('getBeforeChangeHook — re-saving an unsettled doc', () => {
     expect(mux.video.assets.retrieve).not.toHaveBeenCalled()
   })
 
+  it('leaves a doc that never carried a status alone', async () => {
+    // Seeds and programmatic creates supply their own playback options and no status; re-checking
+    // them would hit Mux on every save, and there is nothing to heal.
+    const mux = muxWith({ status: 'ready', playback_ids: PLAYBACK })
+    await run(mux, { assetId: 'a1', playbackOptions: [{ playbackId: 'pb_1' }] }, saved)
+    expect(mux.video.assets.retrieve).not.toHaveBeenCalled()
+  })
+
   it('records an errored asset without deleting the document', async () => {
     const mux = muxWith({ status: 'errored', errors: { messages: ['bad input'] } })
     const out = await run(mux, { assetId: 'a1', status: 'preparing', playbackOptions: [] }, saved)

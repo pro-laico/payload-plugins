@@ -30,8 +30,8 @@ collections. Reads and writes require a logged-in user.
 
 <TypeTable
   type={{
-    title: { description: "The typeface name. Required; the admin title and list-search field.", type: "text" },
-    family: { description: "The generic family it fills: sans / serif / mono / display by default (customisable via the plugin's options.families). Required.", type: "radio" },
+    title: { description: "The typeface name. Required, and what the admin list searches. The displayed title is this plus the preferred family when one is set.", type: "text" },
+    family: { description: "The generic family this typeface is offered for first: sans / serif / mono / display by default (customisable via the plugin's options.families). Optional — every Font Set slot offers every typeface either way; the preference is appended to the option text (Inter (Sans)) rather than filtering the list.", type: "radio" },
     servedFiles: { description: "Read-only sidebar count of the fontOptimized files this typeface currently serves, counted per read. 0 after a save means nothing optimized — re-save, and check the server logs if it stays 0.", type: "number (virtual)" },
     variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added; use this OR weights, not both.", type: "group" },
     weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
@@ -94,15 +94,16 @@ weight/style (or variable file), written by `font`'s save hook, never hand-uploa
 
 Uploading a typeface doesn't put it on the site; it just adds it to the library. **`fontSet`** is
 how you choose which uploaded typeface fills each family. `fontsPlugin()` registers it as a singleton
-global under the **Assets** group with one single-relationship slot per family (four by default),
-each filtered to its family so the admin only offers matching typefaces:
+global under the **Assets** group with one single-relationship slot per family (four by default).
+Every slot offers every typeface — a typeface's `family` is a preference, not a filter, and appears
+in the option text (`Inter (Sans)`) so it guides the choice without hiding anything:
 
-| Slot | Picks the typeface used for… | Choices |
-| --- | --- | --- |
-| `sans` | `var(--font-setSans)` | `font` docs with `family: sans` |
-| `serif` | `var(--font-setSerif)` | `font` docs with `family: serif` |
-| `mono` | `var(--font-setMono)` | `font` docs with `family: mono` |
-| `display` | `var(--font-setDisplay)` | `font` docs with `family: display` |
+| Slot | Picks the typeface used for… |
+| --- | --- |
+| `sans` | `var(--font-setSans)` |
+| `serif` | `var(--font-setSerif)` |
+| `mono` | `var(--font-setMono)` |
+| `display` | `var(--font-setDisplay)` |
 
 Pick one **Font** per slot and save; that selection is the source of truth both serving paths read.
 Change it and the next download (or, with `<PreviewFonts>`, the next refresh) swaps the served fonts, no code change.

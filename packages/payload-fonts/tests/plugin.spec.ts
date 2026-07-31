@@ -65,9 +65,9 @@ describe('fontsPlugin (unit)', () => {
 
   it('trims `font` defaultPopulate so a populated relationship omits the private upload slots', () => {
     const font = (apply(fontsPlugin()).collections ?? []).find((c) => c.slug === 'font')
-    // Only identifying metadata is populated — not `variable`/`weights` (which would drag in the
-    // private fontOriginal blobs).
-    expect(font?.defaultPopulate).toEqual({ title: true, family: true })
+    // Only identifying metadata plus the composed `useAsTitle` label — not `variable`/`weights`
+    // (which would drag in the private fontOriginal blobs).
+    expect(font?.defaultPopulate).toEqual({ title: true, family: true, optionLabel: true })
   })
 
   describe('renaming a collection (collections.<name>.slug)', () => {

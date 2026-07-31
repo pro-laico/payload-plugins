@@ -1,4 +1,4 @@
-import type { ArrayField, CollectionConfig, GroupField, NumberField, RadioField, TextField } from 'payload'
+import type { ArrayField, CollectionConfig, FieldHook, GroupField, NumberField, RadioField, TextField } from 'payload'
 
 import { authd, isRecord } from '../_kit'
 import { resolveFontFamilies } from '../lib/families'
@@ -15,10 +15,28 @@ const d = {
     'Web-ready files generated from your uploads. 0 means nothing was served yet — re-save; if it stays 0, the upload may have failed to optimize (check server logs).',
   variable: 'One file covering many weights. Use this OR specific weights below — not both.',
   weights: 'One file per weight/style. Add only the weights you need.',
+  family: 'Which slot this typeface is offered for first in Font Set. Optional — leaving it blank keeps the typeface available for every slot.',
   font: 'Upload typefaces here to add them to your library. Uploading alone doesn’t put a font on your site — activate it by picking it in Font Set.',
 }
 
 const WEIGHT_OPTIONS = ['100', '200', '300', '400', '500', '600', '700', '800', '900']
+
+/** The typeface's name with its preferred family appended when it has declared one — `Inter (Sans)`.
+ * Every slot in Font Set offers every typeface, so this is what tells an editor which one a typeface
+ * was meant for. It backs `useAsTitle`, which is where a relationship select reads its option text.
+ *
+ * Stored rather than virtual — Payload rejects a virtual `useAsTitle` unless it comes through a
+ * relationship. It's written on save and recomputed on read, so a typeface saved before this field
+ * existed still labels correctly instead of showing blank until someone re-saves it. `forceSelect`
+ * keeps its two inputs present however the document was queried. */
+const optionLabelHook =
+  (families: { key: string; label: string }[]): FieldHook =>
+  ({ data }) => {
+    const title = typeof data?.title === 'string' ? data.title : ''
+    const key = typeof data?.family === 'string' ? data.family : undefined
+    const label = key ? families.find((f) => f.key === key)?.label : undefined
+    return label ? `${title} (${label})` : title
+  }
 
 export const FontOriginalUploadPath = '@pro-laico/payload-fonts/admin/FontOriginalUpload'
 const createOnlyUpload = () => ({ components: { Field: { path: FontOriginalUploadPath } } })
@@ -31,15 +49,21 @@ export const createFontCollection = (opts: CreateFontCollectionOptions): Collect
   const { slug: fontSlug, originalSlug, optimizedSlug } = opts
   const families = resolveFontFamilies(opts.families)
 
-  const fields: [TextField, RadioField, NumberField, GroupField, ArrayField] = [
+  const fields: [TextField, RadioField, TextField, NumberField, GroupField, ArrayField] = [
     { name: 'title', type: 'text', required: true, label: 'Typeface name' },
     {
       name: 'family',
       type: 'radio',
-      required: true,
       label: 'Preferred Family',
+      admin: { description: d.family },
       interfaceName: 'GenericFontFamily',
       options: families.map((r) => ({ label: r.label, value: r.key })),
+    },
+    {
+      name: 'optionLabel',
+      type: 'text',
+      admin: { hidden: true, disableListColumn: true },
+      hooks: { beforeChange: [optionLabelHook(families)], afterRead: [optionLabelHook(families)] },
     },
     {
       name: 'servedFiles',
@@ -108,13 +132,16 @@ export const createFontCollection = (opts: CreateFontCollectionOptions): Collect
     access: { create: authd, delete: authd, read: authd, update: authd },
     admin: {
       group: 'Assets',
-      useAsTitle: 'title',
+      useAsTitle: 'optionLabel',
+      // Search the name an editor actually typed, not the composed label.
+      listSearchableFields: ['title'],
       enableListViewSelectAPI: true,
       defaultColumns: ['title', 'family'],
       description: d.font,
     },
     timestamps: true,
-    defaultPopulate: { title: true, family: true },
+    defaultPopulate: { title: true, family: true, optionLabel: true },
+    forceSelect: { title: true, family: true },
     fields,
     hooks: {
       beforeValidate: [requireFontFiles, makeRejectSharedOriginals(fontSlug)],
