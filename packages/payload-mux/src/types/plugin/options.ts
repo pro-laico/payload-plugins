@@ -17,6 +17,9 @@ export interface MuxAccessOptions {
   /** Who may post to the Mux webhook (`POST /mux/webhook`). Defaults to Mux's own signature
    * verification; override only if you terminate the signature check upstream. */
   webhook?: EndpointAccess
+  /** Who may ask Mux whether a video finished encoding (`GET /mux/refresh`). Defaults to any
+   * logged-in user — it reads one document and writes only when Mux reports a new status. */
+  refresh?: EndpointAccess
 }
 
 export interface MuxVideoCollectionOptions {
@@ -100,6 +103,6 @@ export interface ResolvedMuxVideoOptions {
     posterExtension: MuxPosterExtension
     animatedGifExtension: MuxAnimatedGifExtension
     autoCreateOnWebhook: boolean
-    access: { upload: EndpointAccess | undefined; webhook: EndpointAccess | undefined }
+    access: { upload: EndpointAccess | undefined; webhook: EndpointAccess | undefined; refresh: EndpointAccess | undefined }
   }
 }

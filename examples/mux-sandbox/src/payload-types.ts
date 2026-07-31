@@ -179,7 +179,7 @@ export interface MuxVideo {
   error?: string | null;
   duration?: number | null;
   /**
-   * A timestamp (in seconds) from the video to be used as the poster image. When unset, defaults to the middle of the video.
+   * A timestamp (in seconds) from the video to be used as the poster image. Leave it blank for the first frame.
    */
   posterTimestamp?: number | null;
   aspectRatio?: string | null;

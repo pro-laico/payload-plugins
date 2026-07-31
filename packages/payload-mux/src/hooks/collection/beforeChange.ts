@@ -7,28 +7,35 @@ import { getAssetMetadata } from '../../lib/getAssetMetadata'
 const POLL_INTERVAL_MS = 1500
 const POLL_LIMIT_MS = 6000
 
+/** Drops absent keys so a still-encoding asset can contribute what it knows without blanking the
+ * fields it doesn't — a `preparing` asset has its playback ids but not yet duration or tracks. */
+const known = <T extends object>(metadata: T): Partial<T> =>
+  Object.fromEntries(Object.entries(metadata).filter(([, v]) => v !== undefined)) as Partial<T>
+
 export const getBeforeChangeHook =
   (mux: Mux): CollectionBeforeChangeHook =>
   async ({ req, data: incomingData, operation, originalDoc, collection }) => {
     let data = { ...incomingData }
     const previousAssetId: string | undefined = originalDoc?.assetId
 
-    if (data.assetId && Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0) return data
+    // Settled: has something to play AND Mux is done. Anything less is worth a look at the asset.
+    const settled = data.status === 'ready' && Array.isArray(data.playbackOptions) && data.playbackOptions.length > 0
+    if (data.assetId && settled) return data
 
     if (previousAssetId === data.assetId) {
-      // Same asset, but no playback options — the doc never got its `video.asset.ready` webhook
-      // (bad secret, downtime, wrong URL) and the upload hook's short poll timed out. Heal it from
-      // Mux so a plain re-save is a recovery, rather than leaving the doc `preparing` forever.
+      // Same asset, not settled — either the upload hook's poll timed out before Mux finished, or
+      // the `video.asset.ready` webhook never arrived (bad secret, downtime, wrong URL). Refresh
+      // from Mux so a plain re-save is a recovery rather than leaving the doc stuck.
       if (!data.assetId || data.status === 'errored') return data
       try {
         const asset = await mux.video.assets.retrieve(data.assetId)
-        const metadata = getAssetMetadata(asset)
-        // Only `ready` once it actually has playback options — same guard the webhook applies.
-        // Without it a policy-less asset would be marked ready with nothing to play, and every
-        // later save would fall back in here and re-hit Mux.
-        if (asset.status === 'ready' && metadata.playbackOptions?.length) return { ...data, ...metadata, status: 'ready', error: null }
         if (asset.status === 'errored')
           return { ...data, status: 'errored', error: asset.errors?.messages?.join('; ') || asset.errors?.type || 'Unknown Mux error' }
+        // Only `ready` once it actually has playback options — a policy-less asset would otherwise
+        // be marked ready with nothing to play.
+        const metadata = known(getAssetMetadata(asset))
+        const ready = asset.status === 'ready' && metadata.playbackOptions?.length
+        return { ...data, ...metadata, ...(ready ? { status: 'ready', error: null } : {}) }
       } catch (err) {
         // Best-effort: the doc is already stuck, so a Mux outage must not also block the edit.
         req.payload.logger.error({ err, msg: `[payload-mux] Could not refresh Mux asset '${data.assetId}' — leaving the doc as-is` })
@@ -53,11 +60,11 @@ export const getBeforeChangeHook =
         throw new Error(`Unable to prepare Mux asset (status: ${asset.status}). It's been deleted, please try again.`)
       }
 
-      if (asset.status === 'ready') {
-        data = { ...data, ...getAssetMetadata(asset), status: 'ready', error: null }
-      } else {
-        data = { ...data, status: 'preparing', error: null }
-      }
+      // Take whatever the asset already knows, ready or not. Mux assigns playback ids when it
+      // creates the asset — well before encoding finishes — so discarding this on a slow encode
+      // would leave the doc with nothing to play and make the webhook the only thing that could
+      // ever supply it. Status alone waits for `ready`.
+      data = { ...data, ...known(getAssetMetadata(asset)), status: asset.status === 'ready' ? 'ready' : 'preparing', error: null }
 
       const base = typeof data.title === 'string' ? data.title : ''
       let uniqueTitle = base

@@ -72,6 +72,7 @@ export const options = [
         options: [
           { name: 'upload', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates the direct-upload endpoints (POST / GET /mux/upload).` },
           { name: 'webhook', type: 'EndpointAccess', default: 'Mux signature verification', description: `Gates POST /mux/webhook. Defaults to verifying the Mux webhook signature; override only if you terminate that check upstream.` },
+          { name: 'refresh', type: 'EndpointAccess', default: 'any logged-in user', description: `Gates GET /mux/refresh, which asks Mux whether a document's asset finished encoding. The admin uploader polls it while a video is preparing, so a doc whose ready webhook never arrived still resolves itself.` },
         ],
       },
       { name: 'signedUrlOptions', type: '{ expiration?: string }', default: "{ expiration: '1d' }", description: `Lifetime of the JWT-signed playback / poster / gif URLs under a signed policy.` },
@@ -162,6 +163,7 @@ what breaks without it.
 | --- | --- |
 | `POST /api/mux/upload` | Mint a Mux direct-upload. The admin uploader posts files to it. |
 | `GET /api/mux/upload?id=…` | Read a direct-upload, to pick up its `asset_id`. |
+| `GET /api/mux/refresh?id=…` | Ask Mux whether that document's asset is done, and write the answer. Only writes when the status actually changed, so polling it is cheap. The admin uploader polls it while a video encodes — which is what makes a missed webhook, or local development Mux can't reach, recover on its own. |
 | `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, mark the doc `errored` (with the Mux message) on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
 
 ## Exports

@@ -2,6 +2,7 @@ import Mux from '@mux/mux-node'
 import type { Config, Plugin } from 'payload'
 
 import { resolveOptions } from './options'
+import { muxRefreshHandler } from './endpoints/refresh'
 import { muxWebhookHandler } from './endpoints/webhook'
 import { resolveInitSettings } from './lib/initSettings'
 import { assertNoFieldCollisions, mergeCollection } from './_kit'
@@ -31,7 +32,13 @@ export const muxPlugin =
     const override = resolved.collections.muxVideo
     const muxVideoSlug = override.slug ?? MUX_VIDEO_SLUG
 
-    const marker: PayloadMuxMarker = { options: opts, muxVideoSlug, uploadPath: '/mux/upload', webhookPath: '/mux/webhook' }
+    const marker: PayloadMuxMarker = {
+      options: opts,
+      muxVideoSlug,
+      uploadPath: '/mux/upload',
+      webhookPath: '/mux/webhook',
+      refreshPath: '/mux/refresh',
+    }
     const config: Config = { ...incomingConfig, custom: { ...incomingConfig.custom, payloadMux: marker } }
 
     const signed =
@@ -61,6 +68,7 @@ export const muxPlugin =
       { method: 'post', path: '/mux/upload', handler: createMuxUploadHandler(mux, resolved) },
       { method: 'get', path: '/mux/upload', handler: getMuxUploadHandler(mux, resolved) },
       { method: 'post', path: '/mux/webhook', handler: muxWebhookHandler(mux, resolved, muxVideoSlug) },
+      { method: 'get', path: '/mux/refresh', handler: muxRefreshHandler(mux, resolved, muxVideoSlug) },
     ]
 
     return config

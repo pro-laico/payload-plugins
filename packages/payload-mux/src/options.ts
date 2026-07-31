@@ -20,7 +20,7 @@ export function resolveOptions(options: MuxVideoPluginOptions = {}): ResolvedMux
       posterExtension: opts?.posterExtension ?? 'png',
       animatedGifExtension: opts?.animatedGifExtension ?? 'gif',
       autoCreateOnWebhook: opts?.autoCreateOnWebhook ?? false,
-      access: { upload: opts?.access?.upload, webhook: opts?.access?.webhook },
+      access: { upload: opts?.access?.upload, webhook: opts?.access?.webhook, refresh: opts?.access?.refresh },
     },
   }
 }

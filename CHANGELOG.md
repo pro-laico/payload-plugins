@@ -7,6 +7,22 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Fixed
+
+- **payload-mux: a slow encode no longer costs a video its playback URL.** Mux assigns a playback id
+  when it creates the asset, seconds before encoding finishes — but the upload hook discarded that
+  metadata unless the asset was already `ready` within its 6-second poll. A slower encode therefore
+  saved a document with nothing to play, leaving the `video.asset.ready` webhook as the only thing
+  that could ever supply one; if that webhook was missed, the video was gone for good. The hook now
+  keeps whatever the asset already knows and lets only `status` wait for `ready`.
+- **payload-mux: a video that finished encoding no longer looks stuck in the admin.** The uploader
+  polled nothing, so an edit view opened before the webhook arrived sat on "Video is being encoded"
+  over a document that was already done — with Save greyed out, since nothing on the form had
+  changed. It now polls the new `GET /api/mux/refresh`, which asks Mux directly and writes the
+  answer, then reloads. That also makes local development work, where Mux can never reach your
+  machine, and lets a missed webhook in production recover without a manual save. Gated by
+  `options.access.refresh` (any logged-in user by default).
+
 ## [0.6.1] - 2026-07-30
 
 Three fixes, each one a failure you could only hit outside a test: uploading a font from Windows,

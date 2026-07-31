@@ -5,4 +5,5 @@ export interface PayloadMuxMarker {
   muxVideoSlug: string
   uploadPath: string
   webhookPath: string
+  refreshPath: string
 }

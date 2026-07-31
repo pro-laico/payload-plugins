@@ -3,10 +3,17 @@
 import MuxPlayer from '@mux/mux-player-react'
 import MuxUploader from '@mux/mux-uploader-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast, useConfig, useForm, useFormFields } from '@payloadcms/ui'
+import { toast, useConfig, useDocumentInfo, useForm, useFormFields, useFormModified } from '@payloadcms/ui'
 
 import { isRecord } from '../_kit'
 import './mux-uploader.css'
+
+// Encoding finishes on Mux's schedule and arrives as a webhook, so the open edit view has no reason
+// to re-render — it sat on "being encoded" until the editor reloaded by hand, which reads as stuck.
+// Watch the document instead, and stop once it's plainly no longer a timing question: a 4K source
+// can take several minutes, but past this it's worth naming the webhook as the suspect.
+const POLL_INTERVAL_MS = 5000
+const POLL_LIMIT_MS = 10 * 60 * 1000
 
 const stripExtension = (name: string): string => name.replace(/\.[^./\\]+$/, '')
 
@@ -29,7 +36,50 @@ export const MuxUploaderField = () => {
   }))
 
   const { submit, setProcessing } = useForm()
+  const { id } = useDocumentInfo()
+  const modified = useFormModified()
   const containerRef = useRef<HTMLDivElement>(null)
+  const [encodeTimedOut, setEncodeTimedOut] = useState(false)
+  const [encodedWhileEditing, setEncodedWhileEditing] = useState(false)
+
+  // Keyed on status, not on having a playback URL: Mux assigns the playback id when it creates the
+  // asset, so the document carries one well before the video is playable. Showing the player then
+  // would mount it against a stream Mux still refuses (412).
+  const encoding = Boolean(assetId?.value) && status !== 'ready' && status !== 'errored'
+
+  // Encoding finishes as a webhook, which an open edit view never hears — and in local development
+  // Mux can't reach the machine at all, so the webhook never comes. Ask the server instead; it
+  // checks Mux and writes only when the answer changed. Reload rather than patch the form: the
+  // playback array row doesn't exist client-side yet, and a reload is what the editor would have
+  // done by hand. Never while the form is dirty — that would discard edits, so say so instead.
+  useEffect(() => {
+    if (!encoding || id == null) return
+    const deadline = Date.now() + POLL_LIMIT_MS
+    let timer: ReturnType<typeof setInterval> | undefined
+    const stop = () => clearInterval(timer)
+
+    const check = async () => {
+      if (Date.now() > deadline) {
+        stop()
+        setEncodeTimedOut(true)
+        return
+      }
+      try {
+        const res = await fetch(`${apiUrl}/mux/refresh?id=${encodeURIComponent(String(id))}`, { credentials: 'include' })
+        if (!res.ok) return
+        const body: unknown = await res.json()
+        if (!isRecord(body) || (body.status !== 'ready' && body.status !== 'errored')) return
+        stop()
+        if (modified) setEncodedWhileEditing(true)
+        else window.location.reload()
+      } catch {
+        // A dropped poll isn't worth surfacing — the next tick tries again.
+      }
+    }
+
+    timer = setInterval(check, POLL_INTERVAL_MS)
+    return stop
+  }, [encoding, id, apiUrl, modified])
 
   const getUploadUrl = useCallback(async () => {
     const response = await fetch(`${apiUrl}/mux/upload`, { method: 'POST' })
@@ -89,13 +139,22 @@ export const MuxUploaderField = () => {
           Mux could not process this video{error ? `: ${error}` : ''}. Delete this video and upload it again.
         </div>
       )}
-      {Boolean(assetId?.value) && !playbackUrl && status !== 'errored' && (
+      {encoding && encodedWhileEditing && (
+        <div className="mux-uploader__processing">Encoding finished. Save your changes to see the video — reloading now would lose them.</div>
+      )}
+      {encoding && !encodedWhileEditing && !encodeTimedOut && (
         <div className="mux-uploader__processing">
-          Video is being encoded. This typically takes less than 90 seconds, please refresh the page in a moment. If this persists, ensure your
-          Mux webhook points at {`${apiUrl}/mux/webhook`} (see docs)
+          Video is being encoded — usually under 90 seconds, longer for large or 4K sources. This page updates itself when Mux is done; you
+          don't need to refresh.
         </div>
       )}
-      {playbackUrl && <MuxPlayer src={playbackUrl} streamType="on-demand" style={{ height: '60vh' }} />}
+      {encoding && encodeTimedOut && (
+        <div className="mux-uploader__processing">
+          Still encoding after 10 minutes, which is longer than Mux usually takes. Check the asset in the Mux dashboard; saving this document
+          re-checks Mux directly and will heal it.
+        </div>
+      )}
+      {!encoding && playbackUrl && <MuxPlayer src={playbackUrl} streamType="on-demand" style={{ height: '60vh' }} />}
     </div>
   )
 }
