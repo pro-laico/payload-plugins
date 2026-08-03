@@ -1,6 +1,14 @@
 import { ArrowRight, Blocks } from 'lucide-react'
 import Link from 'next/link'
-import { githubUrl } from '@/lib/shared'
+import type { Metadata } from 'next'
+import { appDescription, appName, githubUrl } from '@/lib/shared'
+
+// The root layout's defaults cover the copy; this adds the card image, which only exists per-route.
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+  openGraph: { images: [{ url: '/og', width: 1200, height: 630, alt: appName }], title: appName, description: appDescription, url: '/' },
+  twitter: { images: ['/og'] },
+}
 
 export default function HomePage() {
   return (
