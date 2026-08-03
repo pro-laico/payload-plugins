@@ -68,7 +68,7 @@ describe('createImagesCollection', () => {
   it('stores the upload-time metadata (beforeChange hook): placeholder tiers, palette, alpha flags; placeholder is virtual', () => {
     const c = createImagesCollection()
     expect(c.hooks?.beforeChange ?? []).toHaveLength(1) // the metadata analyzer
-    for (const name of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl', 'placeholderXxl', 'placeholderX3']) {
+    for (const name of ['blurHashXs', 'blurHashSm', 'blurHashMd', 'blurHashLg', 'blurHashXl', 'placeholder2xl', 'placeholder3xl']) {
       const f = byName(c.fields, name) as { virtual?: boolean; type?: string } | undefined
       expect(f?.type).toBe('text')
       expect(f?.virtual).toBeUndefined() // stored, not computed

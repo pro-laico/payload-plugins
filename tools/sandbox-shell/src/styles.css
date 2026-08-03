@@ -1,6 +1,14 @@
 /* The one sandbox theme. All tokens live on .sandbox-shell so the admin ((payload) group) is untouched.
    Apps set the accent via style={{ '--accent': … }} or [data-accent] — SandboxShell wires both. */
 
+/* The shell IS the page, so the browser's default 8px body margin insets its background — a
+   full-bleed child (width: 100vw) then runs past that background and paints white bars down both
+   sides, plus a horizontal scrollbar. Scoped with :has so this file still touches nothing but pages
+   that actually render the shell; the admin has its own layout and is unaffected. */
+body:has(.sandbox-shell) {
+  margin: 0;
+}
+
 .sandbox-shell {
   color-scheme: dark;
   --accent: oklch(0.72 0.16 250);
@@ -22,6 +30,10 @@
   line-height: 1.5;
   display: flex;
   flex-direction: column;
+  /* `100vw` counts the vertical scrollbar; this element doesn't. Full-bleed children are therefore
+     a scrollbar's width too wide — clip that rather than let it become horizontal scroll. `clip`
+     over `hidden`: it creates no scroll container, so sticky positioning still works. */
+  overflow-x: clip;
 }
 
 .sandbox-shell *,

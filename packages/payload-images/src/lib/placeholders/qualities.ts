@@ -1,5 +1,5 @@
 export const BLURHASH_TIERS = ['xs', 'sm', 'md', 'lg', 'xl'] as const
-export const WEBP_TIERS = ['xxl', 'x3'] as const
+export const WEBP_TIERS = ['2xl', '3xl'] as const
 
 export type BlurhashQuality = (typeof BLURHASH_TIERS)[number]
 export type WebpQuality = (typeof WEBP_TIERS)[number]
@@ -14,7 +14,7 @@ export const BLURHASH_QUALITIES = {
   xl: [9, 9],
 } as const satisfies Record<BlurhashQuality, readonly [number, number]>
 
-export const WEBP_QUALITIES = { xxl: 32, x3: 64 } as const satisfies Record<WebpQuality, number>
+export const WEBP_QUALITIES = { '2xl': 32, '3xl': 64 } as const satisfies Record<WebpQuality, number>
 
 export const DEFAULT_BLURHASH_QUALITY: BlurhashQuality = 'sm'
 
@@ -23,6 +23,7 @@ export const isWebpQuality = (v: unknown): v is WebpQuality => typeof v === 'str
 export const isPlaceholderQuality = (v: unknown): v is PlaceholderQuality => isBlurhashQuality(v) || isWebpQuality(v)
 export const isPlaceholderFormat = (v: unknown): v is PlaceholderFormat => v === 'uri' || v === 'hash'
 
+/** Leaves a leading digit alone, so the webp tiers land on `placeholder2xl` / `placeholder3xl`. */
 const capitalize = (s: string): string => `${s[0]!.toUpperCase()}${s.slice(1)}`
 
 export const blurhashFieldName = (q: BlurhashQuality): string => `blurHash${capitalize(q)}`

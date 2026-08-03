@@ -153,7 +153,7 @@ describe('payload-images wiring', () => {
     expect((doc.blurHashSm as string).length).toBe(4 + 2 * 4 * 3)
     expect((doc.blurHashXl as string).length).toBe(4 + 2 * 9 * 9)
     // The micro-webp tiers store full-frame data URIs.
-    for (const f of ['placeholderXxl', 'placeholderX3']) expect(doc[f], f).toMatch(/^data:image\/webp;base64,/)
+    for (const f of ['placeholder2xl', 'placeholder3xl']) expect(doc[f], f).toMatch(/^data:image\/webp;base64,/)
 
     // The same analysis stamps the palette and alpha flags (RGB gradient: opaque, no alpha).
     const palette = doc.palette as { dominant?: { background?: string; foreground?: string; population?: number } } | null
@@ -192,10 +192,10 @@ describe('payload-images wiring', () => {
     const webp = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      context: { image: { aspectRatio: '16:9' }, blur: { quality: 'xxl' } },
+      context: { image: { aspectRatio: '16:9' }, blur: { quality: '2xl' } },
     })) as { placeholder?: string | null }
     expect(webp.placeholder).toMatch(/^data:image\/webp;base64,/)
-    expect(webp.placeholder).not.toBe(doc.placeholderXxl) // cropped, not the stored full frame
+    expect(webp.placeholder).not.toBe(doc.placeholder2xl) // cropped, not the stored full frame
 
     // blur.format: 'hash' keeps the raw-hash contract for stock blurhash decoders: the cropped
     // hash string — same shape as the stored tier, different coefficients.

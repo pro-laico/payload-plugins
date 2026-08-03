@@ -341,8 +341,8 @@ export interface Image {
   blurHashMd?: string | null;
   blurHashLg?: string | null;
   blurHashXl?: string | null;
-  placeholderXxl?: string | null;
-  placeholderX3?: string | null;
+  placeholder2xl?: string | null;
+  placeholder3xl?: string | null;
   /**
    * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
    */
@@ -754,8 +754,8 @@ export interface ImagesSelect<T extends boolean = true> {
   blurHashMd?: T;
   blurHashLg?: T;
   blurHashXl?: T;
-  placeholderXxl?: T;
-  placeholderX3?: T;
+  placeholder2xl?: T;
+  placeholder3xl?: T;
   placeholder?: T;
   palette?: T;
   hasAlpha?: T;

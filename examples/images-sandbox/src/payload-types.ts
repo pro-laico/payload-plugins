@@ -213,8 +213,8 @@ export interface Image {
   blurHashMd?: string | null;
   blurHashLg?: string | null;
   blurHashXl?: string | null;
-  placeholderXxl?: string | null;
-  placeholderX3?: string | null;
+  placeholder2xl?: string | null;
+  placeholder3xl?: string | null;
   /**
    * Placeholder for the read — opt-in: a finished data URI focal-cropped to the declared render, returned only when the read declares a blur (context.blur = { quality, format } or an X-Blurhash header); null otherwise so undeclared reads carry no data-URI weight.
    */
@@ -588,8 +588,8 @@ export interface ImagesSelect<T extends boolean = true> {
   blurHashMd?: T;
   blurHashLg?: T;
   blurHashXl?: T;
-  placeholderXxl?: T;
-  placeholderX3?: T;
+  placeholder2xl?: T;
+  placeholder3xl?: T;
   placeholder?: T;
   palette?: T;
   hasAlpha?: T;

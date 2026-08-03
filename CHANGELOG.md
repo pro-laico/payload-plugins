@@ -9,6 +9,14 @@ packages share one lockstep version.
 
 ### Changed
 
+- **BREAKING (payload-images): the micro-webp placeholder tiers are renamed `xxl` → `2xl` and
+  `x3` → `3xl`,** so the ladder reads `xs sm md lg xl 2xl 3xl` throughout. The stored fields follow:
+  `placeholderXxl` / `placeholderX3` become `placeholder2xl` / `placeholder3xl`. **Migrate by**
+  renaming the tier in any read that asks for one (`blur: { quality: '2xl' }`, `?q=3xl`,
+  `X-Blurhash`), then running `payload images:backfill` to populate the new fields. An unrecognised
+  tier isn't an error — it falls back to the default blurhash — so a missed rename shows a coarser
+  placeholder rather than breaking a page. Blurhash tiers and the `sm` default are unchanged, so
+  reads that never named a webp tier need nothing.
 - **payload-fonts: a typeface's preferred family is now optional.** It was required, which forced a
   decision at upload time about which slot a typeface was for. Font Set slots no longer filter on it
   either — every slot offers every typeface, since filtering would have made a typeface that declared
@@ -33,11 +41,14 @@ packages share one lockstep version.
 
 ### Upgrade notes
 
-1. **On SQLite, `font` needs a schema push.** Making `family` optional turns a `NOT NULL` column
+1. **`payload images:backfill`** after upgrading, to fill the renamed `placeholder2xl` /
+   `placeholder3xl` fields. Until then those two tiers return null and reads fall back to blurhash;
+   the old columns are left behind and can be dropped.
+2. **On SQLite, `font` needs a schema push.** Making `family` optional turns a `NOT NULL` column
    nullable and adds `option_label` alongside it, which SQLite can only do by rebuilding the table —
    and Drizzle's dev push can't complete that rebuild against an existing database (`no such column:
    option_label`). Generate a migration, or drop the dev database and reseed. MongoDB is unaffected.
-2. **Gitignore `src/app/definition.ts`** and add `payload fonts:download` to `postinstall`. See the
+3. **Gitignore `src/app/definition.ts`** and add `payload fonts:download` to `postinstall`. See the
    [fonts quickstart](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts) — the file is a
    snapshot of your database, and every failure path writes an empty definition, so a fresh clone
    still builds.
