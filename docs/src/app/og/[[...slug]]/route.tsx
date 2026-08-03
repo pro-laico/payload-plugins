@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
 import { notFound } from 'next/navigation'
 import { appDescription, appName } from '@/lib/shared'
@@ -12,6 +14,10 @@ import { source } from '@/lib/source'
  * never goes stale.
  */
 export const dynamic = 'force-static'
+
+/** Every card prerenders at build, so the mark is read from disk once and inlined — an ImageResponse
+ * can't resolve a relative URL, and at build time there's no server to fetch one from anyway. */
+const mark = `data:image/png;base64,${readFileSync(join(process.cwd(), 'public/icons/icon-192.png')).toString('base64')}`
 
 /** Trims to a word so a card never ends mid-word; the ellipsis says the sentence continues. */
 const summarize = (text: string, max = 150): string => {
@@ -52,11 +58,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug?: 
         fontFamily: 'sans-serif',
       }}
     >
-      {/* A hairline of colour along the top edge — enough to be recognisable in a feed without
-          inventing a logo the site doesn't have. */}
+      {/* A hairline of colour along the top edge, so the card reads as ours even as a thumbnail. */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#4ea9ff' }} />
 
-      <div style={{ display: 'flex', fontSize: 26, letterSpacing: 1, textTransform: 'uppercase', color: '#4ea9ff' }}>{section}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        {/* The mark is transparent, so it composites straight onto the card — no plate behind it. */}
+        {/* biome-ignore lint/performance/noImgElement: ImageResponse renders through Satori, which knows <img> and nothing about next/image */}
+        <img src={mark} width={56} height={56} alt="" />
+        <div style={{ display: 'flex', fontSize: 26, letterSpacing: 1, textTransform: 'uppercase', color: '#4ea9ff' }}>{section}</div>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div style={{ display: 'flex', fontSize: 68, fontWeight: 700, lineHeight: 1.1, letterSpacing: -1.5 }}>{title}</div>
