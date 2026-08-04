@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
 
 /**
@@ -183,9 +184,11 @@ export function PrewarmCalculator() {
       {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only reset for a purely illustrative visual */}
       <div className="relative" onMouseLeave={() => setHovered(null)}>
         {hovered != null && (
+          // Mobile: span the strip (inset-x-0) so the tooltip can never leave the viewport; the
+          // tick-anchored centering only applies from sm up, where there's room to clamp it.
           <div
-            className="pointer-events-none absolute bottom-full z-10 mb-2 w-max min-w-60 max-w-[min(36rem,95vw)] -translate-x-1/2 rounded-lg border bg-fd-popover p-3 shadow-md"
-            style={{ left: `${clamp(pct(hovered), 34, 66)}%` }}
+            className="pointer-events-none absolute bottom-full z-10 mb-2 rounded-lg border bg-fd-popover p-3 shadow-md max-sm:inset-x-0 sm:left-(--tooltip-left) sm:w-max sm:min-w-60 sm:max-w-[min(36rem,95vw)] sm:-translate-x-1/2"
+            style={{ '--tooltip-left': `${clamp(pct(hovered), 34, 66)}%` } as CSSProperties}
           >
             <div className="mb-1 font-medium text-fd-foreground">{hovered}px wide</div>
             {hovered > srcW ? (
@@ -197,7 +200,7 @@ export function PrewarmCalculator() {
             ) : (
               <ul className="space-y-1.5">
                 {hoveredTargets.map((t) => (
-                  <li key={`${t.label}${t.q}`} className="whitespace-nowrap text-xs leading-snug">
+                  <li key={`${t.label}${t.q}`} className="text-xs leading-snug sm:whitespace-nowrap">
                     <span
                       className={`mr-1.5 inline-block size-2 rounded-full align-baseline ${t.cut ? 'bg-rose-500' : UNIT_META[t.unit].dot}`}
                     />
