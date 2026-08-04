@@ -27,7 +27,7 @@ path — the endpoint *is* the plugin.
 ## What's included
 
 - **Never bigger than it needs to be:** every layout requests the exact size, crop, and format it needs; [the endpoint](/docs/plugins/payload-images/image-urls) renders it once on demand, then caches it forever.
-- **Focal-point cropping, subject-aware by default:** every upload gets a saliency-detected focal point automatically; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
+- **Focal-point cropping, subject-aware by default:** uploads get a saliency-detected focal point when the analysis finds a subject and the editor hasn't set one; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
 - **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered.

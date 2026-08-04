@@ -14,7 +14,7 @@ export const prewarmNodes = [
   { id: 'enqueue', kind: 'store', label: 'Enqueue imagesPrewarm', detail: 'one job per image — 30s delay coalesces rapid saves; deduped; best-effort', x: 20, y: 180 },
   { id: 'observe', kind: 'store', label: 'Learn render profiles', detail: 'every response logs ratio, fit, quality, format, width', x: 660, y: 180 },
   { id: 'runner', label: 'Your jobs runner', detail: 'payload.jobs.run(), a cron on the jobs endpoint, or strategy.autoRun', x: 20, y: 380 },
-  { id: 'compute', label: 'Compute targets', detail: 'built-ins → seeds → learned, each at the strategy width axis; deduped against the cache; capped by maxVariantsPerImage', x: 340, y: 560 },
+  { id: 'compute', label: 'Compute targets', detail: 'built-ins → seeds → learned; deduped against the cache; capped by maxVariantsPerImage with an even width spread', x: 340, y: 560 },
   { id: 'generate', kind: 'result', label: 'Generate & persist', detail: 'replayed through the endpoint parser — byte-identical cache hits for organic traffic', x: 340, y: 760 },
 ]
 
@@ -41,8 +41,9 @@ its renders:
 
 Targets derive per image in priority order — the budget cuts from the tail:
 
-1. **Built-ins** (`builtIns`) — the three fixed renders the plugin itself emits on every doc read:
-   `src`, `thumbnailURL`, `placeholderURL`. Same three for every project.
+1. **Built-ins** (`builtIns`) — the three render slots the plugin itself emits on every doc read:
+   `src` (at `min(sourceWidth, 1280)`), `thumbnailURL` (160² at `transform.defaultQuality`), and
+   `placeholderURL` (32px, q40).
 2. **Seeds** (`seeds`) — hand-declared learned profiles, for the renders the
    plugin can't know about: the crops *your pages* declare. A hero read of
    `.aspectRatio('16:9').quality(80)` is a render nothing else on this list produces — traffic
@@ -52,20 +53,23 @@ Targets derive per image in priority order — the budget cuts from the tail:
    as you like; an explicit `[]` disables seeding).
 3. **Learned profiles** (`learned`) — the same thing, observed instead of declared. Every transform
    response logs `(ratio, fit, quality, format, width)` to the hidden `image-render-profiles`
-   collection (in-memory buffer with a timed flush — near-zero cost on the serve path); profiles
-   rank by traffic and expire after 30 days.
+   collection (in-memory buffer with a timed flush — near-zero cost on the serve path). Each
+   profile warms its **top 4 observed widths** by hit count; profiles with no traffic for 30 days
+   are ignored by warm plans (the rows are kept, so returning traffic revives them).
 
-Seeds and learned profiles that don't carry their own widths warm at the strategy's **width axis**
-(`widths`): `{ every: n }` is every Nth reachable width (the default is `{ every: 5 }` — every
-~250px on the default 50px grid, a skeleton the
-[fallback](/docs/plugins/payload-images/caching#nearby-quality-fallback) fills between),
+Units that don't carry their own widths inherit them in a chain: a seed without `widths` first
+adopts a matching observed profile's top widths, then falls back to the strategy's **width axis**
+(`widths`), as do learned profiles without a histogram. The axis: `{ every: n }` is every Nth
+reachable width (the default is `{ every: 5 }` — every ~250px on the default 50px grid, a skeleton
+the [fallback](/docs/plugins/payload-images/caching#nearby-quality-fallback) fills between),
 `'srcset'` is exactly the widths `srcset` emits (the default with an array `pixelStep`, whose
 ladder is small and exact), and an explicit `number[]` is those widths.
 
-Every target expands into `formats` (default `['webp']`, plus `'avif'` when
-`transform.preferAvif` is on), dedupes against already-cached variants, and replays through
-the endpoint's own parser — so a warmed variant is a **byte-identical cache hit** for organic
-traffic. The plan is capped by `maxVariantsPerImage` (default 32) — lower-priority units lose
+Built-ins and seeds expand into `formats` (default `['webp']`, plus `'avif'` when
+`transform.preferAvif` is on); a learned profile that observed a concrete format warms only that
+format, and only `auto` observations expand. Every target dedupes against already-cached variants
+and replays through the endpoint's own parser — so a warmed variant is a **byte-identical cache
+hit** for organic traffic. The plan is capped by `maxVariantsPerImage` (default 32) — lower-priority units lose
 budget first, and a unit that doesn't fit **spreads its widths evenly** across its range (half the
 budget warms every other width) rather than losing its large end. A capped plan reports
 `truncated` on the status endpoint and the admin panel.
@@ -73,7 +77,11 @@ budget warms every other width) rather than losing its large end. A capped plan 
 ## When it runs
 
 Enqueueing work and running it are separate: saves **enqueue** one `imagesPrewarm` job per image,
-and nothing generates until a runner picks the queue up.
+and a runner drains the queue. **By default that runner exists**: the strategy wires a 5-minute
+`autoRun` cron (`'*/5 * * * *'`, 50 jobs per firing — one image each, so up to 10 images a minute)
+onto the plugin-owned `images-prewarm` queue, so any long-lived process — `next dev` included —
+warms with zero wiring. The dedicated queue means the cron and the admin **Run now** kick can only
+ever execute the plugin's own jobs, never your app's.
 
 **Enqueued by:**
 
@@ -84,35 +92,34 @@ and nothing generates until a runner picks the queue up.
 - **The admin Prewarm button** on any image — enqueues immediately and kicks the runner.
 - **The CLI**, for a whole library: `payload images:prewarm` (cap a run with `--limit 200`).
 
-**Run by** — pick one:
+**Run by:**
 
-- **Your existing jobs runner** — `payload.jobs.run()`, `payload jobs:run`, or a scheduled request
-  to `/api/payload-jobs/run`. The scheduled request is the serverless answer (e.g. a Vercel Cron).
-  All three are Payload's own machinery — [Payload's Queues docs](https://payloadcms.com/docs/jobs-queue/queues)
-  cover them in full.
-- **`payload images:prewarm --now`** — generates inline as a build/deploy step; needs no runner.
-- **`strategy.autoRun`** — a cron string that wires an in-process runner. Long-lived servers only:
-  on serverless it never fires, leaving jobs enqueued forever.
-
-The cron and the queue are strategy fields, so scheduled warming on its own queue is two lines:
+- **The default `autoRun` cron** — every 5 minutes, `autoRunLimit: 50` jobs per firing, appended to
+  `config.jobs.autoRun` (composing with your own entries, never replacing them). Tune the cadence
+  and throughput, or opt out with `autoRun: false`:
 
 ```ts
 imagesPlugin({
   options: {
     prewarm: {
       strategy: {
-        autoRun: '0 3 * * *', // nightly — appended to config.jobs.autoRun, composing with your own entries
-        queue: 'images',      // a dedicated queue, so bulk warming can't crowd out your other jobs
+        autoRun: '0 3 * * *', // nightly instead of every 5 minutes
+        autoRunLimit: 200,    // jobs (images) per firing
       },
     },
   },
 })
 ```
 
-On serverless, keep the same `queue` and schedule the run externally instead — e.g. a
-[Vercel Cron](https://vercel.com/docs/cron-jobs) hitting `/api/payload-jobs/run?queue=images`.
-Cron strings are the standard five-field expressions — validate one at
-[crontab.guru](https://crontab.guru/).
+- **Your existing jobs runner** — `payload.jobs.run()`, `payload jobs:run`, or a scheduled request
+  to `/api/payload-jobs/run`. All three are Payload's own machinery —
+  [Payload's Queues docs](https://payloadcms.com/docs/jobs-queue/queues) cover them in full.
+- **`payload images:prewarm --now`** — generates inline as a build/deploy step; needs no runner.
+
+**On serverless, the in-process cron never fires reliably** — schedule the run externally instead,
+e.g. a [Vercel Cron](https://vercel.com/docs/cron-jobs) hitting
+`/api/payload-jobs/run?queue=images-prewarm`. Cron strings are the standard five-field
+expressions — validate one at [crontab.guru](https://crontab.guru/).
 
 Retries and re-runs are always safe — every run recomputes the plan and only generates what's
 still missing.
@@ -146,15 +153,16 @@ export const prewarmOptions = [
         name: 'strategy',
         type: "'default' | PrewarmStrategyConfig",
         default: "'default'",
-        description: `What a prewarm run does and when it runs. 'default' is the empty config written out: built-ins, a square 1:1 q80 seed at the derived widths, learned profiles, enqueue on upload.`,
+        description: `What a prewarm run does and when it runs. 'default' is the empty config written out: built-ins, a square 1:1 q80 seed at the derived widths, learned profiles, enqueue on upload, and a 5-minute autoRun cron on the images-prewarm queue.`,
         options: [
           { name: 'widths', type: "'srcset' | { every: number } | number[]", default: "{ every: 5 } · 'srcset' with an array pixelStep", description: `The width axis seeds and learned profiles warm at when they don't carry their own widths: every Nth reachable width (sampled from the top so the largest width always survives), exactly what srcset emits, or an explicit list. The default adapts to pixelStep: an every-5th skeleton on the numeric grid, the exact ladder for an array.` },
           { name: 'builtIns', type: 'boolean', default: 'true', description: `Warm the three renders every read implies: src, thumbnailURL, placeholderURL.` },
-          { name: 'learned', type: 'boolean', default: 'true', description: `Warm learned render profiles at their observed widths.` },
+          { name: 'learned', type: 'boolean', default: 'true', description: `Warm learned render profiles at their top 4 observed widths (by hit count).` },
           { name: 'seeds', type: 'RenderProfileSeed[]', default: "[{ aspectRatio: '1:1', quality: 80 }]", description: `Hand-declared learned profiles: the crops your pages declare, warmed before any traffic has taught the system. Each seed takes aspectRatio, fit, quality, and widths. Declaring your own replaces the default square seed; an explicit [] disables seeding.` },
           { name: 'onUpload', type: 'boolean', default: 'true', description: `Enqueue a prewarm job when an image is created, its file replaced, or its focal edited. false is batch-only mode — the admin button, CLI, and cron paths stay.` },
-          { name: 'autoRun', type: 'string | false', default: 'false', description: `A cron string wires an in-process runner into config.jobs.autoRun. Not for serverless.` },
-          { name: 'queue', type: 'string', default: "'default'", description: `The Payload Jobs queue the prewarm jobs are enqueued on.` },
+          { name: 'autoRun', type: 'string | false', default: "'*/5 * * * *'", description: `The in-process runner's cron, wired into config.jobs.autoRun (composing with your entries). false opts out. In-process crons never fire reliably on serverless — schedule the jobs endpoint externally there.` },
+          { name: 'autoRunLimit', type: 'number', default: '50', description: `Max jobs (one image each) the autoRun cron executes per firing — the default works out to 10 images a minute.` },
+          { name: 'queue', type: 'string', default: "'images-prewarm'", description: `The Payload Jobs queue prewarm jobs land on. Plugin-owned by default, so the cron and the admin Run-now kick can never execute the app's own jobs.` },
         ],
       },
       { name: 'formats', type: 'OutputFormat[]', default: "['webp']", description: `Formats to warm. 'avif' is added automatically when options.transform.preferAvif is set.` },
@@ -190,8 +198,9 @@ imagesPlugin({
         learned: true,    // warm observed render profiles
         seeds: [{ aspectRatio: '1:1', quality: 80 }], // declaring your own replaces this default; [] disables
         onUpload: true,   // enqueue on create / file replace / focal edit
-        autoRun: false,   // a cron string wires an in-process runner (not for serverless)
-        queue: 'default',
+        autoRun: '*/5 * * * *', // the in-process runner's cron — false opts out (serverless: schedule externally)
+        autoRunLimit: 50, // jobs (images) per firing — up to 10 images a minute
+        queue: 'images-prewarm', // plugin-owned, so the cron only ever runs OUR jobs
       },
       formats: ['webp'],  // +'avif' automatically when transform.preferAvif
       maxVariantsPerImage: 32,

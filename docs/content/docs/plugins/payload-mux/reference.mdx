@@ -171,14 +171,14 @@ what breaks without it.
 | Export | From | What |
 | --- | --- | --- |
 | `muxPlugin` (default + named) | `@pro-laico/payload-mux` | The plugin factory. |
-| `muxVideoPlugin` | `@pro-laico/payload-mux` | **Deprecated** alias for `muxPlugin`, kept for one release — removed in 0.6.0. |
+| `muxVideoPlugin` | `@pro-laico/payload-mux` | **Deprecated** alias for `muxPlugin` — still exported, slated for removal in an upcoming release. |
 | `MuxVideoPluginOptions` | `@pro-laico/payload-mux` | The plugin options type (for typing a wrapper / shared factory). |
 | `MuxOptions`, `MuxVideoCollectionOptions` | `@pro-laico/payload-mux` | The nested option groups: the plugin's own domain knobs (`options`) and the `mux-video` collection's own knobs (`collections.muxVideo.options`). |
-| `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath }`. The supported way to discover the managed slug — it follows `collections.muxVideo.slug`. Returns `undefined` when the plugin isn't registered. |
+| `readMuxMarker` | `@pro-laico/payload-mux` | The typed view of `config.custom.payloadMux`: `{ options, muxVideoSlug, uploadPath, webhookPath, refreshPath }`. The supported way to discover the managed slug — it follows `collections.muxVideo.slug`. Returns `undefined` when the plugin isn't registered. |
 | `PayloadMuxMarker` | `@pro-laico/payload-mux` | The marker's type. |
 | `ingestMuxVideo` | `@pro-laico/payload-mux` | Create a video doc from a local file / URL (seeding, imports, migrations). `collection` defaults to the slug on the marker, so a renamed collection needs no argument. |
 | `IngestMuxVideoOptions` | `@pro-laico/payload-mux` | Options for `ingestMuxVideo`: `{ source, title, playbackPolicy?, posterTimestamp?, collection? }`. |
-| `MuxAccessOptions` | `@pro-laico/payload-mux` | The `options.access` gate-map shape: `{ upload?, webhook? }`. |
+| `MuxAccessOptions` | `@pro-laico/payload-mux` | The `options.access` gate-map shape: `{ upload?, webhook?, refresh? }`. |
 | `EndpointAccess` | `@pro-laico/payload-mux` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |
 | `MuxVideoInitSettings`, `MuxVideoUploadSettings`, `MuxVideoNewAssetSettings`, `MuxVideoSignedUrlOptions` | `@pro-laico/payload-mux` | The nested settings types. |
 | `MuxPlaybackPolicy`, `MuxPosterExtension`, `MuxAnimatedGifExtension`, `MuxAdminThumbnail` | `@pro-laico/payload-mux` | The option value unions. |

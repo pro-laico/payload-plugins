@@ -207,9 +207,15 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     expect(marker?.prewarm?.taskSlug).toBe('imagesPrewarm')
     expect(marker?.prewarm?.formats).toEqual(['webp'])
     // Zero-config pixelStep is the 50px grid, so the default width axis is the every-5th skeleton.
-    expect(marker?.prewarm?.strategy).toMatchObject({ widths: { every: 5 }, queue: 'default' })
+    expect(marker?.prewarm?.strategy).toMatchObject({ widths: { every: 5 }, queue: 'images-prewarm' })
     expect(marker?.prewarm?.constraints?.dimensionStep).toBe(50)
-    expect(out.jobs?.autoRun).toBeUndefined() // no forced background work
+    // The working default: a 5-minute cron on the plugin-owned queue, 50 jobs (images) per firing.
+    expect(out.jobs?.autoRun).toEqual([{ cron: '*/5 * * * *', queue: 'images-prewarm', limit: 50 }])
+  })
+
+  it('strategy.autoRun: false opts out of the default cron entirely', () => {
+    const out = run({ options: { prewarm: { strategy: { autoRun: false } } } })
+    expect(out.jobs?.autoRun).toBeUndefined()
   })
 
   it('strategy.onUpload: false drops only the enqueue hook — endpoints, task, and CLI stay', () => {
@@ -226,9 +232,9 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     const marker = (c: Config) => (c.custom as { payloadImages: { prewarm: { formats: string[] } } }).payloadImages
     expect(marker(run({ options: { prewarm: {}, transform: { preferAvif: true } } })).prewarm.formats).toEqual(['webp', 'avif'])
 
-    const cron = { strategy: { autoRun: '0 * * * *' } }
+    const cron = { strategy: { autoRun: '0 * * * *', autoRunLimit: 25 } }
     const fresh = run({ options: { prewarm: cron } })
-    expect(fresh.jobs?.autoRun).toEqual([{ cron: '0 * * * *', queue: 'default', limit: 10 }])
+    expect(fresh.jobs?.autoRun).toEqual([{ cron: '0 * * * *', queue: 'images-prewarm', limit: 25 }])
 
     const withArray = imagesPlugin({ options: { prewarm: cron } })({
       ...baseConfig(),

@@ -175,9 +175,10 @@ never modified, unlike Payload's built-in destructive "Edit image" crop:
   hotspot, the corner handles draw the crop (everything outside dims). Ratio tiles preview the real
   crop, the placeholder, or half & half — live, with the exact geometry the endpoint uses.
 - **It rides along automatically.** The endpoint reads all three layers from the document on any
-  `fit=cover` request, so `<ResponsiveImage>`, the virtual URLs, raw endpoint calls, and the
-  `placeholder` virtual all honor them with nothing extra to pass. Non-cover fits honor the crop
-  rect.
+  `fit=cover` request that pins both dimensions (`w` + `h` — which every ratio-declared render
+  does), so `<ResponsiveImage>`, the virtual URLs, raw endpoint calls, and the `placeholder`
+  virtual all honor them with nothing extra to pass. A width-only cover request and non-cover fits
+  honor the crop rect but resize without the focal window.
 - **No upscaling, even zoomed.** A tight hotspot crops a small pixel region; the endpoint serves
   that region at its native resolution (CSS scales it up) rather than inventing pixels.
 - **Change any layer and stale renders refresh.** Edits purge that image's cached variants and bump

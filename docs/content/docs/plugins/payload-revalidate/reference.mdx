@@ -47,7 +47,7 @@ export const revalidateOptions = [
         name: 'prefix',
         type: 'string',
         default: "''",
-        description: 'Namespaces every emitted tag (e.g. `prefix: "app:"` → `app:posts:my-slug`). Use it to isolate tags when two Payload apps share a cache.',
+        description: 'Namespaces every emitted tag — the separator is added for you (e.g. `prefix: "app"` → `app:posts:my-slug`). Use it to isolate tags when two Payload apps share a cache.',
       },
       {
         name: 'rules',

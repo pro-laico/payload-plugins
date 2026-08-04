@@ -43,6 +43,14 @@ packages share one lockstep version.
   need nothing: no schema change, behavior only improves. **Migrate by** moving the three fields
   under `strategy`: `prewarm: { seeds, autoRun, queue }` → `prewarm: { strategy: { seeds, autoRun,
   queue } }`.
+- **BREAKING (payload-images): prewarm runs by default.** The strategy now wires a 5-minute
+  `autoRun` cron (`strategy.autoRunLimit: 50` jobs — one image each — per firing, up to 10 images
+  a minute) onto a **plugin-owned `images-prewarm` queue** (was `'default'`), so enqueued jobs
+  actually execute in any long-lived process with zero wiring — and the cron and the admin Run-now
+  kick can never run the app's own jobs. In-process crons still never fire reliably on serverless:
+  schedule `/api/payload-jobs/run?queue=images-prewarm` externally there. **Migrate by** doing
+  nothing to accept the runner, `strategy: { autoRun: false }` to restore enqueue-only, and
+  re-pointing any runner you aimed at the `default` queue for prewarm at `images-prewarm`.
 - **BREAKING (payload-images): the default `pixelStep` is now the 50px grid, not the breakpoint
   ladder.** `srcset` steps every 50px up to the source width (fine-grained width selection; larger
   srcset strings on wide originals), and freeform snaps lose the ladder-rung preference — a URL

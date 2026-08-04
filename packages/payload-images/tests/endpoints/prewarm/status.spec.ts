@@ -16,6 +16,7 @@ const deps = {
     seeds: [{ widths: [800] }],
     onUpload: true,
     autoRun: false as const,
+    autoRunLimit: 50,
     queue: 'default',
   },
   formats: ['webp' as const],

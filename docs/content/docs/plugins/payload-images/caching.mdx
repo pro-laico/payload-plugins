@@ -23,7 +23,7 @@ export const pipelineNodes = [
   { id: 'snap', label: 'Snap to the variant grid', detail: 'w → pixelStep grid, q → quality buckets, clamped to maxDimension', x: 300, y: 120 },
   { id: 'cached', kind: 'check', label: 'Cached variant exists?', x: 300, y: 270 },
   { id: 'serve', kind: 'result', label: 'Serve stored bytes', detail: 'immutable, 1y max-age + ETag', x: 20, y: 400 },
-  { id: 'geo', kind: 'check', label: 'Nearby variant exists?', detail: 'same fit + focal, ratio within 8%, at least half the width, a format the client accepts', x: 660, y: 400 },
+  { id: 'geo', kind: 'check', label: 'Nearby variant exists?', detail: 'same fit + focal, ratio within 8%, at least half the effective width, a format the client accepts', x: 660, y: 400 },
   { id: 'observe', kind: 'store', label: 'Record the render profile', detail: 'every response logs ratio, fit, quality, format, width — what smart prewarm learns from', x: 20, y: 620 },
   { id: 'standin', kind: 'result', label: 'Serve stand-in instantly', detail: 'Cache-Control: no-store — nothing caches it', x: 300, y: 620 },
   { id: 'render', kind: 'result', label: 'Render with Sharp & respond', detail: 'the slowest response — a full render, streamed with the same immutable headers', x: 660, y: 620 },
@@ -45,8 +45,8 @@ export const pipelineEdges = [
 
 <Flow nodes={pipelineNodes} edges={pipelineEdges} height={900} />
 
-URLs are **content-addressed**: the `v` token is a hash of the source's filename and focal layers
-(focal point, plus the hotspot size and crop rect when set), so a variant URL is immutable and
+URLs are **content-addressed**: the `v` token is a hash of the source's filename, filesize, and
+focal layers (focal point, plus the hotspot size and crop rect when set), so a variant URL is immutable and
 safe to cache forever — responses ship
 `Cache-Control: public, max-age=31536000, immutable` (plus the CDN variants) and an ETag.
 
@@ -82,10 +82,11 @@ The endpoint is public-facing, so it's bounded on several fronts:
   loopback / private / link-local hosts (while still allowing your configured origin).
 
 <Callout type="warn">
-  Both the purge and the `v` token key on the **filename**. A replacement that keeps the same
-  filename (`upload.overwriteExistingFiles: true`, or Payload's built-in admin crop, which
-  overwrites in place) is invisible to them. These guarantees assume Payload's default
-  suffixed-filename replacement.
+  The purge trigger and the `v` token key on the **filename and filesize**, so a replacement that
+  keeps the same filename (`upload.overwriteExistingFiles: true`, or Payload's built-in admin
+  crop, which overwrites in place) is still caught as long as the bytes change size. The one true
+  blind spot is a same-filename replacement with an **identical byte count** — practically only an
+  unchanged re-upload.
 </Callout>
 
 ## Nearby-quality fallback
@@ -93,7 +94,8 @@ The endpoint is public-facing, so it's bounded on several fronts:
 A cache miss normally means the visitor waits on Sharp. With the fallback (default **on**), a miss
 where a **nearby** variant already exists serves those bytes **instantly** while the exact variant
 generates in the background. Nearby means the same crop: same fit and focal point, aspect ratio
-within 8% drift, at least half the requested width — at any quality, in any format the client's
+within 8% drift, at least half the *effective* request width (the request clamped by the
+no-upscale fit) — at any quality, in any format the client's
 `Accept` negotiation proved it decodes (an AVIF stand-in only for AVIF requests, WebP only for
 WebP/AVIF). The next request gets the accurate image.
 

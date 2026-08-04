@@ -18,9 +18,11 @@ const DEFAULT_PREWARM_SEEDS: RenderProfileSeed[] = [{ aspectRatio: '1:1', qualit
 
 // On by default: these sites are image-led marketing pages where a cold variant is a visible LCP hit.
 // Only an explicit `prewarm: false` opts out — note that being on registers the render-profiles
-// collection (a schema change) and the jobs task, and that the enqueued jobs need a runner to do
-// anything (see the docs' run-path section; Payload's autoRun cron needs a long-lived process, so
-// serverless deploys drive it from a cron hitting the jobs endpoint or the images:prewarm CLI).
+// collection (a schema change) and the jobs task. The default strategy also wires a 5-minute
+// autoRun cron on the plugin-owned 'images-prewarm' queue, so enqueued jobs actually run in any
+// long-lived process (dev servers included) with zero wiring; in-process crons never fire reliably
+// on serverless, so those deploys schedule a request to the jobs endpoint or run images:prewarm
+// as a build step (see the docs' run-path section).
 export const resolvePrewarmOptions = (
   opts: false | PrewarmOptions,
   constraints: TransformConstraints,
@@ -38,8 +40,11 @@ export const resolvePrewarmOptions = (
     learned: strategyConfig.learned ?? true,
     seeds: strategyConfig.seeds ?? DEFAULT_PREWARM_SEEDS,
     onUpload: strategyConfig.onUpload ?? true,
-    autoRun: strategyConfig.autoRun ?? false,
-    queue: strategyConfig.queue ?? 'default',
+    // 50 jobs (one image each) per 5-minute firing = up to 10 images a minute.
+    autoRun: strategyConfig.autoRun ?? '*/5 * * * *',
+    autoRunLimit: strategyConfig.autoRunLimit ?? 50,
+    // A plugin-owned queue: the default cron and the Run-now kick only ever run OUR jobs.
+    queue: strategyConfig.queue ?? 'images-prewarm',
   }
   const defaultFormats: OutputFormat[] = constraints.preferAvif ? ['webp', 'avif'] : ['webp']
   // Only formats the endpoint can actually serve are worth warming — anything outside

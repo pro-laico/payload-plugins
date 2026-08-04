@@ -85,10 +85,10 @@ export const options = [
           { name: 'maxInputPixels', type: 'number', default: '100000000', description: `Max source pixels Sharp will decode: a decompression-bomb guard that also caps per-transform memory (~100MP ≈ 400MB).` },
           { name: 'maxConcurrency', type: 'number', default: 'cpus - 1 (computed)', description: `Max concurrent Sharp transforms in this process (or IMAGES_TRANSFORM_CONCURRENCY). Computed from the host CPU count.` },
           { name: 'sharpConcurrency', type: 'number', default: '1', description: `Per-image libvips thread cap (or IMAGES_SHARP_CONCURRENCY); 0 = CPU cores. Defaults to 1 for serverless safety.` },
-          { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
+          { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready — same fit and focal point, ratio within 8% drift, at least half the effective request width, any quality, in a format the client's negotiation proved it decodes — serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
         ],
       },
-      { name: 'prewarm', type: 'false | PrewarmOptions', default: '{}', description: `Smart prewarming, driven by a strategy: warm the built-in renders, seeds (default: a square 1:1 q80 crop at the derived widths — declaring your own replaces it), and learned traffic profiles for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes strategy / formats / maxVariantsPerImage — the strategy carries widths ('srcset', { every: n }, or a list), builtIns, learned, seeds, onUpload, autoRun, and queue — and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Prewarming → Running prewarm.` },
+      { name: 'prewarm', type: 'false | PrewarmOptions', default: '{}', description: `Smart prewarming, driven by a strategy: warm the built-in renders, seeds (default: a square 1:1 q80 crop at the derived widths — declaring your own replaces it), and learned traffic profiles for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes strategy / formats / maxVariantsPerImage — the strategy carries widths ('srcset', { every: n }, or a list), builtIns, learned, seeds, onUpload, autoRun, autoRunLimit, and queue — and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, the images:prewarm CLI, and by default a 5-minute autoRun cron (50 jobs per firing) on the plugin-owned images-prewarm queue, so jobs actually run in any long-lived process. Serverless needs an external schedule instead — see Prewarming → When it runs.` },
       { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths and the endpoint's snap grid. The default 50 steps srcset densely (every 50px up to the source width) and snaps freeform requests to the same grid — prewarm warms an every-5th skeleton and the fallback bridges the rest. An array switches srcset to a fixed breakpoint ladder (e.g. next/image's deviceSizes [640, 750, 828, 1080, 1200, 1920, 2048, 3840]) whose widths always pass the snap unchanged — smaller responses on wide originals, and prewarm warms the ladder exactly. maxDimension caps the top.` },
       { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching → Guaranteed presets.` },
       { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching → The variant cap.` },
@@ -156,13 +156,14 @@ imagesPlugin({
     prewarm: {
       // or false to opt out; `strategy: 'default'` ≡ `strategy: {}` ≡ this, written out:
       strategy: {
-        widths: 'srcset', // or { every: 2 } (every 2nd reachable width), or an explicit number[]
+        widths: { every: 5 }, // the numeric-grid default — 'srcset' with an array pixelStep, or an explicit number[]
         builtIns: true,   // warm src / thumbnailURL / placeholderURL
         learned: true,    // warm observed render profiles
         seeds: [{ aspectRatio: '1:1', quality: 80 }], // declaring your own replaces this default; [] disables
         onUpload: true,   // enqueue on create / file replace / focal edit
-        autoRun: false,   // a cron string wires an in-process runner (not for serverless)
-        queue: 'default',
+        autoRun: '*/5 * * * *', // the in-process runner's cron — false opts out (serverless: schedule externally)
+        autoRunLimit: 50, // jobs (images) per firing
+        queue: 'images-prewarm', // plugin-owned, so the cron only ever runs the plugin's jobs
       },
       formats: ['webp'],  // +'avif' automatically when transform.preferAvif
       maxVariantsPerImage: 32,
@@ -208,7 +209,7 @@ option is unset.
 | `IMAGES_TRANSFORM_CONCURRENCY` | `cpus - 1` (computed) | Max concurrent Sharp transforms in this process. The default for `transform.maxConcurrency`. |
 | `IMAGES_TRANSFORM_MAX_QUEUE` | `max(64, concurrency × 32)` | Queued transforms allowed before the endpoint sheds load with a `503`. |
 | `IMAGES_SHARP_CONCURRENCY` | `1` | Per-image libvips thread cap; `0` = CPU cores. The default for `transform.sharpConcurrency`. |
-| `IMAGES_PREWARM_FLUSH_MS` | `30000` | How often buffered prewarm observations flush to the render-profiles collection. |
+| `IMAGES_PREWARM_FLUSH_MS` | `30000` | Debounce before buffered prewarm observations flush to the render-profiles collection (armed by the first observation after a flush). Newly seen widths write on flush; pure hit-count bumps persist at most every 15 minutes per profile. |
 | `NEXT_PUBLIC_SERVER_URL` | — | Base URL for generated image URLs. |
 | `VERCEL_PROJECT_PRODUCTION_URL` | — | Fallback base URL when `NEXT_PUBLIC_SERVER_URL` is unset. |
 
@@ -219,7 +220,7 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 | Command | Flags | What |
 | --- | --- | --- |
 | `payload images:backfill` | `--force`, `--focal`, `--collection` | Stamps upload-time metadata (placeholder tiers, palette, alpha flags, saliency focal point) onto images that predate the plugin. See [Metadata → Backfilling an existing library](/docs/plugins/payload-images/metadata#backfilling-an-existing-library). |
-| `payload images:prewarm` | `--now`, `--limit`, `--collection`, `--queue` | Bulk-warms a library against the learned render profiles. Requires `prewarm` on. See [Prewarming](/docs/plugins/payload-images/prewarming). |
+| `payload images:prewarm` | `--now`, `--limit`, `--collection`, `--queue` | Enqueues one prewarm job per source for a runner to execute; `--now` generates inline instead, no runner needed. Requires `prewarm` on. See [Prewarming](/docs/plugins/payload-images/prewarming). |
 
 ## Endpoints
 

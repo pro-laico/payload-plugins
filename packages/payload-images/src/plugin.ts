@@ -20,8 +20,8 @@ import { createGeneratedImagesCollection, GENERATED_IMAGES_SLUG } from './collec
 
 type JobsCfg = NonNullable<Config['jobs']>
 
-const withAutoRun = (existing: JobsCfg['autoRun'], cron: string, queue: string): JobsCfg['autoRun'] => {
-  const entry = { cron, queue, limit: 10 }
+const withAutoRun = (existing: JobsCfg['autoRun'], cron: string, queue: string, limit: number): JobsCfg['autoRun'] => {
+  const entry = { cron, queue, limit }
   if (!existing) return [entry]
   if (Array.isArray(existing)) return [...existing, entry]
   return async (payload) => [...(await existing(payload)), entry]
@@ -197,7 +197,9 @@ export const imagesPlugin =
               //EXCUSE: TypedJobs task slugs are app-generated; the plugin can't name its own task slug in that union
               tasks: [...(config.jobs?.tasks ?? []), createPrewarmTask(prewarmDeps) as never],
               ...(prewarm.strategy.autoRun
-                ? { autoRun: withAutoRun(config.jobs?.autoRun, prewarm.strategy.autoRun, prewarm.strategy.queue) }
+                ? {
+                    autoRun: withAutoRun(config.jobs?.autoRun, prewarm.strategy.autoRun, prewarm.strategy.queue, prewarm.strategy.autoRunLimit),
+                  }
                 : {}),
             },
           }

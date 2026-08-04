@@ -144,6 +144,7 @@ imagesPlugin({
   | `payload-images` | `serve` | **public** — image serving has to answer anonymous traffic |
   | `payload-mux` | `upload` | any logged-in user |
   | `payload-mux` | `webhook` | **Mux's signature verification** — a machine caller, no user session |
+  | `payload-mux` | `refresh` | any logged-in user |
   | `payload-fonts` | `export` | **`PAYLOAD_SECRET` bearer** — a build calls it, no user session |
   | `payload-icons` | `clearRequests` | any logged-in user |
   | `payload-seed` | `run` | any logged-in user (plus `ENABLE_SEED`, below) |

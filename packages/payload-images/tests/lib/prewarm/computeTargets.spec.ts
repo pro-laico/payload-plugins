@@ -28,6 +28,7 @@ const strategy = (over: Partial<ResolvedPrewarmStrategy> = {}): ResolvedPrewarmS
   seeds: [{ aspectRatio: '1:1', quality: 80 }],
   onUpload: true,
   autoRun: false,
+  autoRunLimit: 50,
   queue: 'default',
   ...over,
 })

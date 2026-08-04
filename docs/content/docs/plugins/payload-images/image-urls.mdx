@@ -32,7 +32,7 @@ By default a read gets natural-ratio URLs. Declare the render in the read's `con
 context: { image: { aspectRatio, quality, fit, format } }
 ```
 
-The `srcset` follows the project-wide `pixelStep` (default `50`): one URL every 50px up to the source width, whose native width is always the top rung. An array `pixelStep` switches to a fixed breakpoint ladder instead (e.g. next/image's `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`).
+The `srcset` follows the project-wide `pixelStep` (default `50`): one URL every 50px up to the source width (capped at `maxDimension`, 4096), with the top rung being the source's own width. An array `pixelStep` switches to a breakpoint ladder instead (e.g. next/image's `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) — rungs below the source width plus the source width itself as the top rung; freeform requests still snap to the 50px grid.
 
 export const virtualNodes = [
   { id: 'read', kind: 'start', label: 'Any read of an image doc', detail: 'REST, GraphQL, Local API — or a populated page.heroImage', x: 300, y: 0 },
@@ -82,7 +82,8 @@ When you do build a URL by hand, here's the shape:
 - **`fit=cover`** — how the source maps into the box. `cover` crops around the
   [focal point](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
 - **`q=80&fmt=auto`** — encode settings. `auto` negotiates AVIF/WebP from the browser's `Accept`.
-- **`v=1a2b3c`** — a cache-bust token derived from the source's filename + focal point. The server
+- **`v=1a2b3c`** — a cache-bust token derived from the source's filename, filesize, and focal
+  layers (focal point, plus hotspot/crop when set). The server
   ignores it; it exists so the URL changes when the image does
   ([Caching](/docs/plugins/payload-images/caching)).
 
@@ -102,7 +103,7 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 | `fit` | `cover` | How the source maps into the box: `cover` (focal crop) · `contain` · `inside` · `outside` · `fill`. |
 | `q` | `90` | Quality, bucketed to multiples of 5 and clamped to `qualityRange`. |
 | `fmt` | `auto` | Encode format: `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
-| `v` | — | Cache-busting token (derived from filename + focal). Ignored by the server. |
+| `v` | — | Cache-busting token (derived from filename + filesize + focal layers). Ignored by the server. |
 
 `w` and `h` snap to the `pixelStep` grid (default 50px) and clamp to `maxDimension` (default `4096`). An array `pixelStep`'s exact widths also pass the snap. `q` clamps to `qualityRange` (default `40–95`). Output never upscales past the source.
 

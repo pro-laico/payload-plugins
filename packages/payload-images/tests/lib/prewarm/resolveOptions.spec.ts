@@ -23,8 +23,9 @@ describe('resolvePrewarmOptions strategy', () => {
     learned: true,
     seeds: [{ aspectRatio: '1:1', quality: 80 }],
     onUpload: true,
-    autoRun: false,
-    queue: 'default',
+    autoRun: '*/5 * * * *',
+    autoRunLimit: 50,
+    queue: 'images-prewarm',
   }
 
   it("fills the default strategy for {}, strategy: 'default', and an empty strategy config alike", () => {
@@ -44,9 +45,10 @@ describe('resolvePrewarmOptions strategy', () => {
     expect(on(resolve({ strategy: { seeds: [] } })).strategy.seeds).toEqual([])
   })
 
-  it('honors per-field overrides without disturbing the rest', () => {
-    const r = on(resolve({ strategy: { widths: { every: 2 }, autoRun: '0 3 * * *', queue: 'warmQ', onUpload: false } }))
-    expect(r.strategy).toEqual({ ...defaults, widths: { every: 2 }, autoRun: '0 3 * * *', queue: 'warmQ', onUpload: false })
+  it('honors per-field overrides without disturbing the rest — including autoRun: false to opt out of the cron', () => {
+    const r = on(resolve({ strategy: { widths: { every: 2 }, autoRun: '0 3 * * *', autoRunLimit: 5, queue: 'warmQ', onUpload: false } }))
+    expect(r.strategy).toEqual({ ...defaults, widths: { every: 2 }, autoRun: '0 3 * * *', autoRunLimit: 5, queue: 'warmQ', onUpload: false })
+    expect(on(resolve({ strategy: { autoRun: false } })).strategy.autoRun).toBe(false)
   })
 
   it('defaults the per-image cap to 32, overridable at the top level', () => {

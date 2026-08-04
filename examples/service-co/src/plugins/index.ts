@@ -38,9 +38,9 @@ export const seedDefinitions = [
 export const seedOptions = { definitions: seedDefinitions, options: { assetsDir: 'seed-assets', assetSubDirs: { fontOriginal: 'font' } } }
 
 export const plugins: Plugin[] = [
-  // A non-default prewarm strategy: seed the hero crop before any traffic is observed, and run
-  // queued jobs nightly. autoRun is an in-process cron — it needs a long-lived server; on
-  // serverless drive the queue from a cron hitting /api/payload-jobs/run instead.
+  // A non-default prewarm strategy: seed the hero crop before any traffic is observed, and slow
+  // the default 5-minute runner down to nightly. autoRun is an in-process cron — on serverless,
+  // opt out and drive the queue from a cron hitting /api/payload-jobs/run?queue=images-prewarm.
   imagesPlugin({ options: { prewarm: { strategy: { seeds: [{ aspectRatio: '16:9', quality: 80 }], autoRun: '0 3 * * *' } } } }),
   iconsPlugin(),
   muxPlugin(),

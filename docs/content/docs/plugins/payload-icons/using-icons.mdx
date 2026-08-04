@@ -44,6 +44,7 @@ import { Icon } from '@/components/Icon'
 export const iconProps = [
   { name: 'name', type: 'string', required: true, description: `The name to render, matched against each entry's name in the active iconSet's iconsArray. Resolved server-side through the active set.` },
   { name: 'fallback', type: 'string', default: 'built-in warning glyph', description: `Optional SVG string rendered when name doesn't match any icon in the active set. Omit it to use the built-in warning glyph.` },
+  { name: 'draft', type: 'boolean', default: 'false', description: `Resolve through the draft icon set. A prop rather than a draftMode() call, so published pages stay static — a preview route passes draft={(await draftMode()).isEnabled} explicitly.` },
   { name: '...svgProps', type: 'SVGAttributes', description: `Any SVG attribute (className, style, width, …) spread onto the rendered svg, winning over the source's intrinsic attributes.` },
 ]
 

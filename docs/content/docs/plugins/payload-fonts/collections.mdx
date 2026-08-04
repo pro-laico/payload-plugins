@@ -32,6 +32,7 @@ collections. Reads and writes require a logged-in user.
   type={{
     title: { description: "The typeface name. Required, and what the admin list searches. The displayed title is this plus the preferred family when one is set.", type: "text" },
     family: { description: "The generic family this typeface is offered for first: sans / serif / mono / display by default (customisable via the plugin's options.families). Optional — every Font Set slot offers every typeface either way; the preference is appended to the option text (Inter (Sans)) rather than filtering the list.", type: "radio" },
+    optionLabel: { description: "Hidden, derived label the Font Set slot options display — the title plus the preferred family when one is set. Maintained by hooks; not editable.", type: "text (hidden)" },
     servedFiles: { description: "Read-only sidebar count of the fontOptimized files this typeface currently serves, counted per read. 0 after a save means nothing optimized — re-save, and check the server logs if it stays 0.", type: "number (virtual)" },
     variable: { description: "A single variable file per upright / italic (covers many weights). Hidden once weights are added; use this OR weights, not both.", type: "group" },
     weights: { description: "One file per weight (100–900) + style (normal/italic); each weight+style pair must be unique. Hidden once a variable file is added.", type: "array" },
@@ -73,11 +74,10 @@ The hidden, derived collection of WOFF2 bytes the site actually serves: one uplo
 weight/style (or variable file), written by `font`'s save hook, never hand-uploaded. Read is
 **public** so the build-time export can fetch them on cloud storage; writes stay gated.
 
-**Fields**
+**Fields** — beyond the upload itself (the subsetted WOFF2 bytes):
 
 <TypeTable
   type={{
-    file: { description: "The subsetted WOFF2 bytes (the upload).", type: "upload" },
     font: { description: "The owning typeface. The export endpoint and reconcile hook query by it. Read-only.", type: "relationship" },
     original: { description: "The source fontOriginal this was subsetted from, the reconcile key (one optimized per original). Read-only.", type: "relationship" },
     weight: { description: "CSS font-weight: a single step (400) or a variable range (100 900); served verbatim to next/font. Read-only.", type: "text" },

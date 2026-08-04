@@ -3,11 +3,11 @@ title: "Collections"
 description: "The collections the plugin registers, how to extend your own upload collection, and how images seed natively."
 ---
 
-The plugin registers two collections under an **Assets** admin group: one you upload to, one that
-caches what gets generated. Both accept PNG, JPEG, WebP, and AVIF. With
-[`options.prewarm`](/docs/plugins/payload-images/prewarming) on, a third hidden collection
-joins them — the render-profile registry. `collections.images.options.folders` is on by default, so
-Payload's own hidden `payload-folders` collection is registered too.
+The plugin registers three collections under an **Assets** admin group: one you upload to, one
+that caches what gets generated, and — because [`options.prewarm`](/docs/plugins/payload-images/prewarming)
+is on by default — the hidden render-profile registry (an explicit `prewarm: false` drops it).
+The upload collections accept PNG, JPEG, WebP, and AVIF. `collections.images.options.folders` is
+on by default, so Payload's own hidden `payload-folders` collection is registered too.
 
 ## Collections
 
@@ -22,7 +22,7 @@ is **public**; writes are logged-in-admin only.
 
 <TypeTable
   type={{
-    file: { description: "The original image (the upload). Stored as-is; shown in relationship fields via displayPreview, and the admin list shows a 160px focal-cropped on-demand thumbnail.", type: "upload" },
+    file: { description: "The original image (the upload). Stored as-is; shown in relationship fields via displayPreview, and the admin list shows the 160px focal-cropped `thumbnail` preset (cap-exempt, pre-generated on save).", type: "upload" },
     alt: { description: "Required. Screen-reader / SEO text; the admin title and list-search field. Localized when localizeAlt is on — which it is whenever your config sets localization.", type: "text" },
     focalPoint: { description: "Payload's native upload.focalPoint, surfaced by the picker below.", type: "built-in" },
     folder: { description: "Payload's native folder organization. Nullable, and added by default — set collections.images.options.folders: false to leave it off.", type: "relationship" },

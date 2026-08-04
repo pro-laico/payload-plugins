@@ -141,7 +141,7 @@ Two env vars tune usage detection at runtime, independent of the plugin options.
 
 | Method & path | What |
 | --- | --- |
-| `DELETE /api/payload-icons/icon-requests` | Clears every `iconRequest` doc — the action behind the usage panel's **Clear** button. Gated by `options.access.clearRequests` (any logged-in user by default; see [Gating endpoints](../conventions#gating-endpoints)). The gate is the outer door only — the delete runs as the caller (`overrideAccess: false`), so the `iconRequest` collection's own delete access still applies and a caller the gate admits can still clear nothing. Registered only while the `iconRequest` collection is on; the path follows its resolved slug via the marker. |
+| `DELETE /api/payload-icons/icon-requests` | Clears every `iconRequest` doc — the action behind the usage panel's **Clear** button. Gated by `options.access.clearRequests` (any logged-in user by default; see [Gating endpoints](../conventions#gating-endpoints)). The gate is the outer door only — the delete runs as the caller (`overrideAccess: false`), so the `iconRequest` collection's own delete access still applies and a caller the gate admits can still clear nothing. Registered only while the `iconRequest` collection is on; the path is fixed (a renamed `iconRequest` slug changes the delete target, not the route). |
 
 Icon-set activation itself happens in the admin, or through the companion
 [`@pro-laico/payload-dev-tools`](/docs/plugins/payload-dev-tools) `/dev` panel.

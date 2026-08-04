@@ -130,8 +130,8 @@ each view renders.
 | --- | --- | --- |
 | `devToolsPlugin` | `@pro-laico/payload-dev-tools` | Plugin factory; registers the `/api/dev*` endpoints. |
 | `defineTest` | `@pro-laico/payload-dev-tools` (and `/next`, `/toolbar`) | Identity helper defining a test's versions with full typing. |
-| `readDevToolsMarker` | `@pro-laico/payload-dev-tools` | Reads this plugin's `config.custom` marker (`PayloadDevToolsMarker`) — the resolved `devRoute`, for custom tooling. |
-| `PayloadDevToolsMarker` | `@pro-laico/payload-dev-tools` | The marker's type: `{ options, devRoute }`. |
+| `readDevToolsMarker` | `@pro-laico/payload-dev-tools` | Reads this plugin's `config.custom` marker (`PayloadDevToolsMarker`) — the resolved `devRoute` and `regions`, for custom tooling. |
+| `PayloadDevToolsMarker` | `@pro-laico/payload-dev-tools` | The marker's type: `{ options, devRoute, regions }`. |
 | `DevToolsPluginOptions` | `@pro-laico/payload-dev-tools` | The `devToolsPlugin(options?)` argument type: `{ enabled?, options? }`. |
 | `DevToolsAccessOptions` | `@pro-laico/payload-dev-tools` | The `options.access` gate-map shape: `{ dev? }`. |
 | `EndpointAccess` | `@pro-laico/payload-dev-tools` | The endpoint-gate function type `(req) => boolean \| Promise<boolean>`; see [Gating endpoints](../conventions#gating-endpoints). |

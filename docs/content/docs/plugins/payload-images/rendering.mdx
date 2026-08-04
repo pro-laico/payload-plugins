@@ -83,8 +83,8 @@ at `/api/img`.
 <img
   class="rounded-xl"
   src="/api/img/64a…?w=1280&h=720&fit=cover&q=80&fmt=auto&v=1a2b3c"
-  srcset="/api/img/64a…?w=640&h=360&fit=cover&q=80&fmt=auto&v=1a2b3c   640w,
-          …                                                            (each ladder rung up to the source)
+  srcset="/api/img/64a…?w=50&h=28&fit=cover&q=80&fmt=auto&v=1a2b3c     50w,
+          …                                                            (every pixelStep — 50px by default — up to the source)
           /api/img/64a…?w=2400&h=1350&fit=cover&q=80&fmt=auto&v=1a2b3c 2400w"
   sizes="(max-width: 768px) 100vw, 50vw"
   alt="…"
@@ -125,7 +125,7 @@ export const imageProps = [
   { name: 'alt', type: 'string | null', description: `Alt text, from the doc spread. Empty/null omits the attribute.` },
   { name: 'src', type: 'string | null', description: `The default-width transform URL, from the doc spread. Missing → the component renders null.` },
   { name: 'srcset', type: 'string | null', description: `The responsive srcset, from the doc spread. Missing → the component renders null.` },
-  { name: 'placeholder', type: 'string | null', description: `The doc's placeholder (a finished data URI, or a raw hash) — painted as the <img>'s background while it loads. The quality/crop were decided by the READ that fetched the doc.` },
+  { name: 'placeholder', type: 'string | null', description: `The doc's placeholder — painted as the <img>'s background while it loads when it's a URL-shaped value (data:, http(s):, or root-relative). A raw blurhash string is carried but not painted. The quality/crop were decided by the READ that fetched the doc.` },
   { name: 'aspectRatio', type: `number | "\${n}:\${n}" | null`, description: `CSS aspect-ratio for the box, from the doc spread — the ratio the read declared, else the image's natural one — so you never restate it. Pass it only to override. Ignored with fill, where the positioned parent owns the box.` },
   { name: 'sizes', type: 'string', default: "'100vw'", description: `The img sizes attribute; set it to how big the image actually renders.` },
   { name: 'fill', type: 'boolean', default: 'false', description: `Cover-fill a positioned parent that sets its own height (full-bleed hero, slide) instead of an aspect-ratio box.` },
@@ -175,8 +175,9 @@ import { ResponsiveImage } from '@pro-laico/payload-images/components/image'
 </Tabs>
 
 There is also an `ImageProps` type for the app-level wrapper shown below: `id` + the declared
-render (`image`, `blur`) + every presentation prop, with the doc fields omitted (the wrapper
-fetches those itself).
+render (`image`, `blur`) + every presentation prop, with the fetched doc fields (`alt`, `src`,
+`srcset`, `placeholder`) omitted — the wrapper fetches those itself. `aspectRatio` stays, as the
+declared-render override.
 
 ## The read contract
 

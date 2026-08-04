@@ -17,6 +17,7 @@ The plugin registers three endpoints under Payload's API route. The upload pair 
 | `POST /api/mux/upload` | Mint a Mux direct-upload. The admin uploader posts files to it. |
 | `GET /api/mux/upload?id=…` | Read a direct-upload, to pick up its `asset_id`. |
 | `POST /api/mux/webhook` | Verify and apply Mux events: set metadata on ready/updated, delete on deleted, mark the doc `errored` (with the Mux message) on errored, and (with `autoCreateOnWebhook`) backfill assets uploaded in Mux. |
+| `GET /api/mux/refresh?id=…` | Ask Mux for a doc's current asset state and write it back — the admin uploader polls it, and it recovers a missed webhook. Gated by `options.access.refresh` (any logged-in user by default). |
 
 ## Webhook
 
