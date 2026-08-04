@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Payload, PayloadRequest } from 'payload'
 
-import { DEFAULT_CONSTRAINTS } from '../../../src/lib/transform/params'
+import { variantCacheKey } from '../../../src/lib/transform/variantKey'
 import { createPresetStatusEndpoint } from '../../../src/endpoints/presets'
 import { DEFAULT_PRESET_TEMPLATES } from '../../../src/lib/presets/defaults'
+import { DEFAULT_CONSTRAINTS, parseTransformParams } from '../../../src/lib/transform/params'
 import type { PresetStatusResponse } from '../../../src/types'
 
 const cfg = {
@@ -65,6 +66,19 @@ describe('createPresetStatusEndpoint', () => {
     const { body } = await run({ variants: [{ id: 'v9', cacheKey: ogKey, filename: `${ogKey}.jpg` }] })
     expect(body.presets.find((p) => p.name === 'og')).toMatchObject({ variantId: 'v9', filename: `${ogKey}.jpg` })
     expect(body.presets.find((p) => p.name === 'thumbnail')?.variantId).toBeUndefined()
+  })
+
+  it('computes the SAME key the generation path stores — filesize included (regression: it was omitted, so every lookup missed)', async () => {
+    const source = { id: 'img1', filename: 'a.jpg', filesize: 123_456, presets: [{ template: 'og' }] }
+    const { body } = await run({ source })
+    // Replay the eager-generation key for the og template (1200×630 cover q80 jpeg, dimensionStep 1).
+    const parsed = parseTransformParams(
+      { w: '1200', h: '630', fit: 'cover', q: '80', fmt: 'jpeg' },
+      { ...DEFAULT_CONSTRAINTS, dimensionStep: 1 },
+    )
+    if (!parsed.ok) throw new Error(parsed.error)
+    const expected = variantCacheKey({ id: 'img1', filename: 'a.jpg', filesize: 123_456 }, parsed.params, 'jpeg')
+    expect(body.presets.find((p) => p.name === 'og')?.cacheKey).toBe(expected)
   })
 
   it('cacheKeys differ per preset and change with the crop identity', async () => {

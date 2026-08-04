@@ -1,19 +1,23 @@
 'use client'
 
 import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast, useAllFormFields, useConfig, useDocumentInfo, useField, useForm } from '@payloadcms/ui'
 
-import { ENCODABLE_FORMATS, FITS } from '../../../lib/transform/params'
+import { DEFAULT_CONSTRAINTS, ENCODABLE_FORMATS, FITS } from '../../../lib/transform/params'
 import type { PresetEntry, PresetManagerProps, PresetSpec } from '../../../types'
+import { buildTickModel } from './tickModel'
+import { VariantTicks } from './variantTicks'
 import {
   type PlanRow,
   type PresetMatch,
   type PrewarmView,
+  type VariantAxis,
   type VariantPage,
   type VariantRow,
   parsePresetMatches,
   parsePrewarmStatus,
+  parseVariantAxis,
   parseVariantPage,
 } from './parsers'
 import {
@@ -61,11 +65,13 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
   prewarmPath,
   presetsPath,
   pageSize = 15,
+  constraints,
 }) => {
   const [fields] = useAllFormFields()
   const { addFieldRow, removeFieldRow } = useForm()
   const { config } = useConfig()
-  const { id } = useDocumentInfo()
+  const { id, data } = useDocumentInfo()
+  const sourceWidth = typeof data?.width === 'number' ? data.width : undefined
   const { value: limitValue, setValue: setLimitValue } = useField<number | null>({ path: 'variantLimit' })
   const [attempted, setAttempted] = useState(false)
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
@@ -73,6 +79,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
   const [page, setPage] = useState(1)
   const [refresh, setRefresh] = useState(0)
   const [variants, setVariants] = useState<VariantPage | null>(null)
+  const [axis, setAxis] = useState<VariantAxis | null>(null)
   const [presetMatches, setPresetMatches] = useState<Map<string, PresetMatch> | null>(null)
   const [prewarm, setPrewarm] = useState<PrewarmView | null>(null)
   const [prewarmBusy, setPrewarmBusy] = useState(false)
@@ -112,6 +119,25 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
       cancelled = true
     }
   }, [id, page, refresh, apiRoute, variantSlug, pageSize])
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `refresh` is a trigger-only dep — bumping it refetches.
+  useEffect(() => {
+    if (id == null) return
+    let cancelled = false
+    const select = 'select[width]=true&select[height]=true&select[fit]=true&select[quality]=true&select[format]=true&select[cacheKey]=true'
+    const qs = `where[source][equals]=${encodeURIComponent(String(id))}&limit=1000&depth=0&${select}`
+    fetch(`${apiRoute}/${variantSlug}?${qs}`, { credentials: 'include' })
+      .then((res) => (res.ok ? (res.json() as Promise<unknown>) : null))
+      .then((raw) => {
+        if (!cancelled) setAxis(parseVariantAxis(raw))
+      })
+      .catch(() => {
+        if (!cancelled) setAxis(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, refresh, apiRoute, variantSlug])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `refresh` is a trigger-only dep — bumping it refetches.
   useEffect(() => {
@@ -464,6 +490,16 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
   const prewarmActive = prewarmStatus === 'queued' || prewarmStatus === 'running'
   const showPrewarmBtn = !!prewarmPath && id != null
 
+  // The strip and the table's ghost rows share one plan expression, so they agree through the
+  // finished-run swap window. Constraints fall back to the defaults for custom callers that
+  // don't thread them — wrong only if the app also changed pixelStep/maxDimension.
+  const tickPlan = prewarmActive ? (prewarm?.plan ?? []) : swapping ? lastPlanRef.current : []
+  const tickConstraints = constraints ?? { dimensionStep: DEFAULT_CONSTRAINTS.dimensionStep, maxDimension: DEFAULT_CONSTRAINTS.maxDimension }
+  const tickModel = useMemo(
+    () => (axis ? buildTickModel({ axis, presetMatches, plan: tickPlan, constraints: tickConstraints, sourceWidth }) : null),
+    [axis, presetMatches, tickPlan, tickConstraints, sourceWidth],
+  )
+
   const statusLine = ((): string | null => {
     if (!prewarmPath || id == null) return null
     if (prewarmStatus === 'running') return 'Prewarm running…'
@@ -504,6 +540,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
       </p>
       {statusLine && <p style={{ ...note, margin: `0 0 ${truncatedLine ? '0.2rem' : '0.75rem'}`, fontStyle: 'italic' }}>{statusLine}</p>}
       {truncatedLine && <p style={{ ...note, margin: '0 0 0.75rem', fontStyle: 'italic' }}>{truncatedLine}</p>}
+      {id != null && tickModel && <VariantTicks model={tickModel} />}
 
       <div style={table}>
         <div style={headerRow}>

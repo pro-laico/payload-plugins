@@ -20,6 +20,12 @@ packages share one lockstep version.
   and a unit that doesn't fit the remaining budget spreads its widths evenly across its range (half
   the budget warms every other width) instead of losing its large end. New exports:
   `PrewarmStrategy`, `PrewarmStrategyConfig`, `PrewarmWidths`, `ResolvedPrewarmStrategy`.
+- **payload-images: the admin Presets & variants panel opens with a width-axis tick line.** Every
+  cached render is plotted on the 0→`maxDimension` axis — violet for preset-backed variants, green
+  for generated ones, amber for renders the prewarm plan will generate — over gray hairlines for
+  every width the endpoint could store, with everything beyond the source width shaded. Renders
+  sharing a stored width stack, and hovering a position lists each render's dimensions, fit,
+  quality, and format. The paginated list below is unchanged.
 
 ### Changed
 
@@ -60,6 +66,11 @@ packages share one lockstep version.
 
 ### Fixed
 
+- **payload-images: preset↔variant matching in the admin panel works again.** The preset-status
+  endpoint replayed cache keys without the source's `filesize` — which is part of the key — so
+  every lookup missed and the panel never linked a preset to its cached variant (no `· #id`, and
+  preset-backed variants showed as duplicate rows in the list). Surfaced by the new tick line's
+  cacheKey-based classification.
 - **payload-images: the built-in `src` warm now targets the render `src` actually serves.** The warm
   unit carried the natural aspect ratio, which derived an `h` — but a `src` URL with no declared
   ratio emits no `h`, and `h` is part of the cache key. The default render was therefore never a

@@ -140,9 +140,16 @@ Some variants must **always exist and always be servable** — an OG image a cra
 fixed social card — independent of the cap or on-demand timing. Presets are those: named,
 cap-exempt, and eagerly pre-generated on upload. The **Presets & variants** panel on every image
 manages the whole surface — preset toggles, queued prewarm renders, the cached-variant list with
-per-variant purge, and the per-image cap:
+per-variant purge, and the per-image cap.
 
-![The Presets & variants panel: preset toggles (og, thumbnail), planned prewarm renders, the cached-variant list with per-variant purge, Run now / Purge buttons, and the variant limit input](/screenshots/presets-n-variants.png)
+The panel opens with a **width-axis tick line**: every cached render plotted on the
+0→`maxDimension` axis — violet for preset-backed variants, green for generated ones, amber for
+renders the prewarm plan will generate — over gray hairlines marking every width the endpoint
+*could* store, with everything beyond the source width shaded (no upscaling). Renders sharing a
+stored width stack, and hovering a position lists each render's dimensions, fit, quality, and
+format:
+
+![The Presets & variants panel: the width-axis tick line of cached renders, preset toggles (og, thumbnail), planned prewarm renders, the cached-variant list with per-variant purge, Run now / Purge buttons, and the variant limit input](/screenshots/presets-n-variants.png)
 
 Define reusable **templates** in config. Two ship out of the box — `og` (1200×630 cover jpeg)
 and `thumbnail` (160×160 cover webp, backing the admin list thumbnail) — and your entries merge

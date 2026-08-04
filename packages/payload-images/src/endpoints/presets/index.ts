@@ -23,6 +23,9 @@ const num = (v: unknown): number | null => (typeof v === 'number' ? v : null)
 const toCacheKeyDoc = (raw: Record<string, unknown>, id: string): CacheKeyDoc => ({
   id,
   filename: typeof raw.filename === 'string' ? raw.filename : null,
+  // filesize is part of the cache key (it keys same-filename byte replacement) — omitting it
+  // hashes '' and every lookup misses.
+  filesize: num(raw.filesize),
   focalX: num(raw.focalX),
   focalY: num(raw.focalY),
   focalSize: num(raw.focalSize),

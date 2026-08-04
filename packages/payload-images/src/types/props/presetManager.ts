@@ -1,4 +1,8 @@
 import type { PresetSpec } from '../presets/preset'
+import type { TransformConstraints } from '../transform/transformConstraints'
+
+/** Snap-grid subset the panel's tick line needs — serializable for clientProps. */
+export type TickConstraints = Pick<TransformConstraints, 'dimensionStep' | 'maxDimension' | 'widthLadder'>
 
 export interface PresetManagerProps {
   templates?: Record<string, PresetSpec>
@@ -12,4 +16,6 @@ export interface PresetManagerProps {
   presetsPath?: string
   /** Variants per page in the folded-in cache list. */
   pageSize?: number
+  /** Transform snap constraints — drives the tick line's reachable-width hairlines and axis scale. */
+  constraints?: TickConstraints
 }

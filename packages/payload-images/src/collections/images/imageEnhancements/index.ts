@@ -67,6 +67,7 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
             ...(purgePath ? { purgePath } : {}),
             ...(opts.prewarmPath ? { prewarmPath: opts.prewarmPath } : {}),
             ...(opts.presetsPath ? { presetsPath: opts.presetsPath } : {}),
+            ...(opts.constraints ? { constraints: opts.constraints } : {}),
           },
         },
       },

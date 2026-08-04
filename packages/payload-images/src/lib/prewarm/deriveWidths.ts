@@ -2,8 +2,9 @@ import { stepWidths } from '../urls/srcset'
 import type { PrewarmWidths, TransformConstraints } from '../../types'
 
 /** Every width the endpoint's snap can emit: multiples of `dimensionStep` up to `maxDimension`,
- * `maxDimension` itself (the clamp target), unioned with the width ladder — ascending, deduped. */
-export const reachableWidths = (c: TransformConstraints): number[] => {
+ * `maxDimension` itself (the clamp target), unioned with the width ladder — ascending, deduped.
+ * Takes the Pick so client surfaces (the admin tick line) can call it with just the snap subset. */
+export const reachableWidths = (c: Pick<TransformConstraints, 'dimensionStep' | 'maxDimension' | 'widthLadder'>): number[] => {
   const widths = new Set<number>()
   for (let w = c.dimensionStep; w < c.maxDimension; w += c.dimensionStep) widths.add(w)
   widths.add(c.maxDimension)

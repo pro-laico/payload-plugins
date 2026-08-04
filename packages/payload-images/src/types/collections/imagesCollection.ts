@@ -16,4 +16,6 @@ export interface CreateImagesOptions {
   variantLimit?: number
   presetTemplates?: Record<string, import('../presets/preset').PresetSpec>
   presetGen?: import('../../hooks/collection/generatePresets').GeneratePresetsOptions
+  /** Resolved transform-constraints subset, threaded to the panel's tick line. */
+  constraints?: import('../props/presetManager').TickConstraints
 }

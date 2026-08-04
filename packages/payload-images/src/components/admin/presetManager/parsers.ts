@@ -39,7 +39,7 @@ export const parseVariantPage = (raw: unknown): VariantPage | null => {
 }
 
 // ——— preset ↔ cached-variant matches (server computes the cacheKeys; the panel just displays) ———
-export type PresetMatch = { variantId?: string | number; filename?: string }
+export type PresetMatch = { variantId?: string | number; filename?: string; cacheKey?: string }
 
 export const parsePresetMatches = (raw: unknown): Map<string, PresetMatch> | null => {
   if (!isRecord(raw) || !Array.isArray(raw.presets)) return null
@@ -47,9 +47,29 @@ export const parsePresetMatches = (raw: unknown): Map<string, PresetMatch> | nul
   for (const item of raw.presets) {
     if (!isRecord(item) || typeof item.name !== 'string') continue
     const variantId = typeof item.variantId === 'string' || typeof item.variantId === 'number' ? item.variantId : undefined
-    out.set(item.name, { variantId, ...(typeof item.filename === 'string' ? { filename: item.filename } : {}) })
+    out.set(item.name, {
+      variantId,
+      ...(typeof item.filename === 'string' ? { filename: item.filename } : {}),
+      ...(typeof item.cacheKey === 'string' ? { cacheKey: item.cacheKey } : {}),
+    })
   }
   return out
+}
+
+// ——— all variants, width-axis projection (unpaginated light fetch for the tick line) ———
+export type AxisVariant = { width: number; cacheKey?: string; height?: number; fit?: string; quality?: number; format?: string }
+export type VariantAxis = { docs: AxisVariant[]; totalDocs: number }
+
+export const parseVariantAxis = (raw: unknown): VariantAxis | null => {
+  if (!isRecord(raw) || !Array.isArray(raw.docs)) return null
+  const docs = raw.docs.flatMap((d: unknown): AxisVariant[] => {
+    // Width is the tick's position — a doc without one can't be plotted.
+    if (!isRecord(d) || typeof d.width !== 'number') return []
+    return [
+      { width: d.width, cacheKey: str(d.cacheKey), height: num(d.height), fit: str(d.fit), quality: num(d.quality), format: str(d.format) },
+    ]
+  })
+  return { docs, totalDocs: num(raw.totalDocs) ?? docs.length }
 }
 
 // ——— prewarm status (queued/running job + planned targets) ———

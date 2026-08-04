@@ -150,3 +150,96 @@ export const purgeBtn = (busy: boolean): React.CSSProperties => ({
 export const prewarmBtn = (busy: boolean): React.CSSProperties => ({ ...purgeBtn(busy), color: 'var(--theme-elevation-700)' })
 export const headerBtns: React.CSSProperties = { display: 'flex', gap: '0.35rem', justifySelf: 'stretch', justifyContent: 'center' }
 export const limitWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }
+
+// ——— tick line (the width-axis strip above the table) ———
+// Mid-500 hexes: the plugin has no categorical theme vars, and these read on both admin themes.
+export const TICK_COLORS: Record<'preset' | 'generated' | 'planned', string> = { preset: '#8b5cf6', generated: '#10b981', planned: '#f59e0b' }
+export const tickWrap: React.CSSProperties = { position: 'relative', margin: '0 0 0.75rem' }
+export const tickCanvas: React.CSSProperties = {
+  position: 'relative',
+  height: 56,
+  padding: '0 4px',
+  borderRadius: 'var(--style-radius-s, 3px)',
+  border: '1px solid var(--theme-elevation-100)',
+  background: 'var(--theme-input-bg, var(--theme-elevation-0))',
+}
+export const tickShade: React.CSSProperties = {
+  position: 'absolute',
+  top: 4,
+  bottom: 4,
+  right: 0,
+  borderRadius: '0 var(--style-radius-s, 3px) var(--style-radius-s, 3px) 0',
+  background: 'var(--theme-elevation-100)',
+  opacity: 0.5,
+}
+export const tickCell = (active: boolean): React.CSSProperties => ({
+  position: 'absolute',
+  bottom: 0,
+  width: 8,
+  height: '100%',
+  transform: 'translateX(-50%)',
+  display: 'flex',
+  flexDirection: 'column-reverse',
+  alignItems: 'center',
+  paddingBottom: 8,
+  cursor: 'crosshair',
+  background: active ? 'var(--theme-elevation-100)' : 'transparent',
+  borderRadius: 2,
+})
+export const tickSegment = (color: string, dim: boolean): React.CSSProperties => ({
+  width: 2,
+  height: 8,
+  marginTop: 1,
+  borderRadius: 999,
+  background: color,
+  opacity: dim ? 0.55 : 1,
+})
+export const tickHairline = (beyond: boolean): React.CSSProperties => ({
+  width: 1,
+  height: beyond ? 8 : 12,
+  borderRadius: 999,
+  background: beyond ? 'var(--theme-elevation-100)' : 'var(--theme-elevation-200)',
+})
+export const tickTooltip = (leftPct: number): React.CSSProperties => ({
+  position: 'absolute',
+  bottom: '100%',
+  left: `${leftPct}%`,
+  transform: 'translateX(-50%)',
+  zIndex: 10,
+  marginBottom: 8,
+  minWidth: 220,
+  maxWidth: 440,
+  width: 'max-content',
+  pointerEvents: 'none',
+  padding: '0.6rem 0.7rem',
+  borderRadius: 'var(--style-radius-m, 4px)',
+  border: '1px solid var(--theme-elevation-150)',
+  background: 'var(--theme-input-bg, var(--theme-elevation-0))',
+  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.18)',
+  fontSize: '0.75rem',
+  color: 'var(--theme-elevation-700)',
+})
+export const tickDot = (color: string): React.CSSProperties => ({
+  display: 'inline-block',
+  width: 8,
+  height: 8,
+  marginRight: 6,
+  borderRadius: '50%',
+  background: color,
+  verticalAlign: 'baseline',
+})
+export const tickAxisRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  margin: '0.2rem 0 0',
+  fontSize: '0.65rem',
+  color: 'var(--theme-elevation-500)',
+}
+export const tickLegend: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.35rem 0.9rem',
+  margin: '0.3rem 0 0',
+  fontSize: '0.7rem',
+  color: 'var(--theme-elevation-500)',
+}

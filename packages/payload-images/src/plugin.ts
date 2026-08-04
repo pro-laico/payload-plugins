@@ -103,6 +103,12 @@ export const imagesPlugin =
       // `onUpload: false` drops only the enqueue hook — endpoints, task, CLI, and panel stay,
       // so batch-only setups still warm via Run now / images:prewarm / a cron.
       prewarm: prewarm !== false && prewarm.strategy.onUpload ? { taskSlug: prewarm.taskSlug, queue: prewarm.strategy.queue } : false,
+      // The Pick, not the whole object — minimal clientProps payload for the panel's tick line.
+      constraints: {
+        dimensionStep: constraints.dimensionStep,
+        maxDimension: constraints.maxDimension,
+        ...(constraints.widthLadder?.length ? { widthLadder: constraints.widthLadder } : {}),
+      },
       // Its presence is the panel's prewarm-UI gate.
       ...(prewarm ? { prewarmPath } : {}),
       ...imageOpts,
