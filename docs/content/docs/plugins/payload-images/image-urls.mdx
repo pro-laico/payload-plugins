@@ -32,11 +32,11 @@ By default a read gets natural-ratio URLs. Declare the render in the read's `con
 context: { image: { aspectRatio, quality, fit, format } }
 ```
 
-The `srcset` follows the project-wide `pixelStep` ladder (default `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`) up to the source width — the source's native width is always the top rung. A numeric `pixelStep` steps densely instead.
+The `srcset` follows the project-wide `pixelStep` (default `50`): one URL every 50px up to the source width, whose native width is always the top rung. An array `pixelStep` switches to a fixed breakpoint ladder instead (e.g. next/image's `[640, 750, 828, 1080, 1200, 1920, 2048, 3840]`).
 
 export const virtualNodes = [
   { id: 'read', kind: 'start', label: 'Any read of an image doc', detail: 'REST, GraphQL, Local API — or a populated page.heroImage', x: 300, y: 0 },
-  { id: 'hook', label: 'afterRead computes the virtual fields', detail: 'on every read, never stored — srcset follows the pixelStep ladder up to the source width', x: 300, y: 150 },
+  { id: 'hook', label: 'afterRead computes the virtual fields', detail: 'on every read, never stored — srcset steps by pixelStep up to the source width', x: 300, y: 150 },
   { id: 'ctx', kind: 'check', label: 'Render declared in context?', detail: 'context: { image: { aspectRatio, quality, fit, format } }', x: 300, y: 340 },
   { id: 'tailored', label: 'src/srcset built for that render', detail: 'geometry pinned to your aspect ratio, fit, quality, and format', x: 40, y: 530 },
   { id: 'natural', label: 'Natural-ratio URLs', detail: 'the default — plus placeholderURL and thumbnailURL', x: 560, y: 530 },
@@ -55,9 +55,9 @@ export const virtualEdges = [
 <Flow nodes={virtualNodes} edges={virtualEdges} height={820} />
 
 <Callout type="warn">
-  A wide original with a dense numeric `pixelStep` (e.g. `50`) emits dozens of `srcset` URLs —
-  several KB of string on every read and population, and a much larger stored-variant space.
-  Prefer the ladder default (or your own array) if response size matters.
+  The dense default means a wide original emits dozens of `srcset` URLs — several KB of string on
+  every read and population. Pass an array `pixelStep` (a fixed breakpoint ladder) if response size
+  matters more than fine-grained width selection.
 </Callout>
 
 <Callout type="info">
@@ -84,7 +84,7 @@ When you do build a URL by hand, here's the shape:
 - **`q=80&fmt=auto`** — encode settings. `auto` negotiates AVIF/WebP from the browser's `Accept`.
 - **`v=1a2b3c`** — a cache-bust token derived from the source's filename + focal point. The server
   ignores it; it exists so the URL changes when the image does
-  ([Caching & prewarming](/docs/plugins/payload-images/caching)).
+  ([Caching](/docs/plugins/payload-images/caching)).
 
 The first request for a URL generates the variant with Sharp and streams it same-origin. The variant persists after the response. Every later identical request streams the stored copy.
 
@@ -104,7 +104,7 @@ GET /api/img/<id>?w=1200&h=630&fit=cover&fmt=avif # an OG-sized AVIF
 | `fmt` | `auto` | Encode format: `auto` (negotiate from `Accept`) · `avif` · `webp` · `jpeg` · `png`. |
 | `v` | — | Cache-busting token (derived from filename + focal). Ignored by the server. |
 
-`w` and `h` snap to a 50px grid and clamp to `maxDimension` (default `4096`). A numeric `pixelStep` replaces the grid; an array `pixelStep`'s exact widths also pass. `q` clamps to `qualityRange` (default `40–95`). Output never upscales past the source.
+`w` and `h` snap to the `pixelStep` grid (default 50px) and clamp to `maxDimension` (default `4096`). An array `pixelStep`'s exact widths also pass the snap. `q` clamps to `qualityRange` (default `40–95`). Output never upscales past the source.
 
 Snapping and bucketing aren't cosmetic. They collapse the continuous parameter space into a finite set of possible variants. That's what makes the endpoint safe to expose ([the DoS bounds](/docs/plugins/payload-images/caching#caching--abuse-limits)) and the cache effective. See [Reference](/docs/plugins/payload-images/reference) for these options and their defaults.
 
@@ -121,11 +121,3 @@ Snapping and bucketing aren't cosmetic. They collapse the continuous parameter s
 With `fmt=auto` the endpoint picks the best format the browser's `Accept` header allows. WebP is the default modern target. AVIF only wins when `transform.preferAvif` is on, because AVIF encodes far slower and `auto` keeps the cold path fast. Explicit `fmt=avif` always works.
 
 `fmt=auto` responses carry `Vary: Accept` so caches keep per-format copies straight. Explicit-format responses don't need it.
-
-## Next
-
-- [Rendering images](/docs/plugins/payload-images/rendering) — the component and helper that write these URLs for you.
-- [Metadata & placeholders](/docs/plugins/payload-images/metadata) — the focal point behind `fit=cover` and the blur placeholder.
-- [Caching & prewarming](/docs/plugins/payload-images/caching) — what happens to a URL after its first request.
-- [Reference](/docs/plugins/payload-images/reference) — every option and default (`maxDimension`, `qualityRange`, `pixelStep`).
-- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — when images don't optimize or the browser over-fetches.

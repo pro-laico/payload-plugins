@@ -57,6 +57,7 @@ export type PlanRow = { cacheKey: string; w?: number; h?: number; fit?: string; 
 export type PrewarmView = {
   status: 'idle' | 'queued' | 'running'
   plan: PlanRow[]
+  truncated?: boolean
   waitUntil?: string
   lastRun?: { generated?: number; failed?: number; skipped?: string }
 }
@@ -76,6 +77,7 @@ export const parsePrewarmStatus = (raw: unknown): PrewarmView | null => {
   return {
     status,
     plan,
+    ...(raw.truncated === true ? { truncated: true } : {}),
     ...(job && typeof job.waitUntil === 'string' ? { waitUntil: job.waitUntil } : {}),
     ...(lastRun ? { lastRun: { generated: num(lastRun.generated), failed: num(lastRun.failed), skipped: str(lastRun.skipped) } } : {}),
   }

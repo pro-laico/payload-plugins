@@ -20,7 +20,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
     return
   }
   const slug = asSlug(flag('--collection') ?? marker.sourceSlug)
-  const queue = flag('--queue') ?? prewarm.queue
+  const queue = flag('--queue') ?? prewarm.strategy.queue
   const max = Number(flag('--limit')) || Number.POSITIVE_INFINITY
 
   const payload = await getPayload({ config })
@@ -29,7 +29,7 @@ export const script = async (config: SanitizedConfig): Promise<void> => {
       sourceSlug: slug,
       variantSlug: marker.variantSlug,
       profilesSlug: prewarm.profilesSlug,
-      seeds: prewarm.seeds,
+      strategy: prewarm.strategy,
       formats: prewarm.formats,
       maxVariantsPerImage: prewarm.maxVariantsPerImage,
       constraints: prewarm.constraints,

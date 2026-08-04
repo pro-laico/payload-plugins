@@ -12,7 +12,7 @@ export { IMAGE_RENDER_PROFILES_SLUG } from './collections/renderProfiles'
 
 // Smart prewarm: learn served render profiles, warm new/changed images via a deferred Payload Job.
 export { PREWARM_TASK_SLUG } from './lib/prewarm/resolveOptions'
-export type { PrewarmOptions, RenderProfileSeed } from './types'
+export type { PrewarmOptions, PrewarmStrategy, PrewarmStrategyConfig, PrewarmWidths, RenderProfileSeed, ResolvedPrewarmStrategy } from './types'
 
 // Guaranteed presets + the per-image variant cap.
 export type { PresetEntry, PresetSpec } from './types'

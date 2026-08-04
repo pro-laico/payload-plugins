@@ -48,9 +48,3 @@ These aren't bugs — they're how the plugin works.
 - **The lookup name is the set entry's name, not the filename.** Renaming an uploaded file changes nothing; the `iconsArray` row's name is the key your code references.
 - **No revalidation is built in.** A statically rendered page bakes the SVG at build time and won't reflect an edit or an active-set swap until the route revalidates. Install [`@pro-laico/payload-revalidate`](/docs/plugins/payload-revalidate) to make the whole surface self-healing, or wire `revalidatePath` / `revalidateTag` yourself. See [Revalidation](/docs/plugins/payload-icons/how-it-works#revalidation).
 - **SVGs using `transform` / `clip-path` skip the geometry rewrite** (it can't be applied safely) but are still sanitized before storage.
-
-## Next
-
-- [Using `<Icon>`](/docs/plugins/payload-icons/using-icons) — props, rendering it yourself, styling with CVA.
-- [Collections](/docs/plugins/payload-icons/collections) — the `icon` / `iconSet` / `iconRequest` fields and icon-use detection.
-- [How it works](/docs/plugins/payload-icons/how-it-works) — resolving an icon, revalidation, seeding.

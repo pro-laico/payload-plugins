@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Payload, PayloadRequest } from 'payload'
 
-import { DEFAULT_CONSTRAINTS } from '../../../src/lib/transform/params'
+import { DEFAULT_CONSTRAINTS, DEFAULT_WIDTH_LADDER } from '../../../src/lib/transform/params'
 import { createPrewarmStatusEndpoint } from '../../../src/endpoints/prewarm'
 import type { PrewarmStatusResponse } from '../../../src/types'
 
@@ -9,10 +9,19 @@ const deps = {
   sourceSlug: 'images',
   variantSlug: 'generated-images',
   profilesSlug: 'image-render-profiles',
-  seeds: [{ widths: [800] }],
+  strategy: {
+    widths: 'srcset' as const,
+    builtIns: true,
+    learned: true,
+    seeds: [{ widths: [800] }],
+    onUpload: true,
+    autoRun: false as const,
+    queue: 'default',
+  },
   formats: ['webp' as const],
-  maxVariantsPerImage: 24,
-  constraints: DEFAULT_CONSTRAINTS,
+  maxVariantsPerImage: 32,
+  // Array-pixelStep constraints: an explicit ladder keeps the 'srcset' width axis small and exact.
+  constraints: { ...DEFAULT_CONSTRAINTS, widthLadder: DEFAULT_WIDTH_LADDER },
 }
 const cfg = { deps, taskSlug: 'imagesPrewarm', queue: 'default' }
 
@@ -70,6 +79,16 @@ describe('createPrewarmStatusEndpoint', () => {
       expect(typeof item.cacheKey).toBe('string')
       expect(item.params.w).toBeGreaterThan(0)
     }
+    expect(body.truncated).toBeUndefined()
+  })
+
+  it('surfaces truncated when the plan hits maxVariantsPerImage', async () => {
+    const tiny = { ...cfg, deps: { ...deps, maxVariantsPerImage: 2 } }
+    const { req } = fakeReq()
+    const res = await createPrewarmStatusEndpoint(tiny).handler(req)
+    const body = (await res.json()) as PrewarmStatusResponse
+    expect(body.plan).toHaveLength(2)
+    expect(body.truncated).toBe(true)
   })
 
   it('reports skipped (empty plan) for non-raster sources', async () => {

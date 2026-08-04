@@ -31,7 +31,7 @@ path — the endpoint *is* the plugin.
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
 - **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered.
-- **Self-busting cache, smart prewarming, instant fallbacks:** URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/caching#smart-prewarm) generates what your site actually serves before anyone asks, and a cold request serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
+- **Self-busting cache, smart prewarming, instant fallbacks:** URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/prewarming) generates what your site actually serves before anyone asks, and a cold request serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
 
 ![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)
 
@@ -139,8 +139,11 @@ covers everything it just did.
   <Card href="/docs/plugins/payload-images/metadata" title="Image metadata">
     What upload-time analysis stores on every doc: placeholder tiers, color palette, alpha flags, and the focal layers.
   </Card>
-  <Card href="/docs/plugins/payload-images/caching" title="Caching & prewarming">
-    Content-addressed caching, self-revalidation, smart prewarming, and the nearby-quality fallback.
+  <Card href="/docs/plugins/payload-images/caching" title="Caching">
+    Content-addressed caching, self-revalidation, abuse limits, and the nearby-quality fallback.
+  </Card>
+  <Card href="/docs/plugins/payload-images/prewarming" title="Prewarming">
+    Strategies that pre-generate the renders your site actually serves — before the first visitor asks.
   </Card>
   <Card href="/docs/plugins/payload-images/collections" title="Collections">
     The collections it registers, extending your own upload collection, and seeding.

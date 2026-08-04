@@ -5,7 +5,7 @@ description: "The collections the plugin registers, how to extend your own uploa
 
 The plugin registers two collections under an **Assets** admin group: one you upload to, one that
 caches what gets generated. Both accept PNG, JPEG, WebP, and AVIF. With
-[`options.prewarm`](/docs/plugins/payload-images/caching#smart-prewarm) on, a third hidden collection
+[`options.prewarm`](/docs/plugins/payload-images/prewarming) on, a third hidden collection
 joins them — the render-profile registry. `collections.images.options.folders` is on by default, so
 Payload's own hidden `payload-folders` collection is registered too.
 
@@ -58,7 +58,7 @@ The `presetManager` UI field renders the **Presets & variants** panel — the ad
   type={{
     generateImageMetadataBeforeChange: { description: "When a save carries a new file, one decode stores the placeholder tiers (five BlurHash strings + the micro-webp data URIs), the color palette, the alpha flags, and — when the editor hasn't picked one — a saliency-based focal point, all in the same write (payload images:backfill covers pre-existing images).", type: "beforeChange" },
     purgeStaleVariantsAfterChange: { description: "Purges this image's stale cached variants when its file or focal point changes.", type: "afterChange" },
-    enqueuePrewarmAfterChange: { description: "Queues the imagesPrewarm job on create / file replace / focal edit. Only with prewarm on; best-effort — never blocks the write.", type: "afterChange" },
+    enqueuePrewarmAfterChange: { description: "Queues the imagesPrewarm job on create / file replace / focal edit. Only with prewarm on and `strategy.onUpload` (the default); best-effort — never blocks the write.", type: "afterChange" },
     generatePresetsAfterChange: { description: "Regenerates this image's guaranteed presets on create / file replace / focal or hotspot edits, after the stale-variant purge.", type: "afterChange" },
     purgeVariantsBeforeDelete: { description: "Purges all of this image's cached variants before the doc is deleted.", type: "beforeDelete" },
   }}
@@ -103,7 +103,7 @@ hooks (busting cache tags on every cache-miss create would be pure churn).
 
 ### `image-render-profiles`
 
-Registered only with [`prewarm`](/docs/plugins/payload-images/caching#smart-prewarm) on: the hidden
+Registered only with [`prewarm`](/docs/plugins/payload-images/prewarming) on: the hidden
 registry of render profiles the transform endpoint has actually served — one doc per distinct
 `(ratio, fit, quality, format)` shape, carrying an approximate `hitCount`, a `lastSeenAt`
 (profiles unseen for a while stop being warmed), and a capped per-width observation histogram.
@@ -191,10 +191,3 @@ Payload's folders are on by default (`collections.images.options.folders`) and s
 hidden `payload-folders` collection, each image referencing its folder like any relationship. See
 [`examples/images-sandbox`](https://github.com/pro-laico/payload-plugins) for a full working
 setup, and the [payload-seed docs](/docs/plugins/payload-seed) for everything else about seeding.
-
-## Next
-
-- [Reference](/docs/plugins/payload-images/reference) — every plugin option, env var, CLI command, endpoint, and export.
-- [Image URLs](/docs/plugins/payload-images/image-urls) — what the `transform` knobs actually bound.
-- [Caching & prewarming](/docs/plugins/payload-images/caching) — the `prewarm` and `fallback` options in action.
-- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — Sharp not externalized, missing admin UI, wrong crops, stale pages.

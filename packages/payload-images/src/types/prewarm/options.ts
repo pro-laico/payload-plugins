@@ -1,5 +1,6 @@
 import type { AspectRatio } from '../plugin/renderIntent'
 import type { Fit, OutputFormat } from '../transform/format'
+import type { PrewarmStrategy, ResolvedPrewarmStrategy } from './strategy'
 
 export interface RenderProfileSeed {
   /** The crop to warm. */
@@ -13,33 +14,30 @@ export interface RenderProfileSeed {
 }
 
 export interface PrewarmOptions {
-  /** Renders to warm before the site has served any, so a new project isn't cold.
+  /** How targets are derived and when they run: `'default'` or an inline strategy config.
    *
-   * - `aspectRatio`
-   * - `fit`
-   * - `quality`
-   * - `widths` */
-  seeds?: RenderProfileSeed[]
+   * - `widths`
+   * - `builtIns`
+   * - `learned`
+   * - `seeds`
+   * - `onUpload`
+   * - `autoRun`
+   * - `queue` */
+  strategy?: PrewarmStrategy
   /** Formats to warm per target (default `['webp']`, plus `'avif'` when `transform.preferAvif`).
    * Intersected with `transform.formats` — unservable entries are dropped with a boot warning.
    * An explicit `[]` means "no format expansion" and is honored. */
   formats?: OutputFormat[]
   /** Cap on variants warmed per image, so one image can't consume a run. */
   maxVariantsPerImage?: number
-  /** Cron for the built-in runner; `false` means you run the job yourself. */
-  autoRun?: string | false
-  /** Payload Jobs queue the prewarm task is enqueued on. */
-  queue?: string
 }
 
 export interface ResolvedPrewarmOptions {
-  seeds: RenderProfileSeed[]
+  strategy: ResolvedPrewarmStrategy
   formats: OutputFormat[]
   /** Requested formats that transform.formats can never serve — surfaced as an onInit warning. */
   droppedFormats: OutputFormat[]
   maxVariantsPerImage: number
-  autoRun: string | false
-  queue: string
   profilesSlug: string
   taskSlug: string
 }

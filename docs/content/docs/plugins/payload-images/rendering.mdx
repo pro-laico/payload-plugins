@@ -217,7 +217,7 @@ off the plugin config (a renamed `collections.images` included).
   `fetch()` runs the Local API with its defaults — access is **not** scoped. Reads that need their
   own access control or cache layer write the same `findByID` themselves and wrap it however they
   like (`'use cache'`, [payload-revalidate](/docs/plugins/payload-revalidate), …). See
-  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) for the cached-getter pattern.
+  [Caching](/docs/plugins/payload-images/caching#revalidation) for the cached-getter pattern.
 </Callout>
 
 Populated relationships carry the same fields for free: a `page.heroImage` upload field arrives
@@ -347,10 +347,3 @@ for a **specific** size or ratio the presets don't cover, like OG's 1200×630. `
 one for a fully hand-rolled `<img>` / `<picture>` — pass it the populated doc and it derives the
 width cap and cache-busting token itself. See
 [Art direction](#art-direction-a-different-crop-per-breakpoint) for the case that actually needs it.
-
-## Next
-
-- [Image URLs](/docs/plugins/payload-images/image-urls) — what those `srcset` URLs actually say, parameter by parameter.
-- [Image metadata](/docs/plugins/payload-images/metadata) — where the placeholder, palette, and focal crop come from.
-- [Caching & prewarming](/docs/plugins/payload-images/caching) — why the second request is always fast, and how to make the first one fast too.
-- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — crop looks wrong, browser over-fetches, `<img>` src 404s.

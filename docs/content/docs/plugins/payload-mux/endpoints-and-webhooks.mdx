@@ -78,9 +78,3 @@ await ingestMuxVideo(payload, { source: '/path/to/intro.mp4', title: 'Intro' })
 ```
 
 Local paths stream from disk, so ingesting a large file doesn't load it all into memory. Ingest is also what powers declarative seeding — see [How it works](/docs/plugins/payload-mux/how-it-works#seeding).
-
-## Next
-
-- [Use a video](/docs/plugins/payload-mux/using-video) — relate, play back, and sign playback URLs.
-- [How it works](/docs/plugins/payload-mux/how-it-works) — the asset lifecycle, revalidation, and seeding.
-- [Troubleshooting](/docs/plugins/payload-mux/troubleshooting) — videos stuck on "preparing" and other fixes.

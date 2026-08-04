@@ -476,6 +476,9 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
     if (lr.skipped) return `Last prewarm skipped: ${lr.skipped}`
     return `Last prewarm: ${lr.generated ?? 0} generated, ${lr.failed ?? 0} failed`
   })()
+  const truncatedLine = prewarm?.truncated
+    ? 'Plan capped at maxVariantsPerImage — raise the cap or narrow the strategy to warm the rest.'
+    : null
 
   return (
     <div style={card}>
@@ -499,7 +502,8 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         Presets are guaranteed variants — always servable at a stable URL, never capped; toggled-on ones are pre-generated on save. Below them:
         every cached variant generated on demand for this image, capped by the limit and purgeable at any time.
       </p>
-      {statusLine && <p style={{ ...note, margin: '0 0 0.75rem', fontStyle: 'italic' }}>{statusLine}</p>}
+      {statusLine && <p style={{ ...note, margin: `0 0 ${truncatedLine ? '0.2rem' : '0.75rem'}`, fontStyle: 'italic' }}>{statusLine}</p>}
+      {truncatedLine && <p style={{ ...note, margin: '0 0 0.75rem', fontStyle: 'italic' }}>{truncatedLine}</p>}
 
       <div style={table}>
         <div style={headerRow}>

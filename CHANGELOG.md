@@ -7,6 +7,20 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Added
+
+- **payload-images: prewarm strategies — one option now declares what a prewarm run warms and when
+  it runs.** `options.prewarm.strategy` takes `'default'` or an inline config: `widths` picks the
+  width axis (`'srcset'` for exactly what `srcset` emits, `{ every: n }` for every Nth reachable
+  width — the snap grid unioned with the ladder, sampled from the top so the largest rung always
+  survives — or an explicit list), `builtIns` / `learned` / `seeds` pick the render sources, and
+  `onUpload` / `autoRun` / `queue` govern execution. `onUpload: false` is a batch-only mode: nothing
+  enqueues on save, while the admin button, `images:prewarm` CLI, and cron paths keep working. A plan
+  that hits `maxVariantsPerImage` now reports `truncated` on the status endpoint and admin panel,
+  and a unit that doesn't fit the remaining budget spreads its widths evenly across its range (half
+  the budget warms every other width) instead of losing its large end. New exports:
+  `PrewarmStrategy`, `PrewarmStrategyConfig`, `PrewarmWidths`, `ResolvedPrewarmStrategy`.
+
 ### Changed
 
 - **BREAKING (payload-images): the micro-webp placeholder tiers are renamed `xxl` → `2xl` and
@@ -17,6 +31,27 @@ packages share one lockstep version.
   tier isn't an error — it falls back to the default blurhash — so a missed rename shows a coarser
   placeholder rather than breaking a page. Blurhash tiers and the `sm` default are unchanged, so
   reads that never named a webp tier need nothing.
+- **BREAKING (payload-images): `options.prewarm` is reshaped around the strategy** — `seeds`,
+  `autoRun`, and `queue` move inside it, and `maxVariantsPerImage` defaults to `32` (the default
+  strategy with AVIF already filled the old `24`, starving learned profiles). Zero-config installs
+  need nothing: no schema change, behavior only improves. **Migrate by** moving the three fields
+  under `strategy`: `prewarm: { seeds, autoRun, queue }` → `prewarm: { strategy: { seeds, autoRun,
+  queue } }`.
+- **BREAKING (payload-images): the default `pixelStep` is now the 50px grid, not the breakpoint
+  ladder.** `srcset` steps every 50px up to the source width (fine-grained width selection; larger
+  srcset strings on wide originals), and freeform snaps lose the ladder-rung preference — a URL
+  that snapped to a rung (e.g. `h=630` → the ladder's `640`) now takes the nearest grid value
+  (`650`), so previously cached rung variants regenerate at grid widths on next request.
+  **Migrate by** doing nothing to keep the new default, or pin the old behavior with
+  `options: { pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840] }`.
+- **payload-images: the default prewarm warms declared crops, not the upload's native ratio.**
+  Pages serve the crops their reads declare, so warming natural-ratio renders mostly heated
+  variants nobody requests (the old cold-start list warmed a fixed `320/640/1024/1600` set that
+  almost never matched a served width). The default is now a square seed —
+  `seeds: [{ aspectRatio: '1:1', quality: 80 }]`, replaced entirely by any seeds you declare — at
+  widths derived from `pixelStep`: an every-5th-width skeleton (~every 250px, capped by each
+  source's width) on the numeric-grid default, the exact `srcset` ladder for an array. The same
+  derived widths back seeds and learned profiles that arrive without observed widths.
 - **payload-fonts: a typeface's preferred family is now optional.** It was required, which forced a
   decision at upload time about which slot a typeface was for. Font Set slots no longer filter on it
   either — every slot offers every typeface, since filtering would have made a typeface that declared
@@ -25,6 +60,11 @@ packages share one lockstep version.
 
 ### Fixed
 
+- **payload-images: the built-in `src` warm now targets the render `src` actually serves.** The warm
+  unit carried the natural aspect ratio, which derived an `h` — but a `src` URL with no declared
+  ratio emits no `h`, and `h` is part of the cache key. The default render was therefore never a
+  warm hit; it now is, and the srcset ladder unit covers the with-`h` keys browsers resolve from
+  `srcset`.
 - **payload-mux: a slow encode no longer costs a video its playback URL.** Mux assigns a playback id
   when it creates the asset, seconds before encoding finishes — but the upload hook discarded that
   metadata unless the asset was already `ready` within its 6-second poll. A slower encode therefore
@@ -48,7 +88,9 @@ packages share one lockstep version.
    nullable and adds `option_label` alongside it, which SQLite can only do by rebuilding the table —
    and Drizzle's dev push can't complete that rebuild against an existing database (`no such column:
    option_label`). Generate a migration, or drop the dev database and reseed. MongoDB is unaffected.
-3. **Gitignore `src/app/definition.ts`** and add `payload fonts:download` to `postinstall`. See the
+3. **Object-form `prewarm` configs move `seeds` / `autoRun` / `queue` under `strategy`** (see the
+   BREAKING entry). Zero-config `imagesPlugin()` needs nothing.
+4. **Gitignore `src/app/definition.ts`** and add `payload fonts:download` to `postinstall`. See the
    [fonts quickstart](https://payload-plugins.prolaico.com/docs/plugins/payload-fonts) — the file is a
    snapshot of your database, and every failure path writes an empty definition, so a fresh clone
    still builds.

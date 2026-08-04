@@ -135,9 +135,3 @@ plugins: [iconsPlugin(), seedPlugin({ definitions: [icons, iconSets, pages] })]
 Because `icon` is a real collection, its seed records are type-checked and other docs reference them with `ref()`. This package never imports the seed package, so the two stay decoupled. `active: true` makes the set live and `_status: 'published'` makes it visible to the published frontend.
 
 See the [`examples/icons-sandbox`](https://github.com/pro-laico/payload-plugins/tree/main/examples/icons-sandbox) app for a full working setup, or the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
-
-## Next
-
-- [Using icons](/docs/plugins/payload-icons/using-icons) — the `<Icon>` component, props, and rendering an SVG yourself.
-- [Collections](/docs/plugins/payload-icons/collections) — the `icon`, `iconSet`, and `iconRequest` fields, plus icon use detection.
-- [Troubleshooting](/docs/plugins/payload-icons/troubleshooting) — fallback glyphs, stroke-SVG blobs, and build-time resolution errors.

@@ -196,10 +196,3 @@ It ships closed to anonymous traffic: `access: { read: authd }`, so a read needs
 an anonymous `mux-video` fetch gets a 403. Open or narrow it under
 `collections.muxVideo.overrides.access`, but keep read closed under a signed playback policy, since
 an anonymous read would hand out a working signed URL.
-
-## Next
-
-- [Use a video](/docs/plugins/payload-mux/using-video) — relate, play back, and sign playback URLs.
-- [Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks) — the upload endpoints, the webhook, and server-side ingest.
-- [How it works](/docs/plugins/payload-mux/how-it-works) — the asset lifecycle, revalidation, and seeding.
-- [Troubleshooting](/docs/plugins/payload-mux/troubleshooting) — videos stuck on "preparing", signed-playback 403s, and more.

@@ -12,7 +12,7 @@ import type {
   PrewarmSourceResult,
   PrewarmTarget,
   RenderProfileDoc,
-  RenderProfileSeed,
+  ResolvedPrewarmStrategy,
   TransformConstraints,
   VariantSourceDoc,
 } from '../../types'
@@ -21,7 +21,7 @@ export interface PrewarmSourceDeps {
   sourceSlug: string
   variantSlug: string
   profilesSlug: string
-  seeds: RenderProfileSeed[]
+  strategy: ResolvedPrewarmStrategy
   formats: OutputFormat[]
   maxVariantsPerImage: number
   constraints: TransformConstraints
@@ -30,7 +30,9 @@ export interface PrewarmSourceDeps {
 export type SourceRow = VariantSourceDoc & { width?: number | null; height?: number | null; mimeType?: string | null }
 
 /** The dry-run half of a prewarm: which variants WOULD be generated. Shared by the job handler and the status endpoint. */
-export type PrewarmPlan = { ok: true; source: SourceRow; targets: PrewarmTarget[] } | { ok: false; skipped: 'missing' | 'non-raster' }
+export type PrewarmPlan =
+  | { ok: true; source: SourceRow; targets: PrewarmTarget[]; truncated: boolean }
+  | { ok: false; skipped: 'missing' | 'non-raster' }
 
 // The plugin owns these collections' schemas but can't name their app-generated types; a light id check
 // confirms a real row, and the local shape describes the fields the plugin wrote.
@@ -71,22 +73,26 @@ export const loadPrewarmPlan = async (payload: Payload, sourceId: string | numbe
 
   const profiles = (await payload.find({ collection: profilesSlug, limit: 100, sort: '-hitCount', depth: 0 })).docs.filter(isRenderProfileDoc)
 
-  const targets = computePrewarmTargets({
+  const { targets, truncated } = computePrewarmTargets({
     source,
     profiles,
-    seeds: deps.seeds,
+    strategy: deps.strategy,
     formats: deps.formats,
     constraints: deps.constraints,
     existingKeys: await existingCacheKeys(payload, variantSlug, source.id),
     maxVariantsPerImage: deps.maxVariantsPerImage,
   })
-  return { ok: true, source, targets }
+  return { ok: true, source, targets, truncated }
 }
 
 export const prewarmSource = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmSourceResult> => {
   const plan = await loadPrewarmPlan(payload, sourceId, deps)
   if (!plan.ok) return { targets: 0, generated: 0, failed: 0, skipped: plan.skipped }
   const { source, targets } = plan
+  if (plan.truncated)
+    payload.logger.warn(
+      `[payload-images] prewarm plan for ${String(sourceId)} hit maxVariantsPerImage (${deps.maxVariantsPerImage}) — raise the cap or narrow the strategy to warm the rest.`,
+    )
   const sourceSlug = asSlug(deps.sourceSlug)
 
   const base = payload.config.serverURL || getServerSideURL()

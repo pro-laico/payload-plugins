@@ -88,10 +88,10 @@ export const options = [
           { name: 'fallback', type: 'boolean', default: 'true', description: `On a cache miss with a NEARBY variant ready (same fit + aspect ratio — identical crop — any quality/width/format), serve it immediately with Cache-Control: no-store while the exact variant generates in the background. The next request gets the exact one; the stand-in is never cached or persisted.` },
         ],
       },
-      { name: 'prewarm', type: 'false | PrewarmOptions', default: '{}', description: `Smart prewarming: learn which variants the site actually serves (recorded off the transform endpoint) and pre-generate them for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes seeds / formats / maxVariantsPerImage / autoRun / queue, and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Caching & prewarming → Running prewarm.` },
-      { name: 'pixelStep', type: 'number | number[]', default: '[640, 750, 828, 1080, 1200, 1920, 2048, 3840]', description: `Project-wide srcset widths. The default is a conventional ~8-rung breakpoint ladder (next/image's deviceSizes); ladder widths always pass the endpoint's snap unchanged, and freeform widths still snap to a 50px grid. A number replaces the ladder with a dense step (smaller = more widths and cached variants) and doubles as the endpoint's snap grid. maxDimension caps the top.` },
-      { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching & prewarming → Guaranteed presets.` },
-      { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching & prewarming → The variant cap.` },
+      { name: 'prewarm', type: 'false | PrewarmOptions', default: '{}', description: `Smart prewarming, driven by a strategy: warm the built-in renders, seeds (default: a square 1:1 q80 crop at the derived widths — declaring your own replaces it), and learned traffic profiles for new/replaced/re-focused images via a deferred Payload Job. On by default (a cold variant is a visible LCP hit on image-led pages); the object form takes strategy / formats / maxVariantsPerImage — the strategy carries widths ('srcset', { every: n }, or a list), builtIns, learned, seeds, onUpload, autoRun, and queue — and prewarm: false opts out entirely. Being on registers the hidden image-render-profiles collection (a schema change — regenerate types), the imagesPrewarm jobs task, and the images:prewarm CLI. It only enqueues jobs — something must run them, see Prewarming → Running prewarm.` },
+      { name: 'pixelStep', type: 'number | number[]', default: '50', description: `Project-wide srcset widths and the endpoint's snap grid. The default 50 steps srcset densely (every 50px up to the source width) and snaps freeform requests to the same grid — prewarm warms an every-5th skeleton and the fallback bridges the rest. An array switches srcset to a fixed breakpoint ladder (e.g. next/image's deviceSizes [640, 750, 828, 1080, 1200, 1920, 2048, 3840]) whose widths always pass the snap unchanged — smaller responses on wide originals, and prewarm warms the ladder exactly. maxDimension caps the top.` },
+      { name: 'presetTemplates', type: 'Record<string, PresetSpec>', default: "{ og, thumbnail }", description: `Named, reusable variant specs ({ width?, height?, aspectRatio?, fit?, quality?, format? }) that editors toggle onto images by name and serve via /api/img/:id?preset=<name>. Guaranteed (cap-exempt) and eagerly pre-generated on upload. Two defaults ship unless overridden: og (1200×630 cover jpeg, q80) and thumbnail (160×160 cover webp, q70 — backs the admin thumbnail). See Caching → Guaranteed presets.` },
+      { name: 'variantLimit', type: 'number', default: '200', description: `Per-image cap on cached variants — bounds storage from the public endpoint. Each image gets a variantLimit field defaulting to this; past the cap a new freeform size is served from a nearby variant (or generated but not stored) instead of adding a row. Presets are exempt. See Caching → The variant cap.` },
       {
         name: 'access',
         type: 'ImagesAccessOptions',
@@ -153,8 +153,21 @@ imagesPlugin({
       sharpConcurrency: 1,
       fallback: true,
     },
-    prewarm: {}, // or false to opt out; the object takes seeds / formats / maxVariantsPerImage / autoRun / queue
-    pixelStep: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // or a number, e.g. 50, for a dense grid
+    prewarm: {
+      // or false to opt out; `strategy: 'default'` ≡ `strategy: {}` ≡ this, written out:
+      strategy: {
+        widths: 'srcset', // or { every: 2 } (every 2nd reachable width), or an explicit number[]
+        builtIns: true,   // warm src / thumbnailURL / placeholderURL
+        learned: true,    // warm observed render profiles
+        seeds: [{ aspectRatio: '1:1', quality: 80 }], // declaring your own replaces this default; [] disables
+        onUpload: true,   // enqueue on create / file replace / focal edit
+        autoRun: false,   // a cron string wires an in-process runner (not for serverless)
+        queue: 'default',
+      },
+      formats: ['webp'],  // +'avif' automatically when transform.preferAvif
+      maxVariantsPerImage: 32,
+    },
+    pixelStep: 50, // the dense grid — or an array ladder, e.g. [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
     presetTemplates: {
       // both ship by default; your own entries merge on top
       og: { width: 1200, height: 630, fit: 'cover', quality: 80, format: 'jpeg' },
@@ -174,8 +187,8 @@ imagesPlugin({
 </Tabs>
 
 <Callout type="info">
-  The named option types — `Format`, `TransformEndpointConfig`, `PresetSpec`, and `PrewarmOptions` —
-  all import from `@pro-laico/payload-images`.
+  The named option types — `Format`, `TransformEndpointConfig`, `PresetSpec`, `PrewarmOptions`, and
+  `PrewarmStrategy` — all import from `@pro-laico/payload-images`.
 </Callout>
 
 <Callout type="warn">
@@ -206,7 +219,7 @@ The plugin registers two Payload CLI commands (run via `pnpm payload <command>`)
 | Command | Flags | What |
 | --- | --- | --- |
 | `payload images:backfill` | `--force`, `--focal`, `--collection` | Stamps upload-time metadata (placeholder tiers, palette, alpha flags, saliency focal point) onto images that predate the plugin. See [Metadata → Backfilling an existing library](/docs/plugins/payload-images/metadata#backfilling-an-existing-library). |
-| `payload images:prewarm` | `--now`, `--limit`, `--collection`, `--queue` | Bulk-warms a library against the learned render profiles. Requires `prewarm` on. See [Caching → Smart prewarm](/docs/plugins/payload-images/caching#smart-prewarm). |
+| `payload images:prewarm` | `--now`, `--limit`, `--collection`, `--queue` | Bulk-warms a library against the learned render profiles. Requires `prewarm` on. See [Prewarming](/docs/plugins/payload-images/prewarming). |
 
 ## Endpoints
 
@@ -236,7 +249,7 @@ access is enforced on top of both. See [Gating endpoints](../conventions#gating-
 | Component prop types | `@pro-laico/payload-images/components/image` | `ImageProps`, `ResponsiveImageProps` — for typing a wrapper around `<ResponsiveImage>`. |
 | `FocalPreview` | `@pro-laico/payload-images/admin/focalPreview` | Admin focal-point picker + ratio/placeholder preview field (wired via the import map when `collections.images.options.focalUI` is on). |
 | `PresetManager` | `@pro-laico/payload-images/admin/presetManager` | Admin **Preset manager** panel — preset toggles, cached-variant list, purge button, and the per-image variant cap (wired via the import map when `collections.images.options.focalUI` is on). |
-| `PrewarmOptions` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape and a pinned cold-start render profile. |
+| `PrewarmOptions` / `PrewarmStrategy` / `PrewarmStrategyConfig` / `PrewarmWidths` / `ResolvedPrewarmStrategy` / `RenderProfileSeed` | `@pro-laico/payload-images` | The `prewarm` option's types: the config shape, the strategy (what to warm and when it runs, with its width-axis union), and a pinned cold-start render profile. |
 | `PresetSpec` / `PresetEntry` | `@pro-laico/payload-images` | The presets types: a `presetTemplates` spec and a per-image `presets` array entry. |
 | `PREWARM_TASK_SLUG` | `@pro-laico/payload-images` | The prewarm jobs task slug (`imagesPrewarm`) — for queueing/running the job yourself. |
 | `readImagesMarker` | `@pro-laico/payload-images` | Read the resolved config (slugs + settings) off `config.custom.payloadImages` from a script or app — `readImagesMarker(config).sourceSlug`. |
@@ -252,10 +265,3 @@ variant cache, and — with `options.prewarm` on — the hidden `image-render-pr
 under an **Assets** admin group. `collections.images.options.folders` brings Payload's own hidden
 `payload-folders` collection with it. See [Collections](/docs/plugins/payload-images/collections) for
 their fields, hooks, and access.
-
-## Next
-
-- [Collections](/docs/plugins/payload-images/collections) — the collections it registers, extending your own, and seeding.
-- [Image URLs](/docs/plugins/payload-images/image-urls) — what the `transform` knobs actually bound.
-- [Caching & prewarming](/docs/plugins/payload-images/caching) — the `prewarm` and `fallback` options in action.
-- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — Sharp not externalized, missing admin UI, wrong crops, stale pages.

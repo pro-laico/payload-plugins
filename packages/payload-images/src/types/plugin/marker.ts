@@ -1,15 +1,14 @@
 import type { ImagesPluginOptions } from './options'
 import type { OutputFormat } from '../transform/format'
-import type { RenderProfileSeed } from '../prewarm/options'
+import type { ResolvedPrewarmStrategy } from '../prewarm/strategy'
 import type { TransformConstraints } from '../transform/transformConstraints'
 
 export interface PayloadImagesPrewarmMarker {
   profilesSlug: string
   taskSlug: string
-  queue: string
+  strategy: ResolvedPrewarmStrategy
   formats: OutputFormat[]
   maxVariantsPerImage: number
-  seeds: RenderProfileSeed[]
   constraints: TransformConstraints
 }
 

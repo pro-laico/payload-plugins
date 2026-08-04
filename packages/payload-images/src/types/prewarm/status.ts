@@ -34,6 +34,8 @@ export interface PrewarmStatusResponse {
   status: PrewarmJobStatus
   /** Variants the next prewarm run would generate (already-cached ones excluded). */
   plan: PrewarmPlanItem[]
+  /** The plan hit `maxVariantsPerImage` — raise the cap or narrow the strategy to cover the rest. */
+  truncated?: boolean
   /** Source can't be prewarmed (deleted file / non-raster) — plan is always [] alongside this. */
   skipped?: 'missing' | 'non-raster'
   /** Present iff status !== 'idle'. */

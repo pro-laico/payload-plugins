@@ -182,7 +182,7 @@ never modified, unlike Payload's built-in destructive "Edit image" crop:
   that region at its native resolution (CSS scales it up) rather than inventing pixels.
 - **Change any layer and stale renders refresh.** Edits purge that image's cached variants and bump
   its `v` token, so anything already served refetches —
-  [Caching & prewarming](/docs/plugins/payload-images/caching#revalidation) has the full story.
+  [Caching](/docs/plugins/payload-images/caching#revalidation) has the full story.
 
 ![The Focus & crop component: the hotspot circle with its zoom handle over the image, crop corner handles, and live ratio preview tiles with normal/placeholder modes](/screenshots/focus-n-crop.png)
 
@@ -203,9 +203,3 @@ payload images:backfill --collection media # a renamed images collection
   `--focal` is opt-in because it **changes crops on a live site** (busts caches, regenerates
   variants); everything else is additive metadata that alters no rendered pixels.
 </Callout>
-
-## Next
-
-- [Rendering images](/docs/plugins/payload-images/rendering) — put the placeholder and crop to work.
-- [Collections](/docs/plugins/payload-images/collections#collections) — every field these features add to the collection.
-- [Troubleshooting](/docs/plugins/payload-images/troubleshooting) — placeholders, crops, and metadata that don't show up.

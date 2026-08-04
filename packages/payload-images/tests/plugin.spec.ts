@@ -193,19 +193,40 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     const images = (out.collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
     expect(images.hooks?.afterChange).toHaveLength(3) // purge + prewarm enqueue + preset generation
     const marker = (
-      out.custom as { payloadImages?: { prewarm?: { taskSlug?: string; formats?: string[]; constraints?: { dimensionStep?: number } } } }
+      out.custom as {
+        payloadImages?: {
+          prewarm?: {
+            taskSlug?: string
+            formats?: string[]
+            strategy?: { widths?: string; queue?: string }
+            constraints?: { dimensionStep?: number }
+          }
+        }
+      }
     ).payloadImages
     expect(marker?.prewarm?.taskSlug).toBe('imagesPrewarm')
     expect(marker?.prewarm?.formats).toEqual(['webp'])
+    // Zero-config pixelStep is the 50px grid, so the default width axis is the every-5th skeleton.
+    expect(marker?.prewarm?.strategy).toMatchObject({ widths: { every: 5 }, queue: 'default' })
     expect(marker?.prewarm?.constraints?.dimensionStep).toBe(50)
     expect(out.jobs?.autoRun).toBeUndefined() // no forced background work
+  })
+
+  it('strategy.onUpload: false drops only the enqueue hook — endpoints, task, and CLI stay', () => {
+    const out = run({ options: { prewarm: { strategy: { onUpload: false } } } })
+    const images = (out.collections ?? []).find((c) => c.slug === 'images') as CollectionConfig
+    expect(images.hooks?.afterChange).toHaveLength(2) // purge + preset generation, no prewarm enqueue
+    expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
+    expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
+    const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
+    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
   })
 
   it('derives avif from transform.preferAvif and composes autoRun over existing shapes', async () => {
     const marker = (c: Config) => (c.custom as { payloadImages: { prewarm: { formats: string[] } } }).payloadImages
     expect(marker(run({ options: { prewarm: {}, transform: { preferAvif: true } } })).prewarm.formats).toEqual(['webp', 'avif'])
 
-    const cron = { autoRun: '0 * * * *' }
+    const cron = { strategy: { autoRun: '0 * * * *' } }
     const fresh = run({ options: { prewarm: cron } })
     expect(fresh.jobs?.autoRun).toEqual([{ cron: '0 * * * *', queue: 'default', limit: 10 }])
 

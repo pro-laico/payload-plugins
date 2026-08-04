@@ -5,9 +5,9 @@ export const FORMATS: Format[] = ['auto', 'avif', 'webp', 'jpeg', 'png']
 
 export const DEFAULT_PIXEL_STEP = 50
 
-// The default srcset ladder (next/image's deviceSizes): ~8 conventional rungs instead of a dense
-// 50px grid, so a doc read emits a handful of srcset URLs and the stored variant space stays small.
-// The 50px DEFAULT_PIXEL_STEP remains the endpoint's snap grid for freeform widths.
+// The conventional srcset ladder (next/image's deviceSizes): ~8 rungs for apps that pass an array
+// pixelStep, and the standalone stepWidths/buildSrcset default (a dense grid over an unknown source
+// width would emit dozens of URLs). The plugin's own default pixelStep is the 50px grid.
 export const DEFAULT_WIDTH_LADDER: number[] = [640, 750, 828, 1080, 1200, 1920, 2048, 3840]
 
 // 90 is the quality-forward default: on a 1200px photo it is visually indistinguishable from the

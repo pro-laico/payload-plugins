@@ -11,9 +11,9 @@ const deps = {
   sourceSlug: 'images',
   variantSlug: 'generated-images',
   profilesSlug: 'image-render-profiles',
-  seeds: [],
+  strategy: { widths: 'srcset' as const, builtIns: true, learned: true, seeds: [], onUpload: true, autoRun: false as const, queue: 'default' },
   formats: ['webp' as const],
-  maxVariantsPerImage: 24,
+  maxVariantsPerImage: 32,
   constraints: DEFAULT_CONSTRAINTS,
 }
 const req = { payload: {} as Payload }

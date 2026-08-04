@@ -1,4 +1,4 @@
-import { DEFAULT_WIDTH_LADDER } from './lib/transform/params'
+import { DEFAULT_PIXEL_STEP } from './lib/transform/params'
 import { resolvePresetTemplates, DEFAULT_VARIANT_LIMIT } from './lib/presets/defaults'
 import type { ImagesPluginOptions, ResolvedImagesPluginOptions } from './types'
 
@@ -38,7 +38,7 @@ export function resolveOptions(
     options: {
       transform: engine?.transform ?? {},
       prewarm: engine?.prewarm ?? {},
-      pixelStep: engine?.pixelStep ?? DEFAULT_WIDTH_LADDER,
+      pixelStep: engine?.pixelStep ?? DEFAULT_PIXEL_STEP,
       presetTemplates: resolvePresetTemplates(engine?.presetTemplates),
       variantLimit: engine?.variantLimit ?? DEFAULT_VARIANT_LIMIT,
       access: { manage: engine?.access?.manage, serve: engine?.access?.serve },

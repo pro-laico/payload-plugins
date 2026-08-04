@@ -87,7 +87,7 @@ export const createPrewarmStatusEndpoint = (cfg: PrewarmEndpointConfig): Endpoin
       const body: PrewarmStatusResponse = {
         status: job ? (job.processing ? 'running' : 'queued') : 'idle',
         plan: planItems,
-        ...(plan.ok ? {} : { skipped: plan.skipped }),
+        ...(plan.ok ? (plan.truncated ? { truncated: true } : {}) : { skipped: plan.skipped }),
         ...(job ? { job } : {}),
         ...(lastRun ? { lastRun } : {}),
       }

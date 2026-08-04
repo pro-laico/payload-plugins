@@ -76,8 +76,10 @@ export interface Config {
     iconRequest: IconRequest;
     images: Image;
     'generated-images': GeneratedImage;
+    'image-render-profiles': ImageRenderProfile;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
+    'payload-folders': FolderInterface;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -85,6 +87,9 @@ export interface Config {
   collectionsJoins: {
     images: {
       variants: 'generated-images';
+    };
+    'payload-folders': {
+      documentsAndFolders: 'payload-folders' | 'images';
     };
   };
   collectionsSelect: {
@@ -97,8 +102,10 @@ export interface Config {
     iconRequest: IconRequestSelect<false> | IconRequestSelect<true>;
     images: ImagesSelect<false> | ImagesSelect<true>;
     'generated-images': GeneratedImagesSelect<false> | GeneratedImagesSelect<true>;
+    'image-render-profiles': ImageRenderProfilesSelect<false> | ImageRenderProfilesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
+    'payload-folders': PayloadFoldersSelect<false> | PayloadFoldersSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -120,6 +127,7 @@ export interface Config {
   user: User;
   jobs: {
     tasks: {
+      imagesPrewarm: TaskImagesPrewarm;
       schedulePublish: TaskSchedulePublish;
       inline: {
         input: unknown;
@@ -285,7 +293,7 @@ export interface IconSet {
   _status?: ('draft' | 'published') | null;
 }
 /**
- * Icon names requested at runtime that did not resolve to an icon in the active set. Populated when iconsPlugin({ trackRequests: true }) is set; compare against the IconSet usage panel.
+ * Icon names requested at runtime that did not resolve to an icon in the active set. Populated unless iconsPlugin({ collections: { iconRequest: false } }) opts out; compare against the IconSet usage panel.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "iconRequest".
@@ -344,7 +352,7 @@ export interface Image {
   placeholder2xl?: string | null;
   placeholder3xl?: string | null;
   /**
-   * Placeholder for the read: a finished data URI focal-cropped to the declared render (context.image.aspectRatio + context.blur = { quality, format }, or an X-Blurhash header); the raw sm-tier hash when nothing is declared.
+   * Placeholder for the read — opt-in: a finished data URI focal-cropped to the declared render, returned only when the read declares a blur (context.blur = { quality, format } or an X-Blurhash header); null otherwise so undeclared reads carry no data-URI weight.
    */
   placeholder?: string | null;
   /**
@@ -387,6 +395,36 @@ export interface Image {
    * Non-destructive edge trim, % removed from the bottom.
    */
   cropBottom?: number | null;
+  /**
+   * Guaranteed public variants for this image (OG, social, fixed sizes). Always generatable and pre-generated on upload; served via /api/img/:id?preset=<name>. Managed by the Presets panel.
+   */
+  presets?:
+    | {
+        /**
+         * Name of a plugin preset template to apply (leave blank for a custom preset).
+         */
+        template?: string | null;
+        /**
+         * Name for a custom preset (used when no template is chosen).
+         */
+        name?: string | null;
+        width?: number | null;
+        height?: number | null;
+        /**
+         * e.g. 16:9
+         */
+        aspectRatio?: string | null;
+        fit?: ('cover' | 'contain' | 'inside' | 'outside' | 'fill') | null;
+        quality?: number | null;
+        format?: ('avif' | 'webp' | 'jpeg' | 'png') | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Max cached variants for this image before new sizes are served from a nearby existing one instead of being generated + stored. Blank uses the project default. Presets never count against this.
+   */
+  variantLimit?: number | null;
+  folder?: (number | null) | FolderInterface;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -413,6 +451,7 @@ export interface GeneratedImage {
   fit?: string | null;
   format?: string | null;
   quality?: number | null;
+  windowed?: boolean | null;
   focalX?: number | null;
   focalY?: number | null;
   updatedAt: string;
@@ -424,6 +463,66 @@ export interface GeneratedImage {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders".
+ */
+export interface FolderInterface {
+  id: number;
+  name: string;
+  folder?: (number | null) | FolderInterface;
+  documentsAndFolders?: {
+    docs?: (
+      | {
+          relationTo?: 'payload-folders';
+          value: number | FolderInterface;
+        }
+      | {
+          relationTo?: 'images';
+          value: number | Image;
+        }
+    )[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  folderType?: 'images'[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles".
+ */
+export interface ImageRenderProfile {
+  id: number;
+  /**
+   * Canonical render shape: ratio|fit|quality|format. One doc per distinct shape the transform endpoint has served.
+   */
+  profileKey: string;
+  ratio: string;
+  fit: string;
+  quality: number;
+  format: string;
+  /**
+   * Approximate total serves (flushed from per-process buffers, throttled).
+   */
+  hitCount?: number | null;
+  lastSeenAt?: string | null;
+  /**
+   * Per-width observation histogram: { "640": { n, last } }. Capped; the least-requested widths are evicted.
+   */
+  widths?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -494,7 +593,7 @@ export interface PayloadJob {
     | {
         executedAt: string;
         completedAt: string;
-        taskSlug: 'inline' | 'schedulePublish';
+        taskSlug: 'inline' | 'imagesPrewarm' | 'schedulePublish';
         taskID: string;
         input?:
           | {
@@ -527,7 +626,7 @@ export interface PayloadJob {
         id?: string | null;
       }[]
     | null;
-  taskSlug?: ('inline' | 'schedulePublish') | null;
+  taskSlug?: ('inline' | 'imagesPrewarm' | 'schedulePublish') | null;
   queue?: string | null;
   waitUntil?: string | null;
   processing?: boolean | null;
@@ -576,6 +675,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'generated-images';
         value: number | GeneratedImage;
+      } | null)
+    | ({
+        relationTo: 'image-render-profiles';
+        value: number | ImageRenderProfile;
+      } | null)
+    | ({
+        relationTo: 'payload-folders';
+        value: number | FolderInterface;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -765,6 +872,21 @@ export interface ImagesSelect<T extends boolean = true> {
   cropTop?: T;
   cropRight?: T;
   cropBottom?: T;
+  presets?:
+    | T
+    | {
+        template?: T;
+        name?: T;
+        width?: T;
+        height?: T;
+        aspectRatio?: T;
+        fit?: T;
+        quality?: T;
+        format?: T;
+        id?: T;
+      };
+  variantLimit?: T;
+  folder?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -787,6 +909,7 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
   fit?: T;
   format?: T;
   quality?: T;
+  windowed?: T;
   focalX?: T;
   focalY?: T;
   updatedAt?: T;
@@ -798,6 +921,22 @@ export interface GeneratedImagesSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "image-render-profiles_select".
+ */
+export interface ImageRenderProfilesSelect<T extends boolean = true> {
+  profileKey?: T;
+  ratio?: T;
+  fit?: T;
+  quality?: T;
+  format?: T;
+  hitCount?: T;
+  lastSeenAt?: T;
+  widths?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -835,6 +974,18 @@ export interface PayloadJobsSelect<T extends boolean = true> {
   queue?: T;
   waitUntil?: T;
   processing?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-folders_select".
+ */
+export interface PayloadFoldersSelect<T extends boolean = true> {
+  name?: T;
+  folder?: T;
+  documentsAndFolders?: T;
+  folderType?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -903,6 +1054,22 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskImagesPrewarm".
+ */
+export interface TaskImagesPrewarm {
+  input: {
+    sourceId: string;
+    reason: 'create' | 'replace' | 'focal' | 'manual';
+  };
+  output: {
+    targets?: number | null;
+    generated?: number | null;
+    failed?: number | null;
+    skipped?: string | null;
+  };
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

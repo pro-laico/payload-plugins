@@ -175,9 +175,3 @@ export const fontSet = defineSeed('fontSet', ({ ref }) => ({
 </Tabs>
 
 A reseed clears the `fontOriginal` and `font` collections via `payload.delete`, so the cascade removes the old originals + optimized too (idempotent). See the [seed plugin docs](/docs/plugins/payload-seed) for the full reference.
-
-## Next
-
-- [Collections](/docs/plugins/payload-fonts/collections) — the `font`, `fontOriginal`, `fontOptimized` shapes and the `fontSet` global.
-- [Serving](/docs/plugins/payload-fonts/serving) — wire the baked path and the `PreviewFonts` escape hatch into your layout.
-- [Troubleshooting](/docs/plugins/payload-fonts/troubleshooting) — stale fonts, blank admin fields, and the wasm-bundling failure.

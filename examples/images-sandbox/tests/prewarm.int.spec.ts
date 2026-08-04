@@ -65,6 +65,7 @@ const drainPersists = async (payload: Payload): Promise<number> => {
 describe('smart prewarm', () => {
   let payload: Payload
   let observedId: string
+  let freshId: string
 
   beforeAll(async () => {
     process.env.PAYLOAD_SECRET = 'test-secret'
@@ -114,6 +115,7 @@ describe('smart prewarm', () => {
       data: { alt: 'fresh' },
       file: { data: png, mimetype: 'image/png', name: 'fresh.png', size: png.byteLength },
     })
+    freshId = String(doc.id)
     // The create hook queued a job with a 30s waitUntil; queue an immediately-eligible one instead.
     await payload.jobs.queue({
       task: 'imagesPrewarm',
@@ -137,6 +139,35 @@ describe('smart prewarm', () => {
     await drainPersists(payload)
     const after = await payload.find({ collection: 'generated-images', where: { source: { equals: doc.id } }, limit: 100 })
     expect(after.totalDocs).toBe(before)
+  })
+
+  it('warmed the exact src URL and the every-5th width skeleton the default strategy derives', async () => {
+    // The default strategy's promise on the 50px-grid default: the src render (NO derived h) plus
+    // a skeleton of every 5th reachable width are warm; the fallback bridges in-between srcset
+    // widths from a warm neighbor.
+    const doc = (await payload.findByID({ collection: 'images', id: freshId })) as { src?: string }
+    expect(doc.src).toBeTruthy()
+    const srcQuery = new URL(doc.src ?? '', 'http://local').search.slice(1)
+
+    const before = await drainPersists(payload)
+    const res = await transform(payload)(makeReq(payload, freshId, srcQuery))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).not.toContain('no-store') // a stand-in fallback would be no-store
+    await drainPersists(payload)
+    const after = (await payload.count({ collection: 'generated-images' })).totalDocs
+    expect(after, 'the src render should already be cached').toBe(before)
+
+    // The default 1:1 q80 seed warms the every-5th skeleton ≤ the 1000px source (1000, 750, 500,
+    // 250) — but a square crop of a 1000×700 source never upscales past 700×700, so the 750 and
+    // 1000 targets both land as 700-wide squares (distinct cache keys, same rendered size).
+    const rows = await payload.find({
+      collection: 'generated-images',
+      where: { and: [{ source: { equals: freshId } }, { quality: { equals: 80 } }] },
+      limit: 100,
+      depth: 0,
+    })
+    const widths = new Set(rows.docs.map((v) => (v as { width?: number }).width))
+    for (const w of [250, 500, 700]) expect(widths, `skeleton width ${w} should be warm`).toContain(w)
   })
 
   it('re-enqueues on a focal edit (the purge trigger set)', async () => {

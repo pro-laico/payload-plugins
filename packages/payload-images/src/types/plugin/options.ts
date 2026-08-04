@@ -50,13 +50,11 @@ export interface ImagesOptions {
   transform?: TransformEndpointConfig
   /** Pre-generate the variants the site actually serves. On by default; `false` opts out.
    *
-   * - `seeds`
+   * - `strategy`
    * - `formats`
-   * - `maxVariantsPerImage`
-   * - `autoRun`
-   * - `queue` */
+   * - `maxVariantsPerImage` */
   prewarm?: false | PrewarmOptions
-  /** Width ladder for generated `srcset`s — a step size, or explicit widths. */
+  /** Widths for generated `srcset`s — a step size (default `50`), or an explicit ladder of widths. */
   pixelStep?: number | number[]
   /** Named render specs, guaranteed to exist and exempt from `variantLimit`.
    *

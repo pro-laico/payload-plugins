@@ -35,9 +35,3 @@ When a seed misbehaves, find your symptom below. Each entry leads with what you 
 - **A `ref()` won't point at a global; a global updated after everything else.** `ref()` points at collection docs only — a global can reference docs, but a doc can't reference a global. Globals are applied last, after every doc exists. This is by design; see [How it works](/docs/plugins/payload-seed/advanced#how-it-works).
 
 - **A bulk seed fired a revalidation per doc.** Your `afterChange` / `afterDelete` hooks aren't checking the seed's context flag. The engine sets `context: { disableRevalidate: true }` on every write — have your hooks skip when it's present. See [Disable revalidation](/docs/plugins/payload-seed/advanced#disable-revalidation).
-
-## Next
-
-- [Running the seed](/docs/plugins/payload-seed/running) — the four entry points and their gates
-- [Writing seeds](/docs/plugins/payload-seed/writing-seeds) — `defineSeed`, refs, and files
-- [Advanced](/docs/plugins/payload-seed/advanced) — disabled seeds, revalidation, and how the engine runs
