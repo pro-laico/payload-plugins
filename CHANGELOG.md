@@ -7,6 +7,16 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-04
+
+Prewarming grows up. One `strategy` option now declares both what a prewarm run warms and when it
+runs — and by default it actually runs, on a plugin-owned queue behind a 5-minute cron, so a
+zero-config install warms images with no wiring at all. The admin Presets & variants panel gains a
+width-axis tick line plotting every cached render, and the docs teach the same model with an
+interactive calculator. Three breaking changes in `payload-images` — the `prewarm` reshape, the
+50px-grid default `pixelStep`, and the `2xl` / `3xl` placeholder tier renames — each with a
+one-step migration below.
+
 ### Added
 
 - **payload-images: prewarm strategies — one option now declares what a prewarm run warms and when
