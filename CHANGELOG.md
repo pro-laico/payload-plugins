@@ -7,6 +7,17 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Fixed
+
+- **payload-images: the auto-focal no longer parks the hotspot in a corner on low-saliency
+  images.** Sharp's attention analysis reports a point even when nothing is salient — uniform
+  images come back as (0,0) and smooth gradients pin to the probe's far edge — and the upload-time
+  metadata hook wrote those straight into `focalX`/`focalY`, so the Focus & crop hotspot appeared
+  glued to the bottom-right (or top-left) corner of freshly uploaded images. Attention points are
+  now trusted only when they land comfortably inside the frame (5–95% on both axes); anything
+  edge-pinned is discarded and the focal stays at Payload's 50/50 default. Already-uploaded images
+  keep their saved focal — drag the point once (or re-upload) to correct any that were affected.
+
 ## [0.7.0] - 2026-08-04
 
 Prewarming grows up. One `strategy` option now declares both what a prewarm run warms and when it

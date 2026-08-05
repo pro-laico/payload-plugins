@@ -48,6 +48,12 @@ export const analyzeImageMetadata = async (file: Buffer): Promise<ImageMetadataA
   }
 }
 
+// Sharp reports attention coordinates even when nothing is salient: uniform images come back as
+// (0,0) and smooth gradients pin to the probe's far edge, which used to park the focal point in a
+// corner. Only a point comfortably inside the frame is a real subject; otherwise keep 50/50.
+const ATTENTION_TRUST_MIN = 5
+const ATTENTION_TRUST_MAX = 95
+
 const attentionFocal = async (pipeline: Sharp, dims: { w: number; h: number } | undefined): Promise<{ x: number; y: number } | undefined> => {
   if (!dims) return undefined
   const probe = async (tw: number, th: number): Promise<{ x: number; y: number } | undefined> => {
@@ -55,8 +61,10 @@ const attentionFocal = async (pipeline: Sharp, dims: { w: number; h: number } | 
     const { attentionX, attentionY } = info
     if (typeof attentionX !== 'number' || typeof attentionY !== 'number') return undefined
     const scale = Math.max(tw / dims.w, th / dims.h)
-    const clamp = (v: number): number => Math.max(0, Math.min(100, Math.round(v * 10) / 10))
-    return { x: clamp((attentionX / (dims.w * scale)) * 100), y: clamp((attentionY / (dims.h * scale)) * 100) }
+    const x = Math.round((attentionX / (dims.w * scale)) * 1000) / 10
+    const y = Math.round((attentionY / (dims.h * scale)) * 1000) / 10
+    const trusted = (v: number): boolean => v >= ATTENTION_TRUST_MIN && v <= ATTENTION_TRUST_MAX
+    return trusted(x) && trusted(y) ? { x, y } : undefined
   }
   try {
     return (await probe(SAMPLE_EDGE, 8)) ?? (await probe(8, SAMPLE_EDGE))

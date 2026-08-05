@@ -169,8 +169,10 @@ never modified, unlike Payload's built-in destructive "Edit image" crop:
 | Hotspot size | `focalSize` (%) | the circle's diameter: how much context must stay in frame — smaller = tighter zoom, 100 = the classic maximal window |
 
 - **Set automatically, refined once.** On a fresh upload with no editor-set focal, the hook sets
-  `focalX`/`focalY` from Sharp's saliency (attention) analysis when that analysis yields an
-  attention point; otherwise the focal stays at Payload's default (50/50). The **Focus & crop**
+  `focalX`/`focalY` from Sharp's saliency (attention) analysis when that analysis yields a
+  confident attention point — one comfortably inside the frame. Low-saliency images (flat colors,
+  smooth gradients) report edge-pinned points, which are discarded rather than guessed, so the
+  focal stays at Payload's default (50/50). The **Focus & crop**
   component does the rest: click/drag sets the focal point, the circle's edge handle sizes the
   hotspot, the corner handles draw the crop (everything outside dims). Ratio tiles preview the real
   crop, the placeholder, or half & half — live, with the exact geometry the endpoint uses.
