@@ -8,7 +8,7 @@ export interface CreateImagesOptions {
   mimeTypes?: string[]
   folders?: boolean
   maxOriginalSize?: number
-  prewarm?: { taskSlug: string; queue: string } | false
+  prewarm?: { taskSlug: string; queue: string; kickLimit?: number } | false
   /** Set only when prewarm is on — its presence is the panel's prewarm-UI gate. */
   prewarmPath?: string
   /** The panel's preset↔variant match endpoint. */

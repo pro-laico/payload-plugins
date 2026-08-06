@@ -28,15 +28,18 @@ export interface PrewarmStrategyConfig {
   seeds?: RenderProfileSeed[]
   /** Enqueue a prewarm job when an image is created, its file replaced, or its focal edited (default `true`). */
   onUpload?: boolean
-  /** Cron for the built-in in-process runner (default: every 5 minutes). `false` means you run
-   * the jobs yourself. In-process crons never fire reliably on serverless — schedule an external
-   * request to the jobs endpoint there instead. */
+  /** Whether — and on long-lived processes, how often — the plugin runs its own jobs. The cron
+   * (default: every 5 minutes) drives the in-process runner, which never fires reliably on
+   * serverless; there the same knob keeps two request-scoped runners alive instead: every upload
+   * kicks the queue after its response, and image traffic drains a few queued jobs per minute.
+   * `false` turns all three off — you run the jobs yourself. */
   autoRun?: string | false
-  /** Max jobs (one image each) the autoRun cron executes per firing (default `50` — with the
-   * 5-minute default cron, up to 10 images a minute). */
+  /** Max jobs (one image each) the autoRun cron — and the post-upload kick — executes per firing
+   * (default `50` — with the 5-minute default cron, up to 10 images a minute). */
   autoRunLimit?: number
   /** Payload Jobs queue prewarm jobs land on (default `'images-prewarm'` — a plugin-owned queue,
-   * so the default cron and the admin Run-now kick can never execute the app's own jobs). */
+   * so the plugin's runners — cron, upload kicks, traffic drains, the admin Run-now kick — can
+   * never execute the app's own jobs). */
   queue?: string
 }
 

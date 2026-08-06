@@ -3,7 +3,7 @@ import type { Payload } from 'payload'
 import { isRecord } from '../../_kit'
 import type { PrewarmReason } from '../../types'
 
-const ENQUEUE_DELAY_MS = 30_000
+export const ENQUEUE_DELAY_MS = 30_000
 
 export interface EnqueuePrewarmArgs {
   sourceId: string | number

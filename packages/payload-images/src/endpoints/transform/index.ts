@@ -8,6 +8,7 @@ import { resolveConstraints } from './config'
 import { createSingleFlight } from './coalesce'
 import { readBytes } from '../../lib/transform/source'
 import { getServerSideURL } from '../../lib/getServerSideURL'
+import { kickPrewarmRunner } from '../../lib/prewarm/kick'
 import { resolveStaticDir } from '../../lib/transform/staticDir'
 import { presetQuery, resolvePreset } from '../../lib/presets/resolve'
 import { setTransformConcurrency } from '../../lib/transform/limit'
@@ -29,7 +30,16 @@ export type { TransformEndpointConfig } from '../../types'
 export interface PrewarmObserveConfig {
   profilesSlug: string
   seedCandidates: RatioCandidate[]
+  /** When set, image traffic drains the prewarm queue: at most once a minute per process, a serve
+   * also runs a few queued jobs after the response — the backstop that works anywhere, serverless
+   * included, for jobs the upload kick missed (cold instance died, CLI backlog, crashed callback). */
+  drainQueue?: string
 }
+
+// Small on purpose: a drain rides a visitor-facing request, so it works through the queue a few
+// jobs at a time rather than all at once — steady progress without turning a page view into a batch run.
+const DRAIN_LIMIT = 5
+const DRAIN_INTERVAL_MS = 60_000
 
 export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObserve?: PrewarmObserveConfig): Endpoint => {
   const fallback = cfg.fallback !== false
@@ -42,6 +52,7 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
   setTransformConcurrency(cfg.maxConcurrency)
 
   let recorder: ObservationRecorder | undefined
+  let nextDrainAt = 0
   const sourceFlight = createSingleFlight<string, SourceDoc | null>()
 
   return {
@@ -171,6 +182,11 @@ export const createTransformEndpoint = (cfg: TransformEndpointArgs, prewarmObser
           constraints,
         })
         recorder.observe({ parts: { ratio, fit: p.fit, quality: p.q, format: p.fmt }, width: p.w })
+      }
+
+      if (prewarmObserve?.drainQueue && Date.now() >= nextDrainAt) {
+        nextDrainAt = Date.now() + DRAIN_INTERVAL_MS
+        kickPrewarmRunner(payload, { queue: prewarmObserve.drainQueue, limit: DRAIN_LIMIT })
       }
 
       if (standIn) return new Response(toBody(standIn.data), { headers: buildFallbackHeaders(standIn.mimeType, isAuto, cdn) })

@@ -79,6 +79,9 @@ export const imagesPlugin =
             const ratio = s.aspectRatio != null ? parseAspectRatio(s.aspectRatio) : undefined
             return ratio ? [{ token: ratioToken(ratio), ratio }] : []
           }),
+          // Same autoRun knob as the cron and the upload kick: image traffic drains a few queued
+          // jobs per minute — the backstop that works on serverless too.
+          ...(prewarm.strategy.autoRun ? { drainQueue: prewarm.strategy.queue } : {}),
         }
       : undefined
 
@@ -101,8 +104,17 @@ export const imagesPlugin =
       apiRoute,
       presetsPath,
       // `onUpload: false` drops only the enqueue hook — endpoints, task, CLI, and panel stay,
-      // so batch-only setups still warm via Run now / images:prewarm / a cron.
-      prewarm: prewarm !== false && prewarm.strategy.onUpload ? { taskSlug: prewarm.taskSlug, queue: prewarm.strategy.queue } : false,
+      // so batch-only setups still warm via Run now / images:prewarm / a cron. kickLimit rides
+      // autoRun: one knob for "the plugin runs jobs itself" — cron on long-lived processes, the
+      // post-response upload kick everywhere else (serverless, where the cron never fires).
+      prewarm:
+        prewarm !== false && prewarm.strategy.onUpload
+          ? {
+              taskSlug: prewarm.taskSlug,
+              queue: prewarm.strategy.queue,
+              ...(prewarm.strategy.autoRun ? { kickLimit: prewarm.strategy.autoRunLimit } : {}),
+            }
+          : false,
       // The Pick, not the whole object — minimal clientProps payload for the panel's tick line.
       constraints: {
         dimensionStep: constraints.dimensionStep,
@@ -210,6 +222,14 @@ export const imagesPlugin =
         if (shadowed)
           payload.logger.warn(
             `[payload-images] a collection is named "${baseSegment}", which shadows the transform endpoint at /api/${baseSegment} — rename the collection so it doesn't collide.`,
+          )
+        if (
+          prewarm !== false &&
+          prewarm.strategy.autoRun &&
+          (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY)
+        )
+          payload.logger.info(
+            `[payload-images] serverless platform detected — the in-process prewarm cron won't fire here; prewarm still runs via ${prewarm.strategy.onUpload ? 'post-upload kicks and ' : ''}image-traffic drains. For scheduled draining, point a platform cron at ${apiRoute}/payload-jobs/run?queue=${prewarm.strategy.queue}.`,
           )
         if (prewarm !== false && prewarm.droppedFormats.length)
           payload.logger.warn(

@@ -7,16 +7,21 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-06
+
 ### Fixed
 
-- **payload-images: the auto-focal no longer parks the hotspot in a corner on low-saliency
-  images.** Sharp's attention analysis reports a point even when nothing is salient — uniform
-  images come back as (0,0) and smooth gradients pin to the probe's far edge — and the upload-time
-  metadata hook wrote those straight into `focalX`/`focalY`, so the Focus & crop hotspot appeared
-  glued to the bottom-right (or top-left) corner of freshly uploaded images. Attention points are
-  now trusted only when they land comfortably inside the frame (5–95% on both axes); anything
-  edge-pinned is discarded and the focal stays at Payload's 50/50 default. Already-uploaded images
-  keep their saved focal — drag the point once (or re-upload) to correct any that were affected.
+- **payload-images: prewarm now runs itself on serverless — Vercel installs need zero wiring.**
+  The `autoRun` cron is in-process and never fires on serverless, so enqueued prewarm jobs piled
+  up forever. The same knob now also kicks the queue after every upload (via `after()`, once the
+  30s coalesce window passes) and drains up to 5 jobs per minute off image traffic. Runs pull one
+  job at a time and stop at 290s — under Vercel's 300s ceiling — and jobs stuck `processing` for
+  15+ minutes (a dead runner) are swept back to runnable. `autoRun: false` still disables all of
+  it.
+- **payload-images: degenerate auto-focals are discarded instead of parking the hotspot in a
+  corner.** Sharp's attention analysis pins uniform or gradient images to an edge; those points
+  are now trusted only 5–95% inside the frame, otherwise the focal stays at Payload's 50/50
+  default. Already-saved focals keep their value — drag once or re-upload to correct.
 
 ## [0.7.0] - 2026-08-04
 

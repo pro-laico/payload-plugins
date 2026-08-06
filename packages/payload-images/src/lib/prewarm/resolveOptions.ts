@@ -18,11 +18,10 @@ const DEFAULT_PREWARM_SEEDS: RenderProfileSeed[] = [{ aspectRatio: '1:1', qualit
 
 // On by default: these sites are image-led marketing pages where a cold variant is a visible LCP hit.
 // Only an explicit `prewarm: false` opts out — note that being on registers the render-profiles
-// collection (a schema change) and the jobs task. The default strategy also wires a 5-minute
-// autoRun cron on the plugin-owned 'images-prewarm' queue, so enqueued jobs actually run in any
-// long-lived process (dev servers included) with zero wiring; in-process crons never fire reliably
-// on serverless, so those deploys schedule a request to the jobs endpoint or run images:prewarm
-// as a build step (see the docs' run-path section).
+// collection (a schema change) and the jobs task. The default strategy also runs the jobs with
+// zero wiring on any host: a 5-minute autoRun cron on the plugin-owned 'images-prewarm' queue for
+// long-lived processes (dev servers included), plus — because in-process crons never fire reliably
+// on serverless — a post-response kick after every upload and a throttled drain on image traffic.
 export const resolvePrewarmOptions = (
   opts: false | PrewarmOptions,
   constraints: TransformConstraints,

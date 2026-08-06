@@ -6,7 +6,10 @@ import { DEFAULT_CONSTRAINTS } from '../../../src/lib/transform/params'
 import { createPrewarmTriggerEndpoint } from '../../../src/endpoints/prewarm'
 
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => fn() }))
-vi.mock('../../../src/lib/prewarm/enqueue', () => ({ enqueuePrewarmJob: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('../../../src/lib/prewarm/enqueue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/prewarm/enqueue')>()),
+  enqueuePrewarmJob: vi.fn().mockResolvedValue(undefined),
+}))
 
 const deps = {
   sourceSlug: 'images',
@@ -31,8 +34,9 @@ const mockedEnqueue = vi.mocked(enqueuePrewarmJob)
 
 const fakeReq = (opts: { user?: unknown; id?: string; found?: boolean } = {}) => {
   const findByID = opts.found === false ? vi.fn().mockRejectedValue(new Error('nope')) : vi.fn().mockResolvedValue({ id: 'img1' })
-  const jobsRun = vi.fn().mockResolvedValue({})
-  const payload = { findByID, jobs: { run: jobsRun }, logger: { warn: vi.fn(), error: vi.fn() } } as unknown as Payload
+  const jobsRun = vi.fn().mockResolvedValue({ noJobsRemaining: true, remainingJobsFromQueried: 0 })
+  const update = vi.fn().mockResolvedValue({})
+  const payload = { findByID, update, jobs: { run: jobsRun }, logger: { warn: vi.fn(), error: vi.fn() } } as unknown as Payload
   const req = {
     payload,
     user: 'user' in opts ? opts.user : { id: 'admin' },
@@ -76,6 +80,6 @@ describe('createPrewarmTriggerEndpoint', () => {
       queue: 'warmQ',
       waitUntil: false,
     })
-    expect(jobsRun).toHaveBeenCalledWith({ queue: 'warmQ' })
+    await vi.waitFor(() => expect(jobsRun).toHaveBeenCalledWith({ queue: 'warmQ', limit: 1 }))
   })
 })

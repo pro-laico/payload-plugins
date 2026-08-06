@@ -13,7 +13,7 @@ export const prewarmNodes = [
   { id: 'serve', kind: 'start', label: 'Site serves images', detail: 'GET /api/img/:id — hits, stand-ins, and fresh renders alike', x: 660, y: 0 },
   { id: 'enqueue', kind: 'store', label: 'Enqueue imagesPrewarm', detail: 'one job per image — 30s delay coalesces rapid saves; deduped; best-effort', x: 20, y: 180 },
   { id: 'observe', kind: 'store', label: 'Learn render profiles', detail: 'every response logs ratio, fit, quality, format, width', x: 660, y: 180 },
-  { id: 'runner', label: 'Your jobs runner', detail: 'payload.jobs.run(), a cron on the jobs endpoint, or strategy.autoRun', x: 20, y: 380 },
+  { id: 'runner', label: 'Jobs runner', detail: 'autoRun by default: in-process cron, post-upload kick, image-traffic drain — or your own payload.jobs.run()', x: 20, y: 380 },
   { id: 'compute', label: 'Compute targets', detail: 'built-ins → seeds → learned; deduped against the cache; capped by maxVariantsPerImage with an even width spread', x: 340, y: 560 },
   { id: 'generate', kind: 'result', label: 'Generate & persist', detail: 'replayed through the endpoint parser — byte-identical cache hits for organic traffic', x: 340, y: 760 },
 ]
@@ -77,11 +77,27 @@ budget warms every other width) rather than losing its large end. A capped plan 
 ## When it runs
 
 Enqueueing work and running it are separate: saves **enqueue** one `imagesPrewarm` job per image,
-and a runner drains the queue. **By default that runner exists**: the strategy wires a 5-minute
-`autoRun` cron (`'*/5 * * * *'`, 50 jobs per firing — one image each, so up to 10 images a minute)
-onto the plugin-owned `images-prewarm` queue, so any long-lived process — `next dev` included —
-warms with zero wiring. The dedicated queue means the cron and the admin **Run now** kick can only
-ever execute the plugin's own jobs, never your app's.
+and a runner drains the queue. **By default that runner exists on any host.** `autoRun` (on unless
+you set it to `false`) keeps three runners alive, all on the plugin-owned `images-prewarm` queue:
+
+- **A 5-minute in-process cron** (`'*/5 * * * *'`, 50 jobs per firing — one image each, so up to
+  10 images a minute) — the workhorse on any long-lived process, `next dev` included.
+- **A post-upload kick** — every save that enqueues also runs the queue right after its response
+  (via `after()`, so the upload never waits on sharp). This is what makes prewarm work on
+  **serverless**, where in-process crons never fire: the upload itself carries its own runner.
+- **An image-traffic drain** — at most once a minute per process, serving an image also works
+  through up to 5 queued jobs after the response. A steady backstop for anything the kick missed
+  (a killed instance, a CLI-enqueued backlog): the queue drains promptly, but never all at once.
+
+The request-scoped runners are budgeted and self-healing. A kick pulls jobs one at a time and
+stops starting new ones 290 seconds after it was scheduled — just under the tightest serverless
+function ceiling (Vercel Hobby's 300s) — so a heavy batch ends cleanly between jobs instead of
+being killed mid-encode; the remainder stays queued for the next kick or drain. And every kick or
+drain first returns jobs stuck `processing` for 15+ minutes (a runner that died mid-job) to the
+queue, so a crashed run can never strand an image as forever-"running".
+
+The dedicated queue means all three — and the admin **Run now** kick — can only ever execute the
+plugin's own jobs, never your app's.
 
 **Enqueued by:**
 
@@ -94,9 +110,10 @@ ever execute the plugin's own jobs, never your app's.
 
 **Run by:**
 
-- **The default `autoRun` cron** — every 5 minutes, `autoRunLimit: 50` jobs per firing, appended to
-  `config.jobs.autoRun` (composing with your own entries, never replacing them). Tune the cadence
-  and throughput, or opt out with `autoRun: false`:
+- **The default `autoRun` runners** — the cron (appended to `config.jobs.autoRun`, composing with
+  your own entries, never replacing them), the post-upload kick, and the image-traffic drain. Tune
+  the cadence and throughput, or opt out of all three with `autoRun: false` — that means *you* run
+  the jobs:
 
 ```ts
 imagesPlugin({
@@ -116,8 +133,10 @@ imagesPlugin({
   [Payload's Queues docs](https://payloadcms.com/docs/jobs-queue/queues) cover them in full.
 - **`payload images:prewarm --now`** — generates inline as a build/deploy step; needs no runner.
 
-**On serverless, the in-process cron never fires reliably** — schedule the run externally instead,
-e.g. a [Vercel Cron](https://vercel.com/docs/cron-jobs) hitting
+**On serverless, only the cron is dead weight** — the kick and drain still run everything, so no
+wiring is required (the plugin logs a one-line note at init so you know which paths are live). If
+you want scheduled draining on top — e.g. to chew through a big CLI backlog on a site with little
+traffic — point a [Vercel Cron](https://vercel.com/docs/cron-jobs) at
 `/api/payload-jobs/run?queue=images-prewarm`. Cron strings are the standard five-field
 expressions — validate one at [crontab.guru](https://crontab.guru/).
 
@@ -153,15 +172,15 @@ export const prewarmOptions = [
         name: 'strategy',
         type: "'default' | PrewarmStrategyConfig",
         default: "'default'",
-        description: `What a prewarm run does and when it runs. 'default' is the empty config written out: built-ins, a square 1:1 q80 seed at the derived widths, learned profiles, enqueue on upload, and a 5-minute autoRun cron on the images-prewarm queue.`,
+        description: `What a prewarm run does and when it runs. 'default' is the empty config written out: built-ins, a square 1:1 q80 seed at the derived widths, learned profiles, enqueue on upload, and the autoRun runners (5-minute cron + upload kick + traffic drain) on the images-prewarm queue.`,
         options: [
           { name: 'widths', type: "'srcset' | { every: number } | number[]", default: "{ every: 5 } · 'srcset' with an array pixelStep", description: `The width axis seeds and learned profiles warm at when they don't carry their own widths: every Nth reachable width (sampled from the top so the largest width always survives), exactly what srcset emits, or an explicit list. The default adapts to pixelStep: an every-5th skeleton on the numeric grid, the exact ladder for an array.` },
           { name: 'builtIns', type: 'boolean', default: 'true', description: `Warm the three renders every read implies: src, thumbnailURL, placeholderURL.` },
           { name: 'learned', type: 'boolean', default: 'true', description: `Warm learned render profiles at their top 4 observed widths (by hit count).` },
           { name: 'seeds', type: 'RenderProfileSeed[]', default: "[{ aspectRatio: '1:1', quality: 80 }]", description: `Hand-declared learned profiles: the crops your pages declare, warmed before any traffic has taught the system. Each seed takes aspectRatio, fit, quality, and widths. Declaring your own replaces the default square seed; an explicit [] disables seeding.` },
           { name: 'onUpload', type: 'boolean', default: 'true', description: `Enqueue a prewarm job when an image is created, its file replaced, or its focal edited. false is batch-only mode — the admin button, CLI, and cron paths stay.` },
-          { name: 'autoRun', type: 'string | false', default: "'*/5 * * * *'", description: `The in-process runner's cron, wired into config.jobs.autoRun (composing with your entries). false opts out. In-process crons never fire reliably on serverless — schedule the jobs endpoint externally there.` },
-          { name: 'autoRunLimit', type: 'number', default: '50', description: `Max jobs (one image each) the autoRun cron executes per firing — the default works out to 10 images a minute.` },
+          { name: 'autoRun', type: 'string | false', default: "'*/5 * * * *'", description: `Whether the plugin runs its own jobs. The cron drives the in-process runner on long-lived processes (wired into config.jobs.autoRun, composing with your entries); on serverless — where in-process crons never fire — the same knob keeps the post-upload kick and the image-traffic drain alive instead. false turns all three off: you run the jobs yourself.` },
+          { name: 'autoRunLimit', type: 'number', default: '50', description: `Max jobs (one image each) the autoRun cron — and the post-upload kick — executes per firing; the default works out to 10 images a minute on the cron.` },
           { name: 'queue', type: 'string', default: "'images-prewarm'", description: `The Payload Jobs queue prewarm jobs land on. Plugin-owned by default, so the cron and the admin Run-now kick can never execute the app's own jobs.` },
         ],
       },
@@ -198,8 +217,8 @@ imagesPlugin({
         learned: true,    // warm observed render profiles
         seeds: [{ aspectRatio: '1:1', quality: 80 }], // declaring your own replaces this default; [] disables
         onUpload: true,   // enqueue on create / file replace / focal edit
-        autoRun: '*/5 * * * *', // the in-process runner's cron — false opts out (serverless: schedule externally)
-        autoRunLimit: 50, // jobs (images) per firing — up to 10 images a minute
+        autoRun: '*/5 * * * *', // the plugin runs its own jobs: this cron on long-lived processes, upload kicks + traffic drains on serverless — false turns all three off
+        autoRunLimit: 50, // jobs (images) per cron firing / upload kick — up to 10 images a minute on the cron
         queue: 'images-prewarm', // plugin-owned, so the cron only ever runs OUR jobs
       },
       formats: ['webp'],  // +'avif' automatically when transform.preferAvif

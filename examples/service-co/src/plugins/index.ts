@@ -39,8 +39,8 @@ export const seedOptions = { definitions: seedDefinitions, options: { assetsDir:
 
 export const plugins: Plugin[] = [
   // A non-default prewarm strategy: seed the hero crop before any traffic is observed, and slow
-  // the default 5-minute runner down to nightly. autoRun is an in-process cron — on serverless,
-  // opt out and drive the queue from a cron hitting /api/payload-jobs/run?queue=images-prewarm.
+  // the default 5-minute cron down to nightly. autoRun also keeps the serverless runners alive
+  // (post-upload kick + image-traffic drain) — false would turn all three off.
   imagesPlugin({ options: { prewarm: { strategy: { seeds: [{ aspectRatio: '16:9', quality: 80 }], autoRun: '0 3 * * *' } } } }),
   iconsPlugin(),
   muxPlugin(),

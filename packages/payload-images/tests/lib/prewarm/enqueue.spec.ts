@@ -3,7 +3,14 @@ import type { Payload } from 'payload'
 
 import { enqueuePrewarmAfterChange } from '../../../src/hooks/collection/enqueuePrewarm'
 import { enqueuePrewarmJob } from '../../../src/lib/prewarm/enqueue'
+import { kickPrewarmRunner, UPLOAD_KICK_DELAY_MS } from '../../../src/lib/prewarm/kick'
 import { detectVariantIdentityChange } from '../../../src/hooks/collection/variantIdentity'
+
+vi.mock('../../../src/lib/prewarm/kick', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/prewarm/kick')>()),
+  kickPrewarmRunner: vi.fn(),
+}))
+const mockedKick = vi.mocked(kickPrewarmRunner)
 
 const fakeReq = (pending: { id?: string; input?: unknown }[] = []) => {
   const find = vi.fn().mockResolvedValue({ docs: pending })
@@ -88,6 +95,24 @@ describe('enqueuePrewarmAfterChange', () => {
     queue.mockRejectedValueOnce(new Error('no jobs runner'))
     await expect(run({ doc, operation: 'create', req })).resolves.toBe(doc)
     expect(logger.warn).toHaveBeenCalled()
+  })
+
+  it('kicks the queue runner past the coalesce window when kickLimit is set — the serverless run path', async () => {
+    mockedKick.mockClear()
+    const kicking = enqueuePrewarmAfterChange({ taskSlug: 'imagesPrewarm', queue: 'default', kickLimit: 50 })
+    const { req } = fakeReq()
+    await kicking({ doc, operation: 'create', req } as never)
+    expect(mockedKick).toHaveBeenCalledWith(req.payload, { queue: 'default', limit: 50, delayMs: UPLOAD_KICK_DELAY_MS })
+    // No identity change → no enqueue → no kick.
+    await kicking({ doc: { ...doc, alt: 'x' }, previousDoc: doc, operation: 'update', req } as never)
+    expect(mockedKick).toHaveBeenCalledOnce()
+  })
+
+  it('never kicks without kickLimit (autoRun: false — the app runs jobs itself)', async () => {
+    mockedKick.mockClear()
+    const { req } = fakeReq()
+    await run({ doc, operation: 'create', req })
+    expect(mockedKick).not.toHaveBeenCalled()
   })
 })
 

@@ -1,8 +1,8 @@
-import { after } from 'next/server'
 import type { Endpoint, PayloadRequest } from 'payload'
 
 import { isRecord, type EndpointAccess } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
+import { kickPrewarmRunner } from '../../lib/prewarm/kick'
 import { enqueuePrewarmJob } from '../../lib/prewarm/enqueue'
 import { loadPrewarmPlan, type PrewarmSourceDeps } from '../../lib/prewarm/prewarmSource'
 import type { PrewarmLastRun, PrewarmPendingJob, PrewarmPlanItem, PrewarmStatusResponse } from '../../types'
@@ -110,12 +110,7 @@ export const createPrewarmTriggerEndpoint = (cfg: PrewarmEndpointConfig): Endpoi
     // Enqueue is deduped + immediate (no 30s deferral for manual runs); generation is sharp-heavy,
     // so the queue runner is kicked after the response instead of inline.
     await enqueuePrewarmJob(req.payload, { sourceId: id, reason: 'manual', taskSlug: cfg.taskSlug, queue: cfg.queue, waitUntil: false })
-    const kick = (): Promise<unknown> => req.payload.jobs.run({ queue: cfg.queue })
-    try {
-      after(() => void kick().catch(() => {}))
-    } catch {
-      void kick().catch(() => {})
-    }
+    kickPrewarmRunner(req.payload, { queue: cfg.queue })
     return Response.json({ queued: true }, { status: 202 })
   },
 })
