@@ -5,8 +5,11 @@ import { Inter, JetBrains_Mono } from 'next/font/google'
 import { appDescription, appName, siteUrl } from '@/lib/shared'
 import './global.css'
 
-// Inlined at build time — set it in the deploy environment; absent (local dev, forks) no GTM loads.
-const gtmId = process.env.NEXT_PUBLIC_GTM_ID
+// The container id is public by design (it ships in every page's source), so it lives here rather
+// than in env: the CLI stores project env vars as Sensitive, which the build step can't read, and
+// NEXT_PUBLIC_* inlining happens at build. The VERCEL_ENV gate (read while pages prerender on
+// Vercel) keeps local dev/builds and preview deploys tag-free.
+const gtmId = process.env.VERCEL_ENV === 'production' ? 'GTM-KWX458DP' : undefined
 
 const sans = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains' })
