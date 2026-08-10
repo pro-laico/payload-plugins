@@ -161,7 +161,7 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     const marker = (out.custom as { payloadImages?: { prewarm?: unknown } }).payloadImages
     expect(marker?.prewarm).toBeDefined()
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
-    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
+    expect(paths).toContain('get /img/prewarm/:id')
     expect(presetManagerClientProps(out)?.prewarmPath).toBe('/img/prewarm')
   })
 
@@ -174,14 +174,13 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     expect(marker?.prewarm).toBeUndefined()
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
     expect(paths).not.toContain('get /img/prewarm/:id')
-    expect(paths).not.toContain('post /img/prewarm/:id')
     expect(presetManagerClientProps(out)?.prewarmPath).toBeUndefined()
   })
 
-  it('prewarm registers the status + trigger endpoints and hands the panel the path', () => {
+  it('prewarm registers the status endpoint and hands the panel the path', () => {
     const out = run({ options: { prewarm: {} } })
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
-    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
+    expect(paths).toContain('get /img/prewarm/:id')
     expect(presetManagerClientProps(out)?.prewarmPath).toBe('/img/prewarm')
   })
 
@@ -225,7 +224,7 @@ describe('imagesPlugin — prewarm (on by default, `prewarm: false` opts out of 
     expect((out.jobs?.tasks ?? []).map((t) => (t as { slug?: string }).slug)).toContain('imagesPrewarm')
     expect((out.bin ?? []).map((b) => b.key)).toContain('images:prewarm')
     const paths = (out.endpoints ?? []).map((e) => `${e.method} ${e.path}`)
-    expect(paths).toEqual(expect.arrayContaining(['get /img/prewarm/:id', 'post /img/prewarm/:id']))
+    expect(paths).toContain('get /img/prewarm/:id')
   })
 
   it('derives avif from transform.preferAvif and composes autoRun over existing shapes', async () => {

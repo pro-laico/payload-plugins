@@ -147,7 +147,6 @@ export const purgeBtn = (busy: boolean): React.CSSProperties => ({
   color: 'var(--theme-error-500, #d33)',
   opacity: busy ? 0.6 : 1,
 })
-export const prewarmBtn = (busy: boolean): React.CSSProperties => ({ ...purgeBtn(busy), color: 'var(--theme-elevation-700)' })
 export const headerBtns: React.CSSProperties = { display: 'flex', gap: '0.35rem', justifySelf: 'stretch', justifyContent: 'center' }
 export const limitWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }
 

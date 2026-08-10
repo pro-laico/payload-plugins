@@ -24,7 +24,7 @@ const deps = {
   // Array-pixelStep constraints: an explicit ladder keeps the 'srcset' width axis small and exact.
   constraints: { ...DEFAULT_CONSTRAINTS, widthLadder: DEFAULT_WIDTH_LADDER },
 }
-const cfg = { deps, taskSlug: 'imagesPrewarm', queue: 'default' }
+const cfg = { deps, taskSlug: 'imagesPrewarm' }
 
 type JobDoc = Record<string, unknown>
 
@@ -42,13 +42,14 @@ const fakeReq = (opts: { user?: unknown; id?: string; source?: Record<string, un
     }
     return Promise.resolve({ docs: [], hasNextPage: false })
   })
-  const payload = { find, findByID, logger: { warn: vi.fn(), error: vi.fn() } } as unknown as Payload
+  const update = vi.fn().mockResolvedValue({})
+  const payload = { find, findByID, update, logger: { warn: vi.fn(), error: vi.fn() } } as unknown as Payload
   const req = {
     payload,
     user: 'user' in opts ? opts.user : { id: 'admin' },
     routeParams: { id: opts.id ?? 'img1' },
   } as unknown as PayloadRequest
-  return { req, find, findByID }
+  return { req, find, findByID, update }
 }
 
 const run = async (opts?: Parameters<typeof fakeReq>[0]): Promise<{ status: number; body: PrewarmStatusResponse }> => {
@@ -105,10 +106,20 @@ describe('createPrewarmStatusEndpoint', () => {
     expect(body.job).toMatchObject({ id: 2, processing: false, waitUntil: '2026-07-14T12:00:00.000Z' })
   })
 
-  it('maps processing: true to running', async () => {
-    const { body } = await run({ jobs: [{ id: 2, input: { sourceId: 'img1' }, processing: true }] })
+  it('maps processing: true to running (a fresh heartbeat means the runner is alive)', async () => {
+    const { body } = await run({ jobs: [{ id: 2, input: { sourceId: 'img1' }, processing: true, updatedAt: new Date().toISOString() }] })
     expect(body.status).toBe('running')
     expect(body.job).toMatchObject({ processing: true })
+  })
+
+  it('sweeps a stale processing job (dead runner) back to runnable and reports it queued', async () => {
+    const staleAt = new Date(Date.now() - 6 * 60_000).toISOString()
+    const { req, update } = fakeReq({ jobs: [{ id: 2, input: { sourceId: 'img1' }, processing: true, updatedAt: staleAt }] })
+    const res = await createPrewarmStatusEndpoint(cfg).handler(req)
+    const body = (await res.json()) as PrewarmStatusResponse
+    expect(body.status).toBe('queued')
+    expect(body.job).toMatchObject({ id: 2, processing: false })
+    expect(update).toHaveBeenCalledWith({ collection: 'payload-jobs', id: 2, data: { processing: false }, depth: 0 })
   })
 
   it('extracts lastRun counters from the succeeded log entry', async () => {

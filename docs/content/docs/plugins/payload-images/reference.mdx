@@ -234,7 +234,6 @@ access is enforced on top of both. See [Gating endpoints](../conventions#gating-
 | `POST /api/img/purge/:id` | Purge this image's cached variants (the **Preset manager** panel's purge button posts here). |
 | `GET /api/img/presets/:id` | Which presets exist for this image, each mapped to its cache key and cached variant. |
 | `GET /api/img/prewarm/:id` | Prewarm plan and job status (pending job, last run). Registered only while `options.prewarm` is on. |
-| `POST /api/img/prewarm/:id` | Enqueue and kick a prewarm job for this image (`202 { queued: true }`). Registered only while `options.prewarm` is on. |
 
 ## Exports
 

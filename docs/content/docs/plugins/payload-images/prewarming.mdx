@@ -93,11 +93,11 @@ The request-scoped runners are budgeted and self-healing. A kick pulls jobs one 
 stops starting new ones 290 seconds after it was scheduled — just under the tightest serverless
 function ceiling (Vercel Hobby's 300s) — so a heavy batch ends cleanly between jobs instead of
 being killed mid-encode; the remainder stays queued for the next kick or drain. And every kick or
-drain first returns jobs stuck `processing` for 15+ minutes (a runner that died mid-job) to the
-queue, so a crashed run can never strand an image as forever-"running".
+drain first returns jobs stuck `processing` for 5+ minutes without a heartbeat (a runner that died
+mid-job) to the queue — as does the admin panel's status poll — so a crashed run can never strand
+an image as forever-"running".
 
-The dedicated queue means all three — and the admin **Run now** kick — can only ever execute the
-plugin's own jobs, never your app's.
+The dedicated queue means all three can only ever execute the plugin's own jobs, never your app's.
 
 **Enqueued by:**
 
@@ -105,7 +105,6 @@ plugin's own jobs, never your app's.
   the purge triggers, so invalidation and re-warming can't drift apart. A 30-second delay coalesces
   rapid saves and duplicates dedupe. `onUpload: false` is batch-only mode, for imports that
   shouldn't fan out one job per image.
-- **The admin Prewarm button** on any image — enqueues immediately and kicks the runner.
 - **The CLI**, for a whole library: `payload images:prewarm` (cap a run with `--limit 200`).
 
 **Run by:**

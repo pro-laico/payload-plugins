@@ -6,6 +6,7 @@ import { toast, useAllFormFields, useConfig, useDocumentInfo, useField, useForm 
 
 import { DEFAULT_CONSTRAINTS, ENCODABLE_FORMATS, FITS } from '../../../lib/transform/params'
 import type { PresetEntry, PresetManagerProps, PresetSpec } from '../../../types'
+import { ratioLabel } from './ratio'
 import { buildTickModel } from './tickModel'
 import { VariantTicks } from './variantTicks'
 import {
@@ -49,7 +50,6 @@ import {
   note,
   offStyle,
   pagerBtn,
-  prewarmBtn,
   purgeBtn,
   row,
   table,
@@ -82,7 +82,6 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
   const [axis, setAxis] = useState<VariantAxis | null>(null)
   const [presetMatches, setPresetMatches] = useState<Map<string, PresetMatch> | null>(null)
   const [prewarm, setPrewarm] = useState<PrewarmView | null>(null)
-  const [prewarmBusy, setPrewarmBusy] = useState(false)
   const [pollTick, setPollTick] = useState(0)
   // Set while a run is (or was just) in flight — an active→idle transition means it finished.
   const prewarmActiveRef = useRef(false)
@@ -266,23 +265,6 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
     }
   }
 
-  const triggerPrewarm = async (): Promise<void> => {
-    if (!prewarmPath || id == null || prewarmBusy) return
-    setPrewarmBusy(true)
-    try {
-      const res = await fetch(`${apiRoute}${prewarmPath}/${String(id)}`, { method: 'POST', credentials: 'include' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      toast.success('Prewarm queued.')
-      // Covers the fast-job race: if the run finishes before the first poll, the idle response still refreshes.
-      prewarmActiveRef.current = true
-      setPollTick((n) => n + 1)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to queue the prewarm.')
-    } finally {
-      setPrewarmBusy(false)
-    }
-  }
-
   const deleteVariant = async (v: VariantRow): Promise<void> => {
     try {
       const res = await fetch(`${apiRoute}/${variantSlug}/${String(v.id)}`, { method: 'DELETE', credentials: 'include' })
@@ -412,6 +394,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         {
           width: v.width,
           height: v.height,
+          aspectRatio: ratioLabel(v.width, v.height),
           fit: v.fit && isFit(v.fit) ? v.fit : undefined,
           quality: v.quality,
           format: v.format && isFormat(v.format) ? v.format : undefined,
@@ -439,6 +422,7 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
         {
           width: p.w,
           height: p.h,
+          aspectRatio: ratioLabel(p.w, p.h),
           fit: p.fit && isFit(p.fit) ? p.fit : undefined,
           quality: p.quality,
           format: p.format && isFormat(p.format) ? p.format : undefined,
@@ -488,7 +472,6 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
   const listedVariants = (variants?.docs ?? []).filter((v) => !presetVariantIds.has(String(v.id)))
   const prewarmStatus = prewarm?.status ?? 'idle'
   const prewarmActive = prewarmStatus === 'queued' || prewarmStatus === 'running'
-  const showPrewarmBtn = !!prewarmPath && id != null
 
   // The strip and the table's ghost rows share one plan expression, so they agree through the
   // finished-run swap window. Constraints fall back to the defaults for custom callers that
@@ -550,21 +533,6 @@ export const PresetManager: React.FC<PresetManagerProps> = ({
             </span>
           ))}
           <span style={headerBtns}>
-            {showPrewarmBtn && (
-              <button
-                type="button"
-                disabled={prewarmBusy || prewarmStatus === 'running'}
-                style={prewarmBtn(prewarmBusy || prewarmStatus === 'running')}
-                title={
-                  prewarmStatus === 'queued'
-                    ? 'A prewarm is queued but nothing is scheduled to run it — run it now.'
-                    : 'Queue a prewarm run now — generates the planned variants below without waiting for traffic.'
-                }
-                onClick={() => void triggerPrewarm()}
-              >
-                {prewarmStatus === 'running' ? 'Warming…' : prewarmStatus === 'queued' ? 'Run now' : 'Prewarm'}
-              </button>
-            )}
             {id != null && (variants?.totalDocs ?? 0) > 0 && (
               <button
                 type="button"

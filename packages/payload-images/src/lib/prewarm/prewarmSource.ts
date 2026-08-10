@@ -85,7 +85,14 @@ export const loadPrewarmPlan = async (payload: Payload, sourceId: string | numbe
   return { ok: true, source, targets, truncated }
 }
 
-export const prewarmSource = async (payload: Payload, sourceId: string | number, deps: PrewarmSourceDeps): Promise<PrewarmSourceResult> => {
+export const prewarmSource = async (
+  payload: Payload,
+  sourceId: string | number,
+  deps: PrewarmSourceDeps,
+  /** Called between targets — the job runner threads a throttled heartbeat here so a live run's
+   * `updatedAt` keeps moving and the stale-processing sweep never mistakes it for a dead one. */
+  onProgress?: () => Promise<void>,
+): Promise<PrewarmSourceResult> => {
   const plan = await loadPrewarmPlan(payload, sourceId, deps)
   if (!plan.ok) return { targets: 0, generated: 0, failed: 0, skipped: plan.skipped }
   const { source, targets } = plan
@@ -102,6 +109,7 @@ export const prewarmSource = async (payload: Payload, sourceId: string | number,
   let generated = 0
   let failed = 0
   for (const target of targets) {
+    await onProgress?.()
     try {
       const res = await getOrCreateVariantBytes({
         payload,

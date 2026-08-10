@@ -3,7 +3,7 @@ import type { CollectionConfig, Config, Plugin } from 'payload'
 import { resolveOptions } from './options'
 import { createPrewarmTask } from './jobs/prewarmTask'
 import { createPurgeEndpoint } from './endpoints/purge'
-import { createPrewarmStatusEndpoint, createPrewarmTriggerEndpoint } from './endpoints/prewarm'
+import { createPrewarmStatusEndpoint } from './endpoints/prewarm'
 import { createPresetStatusEndpoint } from './endpoints/presets'
 import { assertNoFieldCollisions, binScriptPath, mergeCollection } from './_kit'
 import { loadSharp } from './lib/transform/sharpInstance'
@@ -104,7 +104,7 @@ export const imagesPlugin =
       apiRoute,
       presetsPath,
       // `onUpload: false` drops only the enqueue hook — endpoints, task, CLI, and panel stay,
-      // so batch-only setups still warm via Run now / images:prewarm / a cron. kickLimit rides
+      // so batch-only setups still warm via images:prewarm / a cron. kickLimit rides
       // autoRun: one knob for "the plugin runs jobs itself" — cron on long-lived processes, the
       // post-response upload kick everywhere else (serverless, where the cron never fires).
       prewarm:
@@ -140,20 +140,7 @@ export const imagesPlugin =
       createPurgeEndpoint({ variantSlug, sourceSlug, access: o.options.access.manage }),
       createPresetStatusEndpoint({ sourceSlug, variantSlug, templates: presetTemplates, constraints, access: o.options.access.manage }),
       ...(prewarm && prewarmDeps
-        ? [
-            createPrewarmStatusEndpoint({
-              deps: prewarmDeps,
-              taskSlug: prewarm.taskSlug,
-              queue: prewarm.strategy.queue,
-              access: o.options.access.manage,
-            }),
-            createPrewarmTriggerEndpoint({
-              deps: prewarmDeps,
-              taskSlug: prewarm.taskSlug,
-              queue: prewarm.strategy.queue,
-              access: o.options.access.manage,
-            }),
-          ]
+        ? [createPrewarmStatusEndpoint({ deps: prewarmDeps, taskSlug: prewarm.taskSlug, access: o.options.access.manage })]
         : []),
       createTransformEndpoint(
         {

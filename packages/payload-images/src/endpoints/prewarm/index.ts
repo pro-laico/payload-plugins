@@ -2,20 +2,26 @@ import type { Endpoint, PayloadRequest } from 'payload'
 
 import { isRecord, type EndpointAccess } from '../../_kit'
 import { guardSourceRequest } from '../guardSource'
-import { kickPrewarmRunner } from '../../lib/prewarm/kick'
-import { enqueuePrewarmJob } from '../../lib/prewarm/enqueue'
+import { STALE_PROCESSING_MS } from '../../lib/prewarm/kick'
 import { loadPrewarmPlan, type PrewarmSourceDeps } from '../../lib/prewarm/prewarmSource'
 import type { PrewarmLastRun, PrewarmPendingJob, PrewarmPlanItem, PrewarmStatusResponse } from '../../types'
 
 export interface PrewarmEndpointConfig {
   deps: PrewarmSourceDeps
   taskSlug: string
-  queue: string
   access?: EndpointAccess
 }
 
 // The plugin can't name the app-generated payload-jobs type; narrow the fields it reads.
-type JobRow = { id: string | number; input?: unknown; processing?: unknown; waitUntil?: unknown; completedAt?: unknown; log?: unknown }
+type JobRow = {
+  id: string | number
+  input?: unknown
+  processing?: unknown
+  waitUntil?: unknown
+  updatedAt?: unknown
+  completedAt?: unknown
+  log?: unknown
+}
 const isJobRow = (v: unknown): v is JobRow => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number')
 const matchesSource = (job: JobRow, sourceId: string): boolean =>
   isRecord(job.input) && 'sourceId' in job.input && String(job.input.sourceId) === sourceId
@@ -54,7 +60,7 @@ export const createPrewarmStatusEndpoint = (cfg: PrewarmEndpointConfig): Endpoin
         req.payload.find({
           collection: 'payload-jobs',
           where: { and: [{ taskSlug: { equals: cfg.taskSlug } }, { completedAt: { exists: false } }, { hasError: { not_equals: true } }] },
-          select: { input: true, processing: true, waitUntil: true },
+          select: { input: true, processing: true, waitUntil: true, updatedAt: true },
           limit: 100,
           depth: 0,
         }),
@@ -73,10 +79,22 @@ export const createPrewarmStatusEndpoint = (cfg: PrewarmEndpointConfig): Endpoin
         : []
 
       const active = pending.docs.filter(isJobRow).find((j) => matchesSource(j, id))
+      // A processing job whose runner died (dev-server restart, killed function) stays
+      // `processing: true` forever — and would pin the panel on "Prewarm running…". A live run
+      // heartbeats `updatedAt` between variants, so one this stale is dead: reset it here (this
+      // endpoint is the poll loop, so the self-heal needs no other traffic) and report it queued
+      // — the next kick, drain, or cron picks it back up.
+      const stale =
+        active?.processing === true && typeof active.updatedAt === 'string' && Date.parse(active.updatedAt) < Date.now() - STALE_PROCESSING_MS
+      if (stale && active) {
+        try {
+          await req.payload.update({ collection: 'payload-jobs', id: active.id, data: { processing: false }, depth: 0 })
+        } catch {}
+      }
       const job: PrewarmPendingJob | undefined = active
         ? {
             id: active.id,
-            processing: active.processing === true,
+            processing: active.processing === true && !stale,
             ...(typeof active.waitUntil === 'string' ? { waitUntil: active.waitUntil } : {}),
           }
         : undefined
@@ -96,21 +114,5 @@ export const createPrewarmStatusEndpoint = (cfg: PrewarmEndpointConfig): Endpoin
       req.payload.logger.error(`[payload-images] prewarm status failed for ${id}: ${String(err)}`)
       return Response.json({ error: 'Prewarm status failed' }, { status: 500 })
     }
-  },
-})
-
-export const createPrewarmTriggerEndpoint = (cfg: PrewarmEndpointConfig): Endpoint => ({
-  path: '/img/prewarm/:id',
-  method: 'post',
-  handler: async (req: PayloadRequest): Promise<Response> => {
-    const guarded = await guardSourceRequest(req, cfg.deps.sourceSlug, cfg.access)
-    if (guarded instanceof Response) return guarded
-    const { id } = guarded
-
-    // Enqueue is deduped + immediate (no 30s deferral for manual runs); generation is sharp-heavy,
-    // so the queue runner is kicked after the response instead of inline.
-    await enqueuePrewarmJob(req.payload, { sourceId: id, reason: 'manual', taskSlug: cfg.taskSlug, queue: cfg.queue, waitUntil: false })
-    kickPrewarmRunner(req.payload, { queue: cfg.queue })
-    return Response.json({ queued: true }, { status: 202 })
   },
 })

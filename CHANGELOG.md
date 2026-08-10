@@ -7,6 +7,26 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING (payload-images): the admin Prewarm button and `POST /api/img/prewarm/:id` are gone.**
+  Prewarming runs itself — post-save kicks, image-traffic drains, and the cron cover every path the
+  button did, so a manual trigger was dead weight (and could wedge on "Warming…" behind a dead
+  runner). The panel keeps the live status line, planned ghost rows, and tick strip. **Migrate by**
+  doing nothing in the admin; if you called the POST endpoint directly, use `payload
+  images:prewarm` or point a cron at `/api/payload-jobs/run?queue=images-prewarm`.
+
+### Fixed
+
+- **payload-images: a dead prewarm runner can no longer report as running forever.** A run killed
+  mid-job (dev-server restart, recycled serverless instance) left its job `processing: true`, which
+  the panel showed as an endless "Prewarm running…". Live runs now heartbeat the job doc between
+  variants, the stale threshold drops from 15 to 5 minutes, and the panel's status poll sweeps a
+  stale job back to runnable itself instead of waiting on the next kick.
+- **payload-images: the panel's Ratio column now has values for generated variants.** It was only
+  ever filled for declared presets; cached variants and planned ghost rows now derive it from their
+  actual pixels, snapping rounded crops back to the intended ratio (800×533 shows `3:2`).
+
 ## [0.7.1] - 2026-08-06
 
 ### Fixed

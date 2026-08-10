@@ -13,12 +13,13 @@ export const UPLOAD_KICK_DELAY_MS = ENQUEUE_DELAY_MS + 1_000
  * for the next kick, drain, or cron. */
 export const KICK_TIME_BUDGET_MS = 290_000
 
-/** A `processing: true` job whose runner died (function hit maxDuration, instance recycled) would
- * otherwise look "running" forever and never retry. The claim bumps `updatedAt` and nothing does
- * afterward, so any processing job untouched this long is declared dead and made runnable again.
- * Comfortably past Vercel's 800s ceiling for a legitimate run; the task is idempotent, so a rare
- * false positive only costs duplicate work. */
-export const STALE_PROCESSING_MS = 15 * 60_000
+/** A `processing: true` job whose runner died (function hit maxDuration, instance recycled, dev
+ * server restarted) would otherwise look "running" forever and never retry. A live run heartbeats
+ * `updatedAt` between variants (see the prewarm task), so any processing job untouched this long is
+ * declared dead and made runnable again. Generous slack over the heartbeat interval — the gap only
+ * has to outlast one variant encode, not the whole run; the task is idempotent, so a rare false
+ * positive only costs duplicate work. */
+export const STALE_PROCESSING_MS = 5 * 60_000
 
 export interface KickPrewarmArgs {
   queue: string
