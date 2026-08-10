@@ -12,6 +12,7 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@next/third-parties": "^16.3.0",
     "@xyflow/react": "12.11.1",
     "fumadocs-core": "^16.11.5",
     "fumadocs-mdx": "^15.2.0",
