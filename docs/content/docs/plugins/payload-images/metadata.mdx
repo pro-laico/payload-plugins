@@ -94,18 +94,18 @@ The `context` keys — and their REST-header equivalents on a `X-Blurhash` read 
 | `blur.quality` | `q=` | `xs` `sm` `md` `lg` `xl` `2xl` `3xl` — default `sm` | which placeholder tier to render |
 | `image.aspectRatio` | ratio prefix (e.g. `16:9`) | `W:H` | crop the placeholder to this ratio |
 
-A read that declares a blur with no tier defaults to `sm`. A read that declares no blur gets `null`
-— no unasked-for data URI bloating admin reads, API responses, or the HTML of images too small to
-need one. A doc with no stored tiers renders without a placeholder. The field's return type is
+A read that declares a blur with no tier defaults to `sm`, as does a read that declares nothing.
+Only `context: { blur: false }` returns `null` — for reads on surfaces that would never paint a
+placeholder. A doc with no stored tiers renders without a placeholder. The field's return type is
 `string | null`.
 
 export const blurNodes = [
   { id: 'upload', kind: 'start', label: 'Upload decodes once', detail: 'one Sharp pass — placeholders, palette, alpha flags, saliency focal', x: 300, y: 0 },
   { id: 'ladder', kind: 'store', label: 'Tier ladder stored on the doc', detail: 'xs–xl blurhash (12–166 chars), 2xl/3xl micro-webp (~0.5–3 KB) — no files', x: 300, y: 150 },
   { id: 'read', label: 'An image doc is read', detail: 'REST, GraphQL, Local API, or population', x: 300, y: 380 },
-  { id: 'declared', kind: 'check', label: 'Blur declared on the read?', detail: "context: { blur: { quality } } / X-Blurhash — or imageFor(…).blur('sm')", x: 300, y: 530 },
+  { id: 'declared', kind: 'check', label: 'Blur opted out on the read?', detail: 'context: { blur: false } — everything else gets a tier (sm by default)', x: 300, y: 530 },
   { id: 'crop', label: 'Cropped at the declared tier', detail: 'blurhash: coefficient math (µs) · webp: ~1 KB Sharp decode (ms) — the same focal crop as the endpoint', x: 40, y: 710 },
-  { id: 'none', kind: 'result', label: 'placeholder is null', detail: 'no unasked-for data URI bloating reads', x: 560, y: 710 },
+  { id: 'none', kind: 'result', label: 'placeholder is null', detail: 'blur: false — surfaces that never paint one', x: 560, y: 710 },
   { id: 'paint', kind: 'result', label: 'A finished data URI paints instantly', detail: '<ResponsiveImage> sets it as background-image — zero network, covered when the real pixels load', x: 40, y: 900 },
 ]
 
@@ -113,8 +113,8 @@ export const blurEdges = [
   { from: 'upload', to: 'ladder' },
   { from: 'ladder', to: 'read', label: 'on every read', dashed: true },
   { from: 'read', to: 'declared' },
-  { from: 'declared', to: 'crop', label: 'yes', fromSide: 'left' },
-  { from: 'declared', to: 'none', label: 'no', fromSide: 'right' },
+  { from: 'declared', to: 'crop', label: 'no', fromSide: 'left' },
+  { from: 'declared', to: 'none', label: 'yes', fromSide: 'right' },
   { from: 'crop', to: 'paint' },
 ]
 
