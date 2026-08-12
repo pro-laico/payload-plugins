@@ -7,6 +7,21 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-12
+
+Prewarming now tends itself — the manual admin button is gone (the one breaking change, with a
+do-nothing migration for most installs) and dead runners self-heal. Every image read also gets a
+blur placeholder by default: the `placeholder` virtual returns the near-free `sm` tier instead of
+`null`, so blur-up rendering works out of the box.
+
+### Changed
+
+- **payload-images: the `placeholder` virtual defaults to the `sm` tier instead of `null`.** A read
+  that declares nothing now gets a finished, focal-cropped `sm` blurhash data URI (~28 chars of
+  source, microseconds to crop); an explicit `context.blur` / `X-Blurhash` still picks its own
+  tier, and the new `context: { blur: false }` opts a read out entirely (for surfaces that never
+  paint one).
+
 ### Removed
 
 - **BREAKING (payload-images): the admin Prewarm button and `POST /api/img/prewarm/:id` are gone.**
@@ -26,6 +41,10 @@ packages share one lockstep version.
 - **payload-images: the panel's Ratio column now has values for generated variants.** It was only
   ever filled for declared presets; cached variants and planned ghost rows now derive it from their
   actual pixels, snapping rounded crops back to the intended ratio (800×533 shows `3:2`).
+- **payload-revalidate: the `cacheIds` carrying-content warning no longer fires falsely on
+  scope-covered fields.** A scoped list busts when its declared fields change, so sitemap-style
+  projections (`slug`, `fullPath`, `updatedAt`) that stay inside the declared scope are legitimate
+  to carry — the dev warning now only names fields the scope does not cover.
 
 ## [0.7.1] - 2026-08-06
 
