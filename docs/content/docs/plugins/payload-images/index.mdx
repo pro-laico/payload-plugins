@@ -30,7 +30,7 @@ path — the endpoint *is* the plugin.
 - **Focal-point cropping, subject-aware by default:** uploads get a saliency-detected focal point when the analysis finds a subject and the editor hasn't set one; refine it once and [every crop, at any ratio, stays centered on it](/docs/plugins/payload-images/metadata#focal-point-hotspot--crop).
 - **Modern formats, negotiated:** AVIF / WebP served to browsers that accept them, with a graceful fallback.
 - **One component, one helper:** [`imageFor` fetches a render-ready doc, `<ResponsiveImage>` paints it](/docs/plugins/payload-images/rendering) — srcset, placeholder, and crop included, zero client JS.
-- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); a read that opts in (`.blur(tier)`) gets a finished placeholder focal-cropped to the exact ratio being rendered.
+- **Instant placeholders, cropped like the image:** [a ladder of quality tiers stored at upload](/docs/plugins/payload-images/metadata); every read gets a finished placeholder focal-cropped to the exact ratio being rendered — `sm` by default, `.blur(tier)` to pick, `blur: false` to opt out.
 - **Self-busting cache, smart prewarming, instant fallbacks:** URLs refresh themselves on change, [prewarming](/docs/plugins/payload-images/prewarming) generates what your site actually serves before anyone asks, and a cold request serves a [nearby stand-in instantly](/docs/plugins/payload-images/caching#nearby-quality-fallback).
 
 ![Sample images rendered in the frontend by the images-sandbox example repo](/screenshots/images-front-end.png)

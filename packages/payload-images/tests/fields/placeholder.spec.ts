@@ -18,14 +18,19 @@ const run = (context?: Record<string, unknown>) =>
     req: context ? { context } : {},
   })
 
-describe('placeholder afterRead — blur is opt-in', () => {
-  it('returns null for a read that declared nothing (no unrequested data-URI bloat)', async () => {
-    expect(await run()).toBeNull()
+describe('placeholder afterRead — sm by default, blur: false opts out', () => {
+  it('returns the default sm data URI for a read that declared nothing', async () => {
+    expect(await run()).toMatch(/^data:image\/png;base64,/)
   })
 
-  it('returns null for a declared image render without a blur intent', async () => {
-    expect(await run({ image: {} })).toBeNull()
-    expect(await run({ image: { aspectRatio: '1:1' } })).toBeNull()
+  it('returns the default sm data URI for a declared image render without a blur intent', async () => {
+    expect(await run({ image: {} })).toMatch(/^data:image\/png;base64,/)
+    expect(await run({ image: { aspectRatio: '1:1' } })).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('returns null when the read opts out with blur: false', async () => {
+    expect(await run({ blur: false })).toBeNull()
+    expect(await run({ image: { aspectRatio: '1:1' }, blur: false })).toBeNull()
   })
 
   it('returns a finished data URI for a declared blur tier alone', async () => {

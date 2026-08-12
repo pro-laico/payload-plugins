@@ -66,8 +66,9 @@ read, not per project.
 On read, the virtual `placeholder` field does **all the placeholder work in the field hook**, next
 to the data. Consumers select one field and paint what they get back.
 
-The field is **opt-in**. Declare a blur on the read and a **finished, focal-cropped data URI**
-comes back: blurhash tiers crop in coefficient space (pure string math, microseconds); webp tiers
+The field is **on by default**: an undeclared read gets the `sm` tier, cropped to any declared
+render ratio, and `context: { blur: false }` opts a read out entirely. Declaring a blur picks the
+tier: blurhash tiers crop in coefficient space (pure string math, microseconds); webp tiers
 crop the stored micro-image (a ~1 KB Sharp decode, milliseconds). It's the same crop the transform
 endpoint makes, applied to the placeholder — no files, no extra cache rows.
 

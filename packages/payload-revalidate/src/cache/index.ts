@@ -56,10 +56,15 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
     const name = options.label ?? `ids:${collection}${options.list ? `:${options.list}` : ''}`
 
     const uploadMeta = ['filename', 'filesize', 'mimeType', 'width', 'height', 'focalX', 'focalY', 'url', 'thumbnailURL', 'sizes']
+    // Fields the read's declared list scope covers are NOT stale content — the scoped list tag
+    // busts when they change, so a scoped list may safely carry them (sitemap-style projections).
+    const scopeConfig = options.list ? marker?.options.collections?.[collection] : undefined
+    const scopeFields =
+      scopeConfig && scopeConfig !== false ? (scopeConfig.lists?.[options.list ?? ''] ?? []).map((f) => f.split('.')[0] as string) : []
     const contentKeys = items
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .flatMap((doc) => Object.keys(doc))
-      .filter((key) => !['id', 'createdAt', 'updatedAt', '_status', ...uploadMeta].includes(key))
+      .filter((key) => !['id', 'createdAt', 'updatedAt', '_status', ...uploadMeta, ...scopeFields].includes(key))
     if (contentKeys.length)
       warnOnce(
         `content:${name}`,
