@@ -166,16 +166,16 @@ describe('payload-images wiring', () => {
     expect(doc.focalX).toBe(40)
     expect(doc.focalY).toBe(60)
 
-    // Blur is opt-in: a read that requests none gets null — no unasked-for data-URI weight.
-    expect(doc.placeholder).toBeNull()
+    // Blur is on by default: an undeclared read gets the sm tier as a finished data URI.
+    expect(doc.placeholder).toMatch(/^data:image\/png;base64,/)
 
-    // An image intent alone still doesn't request one; only context.blur does.
-    const imageOnly = (await payload.findByID({
+    // context: { blur: false } is the opt-out — no unasked-for data-URI weight when declined.
+    const optedOut = (await payload.findByID({
       collection: 'images',
       id: sourceId,
-      context: { image: { aspectRatio: '16:9' } },
+      context: { image: { aspectRatio: '16:9' }, blur: false },
     })) as { placeholder?: string | null }
-    expect(imageOnly.placeholder).toBeNull()
+    expect(optedOut.placeholder).toBeNull()
 
     // Request the blur → a FINISHED placeholder data URI, cropped to the declared ratio in the
     // field hook — no variant rows, nothing written.

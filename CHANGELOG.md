@@ -7,11 +7,11 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
-## [0.8.1] - 2026-08-12
+## [0.8.2] - 2026-08-12
 
 Prewarming now tends itself, and every image read gets a blur placeholder by default. One breaking
 change: the manual Prewarm button is gone — most installs migrate by doing nothing. (Replaces
-`v0.8.0`, whose publish run failed before reaching npm.)
+`v0.8.0`/`v0.8.1`, whose publish runs failed before reaching npm.)
 
 ### Changed
 
