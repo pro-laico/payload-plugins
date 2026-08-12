@@ -7,44 +7,33 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-08-12
+## [0.8.1] - 2026-08-12
 
-Prewarming now tends itself — the manual admin button is gone (the one breaking change, with a
-do-nothing migration for most installs) and dead runners self-heal. Every image read also gets a
-blur placeholder by default: the `placeholder` virtual returns the near-free `sm` tier instead of
-`null`, so blur-up rendering works out of the box.
+Prewarming now tends itself, and every image read gets a blur placeholder by default. One breaking
+change: the manual Prewarm button is gone — most installs migrate by doing nothing. (Replaces
+`v0.8.0`, whose publish run failed before reaching npm.)
 
 ### Changed
 
-- **payload-images: the `placeholder` virtual defaults to the `sm` tier instead of `null`.** A read
-  that declares nothing now gets a finished, focal-cropped `sm` blurhash data URI (~28 chars of
-  source, microseconds to crop); an explicit `context.blur` / `X-Blurhash` still picks its own
-  tier, and the new `context: { blur: false }` opts a read out entirely (for surfaces that never
-  paint one).
+- **payload-images: the `placeholder` virtual defaults to the `sm` tier instead of `null`.** An
+  explicit `context.blur` / `X-Blurhash` still picks its own tier; `context: { blur: false }` opts
+  a read out.
 
 ### Removed
 
-- **BREAKING (payload-images): the admin Prewarm button and `POST /api/img/prewarm/:id` are gone.**
-  Prewarming runs itself — post-save kicks, image-traffic drains, and the cron cover every path the
-  button did, so a manual trigger was dead weight (and could wedge on "Warming…" behind a dead
-  runner). The panel keeps the live status line, planned ghost rows, and tick strip. **Migrate by**
-  doing nothing in the admin; if you called the POST endpoint directly, use `payload
-  images:prewarm` or point a cron at `/api/payload-jobs/run?queue=images-prewarm`.
+- **BREAKING (payload-images): the admin Prewarm button and `POST /api/img/prewarm/:id` are gone**
+  — prewarming runs itself, so most installs migrate by doing nothing. **Migrate by** using
+  `payload images:prewarm` or the `/api/payload-jobs/run?queue=images-prewarm` cron if you called
+  the endpoint directly.
 
 ### Fixed
 
-- **payload-images: a dead prewarm runner can no longer report as running forever.** A run killed
-  mid-job (dev-server restart, recycled serverless instance) left its job `processing: true`, which
-  the panel showed as an endless "Prewarm running…". Live runs now heartbeat the job doc between
-  variants, the stale threshold drops from 15 to 5 minutes, and the panel's status poll sweeps a
-  stale job back to runnable itself instead of waiting on the next kick.
-- **payload-images: the panel's Ratio column now has values for generated variants.** It was only
-  ever filled for declared presets; cached variants and planned ghost rows now derive it from their
-  actual pixels, snapping rounded crops back to the intended ratio (800×533 shows `3:2`).
-- **payload-revalidate: the `cacheIds` carrying-content warning no longer fires falsely on
-  scope-covered fields.** A scoped list busts when its declared fields change, so sitemap-style
-  projections (`slug`, `fullPath`, `updatedAt`) that stay inside the declared scope are legitimate
-  to carry — the dev warning now only names fields the scope does not cover.
+- **payload-images: a dead prewarm runner can no longer report as running forever** — runs
+  heartbeat their job, and stale jobs sweep back to runnable after 5 minutes.
+- **payload-images: the panel's Ratio column is now filled for generated variants**, not just
+  declared presets.
+- **payload-revalidate: the `cacheIds` carrying-content warning no longer fires on fields covered
+  by the read's declared list scope** (sitemap-style projections such as `slug` or `updatedAt`).
 
 ## [0.7.1] - 2026-08-06
 
