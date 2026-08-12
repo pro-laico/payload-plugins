@@ -35,5 +35,5 @@ export const readRequest = (
   if (blur.declared) return { declared: true, ar: readImageIntent(req).aspectRatio, quality: blur.quality, format: blur.format }
   const header = req?.headers?.get?.('x-blurhash')
   if (header) return { declared: true, ...parseHeader(header) }
-  return { declared: true, ar: readImageIntent(req).aspectRatio, quality: 'sm' }
+  return { declared: true, implicit: true, ar: readImageIntent(req).aspectRatio, quality: 'sm' }
 }

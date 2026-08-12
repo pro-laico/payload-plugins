@@ -33,6 +33,15 @@ describe('placeholder afterRead — sm by default, blur: false opts out', () => 
     expect(await run({ image: { aspectRatio: '1:1' }, blur: false })).toBeNull()
   })
 
+  it('skips the implicit default for alpha/SVG docs — a transparent image never covers its placeholder', async () => {
+    const runAlpha = (data: Record<string, unknown>, context?: Record<string, unknown>) =>
+      (placeholderAfterRead as (args: { data: unknown; req: unknown }) => Promise<string | null>)({ data, req: context ? { context } : {} })
+    expect(await runAlpha({ ...doc, hasAlpha: true })).toBeNull()
+    expect(await runAlpha({ ...doc, mimeType: 'image/svg+xml' })).toBeNull()
+    // An explicit blur request is still honored on an alpha doc.
+    expect(await runAlpha({ ...doc, hasAlpha: true }, { blur: { quality: 'sm' } })).toMatch(/^data:image\/png;base64,/)
+  })
+
   it('returns a finished data URI for a declared blur tier alone', async () => {
     const out = await run({ blur: { quality: 'md' } })
     expect(out).toMatch(/^data:image\/png;base64,/)

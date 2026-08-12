@@ -15,8 +15,12 @@ export const placeholderAfterRead: FieldHook = async ({ data, req }) => {
   const doc: ImageDocLike = isImageDoc(data) ? data : {}
   const wanted = readRequest(req)
 
-  // No explicit blur request → no placeholder; an unrequested data URI only bloats the payload.
+  // Opted out (blur: false) → no placeholder.
   if (!wanted.declared) return null
+
+  // The implicit sm default never paints behind transparency — an alpha image (SVG, cut-out PNG)
+  // never covers its placeholder, so it would show through forever. Explicit requests are honored.
+  if (wanted.implicit && (doc.hasAlpha === true || (typeof doc.mimeType === 'string' && doc.mimeType.includes('svg')))) return null
 
   const quality = wanted.quality ?? DEFAULT_BLURHASH_QUALITY
 

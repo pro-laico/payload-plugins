@@ -39,7 +39,7 @@ is **public**; writes are logged-in-admin only.
     variantVersion: { description: "Cache-busting v= token for transform URLs (changes on file replace / focal / hotspot edits) — select it instead of the identity fields.", type: "virtual" },
     "blurHashXs … blurHashXl": { description: "The five stored BlurHash quality tiers (2×2 → 9×9 components), written by the upload hook. Hidden in the admin.", type: "text ×5" },
     "placeholder2xl / placeholder3xl": { description: "The stored micro-webp placeholder tiers (32px / 64px full-frame data URIs), written by the upload hook. Hidden in the admin.", type: "text ×2" },
-    placeholder: { description: "A finished data URI focal-cropped to the declared render. Defaults to the sm tier; a blur request (context.blur / X-Blurhash header) picks its own tier, and context: { blur: false } opts the read out (null).", type: "virtual" },
+    placeholder: { description: "A finished data URI focal-cropped to the declared render. Defaults to the sm tier (opaque rasters only — alpha/SVG docs skip the implicit default); a blur request (context.blur / X-Blurhash header) picks its own tier, and context: { blur: false } opts the read out (null).", type: "virtual" },
     palette: { description: "Sanity-style color palette extracted at upload: dominant/vibrant/muted (+ dark/light variants), each { background, foreground, title, population }. Hidden in the admin.", type: "json" },
     hasAlpha: { description: "The file carries an alpha channel.", type: "checkbox" },
     isOpaque: { description: "No sampled pixel is actually transparent.", type: "checkbox" },

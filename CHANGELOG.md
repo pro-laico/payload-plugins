@@ -7,6 +7,15 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-12
+
+### Fixed
+
+- **payload-images: the implicit `sm` placeholder no longer paints behind transparent images.**
+  Alpha/SVG docs (logos, cut-out PNGs) never cover their placeholder, so the 0.8.2 default showed
+  a blur wash through them forever; they now skip the implicit default while explicit
+  `context.blur` requests are still honored.
+
 ## [0.8.2] - 2026-08-12
 
 Prewarming now tends itself, and every image read gets a blur placeholder by default. One breaking
