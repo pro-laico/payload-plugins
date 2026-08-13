@@ -26,11 +26,11 @@ On upload, the `beforeChange` hook polls the new asset for **~6 seconds**. If Mu
 Point a Mux webhook at `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if you've customized Payload's API route). Set `MUX_WEBHOOK_SECRET` so the plugin can verify each event's signature.
 
 <Callout type="warn">
-  **The webhook needs a publicly reachable URL.** Mux *pushes* events to your endpoint, so its servers
-  must be able to POST to it. The SDK only verifies the signature on receipt — it can't make Mux reach
-  `localhost`. In production, set `MUX_WEBHOOK_SECRET` and point the dashboard at
-  `https://your-site/api/mux/webhook`. For local dev, expose localhost with a tunnel
-  (`cloudflared tunnel --url http://localhost:3000` or ngrok) and set that URL as the webhook.
+  **The webhook only works on a live site.** Mux *pushes* events to your endpoint, so its servers
+  must be able to POST to it — and they can't reach `localhost`. Wire it once the site is deployed:
+  set `MUX_WEBHOOK_SECRET` and point the dashboard at `https://your-site/api/mux/webhook`. Local
+  development runs fine without it — the uploader's refresh polling and doc saves refetch asset
+  state from Mux directly (see the split below).
 </Callout>
 
 Not every flow depends on the webhook. Use the split below to know what breaks without it.

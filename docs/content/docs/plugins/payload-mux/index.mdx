@@ -21,7 +21,7 @@ updates directly. Full credit and thanks to the original author.
 ## Requirements
 
 - **A [Mux](https://www.mux.com/) account** for the API credentials.
-- **A publicly reachable webhook URL.** Mux pushes encoding events to your endpoint, so it must be reachable from the internet. Tunnel localhost in development (see [Quickstart](#quickstart) step 4).
+- **A live site, eventually, for the webhook.** Mux pushes encoding events to your endpoint, so the webhook only works on a deployed, publicly reachable site — it can't reach `localhost`, and local development doesn't need it: the admin recovers encoding state by asking Mux directly.
 - **No framework requirement.** Payload `^3` and React 19, and that's it — zero `next/` imports, no `next` peer. Runs in any Payload app, Next.js or not.
 
 ## What's included
@@ -109,22 +109,69 @@ string path, so regenerate the import map, then restart the dev server:
 ```bash
 pnpm payload generate:importmap
 ```
+
+The plugin has now added a **Video** (`mux-video`) collection to the admin. Drop a clip on it and
+Mux encodes it — no webhook needed yet; the uploader polls Mux for the encoding result.
 </Step>
 
 <Step>
-**Point a Mux webhook at the endpoint**
+**Relate to a video from your collections**
 
-In the Mux dashboard, send webhooks to `/api/mux/webhook` (or `<your routes.api>/mux/webhook` if
-you've customized Payload's API route). The URL must be publicly reachable — Mux can't reach
-`localhost`. For local dev, expose it with a tunnel:
+`mux-video` is a normal collection — reference it with a relationship field wherever you need
+video:
 
-```bash
-cloudflared tunnel --url http://localhost:3000
+```ts title="src/collections/Posts.ts"
+import type { CollectionConfig } from 'payload'
+
+export const Posts: CollectionConfig = {
+  slug: 'posts',
+  fields: [
+    { name: 'video', type: 'relationship', relationTo: 'mux-video' },
+  ],
+}
+```
+</Step>
+
+<Step>
+**Play it back**
+
+Every ready video carries virtual `playbackUrl` / `posterUrl` / `gifUrl` fields, computed on read —
+no extra API calls. Hand them to any Mux player, e.g.
+[`@mux/mux-player-react`](https://www.npmjs.com/package/@mux/mux-player-react)
+(`pnpm add @mux/mux-player-react`):
+
+```tsx title="src/app/(frontend)/watch/page.tsx"
+import config from '@payload-config'
+import MuxPlayer from '@mux/mux-player-react'
+import { getPayload } from 'payload'
+
+export default async function Page() {
+  const payload = await getPayload({ config })
+  const post = await payload.findByID({ collection: 'posts', id: '…', depth: 1 })
+
+  const playback = typeof post.video === 'object' ? post.video?.playbackOptions?.[0] : undefined
+  if (!playback) return null // still encoding — no playback ids yet
+
+  return <MuxPlayer playbackId={playback.playbackId} src={playback.playbackUrl} poster={playback.posterUrl} />
+}
 ```
 
-Set the tunnel's URL (plus `/api/mux/webhook`) as the webhook. See
-[Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks#webhook) for what breaks
-without it.
+More in [Using video](/docs/plugins/payload-mux/using-video).
+</Step>
+
+<Step>
+**Once the site is live: point a Mux webhook at it**
+
+In the Mux dashboard, send webhooks to `https://your-site.com/api/mux/webhook` (or
+`<your routes.api>/mux/webhook` if you've customized Payload's API route), with
+`MUX_WEBHOOK_SECRET` matching the dashboard's signing secret.
+
+The webhook is what finishes videos that encode slower than the upload's ~6s poll and what mirrors
+Mux-dashboard deletes back into Payload. It can't work locally — Mux has to POST to your site, and
+it can't reach `localhost` — but local development doesn't need it: the uploader and doc saves
+refetch the asset state from Mux on their own. See
+[Endpoints and webhooks](/docs/plugins/payload-mux/endpoints-and-webhooks#webhook) for exactly what
+depends on it.
 </Step>
 
 </Steps>
