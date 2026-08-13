@@ -7,6 +7,12 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-08-12
+
+A CLI seed now starts clean, runs quiet, and exits clean: the Mongo transaction warnings during
+clearing, the torn prewarm writes at exit, the flaky lost font weight on Vercel Blob, and the
+confusing end-of-seed revalidation notice are all gone. No API changes.
+
 ### Changed
 
 - **payload-seed: clearing now also clears queued Payload Jobs.** Jobs enqueued before a reseed
