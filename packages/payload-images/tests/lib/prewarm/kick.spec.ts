@@ -92,13 +92,15 @@ describe('kickPrewarmRunner', () => {
     expect(run).toHaveBeenCalledWith({ queue: 'warmQ', limit: 1 })
   })
 
-  it('falls back to a detached run outside a Next request scope', async () => {
+  it('skips the kick outside a Next request scope — no detached run to race a process shutdown', async () => {
     afterMock.mockImplementation(() => {
       throw new Error('after called outside request scope')
     })
-    const { payload, run } = fakePayload([RAN])
-    kickPrewarmRunner(payload, { queue: 'warmQ', limit: 5 })
-    await vi.waitFor(() => expect(run).toHaveBeenCalledWith({ queue: 'warmQ', limit: 1 }))
+    const { payload, run, update } = fakePayload([RAN])
+    expect(() => kickPrewarmRunner(payload, { queue: 'warmQ', limit: 5 })).not.toThrow()
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    expect(run).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('swallows runner failures — a kick is best-effort', async () => {

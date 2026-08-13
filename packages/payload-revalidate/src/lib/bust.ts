@@ -18,7 +18,7 @@ const withoutSingleArgNag = <T>(fn: () => T): T => {
   }
 }
 
-export const safeRevalidate = async (tag: string): Promise<void> => {
+export const safeRevalidate = async (tag: string, opts: { quietOutsideRequest?: boolean } = {}): Promise<void> => {
   let mod: unknown
   try {
     mod = await import('next/cache')
@@ -38,6 +38,7 @@ export const safeRevalidate = async (tag: string): Promise<void> => {
   try {
     withoutSingleArgNag(() => revalidateTag(tag))
   } catch (err) {
+    if (opts.quietOutsideRequest) return
     if (warnOutsideRequestOnce('outside-request')) {
       console.warn(
         `[payload-revalidate] revalidateTag('${tag}') was a no-op — no Next request scope in this process. Normal for CLI seeds/scripts; if this is a long-lived server (jobs runner, scheduled publish), revalidation is NOT reaching the cache:`,
@@ -56,5 +57,9 @@ export const bust = async (
   const unique = [...new Map(busts.map((b) => [b.tag, b])).values()]
   if (unique.length === 0) return
   recordEvent(observe, { source, trigger, busted: unique })
-  for (const { tag } of unique) await safeRevalidate(tag)
+  // A seed's end-of-run flush hitting no request scope IS the expected CLI case — stay silent.
+  // Hook-driven busts keep the warn: there it means a long-lived process is silently not
+  // revalidating (jobs runner, scheduled publish).
+  const quietOutsideRequest = source === 'seed'
+  for (const { tag } of unique) await safeRevalidate(tag, { quietOutsideRequest })
 }

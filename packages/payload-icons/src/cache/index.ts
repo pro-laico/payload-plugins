@@ -1,4 +1,4 @@
-import { cacheTag } from 'next/cache'
+import { cacheLife, cacheTag } from 'next/cache'
 import type { Payload, Where } from 'payload'
 
 import type { IconSetMap } from '../types'
@@ -63,6 +63,9 @@ const handles = new Map<string, Payload | Promise<Payload>>()
 
 const readCachedIconSet = async (key: string, draft: boolean): Promise<IconSetMap> => {
   'use cache'
+  // 'max' — without an explicit profile the scope falls to Next's default (15-minute revalidate),
+  // handing every page that renders an icon a time-based lifetime. Invalidation is the tag's job.
+  cacheLife('max')
   // Lanes follow payload-revalidate's convention: a published write busts the plain tag, a
   // draft-only write busts `:draft`. The draft read claims both, because publishing changes what
   // the draft lane resolves to as well; the published read claims only the plain tag, so editing a

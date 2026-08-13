@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
-export type UploadDoc = { filename?: string | null; url?: string | null; prefix?: string | null }
+export type UploadDoc = { filename?: string | null; url?: string | null; prefix?: string | null; createdAt?: string | null }
 
 export type UploadHandler = (
   req: PayloadRequest,

@@ -50,7 +50,9 @@ const sweepStaleJobs = async (payload: Payload, queue: string): Promise<void> =>
 
 /** Run a slice of the prewarm queue after the current response. This is the serverless-safe runner:
  * `after()` keeps the function alive past the response (Vercel included), where the in-process
- * `autoRun` cron never fires; outside a Next request scope it falls back to a detached run.
+ * `autoRun` cron never fires. Outside a Next request scope (CLI seeds/scripts) the kick is skipped
+ * entirely — a detached run would race the process shutting down its db connection mid-persist, and
+ * the jobs stay queued for the next long-lived process's kick, drain, or cron.
  * Best-effort by design — anything a kick misses stays queued for the next kick, drain, or cron. */
 export const kickPrewarmRunner = (payload: Payload, args: KickPrewarmArgs): void => {
   const deadline = Date.now() + KICK_TIME_BUDGET_MS
@@ -69,6 +71,6 @@ export const kickPrewarmRunner = (payload: Payload, args: KickPrewarmArgs): void
   try {
     after(run)
   } catch {
-    void run()
+    // No request scope — short-lived process; leave the queue for a long-lived one.
   }
 }

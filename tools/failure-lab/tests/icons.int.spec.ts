@@ -16,7 +16,7 @@ import { createReport } from './report'
 // `getIconSvg` caches its read and calls `cacheTag` inside it, which only exists once an app turns
 // on `cacheComponents`. This lab boots Payload without Next, so the tag call is stubbed — the
 // failure being studied here is icon-name resolution, not cache wiring.
-vi.mock('next/cache', () => ({ cacheTag: () => {} }))
+vi.mock('next/cache', () => ({ cacheTag: () => {}, cacheLife: () => {} }))
 
 const record = createReport('payload-icons')
 

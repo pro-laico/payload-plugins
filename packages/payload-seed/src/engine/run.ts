@@ -241,6 +241,12 @@ export async function runSeed({ payload, req, options, definitions }: RunSeedArg
   for (const slug of seededCollections) if (!seen.has(slug)) creationOrder.push(slug)
   payload.logger.info('[payload-seed] clearing collections...')
   for (const slug of [...creationOrder].reverse()) await clearCollection(payload, req, slug)
+  // Queued jobs reference docs that were just cleared (prewarm sources, scheduled publishes) —
+  // stale by definition after a reseed. Jobs enqueued while seeding survive: this runs first.
+  if (payload.collections['payload-jobs']) {
+    payload.logger.info('[payload-seed] clearing queued jobs')
+    await payload.db.deleteMany({ collection: 'payload-jobs', req, where: {} })
+  }
 
   const created: Record<string, number> = {}
 

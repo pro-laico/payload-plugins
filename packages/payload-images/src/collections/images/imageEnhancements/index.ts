@@ -94,7 +94,9 @@ export const imageEnhancements = (opts: CreateImagesOptions = {}): Partial<Colle
   const defaultPopulate: SelectType = RESPONSIVE_IMAGE_SELECT
   // VIRTUAL_URL_INPUTS already includes the hotspot fields; always force the crop/version inputs so
   // the placeholder virtual has them.
-  const forceSelect = Object.fromEntries([...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, 'presets'].map((f): [string, true] => [f, true]))
+  const forceSelect = Object.fromEntries(
+    [...VIRTUAL_URL_INPUTS, ...PLACEHOLDER_FIELD_NAMES, 'presets', 'hasAlpha', 'mimeType'].map((f): [string, true] => [f, true]),
+  )
 
   const presetGen = opts.presetGen ? generatePresetsAfterChange(opts.presetGen) : null
 

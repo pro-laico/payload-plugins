@@ -25,6 +25,15 @@ Open the `fontSet` global, pick a **Font** for the family you want, and save. Se
 Without `serverExternalPackages: ['subset-font', 'harfbuzzjs', 'fontkit']` in next.config, Next bundles the subsetter, the wasm breaks, and optimization silently skips.
 Add the three packages to `serverExternalPackages` (a Quickstart step). You'll hear about it: a dev-boot probe runs a real subset and logs a loud `[payload-fonts]` error with the fix when the wasm can't load. In production the same error logs on the first font save. A typeface whose **Served Files** count stays 0 in the admin is the same signal.
 
+**A save (or seed) warns `could not read original … that weight will NOT be served`.**
+The subsetter couldn't fetch the original's bytes back from storage. On CDN-backed storage
+(Vercel Blob), a freshly uploaded file can take up to ~60 seconds to become readable, so the
+plugin retries fresh originals (created in the last two minutes) for over a minute — with
+cache-busted reads, since a CDN can briefly go on serving a cached 404 — before giving up;
+local-disk collections fail fast, because there a miss means the file is genuinely gone.
+If the warning still fires, the file really is missing or unreadable: re-save the typeface
+(the originals are archived, so a transient miss re-derives cleanly), or re-upload the original.
+
 **Re-subsetted the same typeface but dev still shows the old font.**
 The browser cached the `/api/fontOptimized/file/…` font file.
 Hard-refresh.

@@ -2,10 +2,14 @@ import type { Payload } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const tagged: string[][] = []
+const lives: string[] = []
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({
   cacheTag: (...tags: string[]) => {
     tagged.push(tags)
+  },
+  cacheLife: (profile: string) => {
+    lives.push(profile)
   },
 }))
 
@@ -30,6 +34,7 @@ const fakePayload = ({ rows = [{ name: 'cart', icon: { svgString: '<svg>CART</sv
 beforeEach(() => {
   calls.length = 0
   tagged.length = 0
+  lives.length = 0
 })
 
 describe('getIconSvg', () => {
@@ -43,6 +48,13 @@ describe('getIconSvg', () => {
   it('tags the read with the tag the icon collections declare', async () => {
     await getIconSvg(fakePayload(), 'cart')
     expect(tagged).toContainEqual(['payload-icons'])
+  })
+
+  // Without an explicit profile the scope falls to Next's default 15-minute revalidate, handing
+  // every page that renders an icon a time-based lifetime. Invalidation is the tag's job.
+  it("pins cacheLife('max') so pages don't inherit the default time-based lifetime", async () => {
+    await getIconSvg(fakePayload(), 'cart')
+    expect(lives).toContain('max')
   })
 
   // Lanes follow payload-revalidate: a published write busts the plain tag, a draft-only write

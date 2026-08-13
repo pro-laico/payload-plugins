@@ -85,6 +85,9 @@ you set it to `false`) keeps three runners alive, all on the plugin-owned `image
 - **A post-upload kick** — every save that enqueues also runs the queue right after its response
   (via `after()`, so the upload never waits on sharp). This is what makes prewarm work on
   **serverless**, where in-process crons never fire: the upload itself carries its own runner.
+  The kick is request-scoped by design — a save from a **CLI script or seed** enqueues but does
+  not kick (a detached runner would race the script's exit and tear writes mid-persist); those
+  jobs wait as a queued backlog for the next long-lived process's cron, kick, or drain.
 - **An image-traffic drain** — at most once a minute per process, serving an image also works
   through up to 5 queued jobs after the response. A steady backstop for anything the kick missed
   (a killed instance, a CLI-enqueued backlog): the queue drains promptly, but never all at once.

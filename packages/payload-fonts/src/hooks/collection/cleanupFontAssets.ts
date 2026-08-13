@@ -27,8 +27,11 @@ export const cleanupFontAssetsHook = ({
         pagination: false,
         req,
       })
+      // Never join the caller's transaction: bulk deletes run this hook concurrently per doc on a
+      // shared req, and concurrent transactions on one mongo session abort each other. Originals
+      // and optimized files are derived assets — regenerable, so atomicity buys nothing.
       for (const d of optimized.docs) {
-        await req.payload.delete({ collection: optimizedSlug, id: d.id, req })
+        await req.payload.delete({ collection: optimizedSlug, id: d.id, req, disableTransaction: true })
       }
     } catch (err) {
       req.payload.logger.warn({ msg: 'Could not delete optimized fonts', err })
@@ -37,7 +40,7 @@ export const cleanupFontAssetsHook = ({
     if (data) {
       for (const oid of originalIdsFromDoc(data)) {
         try {
-          await req.payload.delete({ collection: originalSlug, id: oid, req })
+          await req.payload.delete({ collection: originalSlug, id: oid, req, disableTransaction: true })
         } catch (err) {
           if (!isNotFound(err)) req.payload.logger.warn({ msg: 'Could not delete font original', err })
         }

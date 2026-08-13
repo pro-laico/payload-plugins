@@ -179,7 +179,8 @@ Two import entry points, plus the finders and primitives you get back from the f
   (entry materializing untagged), the config being unreachable (bake-in walk skipped),
   and `revalidateTag` no-oping outside a request scope all `console.error`/`warn` — a
   production jobs runner silently not revalidating is the one thing this plugin refuses
-  to be quiet about.
+  to be quiet about. The one exception: a seed's end-of-run flush no-oping in a CLI
+  process is expected (no cache lives there), so it stays silent.
 - The map endpoints are registered only while `observe` is on, so the production default leaves
   them off the config entirely. With `observe: true` forced on in production, they additionally
   require an authenticated Payload user.

@@ -43,7 +43,10 @@ const normalizeWeight = (weight?: number): string | undefined => {
 
 export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata | null> {
   try {
-    const mod: unknown = await import('fontkit')
+    // Never bundle: fontkit/subset-font load wasm/native assets by a path relative to their own
+    // module — bundling rewrites it to a virtual path that doesn't exist on disk and the subset
+    // step silently fails (hb-subset.wasm ENOENT). Belt to serverExternalPackages' suspenders.
+    const mod: unknown = await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ 'fontkit')
     const modRec = isRecord(mod) ? mod : {}
     const defaultRec = isRecord(modRec.default) ? modRec.default : {}
     const create = typeof modRec.create === 'function' ? modRec.create : typeof defaultRec.create === 'function' ? defaultRec.create : null
@@ -83,7 +86,7 @@ export async function detectMetadata(buffer: Buffer): Promise<FontFileMetadata |
 }
 
 export async function subsetToWoff2(buffer: Buffer, charsetText: string): Promise<Buffer> {
-  const subsetFont = (await import('subset-font')).default
+  const subsetFont = (await import(/* turbopackIgnore: true */ /* webpackIgnore: true */ 'subset-font')).default
   return subsetFont(buffer, charsetText, { targetFormat: 'woff2' })
 }
 

@@ -10,8 +10,10 @@ Three of them — the admin button, the HTTP endpoint, and the CLI — sit behin
 See the [Quickstart](/docs/plugins/payload-seed#quickstart) for setting `ENABLE_SEED`.
 
 <Callout type="warn">
-  Every entry point is **destructive**. It clears the seeded collections before recreating them, so run
-  it on purpose. Leave `ENABLE_SEED` unset in production.
+  Every entry point is **destructive**. It clears the seeded collections before recreating them — and
+  the queued Payload Jobs with them, since a job enqueued before the reseed references docs that no
+  longer exist (jobs enqueued *by* the seeding itself survive). Run it on purpose. Leave
+  `ENABLE_SEED` unset in production.
 </Callout>
 
 export const runNodes = [
@@ -19,7 +21,7 @@ export const runNodes = [
   { id: 'gate', kind: 'check', label: "ENABLE_SEED === 'true'?", x: 300, y: 170 },
   { id: 'refuse', kind: 'result', label: '403 — nothing runs', detail: 'leave it unset in production and the surface is inert', x: 20, y: 330 },
   { id: 'validate', label: 'Build + validate the model', detail: 'every ref resolves, no unknown field, no duplicate _key — issues collected and thrown at once (400)', x: 300, y: 330 },
-  { id: 'clear', label: 'Clear the seeded collections', detail: 'destructive — delete hooks fire so external assets clean up', x: 300, y: 520 },
+  { id: 'clear', label: 'Clear the seeded collections', detail: 'destructive — delete hooks fire so external assets clean up; queued Payload Jobs are cleared too (stale after a reseed)', x: 300, y: 520 },
   { id: 'create', label: 'Create docs in dependency order', detail: 'topo-sorted by ref() edges — cycles broken via deferred fields', x: 300, y: 690 },
   { id: 'finish', kind: 'store', label: 'Globals last, then one revalidation flush', detail: 'returns { created, order, deferred, skipped }', x: 300, y: 860 },
 ]
