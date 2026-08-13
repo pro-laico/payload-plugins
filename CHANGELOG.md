@@ -15,43 +15,32 @@ confusing end-of-seed revalidation notice are all gone. No API changes.
 
 ### Changed
 
-- **payload-seed: clearing now also clears queued Payload Jobs.** Jobs enqueued before a reseed
-  reference docs the clear just deleted, so they were stale by definition; jobs enqueued by the
-  seeding itself still survive and drain in the next long-lived process.
+- **payload-seed: clearing now also clears queued Payload Jobs.** Jobs queued before a reseed
+  reference just-deleted docs; jobs enqueued by the seeding itself survive.
 - **payload-revalidate: a seed's end-of-run flush no longer prints the "no Next request scope"
-  no-op notice.** A CLI seed has no cache in its process, so the no-op is expected there; the
-  warning still fires for hook-driven busts, where it flags a long-lived process (jobs runner,
-  scheduled publish) silently not revalidating.
+  no-op notice.** A CLI seed has no cache to bust, so the no-op is expected; hook-driven busts
+  still warn.
 
 ### Fixed
 
 - **payload-images: bulk-deleting sources no longer aborts the variant purge with Mongo
-  transaction errors.** Bulk deletes run the purge hook concurrently on a shared request, and the
-  nested deletes started competing transactions on one session; the purge now runs
-  non-transactionally — variants are a disposable cache, so a rolled-back source delete just
-  regenerates them on demand.
-- **payload-fonts: bulk-deleting typefaces no longer aborts the originals/optimized cascade with
-  the same Mongo transaction errors** (`Could not delete font original`) — same cause, same fix.
+  transaction errors.** The purge runs non-transactionally now — variants are a disposable
+  cache, so a rolled-back source delete just regenerates them.
+- **payload-fonts: bulk-deleting typefaces no longer aborts the originals/optimized cascade the
+  same way** (`Could not delete font original`).
 - **payload-images: CLI seeds and scripts exit cleanly instead of tearing prewarm writes
-  mid-persist.** The post-upload kick is request-scoped by design; outside a request scope it no
-  longer falls back to a detached runner that raced the process closing its database connection
-  (`MongoClientClosedError`). Enqueued jobs stay queued for the next long-lived process's cron,
-  kick, or drain.
-- **payload-fonts: a freshly uploaded original on CDN-backed storage (Vercel Blob) no longer
-  loses its weight to propagation delay.** The subsetter's read-back now retries originals
-  created in the last two minutes for over a minute, with cache-busted URL reads so a
-  CDN-cached 404 can't outlive the object; local-disk collections still fail fast, where a miss
-  means genuinely missing.
+  mid-persist** (`MongoClientClosedError`). Outside a request scope the post-upload kick now
+  leaves jobs queued for the next long-lived process instead of racing the exit.
+- **payload-fonts: a freshly uploaded original on Vercel Blob no longer loses its weight to
+  propagation delay.** The read-back retries fresh originals for over a minute with cache-busted
+  reads; local-disk collections still fail fast.
 - **payload-fonts: `fontkit`/`subset-font` dynamic imports now carry
-  `turbopackIgnore`/`webpackIgnore`**, so a bundler that ignores `serverExternalPackages` can't
-  rewrite their wasm/native asset paths into the bundle and silently break subsetting.
+  `turbopackIgnore`/`webpackIgnore`**, so a bundler can't rewrite their wasm paths and silently
+  break subsetting.
 - **payload-images: the alpha/SVG placeholder skip survives narrow `select`s** — `hasAlpha` and
-  `mimeType` are force-selected, so a read that projects only a few fields can't blind the
-  placeholder virtual into painting behind a transparent image again.
-- **payload-icons: pages that render icons no longer inherit a 15-minute cache lifetime.** The
-  cached icon-set read now pins `cacheLife('max')`; without an explicit profile the `'use cache'`
-  scope fell to Next's default time-based revalidate, and every page rendering an icon inherited
-  it. Invalidation stays the tag's job.
+  `mimeType` are force-selected.
+- **payload-icons: pages that render icons no longer inherit Next's default 15-minute cache
+  lifetime.** The icon-set read pins `cacheLife('max')`; invalidation stays tag-driven.
 
 ## [0.8.3] - 2026-08-12
 
