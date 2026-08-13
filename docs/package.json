@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@next/third-parties": "^16.3.0",
+    "@vercel/analytics": "2.0.1",
     "@xyflow/react": "12.11.1",
     "fumadocs-core": "^16.11.5",
     "fumadocs-mdx": "^15.2.0",

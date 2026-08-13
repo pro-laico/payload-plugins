@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 import { RootProvider } from 'fumadocs-ui/provider/next'
 import { GoogleTagManager } from '@next/third-parties/google'
 import { Inter, JetBrains_Mono } from 'next/font/google'
@@ -35,6 +36,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
       {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body className="flex flex-col min-h-screen font-sans">
         <RootProvider>{children}</RootProvider>
+        <Analytics />
       </body>
     </html>
   )
