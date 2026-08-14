@@ -61,7 +61,14 @@ export const revalidateOptions = [
         type: 'boolean',
         default: 'dev only',
         description:
-          "Force the dependency-map observation and dev warnings on in production. By default they run in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
+          "Force the dependency-map observation on in production. By default it runs in development only. It also governs the `/api/revalidate-map` endpoints: they serve nothing but observations, so when `observe` is off they are not registered at all. With `observe: true` in production they additionally require an authenticated Payload user.",
+      },
+      {
+        name: 'advisories',
+        type: 'boolean',
+        default: 'false',
+        description:
+          'Print the dev-only anti-pattern advisories to the console — bake-ins, undeclared list scopes, content-carrying `cacheIds` reads, risky aliases. Off by default: the `/dev/revalidate` map surfaces the same findings without flooding the dev logs on every cache-entry materialization. Hard failures (untagged entries, dropped tags, missing marker) always log regardless.',
       },
       {
         name: 'access',
@@ -133,7 +140,7 @@ Two import entry points, plus the finders and primitives you get back from the f
 | --- | --- |
 | `revalidatePlugin` | The plugin, also the default export. Add it **last** in `plugins: []`. |
 | `tagsFor` | `tagsFor(payload)` builds prefix-correct raw tags for the rare hand-spelled `cacheTag` need. |
-| `readRevalidateMarker` | `readRevalidateMarker(config)` returns the typed `config.custom.payloadRevalidate` — the resolved `prefix`, `observe`, `lists`, `extraTags`, `rules`, and the map `endpointPath` (non-null only while observing). |
+| `readRevalidateMarker` | `readRevalidateMarker(config)` returns the typed `config.custom.payloadRevalidate` — the resolved `prefix`, `observe`, `advisories`, `lists`, `extraTags`, `rules`, and the map `endpointPath` (non-null only while observing). |
 | `getInspection` | The **live** dependency map for this process (observed reads + graph), or `null` when the plugin isn't active. What `GET /api/revalidate-map` and `/dev/revalidate` serve. |
 | `buildStaticInspection` · `renderRevalidateMap` | Build the **static** map from a config (`MapConfigSource`) and render it to the text report — the machinery behind `payload revalidate-map`, for custom CI checks or map UIs. |
 

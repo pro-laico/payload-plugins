@@ -148,8 +148,9 @@ export async function getSitemapEntries() {
 ```
 
 <Callout type="info">
-`cacheIds` warns that these docs carry `slug` content. The declared scope on `['slug']` is
-exactly the answer to that warning: slug changes bust this entry.
+`cacheIds` flags these docs as carrying `slug` content (in the dev map, or on the console
+with `options: { advisories: true }`). The declared scope on `['slug']` is exactly the
+answer to that flag: slug changes bust this entry.
 </Callout>
 
 ## Manual rules

@@ -23,6 +23,7 @@ export interface FinishInput {
   payload: Payload
   tags: Tags
   observe: boolean
+  advise: boolean
   kind: 'doc' | 'global'
   collection?: string
   global?: string

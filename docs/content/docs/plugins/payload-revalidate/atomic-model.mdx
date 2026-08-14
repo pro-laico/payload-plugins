@@ -30,9 +30,10 @@ Three rules, one consequence each:
 
 <Callout type="info">
 Populated content that DOES get baked in (`depth > 0`) is still tagged for correctness —
-the walk finds it, including inside Lexical richText. It's flagged in dev (console + the
-[`/dev/revalidate` map](/docs/plugins/payload-revalidate/troubleshooting)) as a refactor
-candidate, with the exact field paths.
+the walk finds it, including inside Lexical richText. It's flagged in dev in the
+[`/dev/revalidate` map](/docs/plugins/payload-revalidate/troubleshooting) (and on the
+console with `options: { advisories: true }`) as a refactor candidate, with the exact
+field paths.
 </Callout>
 
 How an entry's tags are generated — the walk runs inside the finder, on whatever you fetched:

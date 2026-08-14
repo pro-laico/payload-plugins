@@ -7,6 +7,14 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+### Changed
+
+- **payload-revalidate: the dev anti-pattern advisories no longer print to the console by
+  default.** They fired once per cache-entry materialization and flooded dev logs; the
+  `/dev/revalidate` map still surfaces them all, and `options: { advisories: true }` turns the
+  console output back on. Hard failures (untagged entries, dropped tags, missing marker) still
+  always log.
+
 ## [0.8.4] - 2026-08-12
 
 A CLI seed now starts clean, runs quiet, and exits clean: the Mongo transaction warnings during

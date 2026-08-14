@@ -40,6 +40,7 @@ export const finish = async ({
   payload,
   tags,
   observe,
+  advise,
   kind,
   collection,
   global,
@@ -63,9 +64,9 @@ export const finish = async ({
       : { tags: [], embeds: [], capped: false }
 
   const name = options.label ?? `${kind}:${slug}${as !== undefined ? `:${as}` : ''}`
-  if (walked.capped)
+  if (walked.capped && advise)
     warnOnce(`cap:${name}`, `${name}: bake-in walk hit maxTags — this entry may under-tag (raise walk.maxTags or narrow the read).`)
-  if (walked.embeds.length)
+  if (walked.embeds.length && advise)
     warnOnce(
       `baked:${name}`,
       `${name} bakes in ${walked.embeds.length} populated doc(s): ${walked.embeds.map((e) => `${e.via} → ${e.tag}`).join(', ')} — fetch shallow (depth: 0) and render references through id-keyed cacheDoc getters for surgical busts.`,

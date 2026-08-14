@@ -17,6 +17,7 @@ interface ReadCtx {
   marker: PayloadRevalidateMarker | undefined
   tags: Tags
   observe: boolean
+  advise: boolean
 }
 
 export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHelpers => {
@@ -28,30 +29,42 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
         'marker-missing',
         'cache reads are running against a Payload whose config carries no payloadRevalidate marker — tags are UNPREFIXED, declared list scopes are unknown, and no write-side hooks are attached to bust these entries (they are silently unbustable). Add revalidatePlugin() to the plugins array of the config this handle was booted from.',
       )
-    return { payload, marker, tags: createTags(marker?.prefix), observe: marker?.observe ?? false }
+    return { payload, marker, tags: createTags(marker?.prefix), observe: marker?.observe ?? false, advise: marker?.advisories ?? false }
   }
 
   async function cacheDoc<T>(doc: T, collection: string, options: CacheDocOptions = {}): Promise<T> {
-    const { payload, tags, observe } = await ctx()
+    const { payload, tags, observe, advise } = await ctx()
     const id = docId(doc)
     const staticTags = [tags.all()]
     if (id !== undefined) staticTags.push(tags.doc(collection, id))
     if (options.as !== undefined && options.as !== id) {
       staticTags.push(tags.doc(collection, options.as))
       const risk = riskyAliasReason(options.as)
-      if (risk)
+      if (risk && advise)
         warnOnce(
           `alias:${collection}:${options.as}`,
           `cacheDoc('${collection}', { as: '${options.as}' }) — alias ${risk}. Over-busts only (never stale), but rename the idField value to avoid coincidental cache purges.`,
         )
     }
     if (doc == null && options.as === undefined) staticTags.push(tags.list(collection))
-    await finish({ payload, tags, observe, kind: 'doc', collection, as: options.as ?? id, staticTags, value: doc, slug: collection, options })
+    await finish({
+      payload,
+      tags,
+      observe,
+      advise,
+      kind: 'doc',
+      collection,
+      as: options.as ?? id,
+      staticTags,
+      value: doc,
+      slug: collection,
+      options,
+    })
     return doc
   }
 
   async function cacheIds<T>(result: T, collection: string, options: CacheIdsOptions = {}): Promise<T> {
-    const { marker, tags, observe } = await ctx()
+    const { marker, tags, observe, advise } = await ctx()
     const items: unknown[] = Array.isArray(result) ? result : isRecord(result) && Array.isArray(result.docs) ? result.docs : []
     const name = options.label ?? `ids:${collection}${options.list ? `:${options.list}` : ''}`
 
@@ -65,7 +78,7 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .flatMap((doc) => Object.keys(doc))
       .filter((key) => !['id', 'createdAt', 'updatedAt', '_status', ...uploadMeta, ...scopeFields].includes(key))
-    if (contentKeys.length)
+    if (contentKeys.length && advise)
       warnOnce(
         `content:${name}`,
         `${name} received docs carrying content (${[...new Set(contentKeys)].slice(0, 5).join(', ')}…) — cacheIds tags membership only. Fetch with select: {} and render items through id-keyed cacheDoc getters, or content edits won't refresh this entry.`,
@@ -73,7 +86,7 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
 
     const declared = marker?.lists[collection]
     const undeclared = marker !== undefined && options.list !== undefined && !(declared ?? []).includes(options.list)
-    if (undeclared)
+    if (undeclared && advise)
       warnOnce(
         `scope:${name}`,
         `${name} carries undeclared list scope '${options.list}' — reorders won't bust it. Declare it: revalidatePlugin({ collections: { ${collection}: { lists: { ${options.list}: ['<sort/filter fields>'] } } } }).`,
@@ -101,11 +114,12 @@ export const createCacheHelpers = (handle: Payload | Promise<Payload>): CacheHel
   }
 
   async function cacheGlobal<T>(doc: T, slug: string, options: CacheDocOptions = {}): Promise<T> {
-    const { payload, tags, observe } = await ctx()
+    const { payload, tags, observe, advise } = await ctx()
     await finish({
       payload,
       tags,
       observe,
+      advise,
       kind: 'global',
       global: slug,
       staticTags: [tags.all(), tags.global(slug)],

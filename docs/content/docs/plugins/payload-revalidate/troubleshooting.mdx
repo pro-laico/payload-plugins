@@ -45,10 +45,11 @@ four tabs:
 `GET /api/revalidate-map` serves it all as JSON (dev-gated);
 `POST /api/revalidate-map { "tag": "posts:42" }` busts one tag by hand.
 
-The plugin also **polices the pattern in dev**: a getter baking in populated docs logs
-the exact field paths to fix; a `cacheIds` read carrying an undeclared scope warns that
-reorders won't reach it; docs-with-content passed to `cacheIds` warn that content edits
-won't refresh the entry.
+The plugin also **polices the pattern in dev** — a getter baking in populated docs, a
+`cacheIds` read carrying an undeclared scope, and docs-with-content passed to `cacheIds`
+are all flagged here in the map with the exact field paths to fix. To also print those
+advisories to the console, opt in with `options: { advisories: true }` (off by default —
+they fire per cache-entry materialization and flood dev logs).
 
 <Callout type="info">
 Both routes are governed by `observe`, so they exist only while it is on — the production

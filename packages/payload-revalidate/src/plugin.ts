@@ -105,6 +105,7 @@ export const revalidatePlugin =
       endpointPath: resolved.options.observe ? `/api${MAP_ENDPOINT_PATH}` : null,
       prefix: resolved.options.prefix,
       observe: resolved.options.observe,
+      advisories: resolved.options.advisories,
       lists,
       extraTags,
       rules: resolved.options.rules,

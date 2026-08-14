@@ -16,6 +16,7 @@ const marker: PayloadRevalidateMarker = {
   endpointPath: null,
   prefix: '',
   observe: true,
+  advisories: true,
   lists: { posts: ['recent'] },
   extraTags: {},
   rules: [],

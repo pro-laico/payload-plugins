@@ -77,7 +77,10 @@ const spyError = () => {
 
 beforeAll(async () => {
   lab = await bootLab({
-    plugins: [revalidatePlugin({ collections: { posts: { lists: { recent: { fields: ['order'] } } } }, options: { observe: true } })],
+    // advisories: true — this suite asserts the console advisories' wording, and they default off.
+    plugins: [
+      revalidatePlugin({ collections: { posts: { lists: { recent: { fields: ['order'] } } } }, options: { observe: true, advisories: true } }),
+    ],
     collections: [Posts, Media],
   })
   payload = lab.payload

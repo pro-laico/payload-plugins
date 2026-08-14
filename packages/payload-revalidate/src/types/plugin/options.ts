@@ -26,6 +26,7 @@ export interface RevalidatePluginOptions {
    * - `prefix`
    * - `rules`
    * - `observe`
+   * - `advisories`
    * - `access` */
   options?: RevalidateOptions
 }
@@ -39,9 +40,14 @@ export interface RevalidateOptions {
    * - `bust`
    * - `whenFields` */
   rules?: DependencyRule[]
-  /** Force the dependency map + dev warnings on in production. Default: dev only. Off means the
+  /** Force the dependency-map observation on in production. Default: dev only. Off means the
    * `/api/revalidate-map` endpoints aren't registered at all. */
   observe?: boolean
+  /** Print the dev-only anti-pattern advisories to the console (bake-ins, undeclared list scopes,
+   * content-carrying `cacheIds`, risky aliases). Default `false` — the `/dev/revalidate` map
+   * surfaces the same findings without flooding the dev logs. Hard failures (untagged entries,
+   * dropped tags) always print regardless. */
+  advisories?: boolean
   /** Per-endpoint gates for the plugin's HTTP endpoints.
    *
    * - `inspect` — gates `GET` + `POST /revalidate-map`; default open in dev, requires a user in production */
@@ -53,5 +59,5 @@ export interface ResolvedRevalidateOptions {
   enabled: boolean
   collections: Partial<Record<string, CollectionRevalidateConfig | false>>
   globals: Partial<Record<string, false>>
-  options: { prefix: string; rules: DependencyRule[]; observe: boolean; access: { inspect: EndpointAccess | undefined } }
+  options: { prefix: string; rules: DependencyRule[]; observe: boolean; advisories: boolean; access: { inspect: EndpointAccess | undefined } }
 }
