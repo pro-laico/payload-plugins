@@ -7,6 +7,8 @@ packages share one lockstep version.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-08-14
+
 ### Changed
 
 - **payload-revalidate: the dev anti-pattern advisories no longer print to the console by
